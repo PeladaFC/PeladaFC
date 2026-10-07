@@ -31,6 +31,7 @@ const ICON={
   jogo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/><path d="M12 3v4M21 10l-5 0M3 10h5M7 20l2.5-5.5M17 20l-2.5-5.5"/></svg>',
   elenco:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3l-5 3 2 4 2-1v12h10V9l2 1 2-4-5-3c0 2-2 3-4 3S8 5 8 3z"/></svg>',
   avisos:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M12 13v3l2 1"/></svg>',
+  convidar:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/><path d="M19 8v6M16 11h6"/></svg>',
   bell:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg>',
   ranking:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 14v4M8 21h8"/></svg>',
   caixa:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 15h2"/></svg>',
@@ -706,7 +707,7 @@ function renderTop(){
   const nvTxt=nv!=null&&nivelVisivel()?` · <span class="nivel">${starsHTML(nv)} ${String(nv).replace('.',',')}${ADM()&&!c.nivelPublico?' (só você vê)':''}</span>`:'';
   let h=`<div class="top"><button class="iconbtn" data-act="voltar-grupos" aria-label="Minhas peladas" style="flex:none">‹</button><div class="brand grow">${esc(c.nome)}<small>${ADM()?'Administrador':'Jogador'}${nvTxt}</small></div>`;
   {const n=ready?naoLidas():0;
-    h+=`<div class="row" style="flex-wrap:nowrap"><button class="iconbtn bell" data-act="notif" aria-label="Notificações${n?', '+n+' novas':''}">${ICON.bell}${n?`<span class="badge num">${n>9?'9+':n}</span>`:''}</button>${ADM()?`<button class="iconbtn" data-act="cfg" aria-label="Ajustes da pelada">${ICON.cfg}</button>`:''}</div>`}
+    h+=`<div class="row" style="flex-wrap:nowrap">${!demo&&GRUPO&&GRUPO.codigo?`<button class="iconbtn" data-act="qr-pelada" aria-label="Convidar para a pelada">${ICON.convidar}</button>`:''}<button class="iconbtn bell" data-act="notif" aria-label="Notificações${n?', '+n+' novas':''}">${ICON.bell}${n?`<span class="badge num">${n>9?'9+':n}</span>`:''}</button>${ADM()?`<button class="iconbtn" data-act="cfg" aria-label="Ajustes da pelada">${ICON.cfg}</button>`:''}</div>`}
   h+='</div>';
   if(demo)h+=`<div class="banner demo"><span><b>Demonstração.</b> ${UI.comoJogador?'Você está vendo o app como um jogador vê.':'Dados de exemplo. Nada aqui é salvo.'}</span><div class="row" style="gap:6px"><button class="btn sm" data-act="como-jogador">${UI.comoJogador?'Ver como administrador':'Ver como jogador'}</button></div></div>`;
   return h;
@@ -1109,11 +1110,16 @@ document.addEventListener('click',e=>{
     case'como-jogador':document.getElementById('push').hidden=true;PUSH_PRONTO=false;PUSH_VISTOS.clear();UI.comoJogador=!UI.comoJogador;UI.sub='presenca';closeSheet();render();window.scrollTo(0,0);break
     case'notif':sheetNotif();break;
     case'voltar-grupos':if(window.voltarGrupos)window.voltarGrupos();break;
-    case'qr-pelada':{const l=linkConvite();openSheet('Entrar na '+cfg().nome,`<div class="stack" style="align-items:center;text-align:center">
-      <div style="background:#fff;padding:14px;border-radius:12px;width:min(100%,300px)">${window.qrSVG?window.qrSVG(l):''}</div>
-      <p class="sub" style="margin:0">Peça para a pessoa apontar a câmera do celular para o código. Ela cria a conta e já entra nesta pelada.</p>
+    case'qr-pelada':{const l=linkConvite(),txt=msg('convite');openSheet('Convidar para a pelada',`<div class="stack" style="text-align:center">
+      <p class="sub" style="margin:0">Com este QR Code ou link, a pessoa instala o app e <b>já entra na ${esc(cfg().nome)}</b>.</p>
+      <div style="background:#fff;padding:14px;border-radius:12px;width:min(100%,300px);margin:0 auto;border:1px solid var(--line)">${window.qrSVG?window.qrSVG(l):''}</div>
+      <p class="sub" style="margin:0">Aponte a câmera do celular para o código.</p>
       <div class="num" style="font-weight:700;word-break:break-all">${esc(l)}</div>
-      <p class="sub" style="margin:0">Quer só mostrar o app, sem entrar na pelada? Volte em Minhas peladas e toque em "Convidar para o app".</p></div>`);break}
+      <div class="sub">Código da pelada: <b>${esc((GRUPO||{}).codigo||'')}</b></div>
+      <a class="btn primary block" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">Enviar convite no WhatsApp</a>
+      <button class="btn block" data-act="copiar-link">Copiar link</button>
+      ${ADM()?'<button class="btn block" data-act="msg" data-v="convite">Editar a mensagem antes</button>':''}
+      <p class="sub" style="margin:0;text-align:left">Quer mandar só o app, sem entrar na pelada? Toque em ‹, depois em <b>Convidar para o app</b>.</p></div>`);break}
     case'copiar-link':{const l=linkConvite();(navigator.clipboard?navigator.clipboard.writeText(l):Promise.reject()).then(()=>toast('Link copiado.'),()=>toast(l));break}
     case'membro-cad':{const m=S.membros[d.u]||{};
       sheetJog(null);F.nome=m.nome||'';F.apelido=m.apelido||'';F.tel=m.tel||'';F.pos=m.pos||'MEI';F.pos2=m.pos2||'';F.tipo=m.prefere==='diarista'?'diarista':'mensalista';F._uid=d.u;renderJogForm();break}
