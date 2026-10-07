@@ -152,7 +152,8 @@ function render() {
     <form id="f-perfil" class="stack" novalidate>
       <div class="row" style="gap:14px;flex-wrap:nowrap"><div class="av bg-${pos}" style="width:84px;height:84px;font-size:30px;${(UIp.foto ?? p.foto) ? `background-image:url('${UIp.foto ?? p.foto}');background-size:cover;background-position:center` : ''}">${(UIp.foto ?? p.foto) ? '' : escH(((p.apelido || p.nome || EU.nome || '?').trim()[0] || '?').toUpperCase())}</div>
         <div class="stack" style="gap:6px"><label class="btn sm">${(UIp.foto ?? p.foto) ? 'Trocar foto' : 'Adicionar foto'}<input type="file" accept="image/*" id="p-foto" class="vh"></label>
-        <span class="sub">Sua foto aparece na carta de jogador e nas artes dos prêmios.</span></div></div>
+        <span class="sub">Ela aparece na carta de jogador e nas artes dos prêmios.</span></div></div>
+      <div class="dica-foto"><b>📸 Para a foto ficar boa</b><ul><li>De rosto, olhando para a câmera</li><li>Rosto no centro, do peito para cima</li><li>Lugar claro, sem luz atrás de você</li><li>Sem boné ou óculos escuros cobrindo o rosto</li></ul></div>
       <label class="field"><span>Nome</span><input type="text" id="p-nome" value="${escH(p.nome || EU.nome || '')}" required></label>
       <label class="field"><span>Apelido</span><input type="text" id="p-ap" value="${escH(p.apelido || '')}" placeholder="Como te chamam no campo"></label>
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>

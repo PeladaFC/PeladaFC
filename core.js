@@ -1040,6 +1040,7 @@ function renderJogForm(){
   el.innerHTML=`<div class="stack">
     <div class="row" style="gap:12px;flex-wrap:nowrap"><div class="av bg-${F.pos}" style="width:64px;height:64px;font-size:24px;${fotoStyle(F.foto)}">${F.foto?'':esc(initials(F.apelido||F.nome||'?'))}</div>
       <div class="row" style="gap:6px"><label class="btn sm">${F.foto?'Trocar foto':'Adicionar foto'}<input type="file" accept="image/*" id="f-foto" class="vh"></label>${F.foto?'<button class="btn sm" data-act="f-foto-rem">Remover</button>':''}</div></div>
+    <div class="dica-foto"><b>📸 Para a foto ficar boa</b><ul><li>De rosto, olhando para a câmera</li><li>Rosto no centro, do peito para cima</li><li>Lugar claro, sem luz atrás de você</li><li>Sem boné ou óculos escuros cobrindo o rosto</li></ul></div>
     <label class="field"><span>Nome</span><input type="text" id="f-nome" data-f="nome" value="${esc(F.nome)}" placeholder="Nome completo"></label>
     <div class="grid2"><label class="field"><span>Apelido</span><input type="text" id="f-apelido" data-f="apelido" value="${esc(F.apelido)}" placeholder="Como chamam no campo"></label>
     <label class="field"><span>WhatsApp</span><input type="tel" id="f-tel" data-f="tel" value="${esc(F.tel)}" placeholder="(81) 99999-9999"></label></div>
