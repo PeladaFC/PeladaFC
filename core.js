@@ -558,9 +558,10 @@ function arteGeral(p){
   const top=430,rowH=Math.min(210,(H-top-110)/Math.max(1,ks.length));
   ks.forEach((k,i)=>{const y=top+i*rowH,id=p.premios[k],j=J(id);
     ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.roundRect(80,y,W-160,rowH-24,22);ctx.fill();
-    const cx=80+28+62,cy=y+(rowH-24)/2;ctx.fillStyle=POSCOR[j.pos]||'#555';ctx.beginPath();ctx.arc(cx,cy,62,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle=ART.w;ctx.lineWidth=5;ctx.stroke();
-    ctx.fillStyle=ART.w;ctx.textAlign='center';ctx.font='800 54px "Saira Condensed", Impact, sans-serif';ctx.fillText(initials(nm(id)),cx,cy+19);ctx.textAlign='left';
+    const cx=80+28+62,cy=y+(rowH-24)/2,im=imgDe(id);ctx.fillStyle=POSCOR[j.pos]||'#555';ctx.beginPath();ctx.arc(cx,cy,62,0,Math.PI*2);ctx.fill();
+    if(im)circFoto(ctx,im,cx,cy,62);
+    ctx.strokeStyle=ART.w;ctx.lineWidth=5;ctx.beginPath();ctx.arc(cx,cy,62,0,Math.PI*2);ctx.stroke();
+    if(!im){ctx.fillStyle=ART.w;ctx.textAlign='center';ctx.font='800 54px "Saira Condensed", Impact, sans-serif';ctx.fillText(initials(nm(id)),cx,cy+19);ctx.textAlign='left'}
     const tx=cx+92;ctx.fillStyle=ART.y;ctx.font='700 34px "Saira Condensed", Impact, sans-serif';ctx.fillText(PREMIO[k].t.toUpperCase(),tx,cy-28);
     const stat=premioStat(p,k);ctx.font='800 46px "Saira Condensed", Impact, sans-serif';const sw=stat?ctx.measureText(stat).width:0;
     ctx.fillStyle=ART.w;fit(ctx,nm(id).toUpperCase(),W-160-28-(tx-80)-sw-50,78,800,'"Saira Condensed", Impact, sans-serif');ctx.fillText(nm(id).toUpperCase(),tx,cy+42);
@@ -573,9 +574,10 @@ function arteIndividual(p,k){
   const id=p.premios[k],j=J(id),FAM='"Saira Condensed", Impact, sans-serif';
   campo(ctx,W,H);cabecalho(ctx,W,p);
   ctx.textAlign='center';ctx.fillStyle=ART.y;fit(ctx,PREMIO[k].t.toUpperCase(),W-180,130,800,FAM);ctx.fillText(PREMIO[k].t.toUpperCase(),W/2,300);
-  const cy=600;ctx.fillStyle=POSCOR[j.pos]||'#555';ctx.beginPath();ctx.arc(W/2,cy,200,0,Math.PI*2);ctx.fill();
-  ctx.strokeStyle=ART.y;ctx.lineWidth=12;ctx.stroke();
-  ctx.fillStyle=ART.w;ctx.font=`800 190px ${FAM}`;ctx.fillText(initials(nm(id)),W/2,cy+66);
+  const cy=600,im=imgDe(id);ctx.fillStyle=POSCOR[j.pos]||'#555';ctx.beginPath();ctx.arc(W/2,cy,200,0,Math.PI*2);ctx.fill();
+  if(im)circFoto(ctx,im,W/2,cy,200);
+  ctx.strokeStyle=ART.y;ctx.lineWidth=12;ctx.beginPath();ctx.arc(W/2,cy,200,0,Math.PI*2);ctx.stroke();
+  if(!im){ctx.fillStyle=ART.w;ctx.font=`800 190px ${FAM}`;ctx.fillText(initials(nm(id)),W/2,cy+66)}
   ctx.fillStyle=ART.w;fit(ctx,nm(id).toUpperCase(),W-160,170,800,FAM);ctx.fillText(nm(id).toUpperCase(),W/2,965);
   ctx.fillStyle=ART.w2;ctx.font='600 36px Figtree, sans-serif';ctx.fillText(POS[j.pos].toUpperCase(),W/2,1025);
   const stat=premioStat(p,k);
@@ -588,7 +590,7 @@ async function sheetArtes(pid){
   const p=S.pel[pid],ks=['mvp','art','gar','gol'].filter(k=>(p.premios||{})[k]);
   if(!ks.length){toast('Escolha os prêmios antes de gerar as artes.');return}
   openSheet('Artes da pelada','<div class="empty">Desenhando as artes…</div>');
-  await fontsReady();
+  await fontsReady();await Promise.all(ks.map(k=>carregarImg(fotoDe(p.premios[k]))));
   ARTS.forEach(a=>URL.revokeObjectURL(a.url));ARTS=[];
   const mk=async(cv,nome,label)=>{const blob=await new Promise(r=>cv.toBlob(r,'image/png'));ARTS.push({blob,url:URL.createObjectURL(blob),nome,label})};
   await mk(arteGeral(p),`destaques-${p.data}.png`,'Destaques');
@@ -637,9 +639,10 @@ function arteCarta(id){
   ctx.font='600 30px Figtree, sans-serif';ctx.fillText(t.n,cx+175,cy+395);
   // avatar com iniciais
   const ax=cx+cw-280,ay=cy+290,ar=190;
-  ctx.fillStyle=POSCOR[j.pos]||'#555';ctx.beginPath();ctx.arc(ax,ay,ar,0,Math.PI*2);ctx.fill();
-  ctx.lineWidth=10;ctx.strokeStyle=t.c;ctx.stroke();
-  ctx.fillStyle='#fff';ctx.font=`800 170px ${FAM}`;ctx.fillText(initials(nm(id)),ax,ay+60);
+  const imc=imgDe(id);ctx.fillStyle=POSCOR[j.pos]||'#555';ctx.beginPath();ctx.arc(ax,ay,ar,0,Math.PI*2);ctx.fill();
+  if(imc)circFoto(ctx,imc,ax,ay,ar);
+  ctx.lineWidth=10;ctx.strokeStyle=t.c;ctx.beginPath();ctx.arc(ax,ay,ar,0,Math.PI*2);ctx.stroke();
+  if(!imc){ctx.fillStyle='#fff';ctx.font=`800 170px ${FAM}`;ctx.fillText(initials(nm(id)),ax,ay+60)}
   // nome
   // faixa do nome
   ctx.save();ctx.translate(W/2,cy+600);ctx.transform(1,0,-.18,1,0,0);
@@ -666,7 +669,7 @@ function arteCarta(id){
 }
 async function sheetCarta(id){
   openSheet('Carta de '+nm(id),'<div class="empty">Desenhando a carta…</div>');
-  await fontsReady();ARTS.forEach(a=>URL.revokeObjectURL(a.url));ARTS=[];
+  await fontsReady();await carregarImg(fotoDe(id));ARTS.forEach(a=>URL.revokeObjectURL(a.url));ARTS=[];
   const blob=await new Promise(r=>arteCarta(id).toBlob(r,'image/png'));
   ARTS.push({blob,url:URL.createObjectURL(blob),nome:`carta-${(nm(id)||'jogador').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g,'-')}.png`});
   const body=document.getElementById('sheet-body');if(!body)return;
@@ -674,6 +677,20 @@ async function sheetCarta(id){
     ${dl?'<button class="btn primary block" data-act="salvar-arte" data-i="0">Salvar imagem</button>':''}
     <p class="sub" style="margin:0">A cor muda com a nota: bronze até 5,9, prata de 6 a 7,9 e ouro a partir de 8. Os atributos vêm da avaliação inicial e a nota se atualiza a cada pelada.${dl?'':' Toque e segure a imagem para salvar.'}</p></div>`;
 }
+
+/* ---------- fotos dos jogadores ---------- */
+const FOTO_CACHE={};
+function fotoDe(id){const j=S.jog[id];if(j&&j.foto)return j.foto;const u=Object.keys(S.pres||{}).find(k=>S.pres[k].jogador===id);const m=u&&S.membros&&S.membros[u];return(m&&m.foto)||null}
+function fotoStyle(f){return f?`background-image:url('${f}');background-size:cover;background-position:center;`:''}
+function avHTML(id){const j=J(id),f=fotoDe(id);return`<div class="av bg-${j.pos}" style="${fotoStyle(f)}" ${f?`role="img" aria-label="${esc(nm(id))}"`:''}>${f?'':esc(initials(nm(id)))}</div>`}
+window.redimFoto=function(file,lado=384){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),im=new Image();
+  im.onload=()=>{const w=im.naturalWidth,h=im.naturalHeight,q0=Math.min(w,h),sx=(w-q0)/2,sy=(h-q0)/2,c=document.createElement('canvas');c.width=c.height=lado;const x=c.getContext('2d');
+    x.fillStyle='#fff';x.fillRect(0,0,lado,lado);x.drawImage(im,sx,sy,q0,q0,0,0,lado,lado);URL.revokeObjectURL(url);
+    let q=.8,d=c.toDataURL('image/jpeg',q);while(d.length>60000&&q>.35){q-=.1;d=c.toDataURL('image/jpeg',q)}res(d)};
+  im.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('foto'))};im.src=url})};
+function carregarImg(src){return new Promise(r=>{if(!src)return r(null);if(FOTO_CACHE[src])return r(FOTO_CACHE[src]);const im=new Image();im.onload=()=>{FOTO_CACHE[src]=im;r(im)};im.onerror=()=>r(null);im.src=src})}
+function imgDe(id){const f=fotoDe(id);return f?FOTO_CACHE[f]||null:null}
+function circFoto(ctx,img,cx,cy,r){ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();ctx.drawImage(img,cx-r,cy-r,r*2,r*2);ctx.restore()}
 
 /* ---------- grupo, convite e membros (versão independente) ---------- */
 let GRUPO=null,GID=null;
@@ -684,7 +701,7 @@ function membrosSemCadastro(){const vinc=new Set(Object.keys(S.pres||{}).filter(
 function painelMembros(){const ms=membrosSemCadastro();
   return`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Entraram pelo convite</h3><span class="cnt" style="font-size:12px;font-weight:700;background:var(--card);color:var(--card-ink);border-radius:10px;padding:2px 8px">${ms.length}</span></div>
     <div class="sub" style="margin-bottom:6px">Estas pessoas entraram na pelada e ainda não estão no elenco. Cadastre e dê a nota inicial.</div><div class="list">
-    ${ms.map(([u,m])=>`<div class="item"><div class="av bg-${m.pos||'MEI'}">${esc(initials(m.apelido||m.nome))}</div><div class="grow"><div class="name">${esc(m.apelido||m.nome||'Sem nome')}${u===myId?' (você)':''}</div><div class="sub">${esc([POS[m.pos]||'',m.prefere?'quer ser '+m.prefere:'',m.tel||''].filter(Boolean).join(' · '))}</div></div>
+    ${ms.map(([u,m])=>`<div class="item"><div class="av bg-${m.pos||'MEI'}" style="${fotoStyle(m.foto)}">${m.foto?'':esc(initials(m.apelido||m.nome))}</div><div class="grow"><div class="name">${esc(m.apelido||m.nome||'Sem nome')}${u===myId?' (você)':''}</div><div class="sub">${esc([POS[m.pos]||'',m.prefere?'quer ser '+m.prefere:'',m.tel||''].filter(Boolean).join(' · '))}</div></div>
       <div class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm primary" data-act="membro-cad" data-u="${u}">Cadastrar</button><button class="btn sm" data-act="membro-vinc" data-u="${u}" aria-label="Já está no elenco">Já está</button></div></div>`).join('')}</div></div>`}
 function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GRUPO)return;const adms=GRUPO.admins||[];
   const nome=u=>{const m=(S.membros||{})[u];const j=S.pres[u]&&S.jog[S.pres[u].jogador];return(j&&(j.apelido||j.nome))||(m&&(m.apelido||m.nome))||'Sem nome'};
@@ -771,7 +788,7 @@ function tJogo(A){
 }
 function rowPlayer(id,right,extra=''){
   const j=J(id);
-  return`<div class="item"><div class="av bg-${j.pos}">${esc(initials(j.apelido||j.nome))}</div><div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${j.pos}">${j.pos}</span><span>${j.tipo==='diarista'?'Diarista':'Mensalista'}</span>${extra}</div></div>${right}</div>`;
+  return`<div class="item">${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${j.pos}">${j.pos}</span><span>${j.tipo==='diarista'?'Diarista':'Mensalista'}</span>${extra}</div></div>${right}</div>`;
 }
 function subPresenca(pid,p,l,A){
   const resp=respDe(p,pid);
@@ -821,7 +838,7 @@ function subPos(pid,p,A){
   for(const id of ids){const s=st[id]||{};
     const step=(f,lbl,val,disp)=>`<div class="stepbox">${A?`<div class="step"><button data-act="stat" data-p="${pid}" data-j="${id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${disp}</output><button data-act="stat" data-p="${pid}" data-j="${id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div>`:`<output class="num">${disp}</output>`}<span class="lbl">${lbl}</span></div>`;
     const j=J(id);
-    h+=`<div class="item" style="flex-wrap:wrap"><div class="av bg-${j.pos}">${esc(initials(nm(id)))}</div><div class="grow" style="min-width:110px"><div class="name">${esc(nm(id))}</div><div class="sub">nota atual ${fmtN(notaAtual(id))}</div></div>
+    h+=`<div class="item" style="flex-wrap:wrap">${avHTML(id)}<div class="grow" style="min-width:110px"><div class="name">${esc(nm(id))}</div><div class="sub">nota atual ${fmtN(notaAtual(id))}</div></div>
       <div class="row" style="gap:6px">${step('n','Nota',s.n,s.n==null?'—':fmtN(s.n))}${step('g','Gols',s.g,s.g||0)}${step('a','Assist.',s.a,s.a||0)}</div></div>`}
   h+='</div></div>';
   const opts=(list,v)=>'<option value="">—</option>'+list.map(id=>`<option value="${id}" ${v===id?'selected':''}>${esc(nm(id))}</option>`).join('');
@@ -889,7 +906,7 @@ function tElenco(A){
   if(!ids.length)h+='<div class="empty">Nenhum jogador aqui.</div>';
   for(const id of ids){const s=st[id]||{};
     h+=`<button class="item" data-act="ver-jog" data-j="${id}" style="all:unset;display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);cursor:pointer">
-      <div class="av bg-${S.jog[id].pos}">${esc(initials(nm(id)))}</div><div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${S.jog[id].pos}">${S.jog[id].pos}</span><span>${S.jog[id].tipo==='diarista'?'Diarista':'Mensalista'} · ${s.j||0} jogos · ${s.g||0} gols</span></div></div><span class="nota num">${fmtN(notaAtual(id))}</span></button>`}
+      ${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${S.jog[id].pos}">${S.jog[id].pos}</span><span>${S.jog[id].tipo==='diarista'?'Diarista':'Mensalista'} · ${s.j||0} jogos · ${s.g||0} gols</span></div></div><span class="nota num">${fmtN(notaAtual(id))}</span></button>`}
   return h+'</div></div>';
 }
 
@@ -1021,6 +1038,8 @@ function renderJogForm(){
   const cr=critKey(F.pos);
   const ini=notaInicial(F);
   el.innerHTML=`<div class="stack">
+    <div class="row" style="gap:12px;flex-wrap:nowrap"><div class="av bg-${F.pos}" style="width:64px;height:64px;font-size:24px;${fotoStyle(F.foto)}">${F.foto?'':esc(initials(F.apelido||F.nome||'?'))}</div>
+      <div class="row" style="gap:6px"><label class="btn sm">${F.foto?'Trocar foto':'Adicionar foto'}<input type="file" accept="image/*" id="f-foto" class="vh"></label>${F.foto?'<button class="btn sm" data-act="f-foto-rem">Remover</button>':''}</div></div>
     <label class="field"><span>Nome</span><input type="text" id="f-nome" data-f="nome" value="${esc(F.nome)}" placeholder="Nome completo"></label>
     <div class="grid2"><label class="field"><span>Apelido</span><input type="text" id="f-apelido" data-f="apelido" value="${esc(F.apelido)}" placeholder="Como chamam no campo"></label>
     <label class="field"><span>WhatsApp</span><input type="tel" id="f-tel" data-f="tel" value="${esc(F.tel)}" placeholder="(81) 99999-9999"></label></div>
@@ -1079,6 +1098,7 @@ document.addEventListener('click',e=>{
     case'edit-jog':sheetJog(d.j);break;
     case'f-pos':F.pos=d.v;if(F.pos2===d.v)F.pos2='';renderJogForm();break;
     case'f-tipo':F.tipo=d.v;renderJogForm();break;
+    case'f-foto-rem':F.foto=null;renderJogForm();break;
     case'f-crit':F.crit[d.k]=Number(d.v);renderJogForm();break;
     case'save-jog':{if(!F.nome.trim()){toast('Coloque o nome do jogador.');document.getElementById('f-nome')?.focus();return}
       const id=F._id||uid('j');const{_id,...data}=F;data.nome=data.nome.trim();data.apelido=(data.apelido||'').trim();
@@ -1122,7 +1142,7 @@ document.addEventListener('click',e=>{
       <p class="sub" style="margin:0;text-align:left">Quer mandar só o app, sem entrar na pelada? Toque em ‹, depois em <b>Convidar para o app</b>.</p></div>`);break}
     case'copiar-link':{const l=linkConvite();(navigator.clipboard?navigator.clipboard.writeText(l):Promise.reject()).then(()=>toast('Link copiado.'),()=>toast(l));break}
     case'membro-cad':{const m=S.membros[d.u]||{};
-      sheetJog(null);F.nome=m.nome||'';F.apelido=m.apelido||'';F.tel=m.tel||'';F.pos=m.pos||'MEI';F.pos2=m.pos2||'';F.tipo=m.prefere==='diarista'?'diarista':'mensalista';F._uid=d.u;renderJogForm();break}
+      sheetJog(null);F.nome=m.nome||'';F.apelido=m.apelido||'';F.tel=m.tel||'';F.pos=m.pos||'MEI';F.pos2=m.pos2||'';F.tipo=m.prefere==='diarista'?'diarista':'mensalista';F.foto=m.foto||null;F._uid=d.u;renderJogForm();break}
     case'membro-vinc':{const m=S.membros[d.u]||{};const ops=Object.keys(S.jog).filter(id=>!Object.values(S.pres).some(x=>x.jogador===id)).sort((a,b)=>nm(a).localeCompare(nm(b)));
       openSheet('Vincular '+(m.apelido||m.nome||''),`<div class="stack"><p class="sub" style="margin:0">Escolha quem é essa pessoa no elenco. Depois disso, ela confirma presença pelo próprio celular.</p>
         <select id="vinc-sel"><option value="">Jogador do elenco</option>${ops.map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('')}</select>
@@ -1236,6 +1256,7 @@ document.addEventListener('change',e=>{
   const t=e.target;
   if(t.dataset.act==='premio'){patch('peladas/'+t.dataset.p,{premios:{[t.dataset.f]:t.value||null}})}
   if(t.dataset.act==='ano'){UI.ano=Number(t.value);render()}
+  if(t.id==='f-foto'&&t.files&&t.files[0]&&F){toast('Preparando a foto…');window.redimFoto(t.files[0]).then(d=>{F.foto=d;renderJogForm()},()=>toast('Não consegui abrir essa foto. Tente outra.'))}
   if(t.dataset.ufsel){const dl=document.getElementById(t.dataset.ufsel);if(dl)dl.innerHTML=t.value?BR[t.value].c.map(c=>`<option value="${esc(c)}">`).join(''):''}
   if(t.dataset.f&&F){F[t.dataset.f]=t.value}
 });

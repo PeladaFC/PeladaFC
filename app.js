@@ -150,6 +150,9 @@ function render() {
   if (t === 'perfil') { const p = PERFIL || {}; const pos = UIp.pos || p.pos || 'MEI';
     h = (p.apelido ? topo('minhas') : '') + `<h2>${p.apelido ? 'Meu perfil' : 'Seu perfil de jogador'}</h2><p class="lead">É assim que a galera vai te ver.</p>
     <form id="f-perfil" class="stack" novalidate>
+      <div class="row" style="gap:14px;flex-wrap:nowrap"><div class="av bg-${pos}" style="width:84px;height:84px;font-size:30px;${(UIp.foto ?? p.foto) ? `background-image:url('${UIp.foto ?? p.foto}');background-size:cover;background-position:center` : ''}">${(UIp.foto ?? p.foto) ? '' : escH(((p.apelido || p.nome || EU.nome || '?').trim()[0] || '?').toUpperCase())}</div>
+        <div class="stack" style="gap:6px"><label class="btn sm">${(UIp.foto ?? p.foto) ? 'Trocar foto' : 'Adicionar foto'}<input type="file" accept="image/*" id="p-foto" class="vh"></label>
+        <span class="sub">Sua foto aparece na carta de jogador e nas artes dos prêmios.</span></div></div>
       <label class="field"><span>Nome</span><input type="text" id="p-nome" value="${escH(p.nome || EU.nome || '')}" required></label>
       <label class="field"><span>Apelido</span><input type="text" id="p-ap" value="${escH(p.apelido || '')}" placeholder="Como te chamam no campo"></label>
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>
@@ -255,7 +258,7 @@ async function aceitarConvite() {
   const { gid, codigo, grupo } = CONVITE, p = PERFIL || {};
   try {
     await B.batch([
-      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', prefere: UIp.prefere || 'mensalista', codigo, t: Date.now() } },
+      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: UIp.prefere || 'mensalista', codigo, t: Date.now() } },
       { op: 'merge', path: 'users/' + EU.uid, data: { grupos: { [gid]: { t: Date.now() } } } }
     ]);
     GRUPOS[gid] = grupo; CONVITE = null; aviso('Pronto! Você entrou na ' + (grupo.nome || 'pelada') + '.');
@@ -272,7 +275,7 @@ async function criarGrupo(f) {
       { op: 'set', path: 'grupos/' + gid, data: { nome: f.nome, dia: f.dia, hora: f.hora, dono: EU.uid, admins: [EU.uid], codigo, criadoEm: now } },
       { op: 'set', path: 'codigos/' + codigo, data: { gid } },
       { op: 'set', path: `grupos/${gid}/config/geral`, data: cfg },
-      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', prefere: 'mensalista', codigo, t: now } },
+      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: 'mensalista', codigo, t: now } },
       { op: 'merge', path: 'users/' + EU.uid, data: { grupos: { [gid]: { t: now } } } }
     ]);
     GRUPOS[gid] = { nome: f.nome, dia: f.dia, hora: f.hora, dono: EU.uid, admins: [EU.uid], codigo };
@@ -332,7 +335,7 @@ window.sincronizarGrupo = async d => { if (ABERTO) try { await B.set('grupos/' +
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-sh]'); if (!b || !$('shell').contains(b)) return;
   const a = b.dataset.sh, v = b.dataset.v;
-  if (a === 'ir') { if (v === 'perfil') UIp.pos = null; ir(v); }
+  if (a === 'ir') { if (v === 'perfil') { UIp.pos = null; UIp.foto = undefined; } ir(v); }
   if (a === 'pos') { UIp.pos = v; const keep = { nome: $('p-nome').value, ap: $('p-ap').value, tel: $('p-tel').value }; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }
   if (a === 'pref') { UIp.prefere = v; render(); }
   if (a === 'google') { try { await B.google(); } catch (err) { aviso(msgErro(err) + ' Se não abrir, use e-mail e senha.'); } }
@@ -347,6 +350,12 @@ document.addEventListener('click', async e => {
   if (a === 'aceitar') aceitarConvite();
   if (a === 'demo') { mostrarCasca(false); window.abrirDemo(); }
 });
+document.addEventListener('change', e => {
+  const t = e.target; if (t.id !== 'p-foto' || !t.files || !t.files[0]) return;
+  const keep = { nome: $('p-nome').value, ap: $('p-ap').value, tel: $('p-tel').value };
+  aviso('Preparando a foto…');
+  window.redimFoto(t.files[0]).then(d => { UIp.foto = d; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }, () => aviso('Não consegui abrir essa foto. Tente outra.'));
+});
 document.addEventListener('submit', async e => {
   const f = e.target; if (!$('shell').contains(f)) return; e.preventDefault();
   if (OCUPADO) return;
@@ -357,7 +366,10 @@ document.addEventListener('submit', async e => {
     if (!val('p-nome')) { aviso('Coloque seu nome.'); return; }
     const pos = UIp.pos || (PERFIL && PERFIL.pos) || 'MEI';
     OCUPADO = true;
-    try { await B.set('users/' + EU.uid, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, email: EU.email || '' }, { merge: true }); PERFIL = { ...(PERFIL || {}), nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos }; OCUPADO = false; await depoisDoLogin(); }
+    const foto = UIp.foto !== undefined ? UIp.foto : ((PERFIL && PERFIL.foto) || null);
+    try { await B.set('users/' + EU.uid, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, email: EU.email || '' }, { merge: true }); PERFIL = { ...(PERFIL || {}), nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto };
+      await Promise.all(Object.keys(GRUPOS).map(g => B.set(`grupos/${g}/membros/${EU.uid}`, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto }, { merge: true }).catch(e => console.warn(e))));
+      UIp.foto = undefined; OCUPADO = false; await depoisDoLogin(); }
     catch (err) { aviso(msgErro(err)); OCUPADO = false; }
     return;
   }
