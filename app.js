@@ -92,6 +92,18 @@ const ERROS = {
 const msgErro = e => ERROS[e && e.code] || 'Algo deu errado. Tente de novo.';
 function aviso(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(aviso.t); aviso.t = setTimeout(() => t.hidden = true, 3200); }
 
+/* ================= Link do app e QR Code ================= */
+const LINK_APP = location.origin + location.pathname;
+window.linkApp = LINK_APP;
+window.qrSVG = texto => {
+  if (!window.qrcode) return '';
+  const q = window.qrcode(0, 'M'); q.addData(texto); q.make();
+  const n = q.getModuleCount(), m = 2, t = n + m * 2; let d = '';
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) d += `M${x + m} ${y + m}h1v1h-1z`;
+  return `<svg viewBox="0 0 ${t} ${t}" width="100%" role="img" aria-label="QR Code" shape-rendering="crispEdges" style="display:block"><rect width="${t}" height="${t}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+};
+const MSG_APP = `⚽ *Pelada FC*\nOrganize sua pelada: lista de presença, sorteio de times equilibrados, notas, artilharia e ranking.\n\n👉 ${LINK_APP}\n\n📲 *Para ter o app no celular:*\niPhone: abra o link no Safari → Compartilhar → Adicionar à Tela de Início\nAndroid: abra no Chrome → menu ⋮ → Instalar app`;
+
 /* ================= Estado da casca ================= */
 let EU = null, PERFIL = null, TELA = 'carregando', GRUPOS = {}, ABERTO = null, unsubGrupo = null, unsubPerfil = null, CONVITE = null, OCUPADO = false;
 const pend = new URLSearchParams(location.search).get('c');
@@ -148,6 +160,7 @@ function render() {
     const card = (g, papel) => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="abrir" data-v="${g}"><div class="av bg-${papel === 'ADMIN' ? 'MEI' : 'ATA'}">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.dia != null ? DIASN[G.dia] + ' ' : ''}${escH(G.hora || '')}</span></span><span class="badge2 ${papel === 'ADMIN' ? '' : 'j'}">${papel}</span></button>`; };
     h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELADA FC</span><button class="btn sm" data-sh="ir" data-v="perfil">${escH(PERFIL?.apelido || PERFIL?.nome || 'Perfil')}</button></div>
     <h2>Minhas peladas</h2>
+    <button class="ob-opt" data-sh="ir" data-v="compartilhar" style="padding:12px 14px"><span class="ic" style="background:var(--card)">📲</span><span class="grow"><b>Convidar para o app</b><span class="sub">Mostre o QR Code ou mande o link do app</span></span></button>
     ${!ids.length ? `<p class="lead">Você ainda não está em nenhuma pelada. Crie a sua ou entre com o código de um convite.</p>` : ''}
     ${adm.length ? `<div class="sub" style="font-weight:700">ADMINISTRO</div>${adm.map(g => card(g, 'ADMIN')).join('')}` : ''}
     ${jog.length ? `<div class="sub" style="font-weight:700">JOGO</div>${jog.map(g => card(g, 'JOGADOR')).join('')}` : ''}
@@ -169,10 +182,19 @@ function render() {
   if (t === 'convite' && CONVITE) { const G = CONVITE.grupo; const pre = UIp.prefere || 'mensalista';
     h = topo('minhas') + `<h2>Você foi convidado!</h2>
     <div class="ob-inv"><div class="h"><span class="sub" style="color:inherit;opacity:.85">Convite para</span><b>${escH(G.nome || 'Pelada')}</b></div>
-    <div class="b">${G.dia != null ? `<div>📅 Toda ${escH(DIASN[G.dia].toLowerCase())}, ${escH(G.hora || '')}</div>` : ''}<div class="sub">Código ${escH(CONVITE.codigo)}</div></div></div>
+    <div class="b">${G.dia != null ? `<div>📅 ${[0,6].includes(Number(G.dia))?'Todo':'Toda'} ${escH(DIASN[G.dia].toLowerCase())}, ${escH(G.hora || '')}</div>` : ''}<div class="sub">Código ${escH(CONVITE.codigo)}</div></div></div>
     <div class="field"><span>Quero entrar como</span><div class="pick"><button data-sh="pref" data-v="mensalista" aria-pressed="${pre === 'mensalista'}">Mensalista</button><button data-sh="pref" data-v="diarista" aria-pressed="${pre === 'diarista'}">Diarista</button></div>
     <p class="sub" style="margin:4px 0 0">${pre === 'mensalista' ? 'Mensalista entra direto na lista quando tem vaga. O administrador confirma.' : 'Diarista pede vaga a cada pelada e o administrador libera.'}</p></div>
     <button class="btn primary block" data-sh="aceitar">Entrar na pelada</button>`; }
+  if (t === 'compartilhar') h = topo('minhas') + `<h2>Convidar para o app</h2>
+    <p class="lead">Este é o link do app, sem entrar em nenhuma pelada. A pessoa cria a conta e depois cria a pelada dela ou entra com um código.</p>
+    <div style="background:#fff;padding:16px;border-radius:14px;border:1px solid var(--line);width:min(100%,320px);margin:0 auto">${window.qrSVG(LINK_APP)}</div>
+    <p class="sub" style="text-align:center;margin:0">Peça para a pessoa apontar a câmera do celular para o código.</p>
+    <div class="num" style="font-weight:700;text-align:center;word-break:break-all">${escH(LINK_APP)}</div>
+    <a class="btn primary block" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(MSG_APP)}">Enviar no WhatsApp</a>
+    <button class="btn block" data-sh="copiar-app">Copiar link</button>
+    ${navigator.share ? '<button class="btn block" data-sh="share-app">Compartilhar…</button>' : ''}
+    <p class="sub" style="margin:0">Para convidar alguém direto para a sua pelada, use o link ou o QR Code que ficam na ⚙️ engrenagem, dentro da pelada.</p>`;
   el.innerHTML = `<div class="ob-in">${h}</div>`;
 }
 const UIp = {};
@@ -301,6 +323,8 @@ document.addEventListener('click', async e => {
   if (a === 'reset') { const em = ($('l-email') || {}).value || ''; if (!em) { aviso('Digite seu e-mail acima e toque de novo em "Esqueci minha senha".'); return; } try { await B.reset(em.trim()); aviso('Mandamos um link para criar uma nova senha no seu e-mail.'); } catch (err) { aviso(msgErro(err)); } }
   if (a === 'sair') { ls.set('pelada.ultimo', null); await B.sair(); }
   if (a === 'abrir') abrirGrupo(v);
+  if (a === 'copiar-app') { try { await navigator.clipboard.writeText(LINK_APP); aviso('Link do app copiado.'); } catch (err) { aviso(LINK_APP); } }
+  if (a === 'share-app') { try { await navigator.share({ title: 'Pelada FC', text: MSG_APP }); } catch (err) { } }
   if (a === 'aceitar') aceitarConvite();
   if (a === 'demo') { mostrarCasca(false); window.abrirDemo(); }
 });

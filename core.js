@@ -399,7 +399,7 @@ function msg(tipo,ctx={}){
     if(d.dia.length){out.push('',`*Diárias* (${BRL(c.diaria)})`);d.dia.forEach(x=>out.push(`• ${nm(x.id)} · ${dShort(x.data)}`))}
     if(c.pix)out.push('','Pix: '+c.pix);return out.join('\n')}
   if(tipo==='convite'){const j=ctx.jid?J(ctx.jid):null;
-    return[`Fala${j?', '+(j.apelido||j.nome.split(' ')[0]):''}! 👋`,`Você está convidado pra *${c.nome}*.`,(()=>{const pe2=atual();return pe2?`📅 Próxima: *${dLong(pe2[1].data)}* às *${pe2[1].hora||c.hora}*`:`📅 Toda ${DIAS[c.dia].toLowerCase()} às ${c.hora}`})(),(()=>{const pe2=atual(),LL=localDe(pe2&&pe2[1]);return LL?'📍 '+LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):''})(),linkConvite()?'\nEntre na pelada pelo app: '+linkConvite():'','\nConfirma por aqui se topa!'].filter(Boolean).join('\n')}
+    return[`Fala${j?', '+(j.apelido||j.nome.split(' ')[0]):''}! 👋`,`Você está convidado pra *${c.nome}*.`,(()=>{const pe2=atual();return pe2?`📅 Próxima: *${dLong(pe2[1].data)}* às *${pe2[1].hora||c.hora}*`:`📅 ${[0,6].includes(Number(c.dia))?'Todo':'Toda'} ${DIAS[c.dia].toLowerCase()} às ${c.hora}`})(),(()=>{const pe2=atual(),LL=localDe(pe2&&pe2[1]);return LL?'📍 '+LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):''})(),linkConvite()?'\nEntre na pelada pelo app: '+linkConvite():'',INSTALAR,'\nConfirma por aqui se topa!'].filter(Boolean).join('\n')}
   return'';
 }
 
@@ -676,6 +676,7 @@ async function sheetCarta(id){
 
 /* ---------- grupo, convite e membros (versão independente) ---------- */
 let GRUPO=null,GID=null;
+const INSTALAR='\n📲 *Para ter o app no celular:*\niPhone: abra o link no Safari → Compartilhar → Adicionar à Tela de Início\nAndroid: abra no Chrome → menu ⋮ → Instalar app';
 function linkConvite(){return GRUPO&&GRUPO.codigo?location.origin+location.pathname+'?c='+GRUPO.codigo:''}
 function membrosSemCadastro(){const vinc=new Set(Object.keys(S.pres||{}).filter(u=>S.pres[u].jogador&&S.jog[S.pres[u].jogador]));
   return Object.entries(S.membros||{}).filter(([u])=>!vinc.has(u)).sort((a,b)=>(b[1].t||0)-(a[1].t||0))}
@@ -997,7 +998,7 @@ function sheetCfg(){
     <label class="field"><span>Chave Pix</span><input type="text" id="c-pix" value="${esc(c.pix)}" placeholder="Telefone, e-mail ou chave aleatória"></label>
     <label class="row"><input type="checkbox" id="c-nivelpub" ${c.nivelPublico?'checked':''}> Mostrar o nível da pelada (estrelas) para os jogadores</label>
     <div class="panel"><h3 style="margin-bottom:6px">Convite</h3><div class="sub">Link para a galera entrar na pelada</div><div class="num" style="font-weight:700;word-break:break-all;margin:4px 0">${esc(linkConvite())}</div><div class="sub">Código: <b>${esc((GRUPO||{}).codigo||'')}</b></div>
-      <div class="row" style="margin-top:8px"><button class="btn sm" data-act="msg" data-v="convite">Mensagem de convite</button><button class="btn sm" data-act="copiar-link">Copiar link</button></div></div>
+      <div class="row" style="margin-top:8px"><button class="btn sm" data-act="msg" data-v="convite">Mensagem de convite</button><button class="btn sm" data-act="copiar-link">Copiar link</button><button class="btn sm" data-act="qr-pelada">QR Code</button></div></div>
     <div class="panel"><h3 style="margin-bottom:6px">Administradores</h3><div id="adm-list"></div></div>
     <div class="panel"><h3 style="margin-bottom:4px">Regras do sorteio</h3><div class="sub" style="margin-bottom:8px">Ex.: dois irmãos que não podem cair juntos.</div><div id="restr"></div>
       <div class="grid2" style="margin-top:8px"><select id="r-a"><option value="">Jogador</option>${Object.keys(S.jog).map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('')}</select>
@@ -1108,6 +1109,11 @@ document.addEventListener('click',e=>{
     case'como-jogador':document.getElementById('push').hidden=true;PUSH_PRONTO=false;PUSH_VISTOS.clear();UI.comoJogador=!UI.comoJogador;UI.sub='presenca';closeSheet();render();window.scrollTo(0,0);break
     case'notif':sheetNotif();break;
     case'voltar-grupos':if(window.voltarGrupos)window.voltarGrupos();break;
+    case'qr-pelada':{const l=linkConvite();openSheet('Entrar na '+cfg().nome,`<div class="stack" style="align-items:center;text-align:center">
+      <div style="background:#fff;padding:14px;border-radius:12px;width:min(100%,300px)">${window.qrSVG?window.qrSVG(l):''}</div>
+      <p class="sub" style="margin:0">Peça para a pessoa apontar a câmera do celular para o código. Ela cria a conta e já entra nesta pelada.</p>
+      <div class="num" style="font-weight:700;word-break:break-all">${esc(l)}</div>
+      <p class="sub" style="margin:0">Quer só mostrar o app, sem entrar na pelada? Volte em Minhas peladas e toque em "Convidar para o app".</p></div>`);break}
     case'copiar-link':{const l=linkConvite();(navigator.clipboard?navigator.clipboard.writeText(l):Promise.reject()).then(()=>toast('Link copiado.'),()=>toast(l));break}
     case'membro-cad':{const m=S.membros[d.u]||{};
       sheetJog(null);F.nome=m.nome||'';F.apelido=m.apelido||'';F.tel=m.tel||'';F.pos=m.pos||'MEI';F.pos2=m.pos2||'';F.tipo=m.prefere==='diarista'?'diarista':'mensalista';F._uid=d.u;renderJogForm();break}
