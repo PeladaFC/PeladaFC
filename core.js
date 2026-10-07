@@ -736,7 +736,7 @@ function renderNav(){
 }
 function renderTab(){
   const A=ADM();
-  if(!Object.keys(S.jog).length&&!demo){
+  if(!Object.keys(S.jog).length&&!demo&&UI.tab==='jogo'){
     return A?`<div class="stack"><div class="board"><div class="when">Bora montar<br>a pelada</div><div class="where">Três passos e o app já sorteia times equilibrados.</div></div>
       <div class="panel stack"><div class="row between"><div><b>1. Ajustes</b><div class="sub">Dia, horário, local, vagas e valores</div></div><button class="btn primary sm" data-act="cfg">Configurar</button></div>
       <div class="row between"><div><b>2. Elenco</b><div class="sub">Cadastre cada jogador com posição e nota</div></div><button class="btn sm" data-act="add-jog">Adicionar</button></div>
@@ -902,6 +902,15 @@ function tElenco(A){
     <input type="text" id="busca" placeholder="Buscar jogador" value="${esc(UI.busca)}" data-in="busca" style="margin-bottom:10px">
     <div class="pick" style="margin-bottom:12px">${[['todos','Todos'],['GOL','GOL'],['ZAG','ZAG'],['MEI','MEI'],['ATA','ATA'],['mensalista','Mensalistas'],['diarista','Diaristas'],['inativos','Inativos']].map(([k,n])=>`<button data-act="filtro" data-v="${k}" aria-pressed="${UI.filtro===k}">${n}</button>`).join('')}</div>`;
   if(A&&membrosSemCadastro().length)h+=painelMembros();
+  if(!Object.keys(S.jog).length){
+    h+=`<div class="panel stack" style="text-align:center;padding-block:22px">
+      <div style="font-size:40px;line-height:1">👕</div><h3 style="align-self:center">Elenco vazio</h3>
+      <p class="sub" style="margin:0">${A?'Monte o elenco de dois jeitos: convide a galera para entrar pelo app, ou cadastre cada jogador você mesmo.':'Ainda não tem ninguém no elenco. Chame a galera para a pelada!'}</p>
+      <button class="btn primary block" data-act="qr-pelada">📲 Convidar pelo QR Code ou link</button>
+      ${A?'<button class="btn block" data-act="add-jog">✍️ Adicionar jogador manualmente</button>':''}
+      ${A?'<p class="sub" style="margin:0;text-align:left">Quem entrar pelo convite aparece aqui em cima, em "Entraram pelo convite", para você dar a nota inicial.</p>':''}</div>`;
+    return h;
+  }
   h+='<div class="panel"><div class="list">';
   if(!ids.length)h+='<div class="empty">Nenhum jogador aqui.</div>';
   for(const id of ids){const s=st[id]||{};
