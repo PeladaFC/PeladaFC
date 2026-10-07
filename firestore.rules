@@ -1,0 +1,62 @@
+rules_version = '2';
+// Pelada FC · regras de segurança do Firestore
+// Cole este texto inteiro em: Firestore Database → Regras → Publicar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function logado() { return request.auth != null; }
+    function eu() { return request.auth.uid; }
+    function grupo(gid) { return get(/databases/$(database)/documents/grupos/$(gid)).data; }
+    function grupoDepois(gid) { return getAfter(/databases/$(database)/documents/grupos/$(gid)).data; }
+    function admin(gid) { return logado() && exists(/databases/$(database)/documents/grupos/$(gid)) && eu() in grupo(gid).admins; }
+    function adminDepois(gid) { return logado() && eu() in grupoDepois(gid).admins; }
+    function membro(gid) { return logado() && exists(/databases/$(database)/documents/grupos/$(gid)/membros/$(eu())); }
+
+    // Perfil de cada pessoa: só ela lê e escreve.
+    match /users/{uid} {
+      allow read, write: if logado() && eu() == uid;
+    }
+
+    // Código do convite → pelada. Qualquer pessoa logada pode procurar um código.
+    match /codigos/{codigo} {
+      allow read: if logado();
+      allow create: if logado() && adminDepois(request.resource.data.gid);
+      allow update, delete: if logado() && admin(resource.data.gid);
+    }
+
+    // A pelada (nome, dia, administradores, código).
+    match /grupos/{gid} {
+      allow read: if logado();
+      allow create: if logado()
+        && request.resource.data.dono == eu()
+        && request.resource.data.admins == [eu()];
+      allow update: if admin(gid)
+        && request.resource.data.dono == resource.data.dono
+        && request.resource.data.dono in request.resource.data.admins
+        && request.resource.data.admins.size() > 0;
+      allow delete: if logado() && resource.data.dono == eu();
+
+      // Quem entrou na pelada. A pessoa entra sozinha se souber o código.
+      match /membros/{uid} {
+        allow read: if membro(gid) || admin(gid);
+        allow create, update: if logado() && (
+          (eu() == uid && request.resource.data.codigo == grupoDepois(gid).codigo)
+          || adminDepois(gid));
+        allow delete: if admin(gid) || (logado() && eu() == uid);
+      }
+
+      // Presença, vínculo com o elenco e avaliação do campo: cada um mexe no seu.
+      match /presencas/{uid} {
+        allow read: if membro(gid) || admin(gid);
+        allow write: if admin(gid) || (logado() && eu() == uid && membro(gid));
+      }
+
+      // Todo o resto (elenco, peladas, caixa, avisos, locais, ajustes, mural, notificações):
+      // membros leem, só administradores escrevem.
+      match /{colecao}/{doc} {
+        allow read: if membro(gid) || admin(gid);
+        allow write: if colecao != 'membros' && colecao != 'presencas' && adminDepois(gid);
+      }
+    }
+  }
+}
