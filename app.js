@@ -237,7 +237,8 @@ function render() {
     <div class="b">${G.dia != null ? `<div>📅 ${[0,6].includes(Number(G.dia))?'Todo':'Toda'} ${escH(DIASN[G.dia].toLowerCase())}, ${escH(G.hora || '')}</div>` : ''}<div class="sub">Código ${escH(CONVITE.codigo)}</div></div></div>
     <div class="field"><span>Quero entrar como</span><div class="pick"><button data-sh="pref" data-v="mensalista" aria-pressed="${pre === 'mensalista'}">Mensalista</button><button data-sh="pref" data-v="diarista" aria-pressed="${pre === 'diarista'}">Diarista</button></div>
     <p class="sub" style="margin:4px 0 0">${pre === 'mensalista' ? 'Mensalista entra direto na lista quando tem vaga. O administrador confirma.' : 'Diarista pede vaga a cada pelada e o administrador libera.'}</p></div>
-    <button class="btn primary block" data-sh="aceitar">Entrar na pelada</button>`; }
+    <button class="btn primary block" data-sh="aceitar">Entrar na pelada</button>
+    <div class="banner due"><span><b>⏳ Sua entrada vai esperar a autorização do administrador.</b><br>Até ele autorizar, seu nome aparece como pendente no Elenco.</span></div>`; }
   if (t === 'convidar-pelada') { const ids = Object.keys(GRUPOS).sort((a, b) => (GRUPOS[a].nome || '').localeCompare(GRUPOS[b].nome || ''));
     h = topo('minhas') + `<h2>Convidar para minha pelada</h2><p class="lead">Escolha a pelada. A pessoa instala o app e já entra nela.</p>
     ${ids.map(g => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="qr-grupo" data-v="${g}"><div class="av bg-MEI">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.dia != null ? DIASN[G.dia] + ' ' : ''}${escH(G.hora || '')} · código ${escH(G.codigo || '')}</span></span><span class="badge2">QR CODE</span></button>`; }).join('')}`; }
@@ -308,7 +309,7 @@ async function aceitarConvite() {
       { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: UIp.prefere || 'mensalista', codigo, t: Date.now() } },
       { op: 'merge', path: 'users/' + EU.uid, data: { grupos: { [gid]: { t: Date.now() } } } }
     ]);
-    GRUPOS[gid] = grupo; CONVITE = null; aviso('Pronto! Você entrou na ' + (grupo.nome || 'pelada') + '.');
+    GRUPOS[gid] = grupo; CONVITE = null; aviso('Pronto! Agora é só esperar o administrador autorizar sua entrada.');
     abrirGrupo(gid);
   } catch (e) { aviso(msgErro(e)); }
   OCUPADO = false;

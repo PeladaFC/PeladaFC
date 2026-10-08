@@ -125,7 +125,10 @@ function lista(p,pid){
   const key=id=>lib(id)?Math.max(aprov[id],resp[id].t||0):(resp[id].t||0);
   const elig=line.filter(ok).sort((a,b)=>{const ma=lib(a)?1:0,mb=lib(b)?1:0;return ma-mb||key(a)-key(b)});
   const aguard=line.filter(id=>!ok(id)).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0));
-  return{vagas,gks,escalados:elig.slice(0,vagas),espera:elig.slice(vagas).concat(aguard),aguardando:aguard.concat(gkAguard),
+  // na espera, mensalista sempre vem antes de diarista (mantendo a ordem de chegada dentro de cada grupo)
+  const esp=elig.slice(vagas).concat(aguard),ehD=id=>J(id).tipo==='diarista'?1:0;
+  const espera=esp.map((id,i)=>[id,i]).sort((a,b)=>ehD(a[0])-ehD(b[0])||a[1]-b[1]).map(x=>x[0]);
+  return{vagas,gks,escalados:elig.slice(0,vagas),espera,aguardando:aguard.concat(gkAguard),
     nao:ativos().filter(id=>resp[id]?.s==='nao'),
     pend:ativos().filter(id=>!resp[id]||!resp[id].s)};
 }
@@ -698,11 +701,16 @@ const INSTALAR='\n📲 *Para ter o app no celular:*\niPhone: abra o link no Safa
 function linkConvite(){return GRUPO&&GRUPO.codigo?location.origin+location.pathname+'?c='+GRUPO.codigo:''}
 function membrosSemCadastro(){const vinc=new Set(Object.keys(S.pres||{}).filter(u=>S.pres[u].jogador&&S.jog[S.pres[u].jogador]));
   return Object.entries(S.membros||{}).filter(([u])=>!vinc.has(u)).sort((a,b)=>(b[1].t||0)-(a[1].t||0))}
+function euPendente(){if(demo||!myId||!(S.membros||{})[myId])return false;const d=S.pres[myId];return!(d&&d.jogador&&S.jog[d.jogador])}
+function painelPendentes(){const adms=(GRUPO&&GRUPO.admins)||[];const ms=membrosSemCadastro().filter(([u])=>!adms.includes(u));if(!ms.length)return'';
+  return`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Pendentes</h3><span class="cnt" style="font-size:12px;font-weight:700;background:var(--card);color:var(--card-ink);border-radius:10px;padding:2px 8px">${ms.length}</span></div>
+    <div class="sub" style="margin-bottom:6px">Entraram pelo convite e estão esperando a autorização do administrador.</div><div class="list">
+    ${ms.map(([u,m])=>`<div class="item"><div class="av bg-${m.pos||'MEI'}" style="${fotoStyle(m.foto)}">${m.foto?'':esc(initials(m.apelido||m.nome))}</div><div class="grow"><div class="name">${esc(m.apelido||m.nome||'Sem nome')}${u===myId?' (você)':''}</div><div class="sub">${esc([POS[m.pos]||'',m.prefere?'quer ser '+m.prefere:''].filter(Boolean).join(' · '))}</div></div><span class="chip" style="background:var(--card);color:var(--card-ink);white-space:nowrap">⏳ Pendente</span></div>`).join('')}</div></div>`}
 function painelMembros(){const ms=membrosSemCadastro();
-  return`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Entraram pelo convite</h3><span class="cnt" style="font-size:12px;font-weight:700;background:var(--card);color:var(--card-ink);border-radius:10px;padding:2px 8px">${ms.length}</span></div>
-    <div class="sub" style="margin-bottom:6px">Estas pessoas entraram na pelada e ainda não estão no elenco. Cadastre e dê a nota inicial.</div><div class="list">
+  return`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Pendentes</h3><span class="cnt" style="font-size:12px;font-weight:700;background:var(--card);color:var(--card-ink);border-radius:10px;padding:2px 8px">${ms.length}</span></div>
+    <div class="sub" style="margin-bottom:6px">Estão esperando sua autorização. Toque em Autorizar para colocar no elenco com a nota inicial, ou em Já está se a pessoa já foi cadastrada.</div><div class="list">
     ${ms.map(([u,m])=>`<div class="item"><div class="av bg-${m.pos||'MEI'}" style="${fotoStyle(m.foto)}">${m.foto?'':esc(initials(m.apelido||m.nome))}</div><div class="grow"><div class="name">${esc(m.apelido||m.nome||'Sem nome')}${u===myId?' (você)':''}</div><div class="sub">${esc([POS[m.pos]||'',m.prefere?'quer ser '+m.prefere:'',m.tel||''].filter(Boolean).join(' · '))}</div></div>
-      <div class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm primary" data-act="membro-cad" data-u="${u}">Cadastrar</button><button class="btn sm" data-act="membro-vinc" data-u="${u}" aria-label="Já está no elenco">Já está</button></div></div>`).join('')}</div></div>`}
+      <div class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm primary" data-act="membro-cad" data-u="${u}">${(GRUPO&&(GRUPO.admins||[]).includes(u))?'Entrar no elenco':'Autorizar'}</button><button class="btn sm" data-act="membro-vinc" data-u="${u}" aria-label="Já está no elenco">Já está</button></div></div>`).join('')}</div></div>`}
 function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GRUPO)return;const adms=GRUPO.admins||[];
   const nome=u=>{const m=(S.membros||{})[u];const j=S.pres[u]&&S.jog[S.pres[u].jogador];return(j&&(j.apelido||j.nome))||(m&&(m.apelido||m.nome))||'Sem nome'};
   const outros=Object.keys(S.membros||{}).filter(u=>!adms.includes(u));
@@ -743,14 +751,16 @@ function renderTab(){
       <div class="row between"><div><b>3. Convide a galera</b><div class="sub">Mande o link no grupo do WhatsApp</div></div><button class="btn sm" data-act="msg" data-v="convite">Convidar</button></div>
       <div class="row between"><div><b>4. Avisos</b><div class="sub">Programe os horários das mensagens</div></div><button class="btn sm" data-act="tab" data-v="avisos">Programar</button></div></div>
       ${membrosSemCadastro().length?painelMembros():''}</div>`
-    :`<div class="board"><div class="when">Bem-vindo!</div><div class="where">Você entrou na ${esc(cfg().nome)}. O administrador ainda está montando o elenco. Assim que você estiver na lista, é só escolher seu nome e confirmar presença.</div></div>`;
+    :`<div class="board"><div class="when">Bem-vindo!</div><div class="where">Você entrou na ${esc(cfg().nome)}.</div></div>${euPendente()?bannerPendente():''}`;
   }
   return({jogo:tJogo,elenco:tElenco,avisos:tAvisos,ranking:tRanking,caixa:tCaixa}[UI.tab]||tJogo)(A);
 }
 
+function bannerPendente(){return`<div class="banner due" style="margin-top:12px"><span><b>⏳ Sua entrada está esperando a autorização do administrador.</b><br>Assim que ele autorizar, seu nome entra no elenco e você já pode confirmar presença.</span></div>`}
 /* --- Jogo --- */
 function tJogo(A){
   const c=cfg();let h='';
+  if(!A&&euPendente())h+=bannerPendente().replace('margin-top:12px','margin:0 0 12px');
   if(!A){const pend=avalPendenteJogador();if(pend){const[pid,p]=pend,L=S.locais[p.localId],d=S.pres[myId]||{};
     h+=`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Como estava o campo?</h3></div>
       <div class="sub" style="margin-bottom:4px">${esc(L.nome)} · pelada de ${dShort(p.data)}</div>${formAvalCampo(pid,(d.avalCampo||{})[pid],'me')}
@@ -901,22 +911,30 @@ function tElenco(A){
   let h=`<div class="row between" style="margin-bottom:10px"><h2>Elenco <span class="muted num">${ativos().length}</span></h2>${A?'<button class="btn primary" data-act="add-jog">+ Jogador</button>':''}</div>
     <input type="text" id="busca" placeholder="Buscar jogador" value="${esc(UI.busca)}" data-in="busca" style="margin-bottom:10px">
     <div class="pick" style="margin-bottom:12px">${[['todos','Todos'],['GOL','GOL'],['ZAG','ZAG'],['MEI','MEI'],['ATA','ATA'],['mensalista','Mensalistas'],['diarista','Diaristas'],['inativos','Inativos']].map(([k,n])=>`<button data-act="filtro" data-v="${k}" aria-pressed="${UI.filtro===k}">${n}</button>`).join('')}</div>`;
-  if(A&&membrosSemCadastro().length)h+=painelMembros();
+  if(membrosSemCadastro().length&&!demo)h+=A?painelMembros():painelPendentes();
+  if(!A&&euPendente())h=bannerPendente().replace('margin-top:12px','margin:0 0 12px')+h;
   if(!Object.keys(S.jog).length){
     h+=`<div class="panel stack" style="text-align:center;padding-block:22px">
       <div style="font-size:40px;line-height:1">👕</div><h3 style="align-self:center">Elenco vazio</h3>
       <p class="sub" style="margin:0">${A?'Monte o elenco de dois jeitos: convide a galera para entrar pelo app, ou cadastre cada jogador você mesmo.':'Ainda não tem ninguém no elenco. Chame a galera para a pelada!'}</p>
       <button class="btn primary block" data-act="qr-pelada">📲 Convidar pelo QR Code ou link</button>
       ${A?'<button class="btn block" data-act="add-jog">✍️ Adicionar jogador manualmente</button>':''}
-      ${A?'<p class="sub" style="margin:0;text-align:left">Quem entrar pelo convite aparece aqui em cima, em "Entraram pelo convite", para você dar a nota inicial.</p>':''}</div>`;
+      ${A?'<p class="sub" style="margin:0;text-align:left">Quem entrar pelo convite aparece aqui em cima, em "Pendentes", para você autorizar e dar a nota inicial.</p>':''}</div>`;
     return h;
   }
-  h+='<div class="panel"><div class="list">';
-  if(!ids.length)h+='<div class="empty">Nenhum jogador aqui.</div>';
-  for(const id of ids){const s=st[id]||{};
-    h+=`<button class="item" data-act="ver-jog" data-j="${id}" style="all:unset;display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);cursor:pointer">
-      ${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${S.jog[id].pos}">${S.jog[id].pos}</span><span>${S.jog[id].tipo==='diarista'?'Diarista':'Mensalista'} · ${s.j||0} jogos · ${s.g||0} gols</span></div></div><span class="nota num">${fmtN(notaAtual(id))}</span></button>`}
-  return h+'</div></div>';
+  const linha=(id,tag='')=>{const s=st[id]||{};
+    return`<button class="item" data-act="ver-jog" data-j="${id}" style="all:unset;display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);cursor:pointer">
+      ${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${S.jog[id].pos}">${S.jog[id].pos}</span>${tag}<span>${S.jog[id].tipo==='diarista'?'Diarista':'Mensalista'} · ${s.j||0} jogos · ${s.g||0} gols</span></div></div><span class="nota num">${fmtN(notaAtual(id))}</span></button>`};
+  if(UI.filtro==='inativos'){h+='<div class="panel"><div class="list">'+(ids.length?ids.map(id=>linha(id)).join(''):'<div class="empty">Nenhum jogador aqui.</div>')+'</div></div>';return h}
+  const set=new Set(ids),cur=atual();
+  const exc=cur?lista(cur[1],cur[0]).espera.filter(id=>set.has(id)):[];
+  const mens=ids.filter(id=>S.jog[id].tipo!=='diarista');
+  const espIds=exc.concat(ids.filter(id=>S.jog[id].tipo==='diarista'&&!exc.includes(id)));
+  if(UI.filtro!=='diarista')h+=`<div class="panel" style="margin-bottom:12px"><div class="panel-h"><h3>Mensalistas <span class="muted num">${mens.length}</span></h3></div><div class="list">${mens.length?mens.map(id=>linha(id)).join(''):'<div class="empty">Nenhum mensalista aqui.</div>'}</div></div>`;
+  if(UI.filtro!=='mensalista')h+=`<div class="panel"><div class="panel-h"><h3>Lista de espera <span class="muted num">${espIds.length}</span></h3></div>
+    <div class="sub" style="margin-bottom:4px">Diaristas e quem confirmou com a lista cheia. Mensalista tem prioridade na espera.</div>
+    <div class="list">${espIds.length?espIds.map(id=>linha(id,exc.includes(id)?`<span class="chip" style="background:var(--card);color:var(--card-ink)">${exc.indexOf(id)+1}º na espera ${dShort(cur[1].data)}</span>`:'')).join(''):'<div class="empty">Ninguém na espera.</div>'}</div></div>`;
+  return h;
 }
 
 /* --- Avisos --- */
