@@ -221,7 +221,8 @@ function render() {
     <form id="f-nova" class="stack" novalidate>
       <label class="field"><span>Nome da pelada</span><input type="text" id="n-nome" placeholder="Pelada do Sábado" required></label>
       <div class="grid2"><label class="field"><span>Dia fixo</span><select id="n-dia">${DIASN.map((d, i) => `<option value="${i}" ${i === 6 ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
-      <label class="field"><span>Horário</span><input type="time" id="n-hora" value="08:00"></label></div>
+      <label class="field"><span>Início</span><input type="time" id="n-hora" value="08:00"></label></div>
+      <label class="field"><span>Término</span><input type="time" id="n-fim" value="09:00"></label>
       <div class="grid2"><label class="field"><span>Times</span><select id="n-times"><option>2</option><option>3</option><option>4</option></select></label>
       <label class="field"><span>Jogadores de linha por time</span><input type="number" id="n-por" value="5" min="3" max="11"></label></div>
       <div class="grid2"><label class="field"><span>Mensalidade (R$)</span><input type="number" id="n-mens" value="80" min="0"></label><label class="field"><span>Diária (R$)</span><input type="number" id="n-dia2" value="20" min="0"></label></div>
@@ -320,7 +321,7 @@ async function aceitarConvite() {
 async function criarGrupo(f) {
   if (OCUPADO) return; OCUPADO = true;
   const gid = novoId(), codigo = novoCodigo(), p = PERFIL || {}, now = Date.now();
-  const cfg = { nome: f.nome, dia: f.dia, hora: f.hora, local: '', times: f.times, porTime: f.por, mensal: f.mens, diaria: f.diaria, pix: '', restr: [], nivelPublico: false };
+  const cfg = { nome: f.nome, dia: f.dia, hora: f.hora, horaFim: f.fim, golSorteio: false, local: '', times: f.times, porTime: f.por, mensal: f.mens, diaria: f.diaria, pix: '', restr: [], nivelPublico: false };
   try {
     await B.batch([
       { op: 'set', path: 'grupos/' + gid, data: { nome: f.nome, dia: f.dia, hora: f.hora, dono: EU.uid, admins: [EU.uid], codigo, criadoEm: now } },
@@ -427,7 +428,7 @@ document.addEventListener('submit', async e => {
     return;
   }
   if (f.id === 'f-nova') { if (!val('n-nome')) { aviso('Dê um nome para a pelada.'); return; }
-    criarGrupo({ nome: val('n-nome'), dia: Number($('n-dia').value), hora: $('n-hora').value || '08:00', times: Number($('n-times').value) || 2, por: Math.max(3, Math.min(11, Number($('n-por').value) || 5)), mens: Number($('n-mens').value) || 0, diaria: Number($('n-dia2').value) || 0 }); }
+    criarGrupo({ nome: val('n-nome'), dia: Number($('n-dia').value), hora: $('n-hora').value || '08:00', fim: $('n-fim').value || '', times: Number($('n-times').value) || 2, por: Math.max(3, Math.min(11, Number($('n-por').value) || 5)), mens: Number($('n-mens').value) || 0, diaria: Number($('n-dia2').value) || 0 }); }
   if (f.id === 'f-codigo') buscarCodigo(val('cod'));
 });
 

@@ -95,7 +95,7 @@ function notaAtual(id){
     const enc=encerradas();
     for(const jid in S.jog){
       const ini=notaInicial(S.jog[jid]);let W=2,T=ini*2,k=0;
-      for(const[,p] of enc){const n=p.stats?.[jid]?.n;if(typeof n==='number'){const w=Math.pow(.85,k++);W+=w;T+=n*w;if(k>=15)break}}
+      for(const[pid,p] of enc){const n=notaJogo(p,pid,jid);if(typeof n==='number'){const w=Math.pow(.85,k++);W+=w;T+=n*w;if(k>=15)break}}
       NOTA_CACHE[jid]=T/W;
     }}
   return NOTA_CACHE[id]??5;
@@ -134,8 +134,9 @@ function lista(p,pid){
 }
 function posLinha(id){const j=J(id);if(j.pos!=='GOL')return j.pos;return j.pos2&&j.pos2!=='GOL'?j.pos2:'MEI'}
 function sortear(p,T){
-  const{escalados,gks}=lista(p),N=notaAtual;
-  const gk=gks.slice().sort((a,b)=>N(b)-N(a));
+  const{escalados,gks}=lista(p),N=notaAtual,noSorteio=!!cfg().golSorteio;
+  // padrão: goleiro é extra e não entra no sorteio; o time é formado só pelos jogadores de linha
+  const gk=noSorteio?gks.slice().sort((a,b)=>N(b)-N(a)):[];
   const teamsGk=Array.from({length:T},(_,i)=>gk[i]||null);
   const line=escalados.concat(gk.slice(T));
   const L=Array.from({length:T},()=>[]);
@@ -170,14 +171,39 @@ function sortear(p,T){
   return L.map((arr,i)=>({cor:i,gk:teamsGk[i],ids:arr.sort((a,b)=>ord[posLinha(a)]-ord[posLinha(b)])}));
 }
 function teamMedia(t){const ids=(t.gk?[t.gk]:[]).concat(t.ids);return ids.length?sum(ids.map(notaAtual))/ids.length:0}
-function jogaram(p){if(p.jogaram)return p.jogaram;if(p.times)return p.times.flatMap(t=>(t.gk?[t.gk]:[]).concat(t.ids));return p.resp||1?lista(p).escalados.concat(lista(p).gks):[]}
+function jogaram(p){if(p.jogaram)return p.jogaram;if(p.times)return p.times.flatMap(t=>(t.gk?[t.gk]:[]).concat(t.ids)).concat((p.goleiros||[]).filter(id=>S.jog[id]));return p.resp||1?lista(p).escalados.concat(lista(p).gks):[]}
+/* horário de início e término */
+function maisHora(h,min){const[a,b]=String(h||'08:00').split(':').map(Number);const t=((a*60+b+min)%1440+1440)%1440;return pad(Math.floor(t/60))+':'+pad(t%60)}
+function horaIniDe(p){return(p&&p.hora)||cfg().hora}
+function horaFimDe(p){return(p&&p.horaFim)||cfg().horaFim||maisHora(horaIniDe(p),60)}
+function horarioTxt(p){return horaIniDe(p)+' às '+horaFimDe(p)}
+function fimDe(p){const d=parseD(p.data),i=horaIniDe(p),f=horaFimDe(p),[h,m]=f.split(':').map(Number);d.setHours(h,m,0,0);if(f<=i)d.setDate(d.getDate()+1);return d}
+const JANELA_POS=48*36e5;
+function posAberto(p){const f=fimDe(p).getTime(),n=Date.now();return n>=f&&n<f+JANELA_POS}
+/* avaliação em estrelas: cada um vota em todo mundo que jogou, menos em si mesmo */
+let PV_CACHE={};
+function votosDe(pid){const out={};for(const d of Object.values(S.pres||{})){const v=d&&d.votos&&d.votos[pid];if(v&&d.jogador)out[d.jogador]=v}return out}
+function placarVotos(pid){if(PV_CACHE[pid])return PV_CACHE[pid];const r={};
+  for(const[voter,m] of Object.entries(votosDe(pid)))for(const[j,v] of Object.entries(m||{})){if(j===voter||!Number(v))continue;(r[j]=r[j]||[]).push(Number(v))}
+  const out={};for(const j in r)out[j]={m:sum(r[j])/r[j].length,n:r[j].length};return PV_CACHE[pid]=out}
+function notaJogo(p,pid,jid){const pv=placarVotos(pid)[jid];if(pv)return pv.m*2;const n=p.stats?.[jid]?.n;return typeof n==='number'?n:null}
+function craquePereba(pid){const pv=placarVotos(pid),ids=Object.keys(pv).filter(j=>S.jog[j]);if(ids.length<2)return{};
+  ids.sort((a,b)=>pv[b].m-pv[a].m||pv[b].n-pv[a].n);return{mvp:ids[0],per:ids[ids.length-1]}}
+function premiosDe(p,pid){pid=pid||pidOf(p);const pr={...(p.premios||{})},cp=craquePereba(pid);
+  if(!pr.mvp&&cp.mvp)pr.mvp=cp.mvp;if(!pr.per&&cp.per)pr.per=cp.per;return pr}
+/* gols e assistências lançados pelo próprio jogador: ficam pendentes até um administrador aprovar */
+function lancStatus(p,u,L){if(!L)return null;if((p.lancOk||{})[u]>=L.t)return'ok';if((p.lancRec||{})[u]>=L.t)return'rec';return'pend'}
+function lancPendentes(){const out=[];for(const[u,d] of Object.entries(S.pres||{})){if(!d||!d.jogador||!S.jog[d.jogador])continue;
+  for(const[pid,L] of Object.entries(d.lanc||{})){const p=S.pel[pid];if(p&&lancStatus(p,u,L)==='pend')out.push({u,pid,p,L,j:d.jogador})}}
+  return out.sort((a,b)=>a.L.t-b.L.t)}
+function trim10(o){return Object.fromEntries(Object.entries(o||{}).sort((x,y)=>String(x[0]).localeCompare(String(y[0]))).slice(-10))}
 function temporada(ano){
   const enc=encerradas().filter(([,p])=>!ano||p.data.startsWith(String(ano)));
   const st={};for(const id in S.jog)st[id]={j:0,g:0,a:0,mvp:0,art:0,gar:0,gol:0};
   for(const[,p] of enc){
     for(const id of jogaram(p)){if(st[id])st[id].j++}
     for(const id in p.stats||{}){if(!st[id])continue;st[id].g+=p.stats[id].g||0;st[id].a+=p.stats[id].a||0}
-    const pr=p.premios||{};if(st[pr.mvp])st[pr.mvp].mvp++;if(st[pr.art])st[pr.art].art++;if(st[pr.gar])st[pr.gar].gar++;if(st[pr.gol])st[pr.gol].gol++;
+    const pr=premiosDe(p);if(st[pr.mvp])st[pr.mvp].mvp++;if(st[pr.art])st[pr.art].art++;if(st[pr.gar])st[pr.gar].gar++;if(st[pr.gol])st[pr.gol].gol++;
   }
   return{st,total:enc.length};
 }
@@ -347,7 +373,7 @@ function sheetDono(){const ls=Object.entries(S.locais).sort((a,b)=>a[1].nome.loc
 /* ---------- mensagens para o WhatsApp ---------- */
 function msg(tipo,ctx={}){
   const c=cfg(),pe=atual(),p=ctx.pel||(pe&&pe[1]);
-  const quando=p?`📅 *${dLong(p.data)}* às *${p.hora||c.hora}*`:`📅 *${DIAS[c.dia]}* às *${c.hora}*`;
+  const quando=p?`📅 *${dLong(p.data)}* das *${horaIniDe(p)}* às *${horaFimDe(p)}*`:`📅 *${DIAS[c.dia]}* das *${c.hora}* às *${horaFimDe(null)}*`;
   const LL=localDe(p),onde=LL?LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):'';
   const head=`⚽ *${c.nome.toUpperCase()}*`;
   if(tipo==='convocacao')return[head,quando,onde?'📍 '+onde:'','',`São ${c.times*c.porTime} vagas na linha + goleiros. Mensalista tem prioridade.`,'Responda aqui: ✅ vou  |  ❌ não vou'].filter((x,i)=>x!==''||i===3).join('\n');
@@ -366,13 +392,15 @@ function msg(tipo,ctx={}){
     const out=[head,quando,'','*TIMES SORTEADOS*'];
     p.times.forEach(t=>{const co=CORES[t.cor];out.push('',`${co.e} *${co.n.toUpperCase()}* · média ${fmtN(teamMedia(t))}`);
       if(t.gk)out.push('🧤 '+nm(t.gk));t.ids.forEach(id=>out.push(`${posLinha(id)} ${nm(id)}`))});
+    {const gx=(p.goleiros||[]).filter(id=>S.jog[id]);if(gx.length)out.push('','🧤 *GOLEIROS*',...gx.map(id=>nm(id)))}
     out.push('','Bom jogo! ⚽');return out.join('\n')}
-  if(tipo==='resultado'){const pr=p.premios||{},st=p.stats||{},out=[`🏁 *RESULTADO · ${dShort(p.data)}*`,''];
+  if(tipo==='resultado'){const pr=premiosDe(p),st=p.stats||{},out=[`🏁 *RESULTADO · ${dShort(p.data)}*`,''];
     if(p.times&&p.vit&&p.vit.some(v=>v>0)){p.times.forEach((t,i)=>out.push(`${CORES[t.cor].e} ${CORES[t.cor].n}: ${p.vit[i]||0} vitória(s)`));out.push('')}
     if(pr.mvp)out.push('🏆 Craque da pelada: *'+nm(pr.mvp)+'*');
     if(pr.art)out.push(`⚽ Artilheiro: *${nm(pr.art)}* (${st[pr.art]?.g||0} gol${(st[pr.art]?.g||0)===1?'':'s'})`);
     if(pr.gar)out.push(`🅰️ Garçom: *${nm(pr.gar)}* (${st[pr.gar]?.a||0} assist.)`);
     if(pr.gol)out.push('🧤 Melhor goleiro: *'+nm(pr.gol)+'*');
+    if(pr.per)out.push('🐢 Pereba da pelada: *'+nm(pr.per)+'*');
     const gols=Object.entries(st).filter(([,s])=>s.g>0).sort((a,b)=>b[1].g-a[1].g);
     if(gols.length){out.push('','*Gols*');gols.forEach(([id,s])=>out.push(`• ${nm(id)} ${s.g}`))}
     out.push('','Valeu, rapaziada! Até a próxima 💪');return out.join('\n')}
@@ -422,10 +450,10 @@ function itensJogador(){
   for(const m of ((S.mural||{}).items||[]))out.push({id:'m'+m.id,tipo:'recado',titulo:m.titulo||'Recado do administrador',texto:m.txt,t:m.t,longo:true});
   if(!j)return out.sort((a,b)=>b.t-a.t);
   const c=cfg();
-  for(const[pid,p] of Object.entries(S.pel)){const q=dShort(p.data)+' às '+(p.hora||c.hora),LL=localDe(p),onde=LL?' · '+LL.nome:'';
+  for(const[pid,p] of Object.entries(S.pel)){const q=dShort(p.data)+' das '+horarioTxt(p),LL=localDe(p),onde=LL?' · '+LL.nome:'';
     if(p.status==='encerrada'){
-      const st=(p.stats||{})[j];if(p.encerradaEm&&jogaram(p).includes(j))out.push({id:'enc'+pid,tipo:'resultado',titulo:'Resultado da pelada',texto:`Pelada de ${dShort(p.data)} encerrada.${typeof st?.n==='number'?' Sua nota: '+fmtN(st.n)+'.':''}${st?.g?' Gols: '+st.g+'.':''}`,t:p.encerradaEm});
-      const pr=p.premios||{};const nomes={mvp:'craque da pelada',art:'artilheiro',gar:'garçom',gol:'melhor goleiro'};
+      const st=(p.stats||{})[j],nj=notaJogo(p,pid,j);if(p.encerradaEm&&jogaram(p).includes(j))out.push({id:'enc'+pid,tipo:'resultado',titulo:'Resultado da pelada',texto:`Pelada de ${dShort(p.data)} encerrada.${typeof nj==='number'?' Sua nota: '+fmtN(nj)+'.':''}${st?.g?' Gols: '+st.g+'.':''}`,t:p.encerradaEm});
+      const pr=premiosDe(p,pid);const nomes={mvp:'craque da pelada',art:'artilheiro',gar:'garçom',gol:'melhor goleiro'};
       for(const k in nomes)if(pr[k]===j&&p.encerradaEm)out.push({id:'pr'+pid+k,tipo:'resultado',titulo:'Parabéns! 🏆',texto:`Você foi o ${nomes[k]} da pelada de ${dShort(p.data)}.`,t:p.encerradaEm+1});
       continue}
     const l=lista(p,pid),r=respDe(p,pid)[j];
@@ -522,10 +550,10 @@ function campo(ctx,W,H){
   ctx.fillStyle=ART.y;ctx.beginPath();ctx.moveTo(W-40,40);ctx.lineTo(W-40,150);ctx.lineTo(W-150,40);ctx.closePath();ctx.fill();
   ctx.fillStyle='#F0662A';ctx.beginPath();ctx.moveTo(40,H-40);ctx.lineTo(40,H-130);ctx.lineTo(130,H-40);ctx.closePath();ctx.fill();
 }
-function premioStat(p,k){const id=(p.premios||{})[k],s=(p.stats||{})[id]||{};
+function premioStat(p,k){const id=premiosDe(p)[k],s=(p.stats||{})[id]||{};
   if(k==='art')return(s.g||0)+(s.g===1?' GOL':' GOLS');
   if(k==='gar')return(s.a||0)+(s.a===1?' ASSISTÊNCIA':' ASSISTÊNCIAS');
-  return typeof s.n==='number'?'NOTA '+fmtN(s.n):'';
+  const n=notaJogo(p,pidOf(p),id);return typeof n==='number'?'NOTA '+fmtN(n):'';
 }
 function cabecalho(ctx,W,p){
   const c=cfg();ctx.textBaseline='alphabetic';
@@ -537,9 +565,9 @@ function arteGeral(p){
   campo(ctx,W,H);cabecalho(ctx,W,p);
   ctx.fillStyle=ART.y;ctx.font='800 150px "Saira Condensed", Impact, sans-serif';ctx.fillText('DESTAQUES',86,290);
   ctx.fillStyle=ART.w;ctx.font='700 58px "Saira Condensed", Impact, sans-serif';ctx.fillText('DA PELADA',92,355);
-  const ks=['mvp','art','gar','gol'].filter(k=>(p.premios||{})[k]);
+  const PR=premiosDe(p),ks=['mvp','art','gar','gol'].filter(k=>PR[k]);
   const top=430,rowH=Math.min(210,(H-top-110)/Math.max(1,ks.length));
-  ks.forEach((k,i)=>{const y=top+i*rowH,id=p.premios[k],j=J(id);
+  ks.forEach((k,i)=>{const y=top+i*rowH,id=PR[k],j=J(id);
     ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.roundRect(80,y,W-160,rowH-24,22);ctx.fill();
     const cx=80+28+62,cy=y+(rowH-24)/2,im=imgDe(id);ctx.fillStyle=POSCOR[j.pos]||'#555';ctx.beginPath();ctx.arc(cx,cy,62,0,Math.PI*2);ctx.fill();
     if(im)circFoto(ctx,im,cx,cy,62);
@@ -554,7 +582,7 @@ function arteGeral(p){
 }
 function arteIndividual(p,k){
   const W=1080,H=1350,cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
-  const id=p.premios[k],j=J(id),FAM='"Saira Condensed", Impact, sans-serif';
+  const id=premiosDe(p)[k],j=J(id),FAM='"Saira Condensed", Impact, sans-serif';
   campo(ctx,W,H);cabecalho(ctx,W,p);
   ctx.textAlign='center';ctx.fillStyle=ART.y;fit(ctx,PREMIO[k].t.toUpperCase(),W-180,130,800,FAM);ctx.fillText(PREMIO[k].t.toUpperCase(),W/2,300);
   const cy=600,im=imgDe(id);ctx.fillStyle=POSCOR[j.pos]||'#555';ctx.beginPath();ctx.arc(W/2,cy,200,0,Math.PI*2);ctx.fill();
@@ -570,14 +598,14 @@ function arteIndividual(p,k){
   ctx.textAlign='left';return cv;
 }
 async function sheetArtes(pid){
-  const p=S.pel[pid],ks=['mvp','art','gar','gol'].filter(k=>(p.premios||{})[k]);
+  const p=S.pel[pid],PR=premiosDe(p,pid),ks=['mvp','art','gar','gol'].filter(k=>PR[k]);
   if(!ks.length){toast('Escolha os prêmios antes de gerar as artes.');return}
   openSheet('Artes da pelada','<div class="empty">Desenhando as artes…</div>');
-  await fontsReady();await Promise.all(ks.map(k=>carregarImg(fotoDe(p.premios[k]))));
+  await fontsReady();await Promise.all(ks.map(k=>carregarImg(fotoDe(PR[k]))));
   ARTS.forEach(a=>URL.revokeObjectURL(a.url));ARTS=[];
   const mk=async(cv,nome,label)=>{const blob=await new Promise(r=>cv.toBlob(r,'image/png'));ARTS.push({blob,url:URL.createObjectURL(blob),nome,label})};
   await mk(arteGeral(p),`destaques-${p.data}.png`,'Destaques');
-  for(const k of ks)await mk(arteIndividual(p,k),`${k==='mvp'?'craque':k==='art'?'artilheiro':k==='gar'?'garcom':'goleiro'}-${p.data}.png`,PREMIO[k].t+' · '+nm(p.premios[k]));
+  for(const k of ks)await mk(arteIndividual(p,k),`${k==='mvp'?'craque':k==='art'?'artilheiro':k==='gar'?'garcom':'goleiro'}-${p.data}.png`,PREMIO[k].t+' · '+nm(PR[k]));
   const body=document.getElementById('sheet-body');if(!body)return;
   const btn=i=>dl?`<button class="btn sm ${i===0?'primary':''}" data-act="salvar-arte" data-i="${i}">Salvar imagem</button>`:'';
   body.innerHTML=`<div class="stack"><div class="art-main"><img src="${ARTS[0].url}" alt="Arte com os destaques da pelada">${btn(0)}</div>
@@ -699,7 +727,7 @@ function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GR
 
 /* ---------- render ---------- */
 function render(){
-  NOTA_CACHE=null;
+  NOTA_CACHE=null;PV_CACHE={};
   const app=document.getElementById('app');
   const ae=document.activeElement,aid=ae&&ae.id,sel=aid&&ae.selectionStart!=null?[ae.selectionStart,ae.selectionEnd]:null;
   renderNav();setTimeout(checarPush,0);
@@ -745,10 +773,12 @@ function tJogo(A){
     h+=`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Como estava o campo?</h3></div>
       <div class="sub" style="margin-bottom:4px">${esc(L.nome)} · pelada de ${dShort(p.data)}</div>${formAvalCampo(pid,(d.avalCampo||{})[pid],'me')}
       <div class="sub" style="margin-top:4px">Sua avaliação ajuda a galera a escolher onde jogar.</div></div>`}}
+  h+=painelPosJogo();
+  if(A)h+=painelAprovar();
   if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar: ${esc(AVISOS[v.a.tipo]?.n||'')}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
   const cur=atual();
   if(!cur){
-    h+=`<div class="board"><div class="when">Sem pelada<br>marcada</div><div class="where">${esc(DIAS[c.dia])} às ${esc(c.hora)}${c.local?' · '+esc(c.local):''}</div></div>`;
+    h+=`<div class="board"><div class="when">Sem pelada<br>marcada</div><div class="where">${esc(DIAS[c.dia])} das ${esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div></div>`;
     if(A){
       if(UI.npLoc===undefined)UI.npLoc=(c.localId&&S.locais[c.localId])?c.localId:null;
       const L=UI.npLoc&&S.locais[UI.npLoc];
@@ -760,14 +790,15 @@ function tJogo(A){
       ${rec.length?`<div class="sub" style="margin-top:4px">Usados recentemente</div><div class="quick">${rec.map(([id,R])=>`<button data-act="np-rapido" data-v="${id}">${esc(R.nome)}<small>${esc(R.end?R.end.split(',').slice(-2).join(',').trim():'')}</small></button>`).join('')}</div>`:''}</div>
       ${L?`<div class="field"><span><i class="stepn">2</i>Quando?</span><div class="grid2">
       <label class="field"><span>Data</span><input type="date" id="np-data" value="${UI.npData||proximaData()}"></label>
-      <label class="field"><span>Horário</span><input type="time" id="np-hora" value="${esc(UI.npHora||c.hora)}"></label></div>
+      <label class="field"><span>Início</span><input type="time" id="np-hora" value="${esc(UI.npHora||c.hora)}"></label></div>
+      <label class="field"><span>Término</span><input type="time" id="np-fim" value="${esc(UI.npFim||horaFimDe(null))}"></label>
 </div>
       <button class="btn primary" data-act="nova-pel">Abrir lista de presença</button>`
       :`<p class="sub" style="margin:0">Depois de escolher o local, você define a data e o horário.</p>`}</div>`}
     return h+renderHist(A);
   }
   const[pid,p]=cur,l=lista(p);
-  h+=`<div class="board"><div class="when">${dShort(p.data)}<br>${esc(p.hora||c.hora)}</div><div class="where row" style="gap:8px">${(()=>{const LL=localDe(p);return LL?`<span>📍 ${esc(LL.nome)}${LL.end?' · '+esc(LL.end):''}</span>${LL.end||LL.tel?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="como-chegar" data-p="${pid}">${LL.end?'🗺️ Como chegar':'📞 Contato'}</button>`:''}`:'Local a definir'})()}${A?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="trocar-local" data-p="${pid}">${localDe(p)?'Trocar local':'Definir local'}</button>`:''}</div>
+  h+=`<div class="board"><div class="when">${dShort(p.data)}<br>${esc(horaIniDe(p))}<small class="ate"> às ${esc(horaFimDe(p))}</small></div><div class="where row" style="gap:8px">${(()=>{const LL=localDe(p);return LL?`<span>📍 ${esc(LL.nome)}${LL.end?' · '+esc(LL.end):''}</span>${LL.end||LL.tel?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="como-chegar" data-p="${pid}">${LL.end?'🗺️ Como chegar':'📞 Contato'}</button>`:''}`:'Local a definir'})()}${A?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="trocar-local" data-p="${pid}">${localDe(p)?'Trocar local':'Definir local'}</button>`:''}</div>
     <div class="stats"><div class="stat"><b class="num">${l.escalados.length}/${l.vagas}</b><span>Linha</span></div><div class="stat"><b class="num">${l.gks.length}</b><span>Goleiros</span></div><div class="stat"><b class="num">${l.espera.length}</b><span>Espera</span></div><div class="stat"><b class="num">${l.pend.length}</b><span>Sem resposta</span></div></div></div>`;
   h+=`<div class="seg" style="margin-block:12px" role="group">${[['presenca','Presença'],['times','Times'],['pos','Pós-jogo']].map(([k,n])=>`<button data-act="sub" data-v="${k}" aria-pressed="${UI.sub===k}">${n}</button>`).join('')}</div>`;
   if(!A)h+=painelJogador(pid,p,l);
@@ -799,7 +830,7 @@ function subPresenca(pid,p,l,A){
 }
 function subTimes(pid,p,l,A){
   const c=cfg();let h='';
-  if(A)h+=`<div class="panel stack"><div class="row between"><div><b>${l.escalados.length} na linha · ${l.gks.length} goleiro(s)</b><div class="sub">Equilibra por nota e posição${(c.restr||[]).length?' · respeita '+c.restr.length+' regra(s)':''}</div></div>
+  if(A)h+=`<div class="panel stack"><div class="row between"><div><b>${l.escalados.length} na linha · ${l.gks.length} goleiro(s)</b><div class="sub">${c.golSorteio?'Goleiros entram no sorteio':'Goleiros ficam fora do sorteio (extra)'} · equilibra por nota e posição${(c.restr||[]).length?' · respeita '+c.restr.length+' regra(s)':''}</div></div>
     <div class="row"><select id="nt" aria-label="Número de times" style="width:auto">${[2,3,4].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
     <button class="btn primary" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div></div>`;
   if(!p.times)return h+`<div class="empty">Os times aparecem aqui depois do sorteio.</div>`;
@@ -814,28 +845,36 @@ function subTimes(pid,p,l,A){
       h+=`<li class="${isSel?'sel':''}">${A?`<button data-act="swap" data-p="${pid}" data-t="${ti}" data-j="${id}">${inner}</button>`:inner}</li>`}
     h+='</ul></div>'});
   h+='</div>';
+  {const gx=(p.goleiros||[]).filter(id=>S.jog[id]);if(gx.length)h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>🧤 Goleiros</h3><span class="sub">extra · fora do sorteio</span></div><div class="list">${gx.map(id=>`<div class="item">${avHTML(id)}<div class="grow name">${esc(nm(id))}</div><span class="num muted small">${fmtN(notaAtual(id))}</span></div>`).join('')}</div></div>`}
   if(A)h+=`<button class="btn block primary" style="margin-top:12px" data-act="msg" data-v="times">Mandar times no WhatsApp</button>`;
   return h;
 }
+function statusVotacao(p,pid,ids){const f=fimDe(p),n=Date.now(),vot=Object.keys(votosDe(pid)).filter(j=>ids.includes(j)).length;
+  const hf=`${DIAS3[f.getDay()]} ${pad(f.getHours())}:${pad(f.getMinutes())}`;
+  if(n<f.getTime())return`A avaliação abre no término da pelada (${hf}).`;
+  const fim=new Date(f.getTime()+JANELA_POS);
+  return(n<fim.getTime()?`Avaliação aberta até ${DIAS3[fim.getDay()]} ${pad(fim.getHours())}:${pad(fim.getMinutes())}.`:'Avaliação encerrada.')+` ${vot} de ${ids.length} já votaram.`}
 function subPos(pid,p,A){
-  const ids=jogaram(p),st=p.stats||{},pr=p.premios||{};
+  const ids=jogaram(p),st=p.stats||{},pr=premiosDe(p,pid),manual=p.premios||{},pv=placarVotos(pid);
   if(!ids.length)return`<div class="empty">Confirme a presença e sorteie os times antes do pós-jogo.</div>`;
   let h='';
   if(p.times&&A){h+=`<div class="panel" style="margin-bottom:12px"><h3 style="margin-bottom:8px">Vitórias por time</h3><div class="row" style="gap:16px">`;
     p.times.forEach((t,i)=>{const v=(p.vit||[])[i]||0;h+=`<div class="stepbox"><div class="step"><button data-act="vit" data-p="${pid}" data-i="${i}" data-d="-1" aria-label="Menos">−</button><output class="num">${v}</output><button data-act="vit" data-p="${pid}" data-i="${i}" data-d="1" aria-label="Mais">+</button></div><span class="lbl">${CORES[t.cor].n}</span></div>`});
     h+='</div></div>'}
-  h+=`<div class="panel"><div class="panel-h"><h3>Notas do jogo</h3><span class="sub">0 a 10</span></div><div class="list">`;
-  for(const id of ids){const s=st[id]||{};
-    const step=(f,lbl,val,disp)=>`<div class="stepbox">${A?`<div class="step"><button data-act="stat" data-p="${pid}" data-j="${id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${disp}</output><button data-act="stat" data-p="${pid}" data-j="${id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div>`:`<output class="num">${disp}</output>`}<span class="lbl">${lbl}</span></div>`;
-    const j=J(id);
-    h+=`<div class="item" style="flex-wrap:wrap">${avHTML(id)}<div class="grow" style="min-width:110px"><div class="name">${esc(nm(id))}</div><div class="sub">nota atual ${fmtN(notaAtual(id))}</div></div>
-      <div class="row" style="gap:6px">${step('n','Nota',s.n,s.n==null?'—':fmtN(s.n))}${step('g','Gols',s.g,s.g||0)}${step('a','Assist.',s.a,s.a||0)}</div></div>`}
+  const ord=ids.slice().sort((a,b)=>(pv[b]?.m||0)-(pv[a]?.m||0)||nm(a).localeCompare(nm(b)));
+  h+=`<div class="panel"><div class="panel-h"><h3>Avaliação da galera</h3><span class="sub">estrelas</span></div><div class="sub" style="margin-bottom:6px">${statusVotacao(p,pid,ids)} Cada um avalia todo mundo que jogou, menos a si mesmo.</div><div class="list">`;
+  for(const id of ord){const s=st[id]||{},v=pv[id];
+    const step=(f,lbl,disp)=>`<div class="stepbox">${A?`<div class="step"><button data-act="stat" data-p="${pid}" data-j="${id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${disp}</output><button data-act="stat" data-p="${pid}" data-j="${id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div>`:`<output class="num">${disp}</output>`}<span class="lbl">${lbl}</span></div>`;
+    h+=`<div class="item" style="flex-wrap:wrap">${avHTML(id)}<div class="grow" style="min-width:110px"><div class="name">${esc(nm(id))}${pr.mvp===id?' 🏆':''}${pr.per===id?' 🐢':''}</div><div class="sub">${v?`<span class="rnota">★ ${fmtN(v.m)}</span> · ${v.n} voto${v.n>1?'s':''}`:'sem votos ainda'}</div></div>
+      <div class="row" style="gap:6px">${step('g','Gols',s.g||0)}${step('a','Assist.',s.a||0)}</div></div>`}
   h+='</div></div>';
   const opts=(list,v)=>'<option value="">—</option>'+list.map(id=>`<option value="${id}" ${v===id?'selected':''}>${esc(nm(id))}</option>`).join('');
   const sugArt=ids.slice().sort((a,b)=>(st[b]?.g||0)-(st[a]?.g||0))[0],sugGar=ids.slice().sort((a,b)=>(st[b]?.a||0)-(st[a]?.a||0))[0];
   const gks=ids.filter(id=>J(id).pos==='GOL');
+  const auto=k=>!manual[k]&&pr[k]?'<div class="sub">Pelos votos da galera</div>':'';
   h+=`<div class="panel" style="margin-top:12px"><h3 style="margin-bottom:10px">Prêmios</h3><div class="awards">
-    <div class="award"><label for="pr-mvp">🏆 Craque</label>${A?`<select id="pr-mvp" data-act="premio" data-p="${pid}" data-f="mvp">${opts(ids,pr.mvp)}</select>`:esc(pr.mvp?nm(pr.mvp):'—')}</div>
+    <div class="award"><label for="pr-mvp">🏆 Craque</label>${A?`<select id="pr-mvp" data-act="premio" data-p="${pid}" data-f="mvp">${opts(ids,pr.mvp)}</select>${auto('mvp')}`:esc(pr.mvp?nm(pr.mvp):'—')}</div>
+    <div class="award"><label for="pr-per">🐢 Pereba</label>${A?`<select id="pr-per" data-act="premio" data-p="${pid}" data-f="per">${opts(ids,pr.per)}</select>${auto('per')}`:esc(pr.per?nm(pr.per):'—')}</div>
     <div class="award"><label for="pr-art">⚽ Artilheiro</label>${A?`<select id="pr-art" data-act="premio" data-p="${pid}" data-f="art">${opts(ids,pr.art)}</select>${!pr.art&&st[sugArt]?.g?`<div class="sub">Sugestão: ${esc(nm(sugArt))}</div>`:''}`:esc(pr.art?nm(pr.art):'—')}</div>
     <div class="award"><label for="pr-gar">🅰️ Garçom</label>${A?`<select id="pr-gar" data-act="premio" data-p="${pid}" data-f="gar">${opts(ids,pr.gar)}</select>${!pr.gar&&st[sugGar]?.a?`<div class="sub">Sugestão: ${esc(nm(sugGar))}</div>`:''}`:esc(pr.gar?nm(pr.gar):'—')}</div>
     <div class="award"><label for="pr-gol">🧤 Goleiro</label>${A?`<select id="pr-gol" data-act="premio" data-p="${pid}" data-f="gol">${opts(gks.length?gks:ids,pr.gol)}</select>`:esc(pr.gol?nm(pr.gol):'—')}</div></div></div>`;
@@ -845,16 +884,37 @@ function subPos(pid,p,A){
   if(A){
     const temPremio=['mvp','art','gar','gol'].some(k=>pr[k]);
     h+=`<div class="stack" style="margin-top:12px"><button class="btn warn" data-act="arte" data-p="${pid}" ${temPremio?'':'disabled'}>Gerar artes dos destaques</button><button class="btn" data-act="msg" data-v="resultado">Mandar resultado no WhatsApp</button>`;
-    h+=UI.confirmEnd?`<div class="confirm"><b>Encerrar a pelada de ${dShort(p.data)}?</b><span class="small">As notas entram no cálculo de cada jogador e a pelada vai para o histórico.</span><div class="row"><button class="btn primary" data-act="encerrar" data-p="${pid}">Encerrar</button><button class="btn" data-act="confirm-end" data-v="0">Voltar</button></div></div>`
+    h+=UI.confirmEnd?`<div class="confirm"><b>Encerrar a pelada de ${dShort(p.data)}?</b><span class="small">A pelada vai para o histórico. A galera ainda pode avaliar até 48h depois do término.</span><div class="row"><button class="btn primary" data-act="encerrar" data-p="${pid}">Encerrar</button><button class="btn" data-act="confirm-end" data-v="0">Voltar</button></div></div>`
       :`<button class="btn primary" data-act="confirm-end" data-v="1">Encerrar pelada</button>`;
     h+='</div>'}
   return h;
 }
+/* cartão do jogador depois do término: avaliar a galera e lançar seus gols e assistências */
+function posJogoMeu(){const j=meuJogador();if(!j)return null;
+  return Object.entries(S.pel).filter(([,p])=>jogaram(p).includes(j)&&posAberto(p)).sort((a,b)=>fimDe(b[1])-fimDe(a[1]))[0]||null}
+function painelPosJogo(){const pp=posJogoMeu();if(!pp)return'';const[pid,p]=pp,j=meuJogador(),doc=S.pres[myId]||{};
+  const outros=jogaram(p).filter(id=>id!==j&&S.jog[id]).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  const meus=(doc.votos||{})[pid]||{},feitos=outros.filter(id=>meus[id]).length;
+  const L=(doc.lanc||{})[pid],stt=lancStatus(p,myId,L),ap=(p.stats||{})[j]||{};
+  const rasc=(UI.lanc&&UI.lanc[pid])||{g:L?L.g:(ap.g||0),a:L?L.a:(ap.a||0)};
+  const aberto=UI.votoAberto===pid||feitos<outros.length;
+  let h=`<div class="panel stack" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Pós-jogo · ${dShort(p.data)}</h3><span class="sub num">${feitos}/${outros.length} avaliados</span></div>`;
+  h+=`<div class="sub" style="margin-top:-4px">Dê de 1 a 5 estrelas para cada um que jogou. Os votos definem o craque 🏆 e o pereba 🐢 da pelada.</div>`;
+  if(aberto)h+=`<div class="list">${outros.map(id=>`<div class="item">${avHTML(id)}<div class="grow name">${esc(nm(id))}</div>${estrelasInput(meus[id],`data-act="voto" data-p="${pid}" data-j="${id}"`)}</div>`).join('')}</div>`;
+  else h+=`<div class="row between"><span>✓ Você avaliou todo mundo.</span><button class="btn sm" data-act="voto-abrir" data-p="${pid}">Rever votos</button></div>`;
+  const stp=(f,lbl)=>`<div class="stepbox"><div class="step"><button data-act="lanc-step" data-p="${pid}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${rasc[f]||0}</output><button data-act="lanc-step" data-p="${pid}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`;
+  const stTxt=stt==='ok'?'✅ Aprovado pelo administrador.':stt==='rec'?'❌ O administrador não aprovou. Confira e envie de novo.':stt==='pend'?'⏳ Enviado. Aguardando a aprovação de um administrador.':'Seus números só contam depois que um administrador aprovar.';
+  h+=`<div style="border-top:1px solid var(--line);padding-top:10px"><b>Seus números</b><div class="row" style="gap:12px;margin:8px 0">${stp('g','Gols')}${stp('a','Assist.')}<button class="btn primary" data-act="lanc-enviar" data-p="${pid}">${L?'Enviar de novo':'Enviar'}</button></div><div class="sub">${stTxt}</div></div>`;
+  return h+'</div>'}
+function painelAprovar(){const ps=lancPendentes();if(!ps.length)return'';
+  return`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Gols e assistências para aprovar</h3><span class="cnt" style="font-size:12px;font-weight:700;background:var(--card);color:var(--card-ink);border-radius:10px;padding:2px 8px">${ps.length}</span></div><div class="list">
+    ${ps.map(x=>{const ap=(x.p.stats||{})[x.j]||{};return`<div class="item">${avHTML(x.j)}<div class="grow"><div class="name">${esc(nm(x.j))}</div><div class="sub">${dShort(x.p.data)} · ⚽ ${x.L.g||0} gol${x.L.g===1?'':'s'} · 🅰️ ${x.L.a||0} assist.${(ap.g||ap.a)?` <span class="muted">(hoje: ${ap.g||0} e ${ap.a||0})</span>`:''}</div></div>
+      <div class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm primary" data-act="lanc-ok" data-p="${x.pid}" data-u="${x.u}">Aprovar</button><button class="btn sm" data-act="lanc-rec" data-p="${x.pid}" data-u="${x.u}" aria-label="Recusar">✕</button></div></div>`}).join('')}</div></div>`}
 function renderHist(A){
   const enc=encerradas();if(!enc.length)return'';
   const show=UI.showHist?enc:enc.slice(0,3);
   let h=`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Últimas peladas</h3></div>`;
-  for(const[pid,p] of show){const pr=p.premios||{};
+  for(const[pid,p] of show){const pr=premiosDe(p,pid);
     h+=`<div class="hist"><div class="grow"><b class="num">${dShort(p.data)}</b><div class="sub">${jogaram(p).length} jogadores${pr.mvp?' · 🏆 '+esc(nm(pr.mvp)):''}${pr.art?' · ⚽ '+esc(nm(pr.art)):''}</div></div>${A?`<div class="row" style="gap:4px;flex-wrap:nowrap">${Object.values(pr).some(Boolean)?`<button class="btn sm" data-act="arte" data-p="${pid}">Artes</button>`:''}<button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button></div>`:''}</div>`}
   if(enc.length>3)h+=`<button class="btn sm block" style="margin-top:8px" data-act="hist">${UI.showHist?'Mostrar menos':'Ver todas ('+enc.length+')'}</button>`;
   return h+'</div>';
@@ -1009,11 +1069,12 @@ function sheetMsg(tipo,ctx={}){
       <p class="sub" style="margin:0">"Enviar no app" chega como notificação para cada jogador. O WhatsApp é opcional: abre com o texto daqui, e você escolhe o grupo.</p></div>`);
 }
 function sheetCfg(){
-  const c=cfg();F={restr:(c.restr||[]).slice()};
+  const c=cfg();F={restr:(c.restr||[]).slice(),golSorteio:!!c.golSorteio};
   openSheet('Ajustes da pelada',`<div class="stack">
     <label class="field"><span>Nome da pelada</span><input type="text" id="c-nome" value="${esc(c.nome)}"></label>
     <div class="grid2"><label class="field"><span>Dia fixo</span><select id="c-dia">${DIAS.map((d,i)=>`<option value="${i}" ${c.dia==i?'selected':''}>${d}</option>`).join('')}</select></label>
-    <label class="field"><span>Horário</span><input type="time" id="c-hora" value="${esc(c.hora)}"></label></div>
+    <label class="field"><span>Início</span><input type="time" id="c-hora" value="${esc(c.hora)}"></label></div>
+    <label class="field"><span>Término</span><input type="time" id="c-fim" value="${esc(horaFimDe(null))}"></label>
     <label class="field"><span>Local padrão</span>${selLocais('c-localid',c.localId,'Sem local padrão')}</label>
     <button class="btn sm" data-act="locais">Gerenciar locais</button>
     <div class="grid2"><label class="field"><span>Times por pelada</span><select id="c-times">${[2,3,4].map(n=>`<option ${c.times==n?'selected':''}>${n}</option>`).join('')}</select></label>
@@ -1025,6 +1086,9 @@ function sheetCfg(){
     <div class="panel"><h3 style="margin-bottom:6px">Convite</h3><div class="sub">Link para a galera entrar na pelada</div><div class="num" style="font-weight:700;word-break:break-all;margin:4px 0">${esc(linkConvite())}</div><div class="sub">Código: <b>${esc((GRUPO||{}).codigo||'')}</b></div>
       <div class="row" style="margin-top:8px"><button class="btn sm" data-act="msg" data-v="convite">Mensagem de convite</button><button class="btn sm" data-act="copiar-link">Copiar link</button><button class="btn sm" data-act="qr-pelada">QR Code</button></div></div>
     <div class="panel"><h3 style="margin-bottom:6px">Administradores</h3><div id="adm-list"></div></div>
+    <div class="panel"><h3 style="margin-bottom:4px">Goleiros</h3><div class="sub" style="margin-bottom:8px">O time é formado pelos jogadores de linha. Escolha se o goleiro entra no sorteio.</div>
+      <div class="pick" id="gol-pick"><button type="button" data-act="gol-sorteio" data-v="0" aria-pressed="${!c.golSorteio}">Goleiro extra</button><button type="button" data-act="gol-sorteio" data-v="1" aria-pressed="${!!c.golSorteio}">Goleiro no sorteio</button></div>
+      <div class="sub" id="gol-txt" style="margin-top:6px">${c.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.'}</div></div>
     <div class="panel"><h3 style="margin-bottom:4px">Regras do sorteio</h3><div class="sub" style="margin-bottom:8px">Ex.: dois irmãos que não podem cair juntos.</div><div id="restr"></div>
       <div class="grid2" style="margin-top:8px"><select id="r-a"><option value="">Jogador</option>${Object.keys(S.jog).map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('')}</select>
       <select id="r-b"><option value="">Jogador</option>${Object.keys(S.jog).map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('')}</select></div>
@@ -1063,12 +1127,12 @@ function renderJogForm(){
 }
 function sheetVerJog(id){
   const j=J(id),{st}=temporada(UI.ano),s=st[id]||{},A=ADM();
-  const hist=encerradas().filter(([,p])=>typeof p.stats?.[id]?.n==='number').slice(0,8);
+  const hist=encerradas().map(([pid,p])=>[pid,p,notaJogo(p,pid,id)]).filter(x=>typeof x[2]==='number').slice(0,8);
   openSheet(nm(id),`<div class="stack">
     <div class="board"><div class="row between"><div><div class="when" style="font-size:56px">${fmtN(notaAtual(id))}</div><div class="where">${POS[j.pos]}${j.pos2?' · também '+POS[j.pos2].toLowerCase():''} · ${j.tipo==='diarista'?'Diarista':'Mensalista'}</div></div></div>
     <div class="stats"><div class="stat"><b>${s.j||0}</b><span>Jogos ${UI.ano}</span></div><div class="stat"><b>${s.g||0}</b><span>Gols</span></div><div class="stat"><b>${s.a||0}</b><span>Assist.</span></div><div class="stat"><b>${s.mvp||0}</b><span>Craque</span></div></div></div>
     <div class="panel small"><div class="row between"><span>Nota inicial</span><b class="num">${fmtN(notaInicial(j))}</b></div>${j.conv?`<div class="row between" style="margin-top:4px"><span>Convidado por</span><b>${esc(nm(j.conv))}</b></div>`:''}<div class="row between" style="margin-top:4px"><span>Confirma pelo app</span><b>${vinculo(id)?'Sim':'Ainda não'}</b></div>${j.tel?`<div class="row between" style="margin-top:4px"><span>WhatsApp</span><b class="num">${esc(j.tel)}</b></div>`:''}
-      ${hist.length?`<div style="margin-top:8px"><span class="muted">Últimas notas</span><div class="row" style="margin-top:4px">${hist.map(([,p])=>`<span class="chip solid num">${dShort(p.data).slice(4)} · ${fmtN(p.stats[id].n)}</span>`).join('')}</div></div>`:''}</div>
+      ${hist.length?`<div style="margin-top:8px"><span class="muted">Últimas notas</span><div class="row" style="margin-top:4px">${hist.map(([,p,n])=>`<span class="chip solid num">${dShort(p.data).slice(4)} · ${fmtN(n)}</span>`).join('')}</div></div>`:''}</div>
     <button class="btn warn block" data-act="carta" data-j="${id}">Ver carta do jogador</button>
     ${A?`<div class="row"><button class="btn primary grow" data-act="edit-jog" data-j="${id}">Editar</button><button class="btn grow" data-act="msg" data-v="convite" data-j="${id}">Convite</button></div>`:''}</div>`);
 }
@@ -1117,7 +1181,8 @@ document.addEventListener('click',e=>{
     case'toggle-ativo':{const j=S.jog[d.j];put('jogadores/'+d.j,{...j,ativo:j.ativo===false});closeSheet();toast(j.ativo===false?'Jogador reativado.':'Jogador inativado.');break}
     case'nova-pel':{const data=document.getElementById('np-data').value;if(!data){toast('Escolha a data.');return}
       const id='p_'+data+'_'+Math.random().toString(36).slice(2,5);
-      put('peladas/'+id,{data,hora:document.getElementById('np-hora').value||cfg().hora,localId:UI.npLoc||null,local:(S.locais[UI.npLoc]||{}).nome||'',status:'aberta',resp:{},criadoEm:Date.now()});
+      const hi=document.getElementById('np-hora').value||cfg().hora;
+      put('peladas/'+id,{data,hora:hi,horaFim:document.getElementById('np-fim').value||maisHora(hi,60),localId:UI.npLoc||null,local:(S.locais[UI.npLoc]||{}).nome||'',status:'aberta',resp:{},criadoEm:Date.now()});
       if(UI.npLoc&&S.locais[UI.npLoc])put('locais/'+UI.npLoc,{...S.locais[UI.npLoc],usadoEm:Date.now()});
       UI.npLoc=undefined;UI.npData=UI.npHora=null;UI.sub='presenca';toast('Pelada marcada. Agora é só convocar.');break}
     case'cancel-pel':if(b.dataset.sure){del('peladas/'+d.p);toast('Pelada cancelada.')}else{b.dataset.sure='1';b.textContent='Toque de novo para cancelar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Cancelar esta pelada'}},3500)}break;
@@ -1217,7 +1282,8 @@ document.addEventListener('click',e=>{
     case'salvar-arte':{const a=ARTS[Number(d.i)];if(!a||!dl)return;
       dl.save({filename:a.nome,data:a.blob}).then(r=>{if(r&&r.status==='saved')toast('Imagem pronta.')},e=>{if(e&&e.name!=='AbortError')toast('Não deu para salvar. Toque e segure a imagem.')});break}
     case'sortear':{const T=Number(document.getElementById('nt').value)||cfg().times;const times=sortear(S.pel[d.p],T);UI.sel=null;
-      patch('peladas/'+d.p,{times,nTimes:T,vit:times.map(()=>0),sorteadoEm:Date.now()});toast('Times sorteados.');break}
+      const goleiros=cfg().golSorteio?[]:lista(S.pel[d.p],d.p).gks;
+      patch('peladas/'+d.p,{times,goleiros,nTimes:T,vit:times.map(()=>0),sorteadoEm:Date.now()});toast('Times sorteados.');break}
     case'swap':{const p=S.pel[d.p],ti=Number(d.t);
       if(!UI.sel){UI.sel={t:ti,id:d.j};render();break}
       if(UI.sel.id===d.j||UI.sel.t===ti){UI.sel=UI.sel.id===d.j?null:{t:ti,id:d.j};render();break}
@@ -1245,8 +1311,23 @@ document.addEventListener('click',e=>{
     case'premio':break;
     case'add-restr':{const a=document.getElementById('r-a').value,bb=document.getElementById('r-b').value;if(!a||!bb||a===bb){toast('Escolha dois jogadores diferentes.');return}F.restr.push({a,b:bb,tipo:d.v});renderRestr();break}
     case'del-restr':F.restr.splice(Number(d.i),1);renderRestr();break;
+    case'voto':{const doc=S.pres[myId];if(!doc||!doc.jogador||d.j===doc.jogador)return;const v=Number(d.v);
+      const vp={...((doc.votos||{})[d.p]||{})};vp[d.j]=vp[d.j]===v?0:v;
+      put('presencas/'+myId,{...doc,votos:trim10({...(doc.votos||{}),[d.p]:vp})});break}
+    case'voto-abrir':UI.votoAberto=UI.votoAberto===d.p?null:d.p;render();break;
+    case'lanc-step':{const doc=S.pres[myId]||{},L=(doc.lanc||{})[d.p],ap=(S.pel[d.p].stats||{})[doc.jogador]||{};
+      UI.lanc=UI.lanc||{};const r=UI.lanc[d.p]||{g:L?L.g:(ap.g||0),a:L?L.a:(ap.a||0)};r[d.f]=Math.max(0,Math.min(30,(r[d.f]||0)+Number(d.d)));UI.lanc[d.p]=r;render();break}
+    case'lanc-enviar':{const doc=S.pres[myId];if(!doc||!doc.jogador)return;const L=(doc.lanc||{})[d.p],ap=(S.pel[d.p].stats||{})[doc.jogador]||{};
+      const r=(UI.lanc&&UI.lanc[d.p])||{g:L?L.g:(ap.g||0),a:L?L.a:(ap.a||0)};
+      put('presencas/'+myId,{...doc,lanc:trim10({...(doc.lanc||{}),[d.p]:{g:r.g||0,a:r.a||0,t:Date.now()}})});if(UI.lanc)delete UI.lanc[d.p];
+      toast('Enviado! Agora um administrador precisa aprovar.');break}
+    case'lanc-ok':{const doc=S.pres[d.u],L=doc&&doc.lanc&&doc.lanc[d.p];if(!L||!doc.jogador)return;
+      patch('peladas/'+d.p,{stats:{[doc.jogador]:{g:L.g||0,a:L.a||0}},lancOk:{[d.u]:L.t}});toast(`Números de ${nm(doc.jogador)} aprovados.`);break}
+    case'lanc-rec':{const doc=S.pres[d.u],L=doc&&doc.lanc&&doc.lanc[d.p];if(!L)return;patch('peladas/'+d.p,{lancRec:{[d.u]:L.t}});toast('Lançamento recusado.');break}
+    case'gol-sorteio':{F.golSorteio=d.v==='1';document.querySelectorAll('#gol-pick button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===d.v)));
+      document.getElementById('gol-txt').textContent=F.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
-      put('config/geral',{...(S.config||{}),nome:g('c-nome').trim()||DEF_CFG.nome,dia:Number(g('c-dia')),hora:g('c-hora')||'08:00',localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),porTime:Math.max(3,Math.min(11,Number(g('c-portime'))||5)),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,restr:F.restr});
+      put('config/geral',{...(S.config||{}),nome:g('c-nome').trim()||DEF_CFG.nome,dia:Number(g('c-dia')),hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),porTime:Math.max(3,Math.min(11,Number(g('c-portime'))||5)),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,golSorteio:F.golSorteio,restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:Number(g('c-dia')),hora:g('c-hora')||'08:00'});
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':{const cx=S.caixa[d.m]||{mens:{},desp:[]};put('caixa/'+d.m,{...cx,mens:{...(cx.mens||{}),[d.j]:!(cx.mens||{})[d.j]}});break}

@@ -207,6 +207,7 @@ nav.tabs button[aria-current="page"]{color:var(--pitch)}
 .pickrow .go{color:var(--muted);font-size:20px;line-height:1}
 .crumbs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-bottom:10px}
 .crumbs button{all:unset;cursor:pointer;color:var(--pitch);font-weight:700}
+.board .when .ate{display:block;font-size:.42em;opacity:.85;line-height:1.1}
 .mapa{display:block;width:100%;height:200px;border:0;border-radius:8px;margin-top:8px;background:var(--line)}
 .navs{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .field .opc{font-style:normal;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0;margin-left:4px}
@@ -232,10 +233,10 @@ nav.tabs button[aria-current="page"]{color:var(--pitch)}
 @media (prefers-reduced-motion: no-preference){.push{animation:pushin .3s ease-out}@keyframes pushin{from{transform:translate(-50%,-30px);opacity:0}}}
 .recado{white-space:pre-wrap;font-size:14px;background:var(--surface2);border-radius:8px;padding:10px;margin-top:6px}
 .rate{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0}
-.rate .st{display:flex;gap:2px}
-.rate .st button{all:unset;cursor:pointer;font-size:24px;line-height:1;color:var(--line);padding:2px}
-.rate .st button.on{color:var(--card)}
-.rate .st button:focus-visible{outline:2px solid var(--pitch);border-radius:4px}
+.st{display:flex;gap:2px}
+.st button{all:unset;cursor:pointer;font-size:26px;line-height:1;color:var(--line);padding:2px 3px}
+.st button.on{color:var(--card)}
+.st button:focus-visible{outline:2px solid var(--pitch);border-radius:4px}
 .rbar{display:grid;grid-template-columns:110px 1fr 34px;gap:8px;align-items:center;font-size:13px}
 .rbar .meter{height:7px}
 .rbar .meter i{background:var(--card)}
