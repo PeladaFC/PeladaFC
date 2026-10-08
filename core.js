@@ -198,9 +198,32 @@ function posAberto(p){const f=fimDe(p).getTime(),n=Date.now();return n>=f&&n<fim
 const MIN_VOTOS=2;
 function meusVotos(pid){const d=(S.votos||{})[myId];return(d&&d.v&&d.v[pid])||{}}
 function votosDe(pid){const out={};for(const[u,d] of Object.entries(S.votos||{})){const v=d&&d.v&&d.v[pid];const jog=(d&&d.jogador)||(S.pres[u]||{}).jogador;if(v&&jog)out[jog]=v}return out}
-function apurar(pid){const r={};
-  for(const[voter,m] of Object.entries(votosDe(pid)))for(const[j,v] of Object.entries(m||{})){if(j===voter||!Number(v))continue;(r[j]=r[j]||[]).push(Number(v))}
-  const out={};for(const j in r)out[j]={m:Math.round(sum(r[j])/r[j].length*100)/100,n:r[j].length};return out}
+/* Detecção de votos fora da curva ("avacalhação").
+   Para cada eleitor, compara cada voto dele com a média que os OUTROS deram para o mesmo jogador.
+   - desvio médio até 1 estrela: voto normal, peso 100%
+   - de 1 a 2,5 estrelas: o peso cai aos poucos até 15%
+   - acima de 2,5 estrelas: peso 15%
+   - mesma nota para todo mundo (4 ou mais votos): peso no máximo 50%
+   - se já foi fora da curva em 2 das últimas 5 peladas: peso cai pela metade
+   Tudo automático e silencioso: ninguém é avisado e os votos continuam secretos. */
+function pesoBase(dev,chapado){let w=dev<=1?1:dev>=2.5?.15:1-(dev-1)/1.5*.85;if(chapado)w=Math.min(w,.5);return w}
+function analiseBase(pid){const vs=votosDe(pid),out={};
+  for(const[V,m] of Object.entries(vs)){const its=Object.entries(m||{}).filter(([t,v])=>t!==V&&Number(v));if(!its.length)continue;
+    const devs=[];for(const[t,v] of its){const os=Object.entries(vs).filter(([o])=>o!==V&&o!==t).map(([,mm])=>Number((mm||{})[t])).filter(Boolean);
+      if(os.length>=2)devs.push(Math.abs(Number(v)-sum(os)/os.length))}
+    const vals=its.map(([,v])=>Number(v)),chapado=vals.length>=4&&vals.every(x=>x===vals[0]);
+    const dev=devs.length>=2?sum(devs)/devs.length:0,lado=devs.length?sum(its.map(([t,v])=>{const os=Object.entries(vs).filter(([o])=>o!==V&&o!==t).map(([,mm])=>Number((mm||{})[t])).filter(Boolean);return os.length>=2?Number(v)-sum(os)/os.length:0}))/its.length:0;
+    out[V]={dev,lado,chapado,qtd:vals.length,media:sum(vals)/vals.length,wb:pesoBase(dev,chapado)}}
+  return out}
+function analisarVotos(pid){const p=S.pel[pid]||{},base=analiseBase(pid);
+  const ant=Object.entries(S.pel).filter(([k,q])=>k!==pid&&q.data<p.data).sort((a,b)=>b[1].data.localeCompare(a[1].data)).slice(0,5).map(([k])=>[k,analiseBase(k)]);
+  for(const[V,x] of Object.entries(base)){x.hist=ant.filter(([,b])=>b[V]&&b[V].wb<.6).map(([k])=>k);
+    x.w=x.wb*(x.hist.length>=2?.5:1)}
+  const r={},vs=votosDe(pid);
+  for(const[V,m] of Object.entries(vs)){const w=base[V]?base[V].w:1;for(const[t,v] of Object.entries(m||{})){if(t===V||!Number(v))continue;(r[t]=r[t]||{s:0,w:0,n:0});r[t].s+=Number(v)*w;r[t].w+=w;if(w>0)r[t].n++}}
+  const aval={};for(const t in r)if(r[t].w>0)aval[t]={m:Math.round(r[t].s/r[t].w*100)/100,n:r[t].n};
+  return{aval,eleitores:base}}
+function apurar(pid){return analisarVotos(pid).aval}
 const FECHANDO=new Set();
 function consolidarAvaliacoes(){if(demo||!ADM()||!S.votosOk)return;const now=Date.now();
   for(const[pid,p] of Object.entries(S.pel)){if(p.aval||FECHANDO.has(pid)||!jogaram(p).length||(!p.times&&p.status!=='encerrada'))continue;
