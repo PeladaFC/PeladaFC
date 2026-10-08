@@ -82,9 +82,10 @@ const novoId = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b =>
 const novoCodigo = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('');
 const POSN = { GOL: 'Goleiro', ZAG: 'Zagueiro', MEI: 'Meio-campo', ATA: 'Atacante' };
 const DIASN = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-// texto de quando é a pelada: fixa (toda semana) ou evento único (uma data)
+// texto de quando é a pelada: fixa (toda semana) ou evento livre (datas a definir)
 function dataBR(iso) { const [y, m, d] = String(iso).split('-').map(Number); const dt = new Date(y, m - 1, d); return `${DIASN[dt.getDay()].toLowerCase()}, ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`; }
-function quandoG(G, curto) { if (G.evento && G.data) return (curto ? '' : '📅 ') + dataBR(G.data) + (G.hora ? (curto ? ' ' : ' às ') + G.hora : '');
+function quandoG(G, curto) { if (G.evento && !G.data) return (curto ? '' : '📅 ') + 'Datas livres';
+  if (G.evento && G.data) return (curto ? '' : '📅 ') + dataBR(G.data) + (G.hora ? (curto ? ' ' : ' às ') + G.hora : '');
   if (G.dia == null) return G.hora || ''; return curto ? DIASN[G.dia] + ' ' + (G.hora || '') : `📅 ${[0, 6].includes(Number(G.dia)) ? 'Todo' : 'Toda'} ${DIASN[G.dia].toLowerCase()}${G.hora ? ' às ' + G.hora : ''}`; }
 function proxSabado() { const d = new Date(); d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7)); return d.toISOString().slice(0, 10); }
 const ERROS = {
@@ -211,7 +212,7 @@ function render() {
       <button class="btn primary block" type="submit">Salvar</button></form>
     ${p.apelido ? `<button class="btn block" data-sh="sair">Sair da conta</button><p class="sub" style="text-align:center">${escH(EU.email || '')}</p>` : ''}`; }
   if (t === 'minhas') { const ids = Object.keys(GRUPOS); const adm = ids.filter(g => (GRUPOS[g].admins || []).includes(EU.uid)), jog = ids.filter(g => !adm.includes(g));
-    const card = (g, papel) => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="abrir" data-v="${g}"><div class="av bg-${papel === 'ADMIN' ? 'MEI' : 'ATA'}">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.evento ? '<b style="display:inline;font-size:10px;letter-spacing:.05em;color:var(--card-ink);background:var(--card);border-radius:5px;padding:1px 5px;margin-right:4px">EVENTO</b>' : ''}${escH(quandoG(G, true))}</span></span><span class="badge2 ${papel === 'ADMIN' ? '' : 'j'}">${papel}</span></button>`; };
+    const card = (g, papel) => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="abrir" data-v="${g}"><div class="av bg-${papel === 'ADMIN' ? 'MEI' : 'ATA'}">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.evento ? '<b style="display:inline;font-size:10px;letter-spacing:.05em;color:var(--card-ink);background:var(--card);border-radius:5px;padding:1px 5px;margin-right:4px">EVENTO LIVRE</b>' : ''}${escH(quandoG(G, true))}</span></span><span class="badge2 ${papel === 'ADMIN' ? '' : 'j'}">${papel}</span></button>`; };
     h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELADA FC</span><button class="btn sm" data-sh="ir" data-v="perfil">${escH(PERFIL?.apelido || PERFIL?.nome || 'Perfil')}</button></div>
     <h2>Minhas peladas</h2>
     ${cartaoPush()}
@@ -226,9 +227,8 @@ function render() {
   if (t === 'nova') h = topo('minhas') + `<h2>Criar sua pelada</h2><p class="lead">Depois você ajusta tudo nos Ajustes.</p>
     <form id="f-nova" class="stack" novalidate>
       <label class="field"><span>Nome da pelada</span><input type="text" id="n-nome" placeholder="Pelada do Sábado" required></label>
-      <div class="field"><span>Tipo</span><div class="pick" id="n-tipo"><button type="button" data-sh="tipo-pel" data-v="fixa" aria-pressed="true">Fixa (toda semana)</button><button type="button" data-sh="tipo-pel" data-v="evento" aria-pressed="false">Evento único</button></div>
+      <div class="field"><span>Tipo</span><div class="pick" id="n-tipo"><button type="button" data-sh="tipo-pel" data-v="fixa" aria-pressed="true">Fixa (toda semana)</button><button type="button" data-sh="tipo-pel" data-v="evento" aria-pressed="false">Evento livre</button></div>
         <p class="sub" id="n-tipo-txt" style="margin:4px 0 0">Tem mensalistas e diaristas, e acontece toda semana no mesmo dia.</p></div>
-      <label class="field" id="n-data-box" hidden><span>Data do evento</span><input type="date" id="n-data" value="${proxSabado()}"></label>
       <div class="grid2"><label class="field" id="n-dia-box"><span>Dia fixo</span><select id="n-dia">${DIASN.map((d, i) => `<option value="${i}" ${i === 6 ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
       <label class="field"><span>Início</span><input type="time" id="n-hora" value="08:00"></label></div>
       <label class="field"><span>Término</span><input type="time" id="n-fim" value="09:00"></label>
@@ -244,8 +244,8 @@ function render() {
   if (t === 'convite' && CONVITE) { const G = CONVITE.grupo; const pre = UIp.prefere || 'mensalista';
     h = topo('minhas') + `<h2>Você foi convidado!</h2>
     <div class="ob-inv"><div class="h"><span class="sub" style="color:inherit;opacity:.85">Convite para</span><b>${escH(G.nome || 'Pelada')}</b></div>
-    <div class="b">${(G.dia != null || G.data) ? `<div>${escH(quandoG(G))}${G.evento ? ' · <b>evento único</b>' : ''}</div>` : ''}<div class="sub">Código ${escH(CONVITE.codigo)}</div></div></div>
-    ${G.evento ? '<p class="sub" style="margin:0">É um evento único: depois de entrar, é só confirmar presença. Quem confirma primeiro garante a vaga.</p>' : `<div class="field"><span>Quero entrar como</span><div class="pick"><button data-sh="pref" data-v="mensalista" aria-pressed="${pre === 'mensalista'}">Mensalista</button><button data-sh="pref" data-v="diarista" aria-pressed="${pre === 'diarista'}">Diarista</button></div>
+    <div class="b">${(G.dia != null || G.data || G.evento) ? `<div>${escH(quandoG(G))}${G.evento ? ' · <b>evento livre</b>' : ''}</div>` : ''}<div class="sub">Código ${escH(CONVITE.codigo)}</div></div></div>
+    ${G.evento ? '<p class="sub" style="margin:0">É um evento livre, sem cobrança: o administrador marca as datas e você só confirma presença. Quem confirma primeiro garante a vaga.</p>' : `<div class="field"><span>Quero entrar como</span><div class="pick"><button data-sh="pref" data-v="mensalista" aria-pressed="${pre === 'mensalista'}">Mensalista</button><button data-sh="pref" data-v="diarista" aria-pressed="${pre === 'diarista'}">Diarista</button></div>
     <p class="sub" style="margin:4px 0 0">${pre === 'mensalista' ? 'Mensalista entra direto na lista quando tem vaga. O administrador confirma.' : 'Diarista pede vaga a cada pelada e o administrador libera.'}</p></div>`}
     <button class="btn primary block" data-sh="aceitar">Entrar na pelada</button>
     <div class="banner due"><span><b>⏳ Sua entrada vai esperar a autorização do administrador.</b><br>Até ele autorizar, seu nome aparece como pendente no Elenco.</span></div>`; }
@@ -253,7 +253,7 @@ function render() {
     h = topo('minhas') + `<h2>Convidar para minha pelada</h2><p class="lead">Escolha a pelada. A pessoa instala o app e já entra nela.</p>
     ${ids.map(g => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="qr-grupo" data-v="${g}"><div class="av bg-MEI">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${escH(quandoG(G, true))} · código ${escH(G.codigo || '')}</span></span><span class="badge2">QR CODE</span></button>`; }).join('')}`; }
   if (t === 'qr-grupo' && UIp.qrg && GRUPOS[UIp.qrg]) { const G = GRUPOS[UIp.qrg], link = LINK_APP + '?c=' + G.codigo;
-    const quando = (G.dia != null || G.data) ? quandoG(G) + '\n' : '';
+    const quando = (G.dia != null || G.data || G.evento) ? quandoG(G) + '\n' : '';
     const txt = `⚽ Você está convidado pra *${G.nome || 'pelada'}*!\n${quando}\nEntre na pelada pelo app: ${link}\n\n📲 *Para ter o app no celular:*\niPhone: abra o link no Safari → Compartilhar → Adicionar à Tela de Início\nAndroid: abra no Chrome → menu ⋮ → Instalar app`;
     UIp.qrLink = link; UIp.qrTxt = txt;
     h = topo('convidar-pelada') + `<h2>${escH(G.nome || 'Pelada')}</h2><p class="lead">Com este QR Code, a pessoa instala o app e <b>já entra nesta pelada</b>.</p>
@@ -475,8 +475,8 @@ document.addEventListener('click', async e => {
   if (a === 'abrir') abrirGrupo(v);
   if (a === 'tipo-pel') { const ev = v === 'evento'; UIp.tipoPel = v;
     document.querySelectorAll('#n-tipo button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === v)));
-    $('n-data-box').hidden = !ev; $('n-dia-box').hidden = ev; $('n-fixa-box').hidden = ev;
-    $('n-tipo-txt').textContent = ev ? 'Uma pelada só, numa data, sem cobrança. Ninguém entra como mensalista nem diarista: quem confirma primeiro entra, e quem passar das vagas vai para a espera.' : 'Tem mensalistas e diaristas, e acontece toda semana no mesmo dia.'; }
+    $('n-dia-box').hidden = ev; $('n-fixa-box').hidden = ev;
+    $('n-tipo-txt').textContent = ev ? 'Sem cobrança e sem dia fixo: o administrador marca cada pelada na data que quiser, e o grupo continua para os próximos eventos. Ninguém entra como mensalista nem diarista: quem confirma primeiro garante a vaga.' : 'Tem mensalistas e diaristas, e acontece toda semana no mesmo dia.'; }
   if (a === 'push-ativar') ativarPush();
   if (a === 'ler-qr') abrirLeitor();
   if (a === 'fechar-leitor') fecharLeitor();
@@ -512,8 +512,8 @@ document.addEventListener('submit', async e => {
     return;
   }
   if (f.id === 'f-nova') { if (!val('n-nome')) { aviso('Dê um nome para a pelada.'); return; }
-    const ev = UIp.tipoPel === 'evento', dataEv = ev ? ($('n-data').value || proxSabado()) : null;
-    criarGrupo({ evento: ev, data: dataEv, nome: val('n-nome'), dia: ev ? new Date(dataEv + 'T12:00').getDay() : Number($('n-dia').value), hora: $('n-hora').value || '08:00', fim: $('n-fim').value || '', times: Number($('n-times').value) || 2, por: Math.max(3, Math.min(11, Number($('n-por').value) || 5)), mens: Number($('n-mens').value) || 0, diaria: Number($('n-dia2').value) || 0 }); }
+    const ev = UIp.tipoPel === 'evento', dataEv = null;
+    criarGrupo({ evento: ev, data: dataEv, nome: val('n-nome'), dia: ev ? null : Number($('n-dia').value), hora: $('n-hora').value || '08:00', fim: $('n-fim').value || '', times: Number($('n-times').value) || 2, por: Math.max(3, Math.min(11, Number($('n-por').value) || 5)), mens: Number($('n-mens').value) || 0, diaria: Number($('n-dia2').value) || 0 }); }
   if (f.id === 'f-codigo') buscarCodigo(val('cod'));
 });
 

@@ -90,7 +90,9 @@ function critKey(pos){return pos==='GOL'?CRIT.GOL:CRIT.linha}
 /* avaliação do jogador na escala de 0 a 100 (como no FIFA); a nota do jogo continua de 0 a 10 */
 const ovr=n=>Math.round((Number(n)||0)*10);
 function nomeTime(cor){const v=((cfg().nomesTimes||[])[cor]||'').trim();return v||(CORES[cor]||{n:'Time'}).n}
-/* evento único: sem mensalista nem diarista; todo mundo confirma direto e quem passa das vagas vai para a espera */
+/* evento livre: sem cobrança e sem dia fixo; o administrador marca cada pelada na data que quiser.
+   Sem mensalista nem diarista: todo mundo confirma direto e quem passa das vagas vai para a espera.
+   O grupo nunca é apagado: ao encerrar uma pelada ela vai para o histórico e o grupo segue para os próximos eventos. */
 const EV=()=>!!cfg().evento;
 const ehDiarista=id=>!EV()&&J(id).tipo==='diarista';
 const pagaPorJogo=id=>!EV()&&J(id).tipo==='diarista';
@@ -277,7 +279,7 @@ function estatPeriodo(ini,fim){
   return{st,total:enc.length};
 }
 function temporada(ano){return estatPeriodo(ano?ano+'-01-01':null,ano?(Number(ano)+1)+'-01-01':null)}
-function proximaData(){const c=cfg(),d=new Date();d.setHours(0,0,0,0);while(d.getDay()!==Number(c.dia))d.setDate(d.getDate()+1);return iso(d)}
+function proximaData(){const c=cfg(),d=new Date();d.setHours(0,0,0,0);const dia=c.dia==null?6:Number(c.dia);while(d.getDay()!==dia)d.setDate(d.getDate()+1);return iso(d)}
 
 /* ---------- avisos programados ---------- */
 function ocorrencias(a,now=new Date()){
@@ -443,7 +445,7 @@ function sheetDono(){const ls=Object.entries(S.locais).sort((a,b)=>a[1].nome.loc
 /* ---------- mensagens para o WhatsApp ---------- */
 function msg(tipo,ctx={}){
   const c=cfg(),pe=atual(),p=ctx.pel||(pe&&pe[1]);
-  const quando=p?`📅 *${dLong(p.data)}* das *${horaIniDe(p)}* às *${horaFimDe(p)}*`:EV()&&c.dataEvento?`📅 *${dLong(c.dataEvento)}* das *${c.hora}* às *${horaFimDe(null)}*`:`📅 *${DIAS[c.dia]}* das *${c.hora}* às *${horaFimDe(null)}*`;
+  const quando=p?`📅 *${dLong(p.data)}* das *${horaIniDe(p)}* às *${horaFimDe(p)}*`:EV()?'📅 Data a definir':`📅 *${DIAS[c.dia]}* das *${c.hora}* às *${horaFimDe(null)}*`;
   const LL=localDe(p),onde=LL?LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):'';
   const head=`⚽ *${c.nome.toUpperCase()}*`;
   if(tipo==='convocacao')return[head,quando,onde?'📍 '+onde:'','',`São ${c.times*c.porTime} vagas na linha + goleiros.${EV()?' Quem confirmar primeiro garante a vaga.':' Mensalista tem prioridade.'}`,'Responda aqui: ✅ vou  |  ❌ não vou'].filter((x,i)=>x!==''||i===3).join('\n');
@@ -482,7 +484,7 @@ function msg(tipo,ctx={}){
     if(d.dia.length){out.push('',`*Diárias* (${BRL(c.diaria)})`);d.dia.forEach(x=>out.push(`• ${nm(x.id)} · ${dShort(x.data)}`))}
     if(c.pix)out.push('','Pix: '+c.pix);return out.join('\n')}
   if(tipo==='convite'){const j=ctx.jid?J(ctx.jid):null;
-    return[`Fala${j?', '+(j.apelido||j.nome.split(' ')[0]):''}! 👋`,`Você está convidado pra *${c.nome}*.`,(()=>{const pe2=atual();return pe2?`📅 Próxima: *${dLong(pe2[1].data)}* às *${pe2[1].hora||c.hora}*`:`📅 ${[0,6].includes(Number(c.dia))?'Todo':'Toda'} ${DIAS[c.dia].toLowerCase()} às ${c.hora}`})(),(()=>{const pe2=atual(),LL=localDe(pe2&&pe2[1]);return LL?'📍 '+LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):''})(),linkConvite()?'\nEntre na pelada pelo app: '+linkConvite():'',INSTALAR,'\nConfirma por aqui se topa!'].filter(Boolean).join('\n')}
+    return[`Fala${j?', '+(j.apelido||j.nome.split(' ')[0]):''}! 👋`,`Você está convidado pra *${c.nome}*.`,(()=>{const pe2=atual();return pe2?`📅 Próxima: *${dLong(pe2[1].data)}* às *${pe2[1].hora||c.hora}*`:EV()?'📅 Datas livres: o administrador avisa cada pelada no app':`📅 ${[0,6].includes(Number(c.dia))?'Todo':'Toda'} ${DIAS[c.dia].toLowerCase()} às ${c.hora}`})(),(()=>{const pe2=atual(),LL=localDe(pe2&&pe2[1]);return LL?'📍 '+LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):''})(),linkConvite()?'\nEntre na pelada pelo app: '+linkConvite():'',INSTALAR,'\nConfirma por aqui se topa!'].filter(Boolean).join('\n')}
   return'';
 }
 
@@ -861,7 +863,7 @@ function tJogo(A){
   if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar: ${esc(AVISOS[v.a.tipo]?.n||'')}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
   const cur=atual();
   if(!cur){
-    h+=`<div class="board"><div class="when">Sem pelada<br>marcada</div><div class="where">${EV()&&c.dataEvento?'Evento único · '+esc(dLong(c.dataEvento)):esc(DIAS[c.dia])} das ${esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div></div>`;
+    h+=`<div class="board"><div class="when">Sem pelada<br>marcada</div><div class="where">${EV()?'Evento livre · marque a data da próxima':esc(DIAS[c.dia])+' das '+esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div></div>`;
     if(A){
       if(UI.npLoc===undefined)UI.npLoc=(c.localId&&S.locais[c.localId])?c.localId:null;
       const L=UI.npLoc&&S.locais[UI.npLoc];
@@ -871,7 +873,7 @@ function tJogo(A){
         :`<button class="btn primary block" data-act="lp-abrir" data-v="np">Escolher o local</button>`}
       </div>
       ${L?`<div class="field"><span><i class="stepn">2</i>Quando?</span>
-      <label class="field"><span>Data</span><input type="date" id="np-data" data-np="npData" value="${UI.npData||(EV()&&c.dataEvento)||proximaData()}"></label>
+      <label class="field"><span>Data</span><input type="date" id="np-data" data-np="npData" value="${UI.npData||proximaData()}"></label>
       <div class="lado"><label class="field"><span>Início</span><input type="time" id="np-hora" data-np="npHora" value="${esc(UI.npHora||c.hora)}"></label>
       <label class="field"><span>Término</span><input type="time" id="np-fim" data-np="npFim" value="${esc(UI.npFim||horaFimDe(null))}"></label></div>
 </div>
@@ -1288,8 +1290,7 @@ function sheetCfg(){
     <div class="grid2"><label class="field"><span>Dia fixo</span><select id="c-dia">${DIAS.map((d,i)=>`<option value="${i}" ${c.dia==i?'selected':''}>${d}</option>`).join('')}</select></label>
     <label class="field"><span>Início</span><input type="time" id="c-hora" value="${esc(c.hora)}"></label></div>
     <label class="field"><span>Término</span><input type="time" id="c-fim" value="${esc(horaFimDe(null))}"></label>
-    <div class="field"><span>Tipo de pelada</span><select id="c-tipo"><option value="fixa" ${c.evento?'':'selected'}>Fixa (toda semana, com mensalistas e diaristas)</option><option value="evento" ${c.evento?'selected':''}>Evento único (sem cobrança, sem mensalista nem diarista)</option></select></div>
-    <label class="field"><span>Data do evento (se for evento único)</span><input type="date" id="c-dataev" value="${esc(c.dataEvento||'')}"></label>
+    <div class="field"><span>Tipo de pelada</span><select id="c-tipo"><option value="fixa" ${c.evento?'':'selected'}>Fixa (toda semana, com mensalistas e diaristas)</option><option value="evento" ${c.evento?'selected':''}>Evento livre (sem cobrança, datas livres)</option></select></div>
     <label class="field"><span>Local padrão</span>${selLocais('c-localid',c.localId,'Sem local padrão')}</label>
     <button class="btn sm" data-act="locais">Gerenciar locais</button>
     <div class="grid2"><label class="field"><span>Times por pelada</span><select id="c-times">${[2,3,4].map(n=>`<option ${c.times==n?'selected':''}>${n}</option>`).join('')}</select></label>
@@ -1361,7 +1362,7 @@ function sheetVerJog(id){
     ${A?`<div class="row"><button class="btn primary grow" data-act="edit-jog" data-j="${id}">Editar</button><button class="btn grow" data-act="msg" data-v="convite" data-j="${id}">Convite</button></div>`:''}</div>`);
 }
 function sheetAviso(id){
-  const a=id?S.avisos[id]:{tipo:'convocacao',dia:(cfg().dia+5)%7,hora:'19:00',ativo:true};
+  const a=id?S.avisos[id]:{tipo:'convocacao',dia:((cfg().dia??6)+5)%7,hora:'19:00',ativo:true};
   openSheet(id?'Editar aviso':'Novo aviso',`<div class="stack">
     <label class="field"><span>Mensagem</span><select id="a-tipo">${Object.entries(AVISOS).map(([k,v])=>`<option value="${k}" ${a.tipo===k?'selected':''}>${v.n}</option>`).join('')}</select></label>
     <div class="grid2"><label class="field"><span>Dia</span><select id="a-dia">${DIAS.map((d,i)=>`<option value="${i}" ${a.dia==i?'selected':''}>${d}</option>`).join('')}</select></label>
@@ -1531,7 +1532,7 @@ document.addEventListener('click',e=>{
     case'save-aviso':{const id=d.a||uid('a'),old=d.a?S.avisos[d.a]:{};
       put('avisos/'+id,{...old,tipo:document.getElementById('a-tipo').value,dia:Number(document.getElementById('a-dia').value),hora:document.getElementById('a-hora').value||'09:00',ativo:document.getElementById('a-ativo').checked});closeSheet();toast('Aviso salvo.');break}
     case'del-aviso':del('avisos/'+d.a);closeSheet();toast('Aviso apagado.');break;
-    case'avisos-padrao':{const dia=cfg().dia,w=n=>(dia+n+7)%7;
+    case'avisos-padrao':{const dia=cfg().dia??6,w=n=>(dia+n+7)%7;
       [['convocacao',w(-4),'09:00'],['cobrar',w(-2),'19:00'],['lista',w(-1),'20:00'],['times',dia,'07:00'],['resultado',dia,'12:00'],['pagamento',1,'10:00']]
         .forEach(([tipo,d2,hora])=>put('avisos/'+uid('a'),{tipo,dia:d2,hora,ativo:true}));toast('Agenda sugerida criada. Ajuste à vontade.');break}
     case'premio':break;
@@ -1574,7 +1575,7 @@ document.addEventListener('click',e=>{
     case'gol-sorteio':{F.golSorteio=d.v==='1';document.querySelectorAll('#gol-pick button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===d.v)));
       document.getElementById('gol-txt').textContent=F.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
-      const ev=g('c-tipo')==='evento',dataEv=ev?(g('c-dataev')||proximaData()):null,diaEv=ev?parseD(dataEv).getDay():Number(g('c-dia'));
+      const ev=g('c-tipo')==='evento',dataEv=null,diaEv=Number(g('c-dia'));
       put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),porTime:Math.max(3,Math.min(11,Number(g('c-portime'))||5)),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,golSorteio:F.golSorteio,janelaAval:Number(g('c-janela'))||24,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',evento:ev,data:dataEv});
       closeSheet();toast('Ajustes salvos.');break}
