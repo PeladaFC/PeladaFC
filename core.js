@@ -876,12 +876,8 @@ function tJogo(A){
     h+=`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Como estava o campo?</h3></div>
       <div class="sub" style="margin-bottom:4px">${esc(L.nome)} · pelada de ${dShort(p.data)}</div>${formAvalCampo(pid,(d.avalCampo||{})[pid],'me')}
       <div class="sub" style="margin-top:4px">Sua avaliação ajuda a galera a escolher onde jogar.</div></div>`}}
+  if(A)h+=painelAvAdmin();
   h+=cartaoAvCompleta();
-  if(A&&!rodadaAberta()&&ativos().length){const semAv=ativos().filter(x=>!S.jog[x].critGalera);
-    h+=`<div class="panel stack" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Notas pela galera</h3><span class="sub">${semAv.length?semAv.length+' sem avaliação':'todos avaliados'}</span></div>
-    <div class="sub" style="margin-top:-4px">${semAv.length?'Quer que a galera avalie? Todo mundo avalia todo mundo nos 5 critérios e as notas deixam de depender só do administrador.':'Todos já têm avaliação da galera. Quer abrir uma nova rodada para atualizar as notas?'}</div>
-    <div class="row" style="gap:4px;flex-wrap:nowrap;overflow:hidden">${(semAv.length?semAv:ativos()).slice(0,8).map(id=>avHTML(id)).join('')}${(semAv.length||ativos().length)>8?`<span class="sub">+${(semAv.length||ativos().length)-8}</span>`:''}</div>
-    <div class="lado"><button class="btn warn" data-act="av-todos">Todos avaliam todos</button><button class="btn" data-act="av-admin">Escolher jogadores</button></div></div>`}
   h+=painelPosJogo();
   if(A)h+=painelAprovar();
   if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar: ${esc(AVISOS[v.a.tipo]?.n||'')}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
@@ -1098,12 +1094,29 @@ function fecharRodada(rid){const r=S.avals[rid];if(!r||FECHANDO_AV.has(rid))retu
 }
 function consolidarRodadas(){if(demo||!ADM()||!S.votosOk)return;const ra=rodadaAberta();if(ra&&Date.now()>=(ra[1].fim||0))fecharRodada(ra[0])}
 
+/* painel do administrador: abrir / acompanhar / encerrar a avaliação da galera */
+function statsRodada(rid,r){const ids=alvosDe(r),vs=Object.entries(S.votos||{}).filter(([,d])=>d&&d.av&&d.av[rid]);
+  const concluiram=vs.filter(([u,d])=>{const jog=d.jogador||(S.pres[u]||{}).jogador;const alvo=ids.filter(x=>x!==jog);return alvo.length&&alvo.every(x=>feitoAv(x,d.av[rid][x]))}).length;
+  return{ids,comecaram:vs.length,concluiram}}
+function painelAvAdmin(){if(!ativos().length)return'';const ra=rodadaAberta();
+  if(!ra){const semAv=ativos().filter(x=>!S.jog[x].critGalera);
+    return`<div class="panel stack avadm" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Avaliação da galera</h3><span class="pill-off">FECHADA</span></div>
+    <div class="sub" style="margin-top:-4px">Quando você abrir, todo mundo do grupo recebe um <b>alerta amarelo</b> para dar nota aos outros nos 5 critérios (cada um avalia todos, menos a si mesmo). Antes disso, nada aparece para eles.${semAv.length?` <b>${semAv.length}</b> jogador${semAv.length>1?'es ainda não têm':' ainda não tem'} nota da galera.`:''}</div>
+    <button class="btn primary block btn-grande" data-act="av-todos">Abrir avaliação para todos</button>
+    <button class="btn block" data-act="av-admin">Abrir só para alguns jogadores</button></div>`}
+  const[rid,r]=ra,{ids,concluiram}=statsRodada(rid,r),parcial=ids.length<ativos().length;
+  return`<div class="panel stack avadm on" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Avaliação da galera</h3><span class="pill-on">ABERTA</span></div>
+    <div class="sub" style="margin-top:-4px">Até <b>${quandoFim(r.fim)}</b> · ${parcial?`<b>${ids.length} de ${ativos().length}</b> jogadores em avaliação`:'todo o elenco em avaliação'} · <b>${concluiram}</b> pessoa${concluiram===1?'':'s'} já terminaram.</div>
+    ${parcial?`<button class="btn warn block" data-act="av-incluir">Incluir todo o elenco (${ativos().length})</button>`:''}
+    <button class="btn primary block" data-act="av-encerrar-p" data-r="${rid}">Encerrar agora e calcular as notas</button>
+    <div class="lado"><button class="btn sm" data-act="av-admin">Ver detalhes</button><button class="btn sm danger" data-act="av-cancelar" data-r="${rid}">Cancelar avaliação</button></div></div>`}
+
 /* cartão para quem precisa avaliar */
 function cartaoAvCompleta(){const ra=rodadaAberta();if(!ra)return'';const[rid,r]=ra,{feitos,total}=meuJogador()?progressoAv(rid,r):{feitos:0,total:0};
-  const parcial=alvosDe(r).length<ativos().length,adm=ADM()?`<div class="lado">${parcial?`<button class="btn sm warn" data-act="av-incluir">Incluir todo o elenco (${ativos().length})</button>`:''}<button class="btn sm" data-act="av-admin">Gerenciar avaliação</button></div>`:'';
-  if(!total)return ADM()?`<div class="panel stack" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>⭐ Avaliação completa</h3></div><div class="sub" style="margin-top:-4px">Aberta até ${quandoFim(r.fim)} · ${alvosDe(r).length} de ${ativos().length} jogadores em avaliação.</div>${adm}</div>`:'';
+  const parcial=alvosDe(r).length<ativos().length,adm='';
+  if(!total)return'';
   const ok=feitos>=total;
-  return`<div class="panel stack" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>⭐ Avaliação completa</h3><span class="sub num">${feitos}/${total}</span></div>
+  return`<div class="panel stack" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>⭐ ${ADM()?'Seu voto':'Avaliação completa'}</h3><span class="sub num">${feitos}/${total}</span></div>
     <div class="sub" style="margin-top:-4px">${ok?'✓ Você já avaliou todo mundo. Pode rever até o prazo.':`${parcial?`Nesta rodada, o administrador escolheu <b>${alvosDe(r).length} de ${ativos().length}</b> jogadores do elenco. Avalie os ${total} abaixo`:`Avalie <b>todo o elenco</b> (${total} jogador${total>1?'es':''}, menos você)`} nos 5 critérios. 🔒 Secreto. Até ${quandoFim(r.fim)}.`}</div>
     <div class="row" style="gap:4px;flex-wrap:nowrap;overflow:hidden">${paraMimAvaliar(r).slice(0,8).map(id=>avHTML(id)).join('')}${total>8?`<span class="sub">+${total-8}</span>`:''}</div>
     <button class="btn ${ok?'':'primary'} block" data-act="av-abrir">${ok?'Rever minhas avaliações':feitos?'Continuar avaliando':'Avaliar agora'}</button>${adm}</div>`}
@@ -1599,6 +1612,7 @@ document.addEventListener('click',e=>{
     case'av-sel':{const ids=ativos();UI.avSel=new Set(d.v==='todos'?ids:d.v==='novos'?ids.filter(x=>!S.jog[x].critGalera):[]);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
     case'av-criar':{if(!UI.avSel||!UI.avSel.size)return;const dias=Number(document.getElementById('av-prazo').value)||3,rid=uid('r');
       put('avaliacoes/'+rid,{criadoEm:Date.now(),fim:Date.now()+dias*864e5,alvos:[...UI.avSel],status:'aberta'});AV_POP.add(rid);UI.avSel=null;closeSheet();toast('Avaliação aberta! A galera já pode avaliar.');break}
+    case'av-encerrar-p':if(b.dataset.sure){fecharRodada(d.r);toast('Avaliação encerrada. Notas atualizadas.')}else{b.dataset.sure='1';b.textContent='Toque de novo para encerrar'}break;
     case'av-encerrar':fecharRodada(d.r);closeSheet();toast('Avaliação encerrada. Estrelas e notas atualizadas.');break;
     case'av-cancelar':if(b.dataset.sure){const r=S.avals[d.r];put('avaliacoes/'+d.r,{...r,status:'cancelada'});closeSheet();toast('Avaliação cancelada.')}else{b.dataset.sure='1';b.textContent='Toque de novo para cancelar'}break;
     case'av-abrir':abrirAvaliar();break;
