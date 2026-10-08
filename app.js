@@ -104,6 +104,50 @@ window.qrSVG = texto => {
 };
 const MSG_APP = `⚽ *Pelada FC*\nOrganize sua pelada: lista de presença, sorteio de times equilibrados, notas, artilharia e ranking.\n\n👉 ${LINK_APP}\n\n📲 *Para ter o app no celular:*\niPhone: abra o link no Safari → Compartilhar → Adicionar à Tela de Início\nAndroid: abra no Chrome → menu ⋮ → Instalar app`;
 
+/* ================= Leitor de QR Code ================= */
+let LEITOR = null;
+function carregarJsQR() { if (window.jsQR) return Promise.resolve(); return new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'jsqr.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+function extrairCodigo(txt) { const t = String(txt || '').trim(); const m = t.match(/[?&]c=([A-Za-z0-9]{6})(?![A-Za-z0-9])/); if (m) return m[1].toUpperCase(); if (/^[A-Za-z0-9]{6}$/.test(t)) return t.toUpperCase(); return null; }
+window.extrairCodigo = extrairCodigo;
+async function abrirLeitor() {
+  const ov = $('leitor'); ov.hidden = false;
+  ov.innerHTML = `<div class="leitor-in"><div class="leitor-top"><b>Aponte para o QR Code do convite</b><button class="btn sm" data-sh="fechar-leitor">Fechar</button></div>
+    <div class="leitor-vid"><video id="lv" playsinline muted autoplay></video><div class="leitor-mira"></div></div>
+    <p class="leitor-msg" id="leitor-msg">Abrindo a câmera…</p></div>`;
+  try {
+    await carregarJsQR();
+    const st = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    if (ov.hidden) { st.getTracks().forEach(t => t.stop()); return; }
+    const v = $('lv'); v.srcObject = st; await v.play();
+    LEITOR = { st, v, c: document.createElement('canvas'), on: true };
+    $('leitor-msg').textContent = 'Procurando o código…';
+    loopLeitor();
+  } catch (e) {
+    console.warn(e);
+    const m = $('leitor-msg'); if (m) m.innerHTML = 'Não consegui abrir a câmera. Permita o acesso à câmera quando o iPhone perguntar e tente de novo.<br><br>Outro jeito: abra a <b>Câmera</b> do celular, aponte para o QR Code e toque no link que aparecer.';
+  }
+}
+function fecharLeitor() { if (LEITOR) { LEITOR.on = false; LEITOR.st.getTracks().forEach(t => t.stop()); LEITOR = null; } const ov = $('leitor'); ov.hidden = true; ov.innerHTML = ''; }
+function loopLeitor() {
+  if (!LEITOR || !LEITOR.on) return;
+  const { v, c } = LEITOR;
+  if (v.readyState >= 2 && v.videoWidth) {
+    const w = Math.min(640, v.videoWidth), h = Math.round(v.videoHeight * w / v.videoWidth);
+    c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(v, 0, 0, w, h);
+    const r = window.jsQR(x.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
+    if (r && r.data) {
+      const cod = extrairCodigo(r.data);
+      if (cod) { fecharLeitor(); if (navigator.vibrate) navigator.vibrate(80); codigoLido(cod); return; }
+      const m = $('leitor-msg'); if (m) m.textContent = r.data.includes(location.host) ? 'Esse é o QR Code do app, não de uma pelada. Peça o QR Code da pelada.' : 'Esse QR Code não é de uma pelada do app.';
+    }
+  }
+  setTimeout(() => requestAnimationFrame(loopLeitor), 120);
+}
+function codigoLido(cod) {
+  if (EU) { buscarCodigo(cod); return; }
+  ls.set('pelada.convite', cod); aviso('Convite lido! Crie sua conta ou entre para participar.'); ir('criar');
+}
+
 /* ================= Estado da casca ================= */
 let EU = null, PERFIL = null, TELA = 'carregando', GRUPOS = {}, ABERTO = null, unsubGrupo = null, unsubPerfil = null, CONVITE = null, OCUPADO = false;
 const pend = new URLSearchParams(location.search).get('c');
@@ -128,7 +172,8 @@ function render() {
     <button class="btn primary block" data-sh="ir" data-v="criar">Criar conta</button>
     <button class="btn block" data-sh="ir" data-v="login">Já tenho conta</button>
     <div class="ob-div">ou</div>
-    <button class="btn block ob-google" data-sh="google">Continuar com o Google</button>`;
+    <button class="btn block ob-google" data-sh="google">Continuar com o Google</button>
+    ${ls.get('pelada.convite') ? '' : '<button class="btn block" data-sh="ler-qr">📷 Recebi um QR Code de convite</button>'}`;
   if (t === 'login') h = topo('boas') + `<h2>Entrar</h2><p class="lead">Bem-vindo de volta.</p>
     <form id="f-login" class="stack" novalidate>
       <label class="field"><span>E-mail</span><input type="email" id="l-email" autocomplete="email" inputmode="email" placeholder="seu@email.com" required></label>
@@ -170,7 +215,7 @@ function render() {
     ${adm.length ? `<div class="sub" style="font-weight:700">ADMINISTRO</div>${adm.map(g => card(g, 'ADMIN')).join('')}` : ''}
     ${jog.length ? `<div class="sub" style="font-weight:700">JOGO</div>${jog.map(g => card(g, 'JOGADOR')).join('')}` : ''}
     <button class="btn primary block" data-sh="ir" data-v="nova">+ Criar uma pelada</button>
-    <button class="btn block" data-sh="ir" data-v="codigo">Entrar com código de convite</button>
+    <button class="btn block" data-sh="ir" data-v="codigo">📷 Entrar com QR Code ou código</button>
     <button class="btn block" data-sh="demo">Ver demonstração</button>`; }
   if (t === 'nova') h = topo('minhas') + `<h2>Criar sua pelada</h2><p class="lead">Depois você ajusta tudo nos Ajustes.</p>
     <form id="f-nova" class="stack" novalidate>
@@ -181,9 +226,11 @@ function render() {
       <label class="field"><span>Jogadores de linha por time</span><input type="number" id="n-por" value="5" min="3" max="11"></label></div>
       <div class="grid2"><label class="field"><span>Mensalidade (R$)</span><input type="number" id="n-mens" value="80" min="0"></label><label class="field"><span>Diária (R$)</span><input type="number" id="n-dia2" value="20" min="0"></label></div>
       <button class="btn primary block" type="submit">Criar pelada</button></form>`;
-  if (t === 'codigo') h = topo('minhas') + `<h2>Entrar numa pelada</h2><p class="lead">Digite o código de 6 letras que veio no convite.</p>
+  if (t === 'codigo') h = topo('minhas') + `<h2>Entrar numa pelada</h2><p class="lead">Leia o QR Code de quem já está na pelada, ou digite o código de 6 letras.</p>
+    <button class="btn primary block" data-sh="ler-qr" style="padding-block:16px;font-size:16px">📷 Ler QR Code do convite</button>
+    <div class="ob-div">ou digite o código</div>
     <form id="f-codigo" class="stack" novalidate><label class="field"><span>Código</span><input type="text" id="cod" maxlength="6" autocapitalize="characters" autocomplete="off" placeholder="Ex.: SAB8H2" style="text-transform:uppercase;font-size:22px;letter-spacing:.15em;text-align:center" value="${escH(ls.get('pelada.convite') || '')}"></label>
-    <button class="btn primary block" type="submit">Buscar pelada</button></form>`;
+    <button class="btn block" type="submit">Buscar pelada</button></form>`;
   if (t === 'convite' && CONVITE) { const G = CONVITE.grupo; const pre = UIp.prefere || 'mensalista';
     h = topo('minhas') + `<h2>Você foi convidado!</h2>
     <div class="ob-inv"><div class="h"><span class="sub" style="color:inherit;opacity:.85">Convite para</span><b>${escH(G.nome || 'Pelada')}</b></div>
@@ -334,7 +381,7 @@ window.sincronizarGrupo = async d => { if (ABERTO) try { await B.set('grupos/' +
 
 /* ================= Eventos ================= */
 document.addEventListener('click', async e => {
-  const b = e.target.closest('[data-sh]'); if (!b || !$('shell').contains(b)) return;
+  const b = e.target.closest('[data-sh]'); if (!b || !($('shell').contains(b) || $('leitor').contains(b))) return;
   const a = b.dataset.sh, v = b.dataset.v;
   if (a === 'ir') { if (v === 'perfil') { UIp.pos = null; UIp.foto = undefined; } ir(v); }
   if (a === 'pos') { UIp.pos = v; const keep = { nome: $('p-nome').value, ap: $('p-ap').value, tel: $('p-tel').value }; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }
@@ -343,6 +390,8 @@ document.addEventListener('click', async e => {
   if (a === 'reset') { const em = ($('l-email') || {}).value || ''; if (!em) { aviso('Digite seu e-mail acima e toque de novo em "Esqueci minha senha".'); return; } try { await B.reset(em.trim()); aviso('Mandamos um link para criar uma nova senha no seu e-mail.'); } catch (err) { aviso(msgErro(err)); } }
   if (a === 'sair') { ls.set('pelada.ultimo', null); await B.sair(); }
   if (a === 'abrir') abrirGrupo(v);
+  if (a === 'ler-qr') abrirLeitor();
+  if (a === 'fechar-leitor') fecharLeitor();
   if (a === 'qr-grupo') { UIp.qrg = v; ir('qr-grupo'); }
   if (a === 'copiar-qrg') { try { await navigator.clipboard.writeText(UIp.qrLink); aviso('Link da pelada copiado.'); } catch (err) { aviso(UIp.qrLink); } }
   if (a === 'share-qrg') { try { await navigator.share({ title: 'Pelada FC', text: UIp.qrTxt }); } catch (err) { } }
