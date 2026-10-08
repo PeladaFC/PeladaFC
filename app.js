@@ -215,10 +215,13 @@ function render() {
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
       <button class="btn primary block" type="submit">Salvar</button></form>
     ${p.apelido ? `<button class="btn block" data-sh="sair">Sair da conta</button><p class="sub" style="text-align:center">${escH(EU.email || '')}</p>` : ''}`; }
+  const avOk = rid => { try { return !!localStorage.getItem('pelada.avok.' + rid); } catch (e) { return false; } };
+  const avAb = g => { const a = GRUPOS[g] && GRUPOS[g].avAberta; return a && a.fim > Date.now() && !avOk(a.rid) ? a : null; };
   if (t === 'minhas') { const ids = Object.keys(GRUPOS); const adm = ids.filter(g => (GRUPOS[g].admins || []).includes(EU.uid)), jog = ids.filter(g => !adm.includes(g));
     const card = (g, papel) => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="abrir" data-v="${g}"><div class="av bg-${papel === 'ADMIN' ? 'MEI' : 'ATA'}">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.evento ? '<b style="display:inline;font-size:10px;letter-spacing:.05em;color:var(--card-ink);background:var(--card);border-radius:5px;padding:1px 5px;margin-right:4px">EVENTO LIVRE</b>' : ''}${escH(quandoG(G, true))}</span></span><span class="badge2 ${papel === 'ADMIN' ? '' : 'j'}">${papel}</span></button>`; };
     h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELADA FC</span><button class="btn sm" data-sh="ir" data-v="perfil">${escH(PERFIL?.apelido || PERFIL?.nome || 'Perfil')}</button></div>
     <h2>Minhas peladas</h2>
+    ${ids.filter(avAb).map(g => `<button class="alerta-av" data-sh="avaliar" data-v="${g}"><span class="ic">⭐</span><span><b>Avaliação da galera aberta!</b>${escH(GRUPOS[g].nome || 'Pelada')} · dê sua nota para o elenco</span><span class="ir">Avaliar</span></button>`).join('')}
     ${cartaoPush()}
     <button class="ob-opt" data-sh="ir" data-v="compartilhar" style="padding:12px 14px"><span class="ic" style="background:var(--card)">📲</span><span class="grow"><b>Convidar para o app</b><span class="sub">Mostre o QR Code ou mande o link do app</span></span></button>
     ${ids.length ? `<button class="ob-opt" data-sh="ir" data-v="convidar-pelada" style="padding:12px 14px"><span class="ic" style="background:var(--pitch-soft)">⚽</span><span class="grow"><b>Convidar para minha pelada</b><span class="sub">QR Code ou link que já entra na pelada</span></span></button>` : ''}
@@ -505,6 +508,7 @@ document.addEventListener('click', async e => {
   if (a === 'reset') { const em = ($('l-email') || {}).value || ''; if (!em) { aviso('Digite seu e-mail acima e toque de novo em "Esqueci minha senha".'); return; } try { await B.reset(em.trim()); aviso('Mandamos um link para criar uma nova senha no seu e-mail.'); } catch (err) { aviso(msgErro(err)); } }
   if (a === 'sair') { ls.set('pelada.ultimo', null); await B.sair(); }
   if (a === 'abrir') abrirGrupo(v);
+  if (a === 'avaliar') { window.__abrirAval = true; abrirGrupo(v); }
   if (a === 'tipo-pel') { const ev = v === 'evento'; UIp.tipoPel = v;
     document.querySelectorAll('#n-tipo button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === v)));
     $('n-dia-box').hidden = ev; $('n-fixa-box').hidden = ev;
