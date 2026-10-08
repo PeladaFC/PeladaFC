@@ -213,6 +213,24 @@ nav.tabs button[aria-current="page"]{color:var(--pitch)}
 input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;max-width:100%;min-height:44px;text-align:left}
 input::-webkit-date-and-time-value{text-align:left}
 .btn-grande{padding-block:17px;font-size:17px}
+.avstrip{display:flex;gap:6px;overflow-x:auto;padding:4px 2px 8px;scrollbar-width:none}
+.avthumb{all:unset;position:relative;cursor:pointer;border-radius:50%;padding:2px;opacity:.6}
+.avthumb.on{opacity:1;outline:3px solid var(--card);outline-offset:1px}
+.avthumb .ok,.avcard .ok{position:absolute;right:-2px;bottom:-2px;background:var(--pitch);color:#fff;border-radius:50%;width:16px;height:16px;font-size:11px;display:grid;place-items:center;font-weight:800}
+.avgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.avcard{all:unset;box-sizing:border-box;position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border:2px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer;text-align:center;min-width:0}
+.avcard b{font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.avcard.on{border-color:var(--pitch);background:var(--pitch-soft)}
+.avcard .ok{right:6px;top:6px;bottom:auto}
+.avcard .novo{position:absolute;left:6px;top:6px;font-size:9px;font-weight:800;background:var(--card);color:var(--card-ink);border-radius:6px;padding:1px 4px}
+.radar{width:100%;max-width:320px;display:block;margin:0 auto}
+.radar .rg{fill:none;stroke:var(--line);stroke-width:1}
+.radar .rg.ext{stroke-width:1.5}
+.radar .rs{fill-opacity:.28;stroke-width:2.5}
+.radar .rl{font-size:11px;font-weight:700;fill:var(--ink,#1a1a1a)}
+.radar .rv{font-size:11px;font-weight:800;fill:var(--pitch)}
+.legenda{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
+.legenda::before{content:'';width:12px;height:12px;border-radius:3px;background:var(--c)}
 .mapa{display:block;width:100%;height:200px;border:0;border-radius:8px;margin-top:8px;background:var(--line)}
 .navs{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .field .opc{font-style:normal;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0;margin-left:4px}

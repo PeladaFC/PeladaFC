@@ -85,4 +85,10 @@ function avisoAval(p, pid, ctx) {
   const ate = `${DIAS3[loc.getUTCDay()]} ${pad(loc.getUTCHours())}:${pad(loc.getUTCMinutes())}`;
   return [{ para: uidsDe(ctx, participantes(p, pid, ctx)), titulo: '⭐ Avalie a galera', texto: `Como foi a pelada de ${dShort(p.data)}? Dê suas estrelas, o voto é secreto. Aberta até ${ate}.`, tag: 'aval-' + pid }];
 }
-module.exports = { dShort, fimDe, janelaH, pelCriada, pelMudouAlgo, pelAtualizada, presAtualizada, membroNovo, muralAtualizado, avalAbriu, avisoAval, participantes, uidsDe };
+function rodadaNova(r, ctx) {
+  if (!r || r.status !== 'aberta') return [];
+  const n = (r.alvos || []).length, loc = new Date((r.fim || Date.now()) - 3 * 36e5);
+  const ate = `${DIAS3[loc.getUTCDay()]} ${pad(loc.getUTCDate())}/${pad(loc.getUTCMonth() + 1)} ${pad(loc.getUTCHours())}:${pad(loc.getUTCMinutes())}`;
+  return [{ para: todos(ctx), titulo: '⭐ Avaliação completa', texto: `Avalie ${n} jogador${n === 1 ? '' : 'es'} nos 5 critérios até ${ate}. O voto é secreto.`, tag: 'rodada' }];
+}
+module.exports = { rodadaNova, dShort, fimDe, janelaH, pelCriada, pelMudouAlgo, pelAtualizada, presAtualizada, membroNovo, muralAtualizado, avalAbriu, avisoAval, participantes, uidsDe };

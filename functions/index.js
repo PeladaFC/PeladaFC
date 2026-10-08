@@ -116,6 +116,12 @@ exports.pushMural = onDocumentWritten('grupos/{gid}/mural/{doc}', async ev => {
   await enviarTodos(R.muralAtualizado(a, b, ctx));
 });
 
+exports.pushAvaliacaoCompleta = onDocumentCreated('grupos/{gid}/avaliacoes/{rid}', async ev => {
+  const r = ev.data && ev.data.data(); if (!r) return;
+  const ctx = await contexto(ev.params.gid, { membros: true });
+  await enviarTodos(R.rodadaNova(r, ctx));
+});
+
 // Boas-vindas: confirma na hora que a notificação chegou no celular
 exports.pushAtivado = onDocumentCreated('users/{uid}/push/{id}', async ev => {
   const s = ev.data && ev.data.data(); if (!s || !s.endpoint) return;

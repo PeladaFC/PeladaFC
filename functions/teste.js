@@ -69,4 +69,8 @@ t('aviso de avaliação: só depois do término, só uma vez, horário de Recife
 t('pelada que vira a meia-noite termina no dia seguinte', () => {
   assert.strictEqual(R.fimDe({ data: '2026-10-10', hora: '23:00', horaFim: '00:30' }, {}), Date.parse('2026-10-11T00:30:00-03:00'));
 });
+t('avaliação completa aberta avisa todo mundo com o prazo em horário de Recife', () => {
+  const av = R.rodadaNova({ status: 'aberta', alvos: ['jA', 'jB'], fim: Date.parse('2026-10-11T15:00:00-03:00') }, ctx);
+  assert.deepStrictEqual(av[0].para.sort(), ['uA', 'uB', 'uC']); assert.match(av[0].texto, /Avalie 2 jogadores nos 5 critérios até dom 11\/10 15:00/);
+});
 console.log(`\n${n} testes passaram.`);

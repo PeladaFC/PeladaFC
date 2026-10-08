@@ -39,14 +39,14 @@ const ICON={
 };
 
 /* ---------- estado ---------- */
-let S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{}};
+let S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};
 let REAL=null;               // estado real guardado enquanto a demonstração está aberta
 let dl=null, ARTS=[], REAL_ID=null, MSG_ORIG='';
 let db=null, isAdmin=false, demo=false, ready=false, loaded=0;
 let UI={tab:'jogo',sub:'presenca',filtro:'todos',busca:'',rk:'nota',ano:new Date().getFullYear(),mes:null,sel:null,confirmEnd:false,showHist:false};
 try{const t=localStorage.getItem('pelada.tab');if(t)UI.tab=t}catch(e){}
 const pending={}, timers={}, queues={};
-const COL={jogadores:'jog',peladas:'pel',caixa:'caixa',avisos:'avisos',presencas:'pres',locais:'locais',membros:'membros',votos:'votos'};
+const COL={jogadores:'jog',peladas:'pel',caixa:'caixa',avisos:'avisos',presencas:'pres',locais:'locais',membros:'membros',votos:'votos',avaliacoes:'avals'};
 let myId=null;
 const ADM=()=>demo?!UI.comoJogador:isAdmin;
 
@@ -87,7 +87,7 @@ function withPending(colName,map){for(const p in pending){const[c,id]=p.split('/
 
 /* ---------- regras do jogo ---------- */
 function critKey(pos){return pos==='GOL'?CRIT.GOL:CRIT.linha}
-function notaInicial(j){const k=critKey(j.pos).map(([c])=>Number(j.crit?.[c]||3));return sum(k)/k.length*2}
+function notaInicial(j){const g=j.critGalera||{};const k=critKey(j.pos).map(([c])=>Number(g[c]??j.crit?.[c]??3));return sum(k)/k.length*2}
 function encerradas(){return Object.entries(S.pel).filter(([,p])=>p.status==='encerrada').sort((a,b)=>b[1].data.localeCompare(a[1].data))}
 let NOTA_CACHE=null;
 /* Nota do jogador (0 a 10)
@@ -782,7 +782,7 @@ function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GR
 
 /* ---------- render ---------- */
 function render(){
-  NOTA_CACHE=null;consolidarAvaliacoes();
+  NOTA_CACHE=null;consolidarAvaliacoes();consolidarRodadas();
   const app=document.getElementById('app');
   const ae=document.activeElement,aid=ae&&ae.id,sel=aid&&ae.selectionStart!=null?[ae.selectionStart,ae.selectionEnd]:null;
   renderNav();setTimeout(checarPush,0);
@@ -832,6 +832,7 @@ function tJogo(A){
     h+=`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Como estava o campo?</h3></div>
       <div class="sub" style="margin-bottom:4px">${esc(L.nome)} · pelada de ${dShort(p.data)}</div>${formAvalCampo(pid,(d.avalCampo||{})[pid],'me')}
       <div class="sub" style="margin-top:4px">Sua avaliação ajuda a galera a escolher onde jogar.</div></div>`}}
+  h+=cartaoAvCompleta();
   h+=painelPosJogo();
   if(A)h+=painelAprovar();
   if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar: ${esc(AVISOS[v.a.tipo]?.n||'')}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
@@ -1003,6 +1004,113 @@ function painelJogador(pid,p,l){
     <div class="sub">${status}</div></div>`;
 }
 
+/* ---------- avaliação completa (5 critérios, de tempos em tempos) ----------
+   O administrador abre uma rodada (todos ou só alguns jogadores, ex.: novatos) com prazo.
+   Cada um avalia os outros nos 5 critérios (1 a 5 estrelas), pode pular quem não conhece.
+   Votos secretos em votos/{uid}.av. Ao fechar, o app do administrador calcula a média de cada critério
+   (com o mesmo peso menor para quem avacalha) e grava em jogadores/{id}.critGalera.
+   Essa média vira a "estrela" do jogador e substitui a nota inicial do cadastro no cálculo da nota. */
+const MIN_AV=2;
+function critDe(jid){return critKey(J(jid).pos)}
+function rodadaAberta(){return Object.entries(S.avals||{}).filter(([,r])=>r&&r.status==='aberta').sort((a,b)=>(b[1].criadoEm||0)-(a[1].criadoEm||0))[0]||null}
+function alvosDe(r){return(r.alvos||[]).filter(id=>S.jog[id])}
+function meusAv(rid){const d=(S.votos||{})[myId];return((d&&d.av)||{})[rid]||{}}
+function feitoAv(jid,v){if(!v)return false;if(v.ns)return true;return critDe(jid).every(([c])=>Number(v[c])>0)}
+function paraMimAvaliar(r){const eu=meuJogador();return alvosDe(r).filter(id=>id!==eu)}
+function progressoAv(rid,r){const mv=meusAv(rid),ids=paraMimAvaliar(r);return{feitos:ids.filter(id=>feitoAv(id,mv[id])).length,total:ids.length}}
+function quandoFim(t){const d=new Date(t);return`${DIAS3[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`}
+function avG(id,px){const j=J(id),f=fotoDe(id);return`<div class="av bg-${j.pos}" style="width:${px}px;height:${px}px;font-size:${Math.round(px*.38)}px;${fotoStyle(f)}" ${f?`role="img" aria-label="${esc(nm(id))}"`:''}>${f?'':esc(initials(nm(id)))}</div>`}
+
+// apuração: média ponderada por critério; quem foge muito da galera pesa menos
+function apurarRodada(rid){
+  const vs={};for(const[u,d] of Object.entries(S.votos||{})){const v=d&&d.av&&d.av[rid];const jog=(d&&d.jogador)||(S.pres[u]||{}).jogador;if(v&&jog)vs[jog]=v}
+  const peso={};
+  for(const[V,m] of Object.entries(vs)){const devs=[],vals=[];
+    for(const[t,cr] of Object.entries(m||{})){if(t===V||!cr||cr.ns)continue;
+      for(const[c] of critDe(t)){const x=Number(cr[c]);if(!x)continue;vals.push(x);
+        const os=Object.entries(vs).filter(([o])=>o!==V&&o!==t).map(([,mm])=>Number(((mm||{})[t]||{})[c])).filter(Boolean);
+        if(os.length>=2)devs.push(Math.abs(x-sum(os)/os.length))}}
+    const dev=devs.length>=3?sum(devs)/devs.length:0,chapado=vals.length>=8&&vals.every(x=>x===vals[0]);
+    peso[V]=pesoBase(dev,chapado)}
+  const res={};
+  for(const[V,m] of Object.entries(vs))for(const[t,cr] of Object.entries(m||{})){if(t===V||!cr||cr.ns||!S.jog[t])continue;const w=peso[V]??1;
+    const r=res[t]=res[t]||{s:{},w:{},n:0};let algum=false;
+    for(const[c] of critDe(t)){const x=Number(cr[c]);if(!x)continue;algum=true;r.s[c]=(r.s[c]||0)+x*w;r.w[c]=(r.w[c]||0)+w}
+    if(algum)r.n++}
+  const out={};for(const[t,r] of Object.entries(res)){const c={};for(const k in r.s)if(r.w[k]>0)c[k]=Math.round(r.s[k]/r.w[k]*100)/100;out[t]={crit:c,n:r.n}}
+  return out}
+const FECHANDO_AV=new Set();
+function fecharRodada(rid){const r=S.avals[rid];if(!r||FECHANDO_AV.has(rid))return;FECHANDO_AV.add(rid);
+  const res=apurarRodada(rid),now=Date.now();
+  put('avaliacoes/'+rid,{...r,status:'fechada',fechadaEm:now,resultado:res});
+  for(const[jid,x] of Object.entries(res)){const j=S.jog[jid];if(!j||x.n<MIN_AV)continue;
+    put('jogadores/'+jid,{...j,critGalera:x.crit,critN:x.n,critEm:now})}
+}
+function consolidarRodadas(){if(demo||!ADM()||!S.votosOk)return;const ra=rodadaAberta();if(ra&&Date.now()>=(ra[1].fim||0))fecharRodada(ra[0])}
+
+/* cartão para quem precisa avaliar */
+function cartaoAvCompleta(){const ra=rodadaAberta();if(!ra||!meuJogador())return'';const[rid,r]=ra,{feitos,total}=progressoAv(rid,r);if(!total)return'';
+  const ok=feitos>=total;
+  return`<div class="panel stack" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>⭐ Avaliação completa</h3><span class="sub num">${feitos}/${total}</span></div>
+    <div class="sub" style="margin-top:-4px">${ok?'✓ Você já avaliou todo mundo. Pode rever até o prazo.':`Avalie ${total} jogador${total>1?'es':''} nos 5 critérios. 🔒 Secreto. Até ${quandoFim(r.fim)}.`}</div>
+    <div class="row" style="gap:4px;flex-wrap:nowrap;overflow:hidden">${paraMimAvaliar(r).slice(0,8).map(id=>avHTML(id)).join('')}${total>8?`<span class="sub">+${total-8}</span>`:''}</div>
+    <button class="btn ${ok?'':'primary'} block" data-act="av-abrir">${ok?'Rever minhas avaliações':feitos?'Continuar avaliando':'Avaliar agora'}</button></div>`}
+
+/* tela de avaliar: um jogador por vez, com foto grande */
+function sheetAvaliar(){const ra=rodadaAberta();if(!ra){closeSheet();toast('A avaliação já fechou.');return}const[rid,r]=ra,ids=paraMimAvaliar(r);if(!ids.length){closeSheet();return}
+  UI.avi=Math.max(0,Math.min(ids.length-1,UI.avi||0));const id=ids[UI.avi],mv=meusAv(rid),v=mv[id]||{},{feitos,total}=progressoAv(rid,r),j=J(id);
+  openSheet('Avaliação completa',`<div class="stack">
+    <div class="avstrip">${ids.map((x,i)=>`<button class="avthumb ${i===UI.avi?'on':''}" data-act="av-ir" data-v="${i}" aria-label="${esc(nm(x))}">${avHTML(x)}${feitoAv(x,mv[x])?'<span class="ok">✓</span>':''}</button>`).join('')}</div>
+    <div class="sub" style="text-align:center">${feitos} de ${total} avaliados · até ${quandoFim(r.fim)}</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px">${avG(id,112)}<div style="font-family:var(--f-display);font-weight:800;font-size:24px;text-transform:uppercase">${esc(nm(id))}</div>
+      <div class="sub">${esc(j.nome||'')}${j.nome&&j.apelido?' · ':''}<span class="chip p-${j.pos}">${j.pos}</span> ${esc(POS[j.pos]||'')}</div></div>
+    ${v.ns?`<div class="banner"><span>Você marcou que não sabe avaliar ${esc(nm(id))}.</span></div>`
+      :`<div class="panel">${critDe(id).map(([c,n])=>`<div class="rate"><span>${n}</span>${estrelasInput(v[c],`data-act="av-voto" data-j="${id}" data-c="${c}"`)}</div>`).join('')}</div>`}
+    <button class="btn sm block" data-act="av-ns" data-j="${id}">${v.ns?'Quero avaliar':'Não sei avaliar este jogador'}</button>
+    <div class="lado"><button class="btn" data-act="av-ir" data-v="${UI.avi-1}" ${UI.avi===0?'disabled':''}>‹ Anterior</button><button class="btn ${feitoAv(id,v)?'primary':''}" data-act="av-ir" data-v="${UI.avi+1}" ${UI.avi>=ids.length-1?'disabled':''}>Próximo ›</button></div>
+    <div class="sub" style="text-align:center;font-style:italic;opacity:.85">⚖️ Avacalhou na votação? O app foi programado para perceber. Além de atrapalhar a pelada, seu voto passa a valer menos.</div></div>`)}
+function votarAv(jid,patchV){const ra=rodadaAberta();if(!ra){toast('A avaliação já fechou.');return}const rid=ra[0],eu=meuJogador();if(!eu||jid===eu)return;
+  const mv=(S.votos||{})[myId]||{},av={...(mv.av||{})},cur={...((av[rid]||{})[jid]||{})};
+  const novo=patchV(cur);av[rid]={...(av[rid]||{}),[jid]:novo};
+  const ks=Object.keys(av).sort().slice(-3),av3={};ks.forEach(k=>av3[k]=av[k]);
+  put('votos/'+myId,{...mv,jogador:eu,av:av3,t:Date.now()})}
+
+/* tela do administrador: abrir rodada escolhendo quem (com fotos) ou ver andamento */
+function sheetAvAdmin(){const ra=rodadaAberta();
+  if(ra){const[rid,r]=ra,ids=alvosDe(r),vs=Object.entries(S.votos||{}).filter(([,d])=>d&&d.av&&d.av[rid]);
+    const comecaram=vs.length,concluiram=vs.filter(([u,d])=>{const jog=d.jogador||(S.pres[u]||{}).jogador;const alvo=ids.filter(x=>x!==jog);return alvo.length&&alvo.every(x=>feitoAv(x,d.av[rid][x]))}).length;
+    openSheet('Avaliação completa',`<div class="stack"><div class="banner due"><span><b>Aberta até ${quandoFim(r.fim)}</b><br>${ids.length} jogador${ids.length>1?'es':''} em avaliação · ${comecaram} pessoa(s) começaram · ${concluiram} concluíram</span></div>
+      <div class="avgrid">${ids.map(id=>`<div class="avcard on">${avG(id,56)}<b>${esc(nm(id))}</b><span class="chip p-${J(id).pos}">${J(id).pos}</span></div>`).join('')}</div>
+      <button class="btn primary block" data-act="av-encerrar" data-r="${rid}">Encerrar agora e calcular</button>
+      <button class="btn danger block" data-act="av-cancelar" data-r="${rid}">Cancelar avaliação</button>
+      <p class="sub" style="margin:0">Ao encerrar, cada jogador avaliado por pelo menos ${MIN_AV} pessoas ganha a estrela da galera, que passa a valer no lugar da nota inicial do cadastro.</p></div>`);return}
+  if(!UI.avSel)UI.avSel=new Set();const sel=UI.avSel;
+  const ids=ativos().sort((a,b)=>(!!S.jog[a].critGalera)-(!!S.jog[b].critGalera)||nm(a).localeCompare(nm(b)));
+  openSheet('Nova avaliação completa',`<div class="stack"><p class="sub" style="margin:0">Escolha quem a galera vai avaliar nos 5 critérios. Os marcados com <b>NOVO</b> ainda não têm avaliação da galera.</p>
+    <div class="row" style="gap:6px"><button class="btn sm" data-act="av-sel" data-v="todos">Todos</button><button class="btn sm" data-act="av-sel" data-v="novos">Só os novos</button><button class="btn sm" data-act="av-sel" data-v="nenhum">Limpar</button></div>
+    <div class="avgrid">${ids.map(id=>`<button class="avcard ${sel.has(id)?'on':''}" data-act="av-tog" data-j="${id}" aria-pressed="${sel.has(id)}">${avG(id,56)}<b>${esc(nm(id))}</b><span class="chip p-${J(id).pos}">${J(id).pos}</span>${S.jog[id].critGalera?'':'<span class="novo">NOVO</span>'}${sel.has(id)?'<span class="ok">✓</span>':''}</button>`).join('')}</div>
+    <label class="field"><span>Prazo para avaliar</span><select id="av-prazo">${[1,2,3,5,7].map(d=>`<option value="${d}" ${d===3?'selected':''}>${d} dia${d>1?'s':''}</option>`).join('')}</select></label>
+    <button class="btn primary block btn-grande" data-act="av-criar" ${sel.size?'':'disabled'}>Abrir avaliação · ${sel.size} jogador${sel.size===1?'':'es'}</button></div>`)}
+
+/* estrela (radar) dos 5 critérios, com comparação */
+function valoresCrit(jid){const j=J(jid),src=j.critGalera||j.crit||{};return critDe(jid).map(([c])=>Number(src[c]??(j.crit||{})[c]??3))}
+function radarSVG(labels,series){const W=300,H=260,cx=150,cy=136,R=92,n=labels.length,ang=i=>-Math.PI/2+i*2*Math.PI/n;
+  const pt=(i,v)=>[cx+Math.cos(ang(i))*R*v/5,cy+Math.sin(ang(i))*R*v/5];
+  let s=`<svg viewBox="0 0 ${W} ${H}" class="radar" role="img" aria-label="Estrela de habilidades">`;
+  for(let l=1;l<=5;l++)s+=`<polygon points="${labels.map((_,i)=>pt(i,l).join(',')).join(' ')}" class="rg${l===5?' ext':''}"/>`;
+  labels.forEach((_,i)=>{const[x,y]=pt(i,5);s+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" class="rg"/>`});
+  series.forEach(se=>{s+=`<polygon points="${se.vals.map((v,i)=>pt(i,v).join(',')).join(' ')}" class="rs" style="fill:${se.cor};stroke:${se.cor}"/>`;
+    se.vals.forEach((v,i)=>{const[x,y]=pt(i,v);s+=`<circle cx="${x}" cy="${y}" r="3.5" style="fill:${se.cor}"/>`})});
+  labels.forEach((t,i)=>{const[x,y]=pt(i,6.1);const v=series[0].vals[i];s+=`<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" class="rl">${esc(t)}<tspan x="${x}" dy="14" class="rv">${fmtN(v*2)}</tspan></text>`});
+  return s+'</svg>'}
+function painelEstrela(id){const j=J(id),labels=critDe(id).map(([,n])=>n),cmp=UI.cmp&&S.jog[UI.cmp]&&UI.cmp!==id&&critKey(J(UI.cmp).pos)===critKey(j.pos)?UI.cmp:null;
+  const series=[{vals:valoresCrit(id),cor:'#1B6A36'}];if(cmp)series.push({vals:valoresCrit(cmp),cor:'#E8742A'});
+  const fonte=j.critGalera?`Avaliação da galera · ${j.critN||''} voto(s) · ${new Date(j.critEm).toLocaleDateString('pt-BR',{month:'short',year:'numeric'})}`:'Avaliação inicial do cadastro';
+  const outros=ativos().filter(x=>x!==id&&critKey(J(x).pos)===critKey(j.pos)).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  return`<div class="panel"><div class="panel-h"><h3>⭐ Estrela</h3><span class="sub">${esc(fonte)}</span></div>${radarSVG(labels,series)}
+    <div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><span class="legenda" style="--c:#1B6A36">${esc(nm(id))}</span>${cmp?`<span class="legenda" style="--c:#E8742A">${esc(nm(cmp))}</span>`:''}</div>
+    <label class="field" style="margin-top:8px"><span>Comparar com</span><select data-act="cmp" data-j="${id}"><option value="">Ninguém</option>${outros.map(x=>`<option value="${x}" ${x===cmp?'selected':''}>${esc(nm(x))}</option>`).join('')}</select></label></div>`}
+
 /* --- Elenco --- */
 function tElenco(A){
   const q=UI.busca.trim().toLowerCase();
@@ -1016,6 +1124,8 @@ function tElenco(A){
   let h=`<div class="row between" style="margin-bottom:10px"><h2>Elenco <span class="muted num">${ativos().length}</span></h2>${A?'<button class="btn primary" data-act="add-jog">+ Jogador</button>':''}</div>
     <input type="text" id="busca" placeholder="Buscar jogador" value="${esc(UI.busca)}" data-in="busca" style="margin-bottom:10px">
     <div class="pick" style="margin-bottom:12px">${[['todos','Todos'],['GOL','GOL'],['ZAG','ZAG'],['MEI','MEI'],['ATA','ATA'],['mensalista','Mensalistas'],['diarista','Diaristas'],['inativos','Inativos']].map(([k,n])=>`<button data-act="filtro" data-v="${k}" aria-pressed="${UI.filtro===k}">${n}</button>`).join('')}</div>`;
+  if(A){const ra=rodadaAberta();h+=`<button class="btn block ${ra?'':'warn'}" data-act="av-admin" style="margin-bottom:12px">${ra?`⭐ Avaliação completa aberta · até ${quandoFim(ra[1].fim)}`:'⭐ Nova avaliação completa (5 critérios)'}</button>`}
+  h+=cartaoAvCompleta();
   if(membrosSemCadastro().length&&!demo)h+=A?painelMembros():painelPendentes();
   if(!A&&euPendente())h=bannerPendente().replace('margin-top:12px','margin:0 0 12px')+h;
   if(!Object.keys(S.jog).length){
@@ -1211,11 +1321,12 @@ function sheetVerJog(id){
   openSheet(nm(id),`<div class="stack">
     <div class="board"><div class="row between"><div><div class="when" style="font-size:56px">${fmtN(notaAtual(id))}</div><div class="where">${POS[j.pos]}${j.pos2?' · também '+POS[j.pos2].toLowerCase():''} · ${j.tipo==='diarista'?'Diarista':'Mensalista'}</div></div></div>
     <div class="stats"><div class="stat"><b>${s.j||0}</b><span>Jogos ${UI.ano}</span></div><div class="stat"><b>${s.g||0}</b><span>Gols</span></div><div class="stat"><b>${s.a||0}</b><span>Assist.</span></div><div class="stat"><b>${s.mvp||0}</b><span>Craque</span></div></div></div>
-    <div class="panel small"><div class="row between"><span>Nota inicial</span><b class="num">${fmtN(notaInicial(j))}</b></div>${j.conv?`<div class="row between" style="margin-top:4px"><span>Convidado por</span><b>${esc(nm(j.conv))}</b></div>`:''}<div class="row between" style="margin-top:4px"><span>Confirma pelo app</span><b>${vinculo(id)?'Sim':'Ainda não'}</b></div>${j.tel?`<div class="row between" style="margin-top:4px"><span>WhatsApp</span><b class="num">${esc(j.tel)}</b></div>`:''}
+    <div class="panel small"><div class="row between"><span>${j.critGalera?'Base da avaliação da galera':'Nota inicial'}</span><b class="num">${fmtN(notaInicial(j))}</b></div>${j.conv?`<div class="row between" style="margin-top:4px"><span>Convidado por</span><b>${esc(nm(j.conv))}</b></div>`:''}<div class="row between" style="margin-top:4px"><span>Confirma pelo app</span><b>${vinculo(id)?'Sim':'Ainda não'}</b></div>${j.tel?`<div class="row between" style="margin-top:4px"><span>WhatsApp</span><b class="num">${esc(j.tel)}</b></div>`:''}
       ${hist.length?`<div style="margin-top:8px"><span class="muted">Últimas notas</span><div class="row" style="margin-top:4px">${hist.map(([,p,n])=>`<span class="chip solid num">${dShort(p.data).slice(4)} · ${fmtN(n)}</span>`).join('')}</div></div>`:''}</div>
     ${A?`<div class="panel"><div class="panel-h"><h3>Ajustar total de ${UI.ano}</h3></div><div class="sub" style="margin-bottom:8px">Corrija gols e assistências que não foram lançados nas peladas. O ajuste entra no mês atual.</div>
       <div class="row" style="gap:16px">${[['g','Gols',s.g||0],['a','Assist.',s.a||0]].map(([f,lbl,v])=>`<div class="stepbox"><div class="step"><button data-act="ajuste" data-j="${id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${v}</output><button data-act="ajuste" data-j="${id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`).join('')}</div>
       ${(s.ajG||s.ajA)?`<div class="sub" style="margin-top:6px">Inclui ajustes do administrador: ${s.ajG>0?'+':''}${s.ajG||0} gol(s) e ${s.ajA>0?'+':''}${s.ajA||0} assist.</div>`:''}</div>`:''}
+    ${painelEstrela(id)}
     <button class="btn warn block" data-act="carta" data-j="${id}">Ver carta do jogador</button>
     ${A?`<div class="row"><button class="btn primary grow" data-act="edit-jog" data-j="${id}">Editar</button><button class="btn grow" data-act="msg" data-v="convite" data-j="${id}">Convite</button></div>`:''}</div>`);
 }
@@ -1403,6 +1514,17 @@ document.addEventListener('click',e=>{
     case'ajuste':{const j=S.jog[d.j];if(!j)return;const k=mesAtual(),cur={...((j.ajustes||{})[k]||{})};
       const{st}=temporada(UI.ano);if(Number(d.d)<0&&(st[d.j][d.f]||0)<=0)return;
       cur[d.f]=(cur[d.f]||0)+Number(d.d);put('jogadores/'+d.j,{...j,ajustes:{...(j.ajustes||{}),[k]:cur}});sheetVerJog(d.j);break}
+    case'av-admin':UI.avSel=null;sheetAvAdmin();break;
+    case'av-tog':{UI.avSel.has(d.j)?UI.avSel.delete(d.j):UI.avSel.add(d.j);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
+    case'av-sel':{const ids=ativos();UI.avSel=new Set(d.v==='todos'?ids:d.v==='novos'?ids.filter(x=>!S.jog[x].critGalera):[]);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
+    case'av-criar':{if(!UI.avSel||!UI.avSel.size)return;const dias=Number(document.getElementById('av-prazo').value)||3,rid=uid('r');
+      put('avaliacoes/'+rid,{criadoEm:Date.now(),fim:Date.now()+dias*864e5,alvos:[...UI.avSel],status:'aberta'});UI.avSel=null;closeSheet();toast('Avaliação aberta! A galera já pode avaliar.');break}
+    case'av-encerrar':fecharRodada(d.r);closeSheet();toast('Avaliação encerrada. Estrelas e notas atualizadas.');break;
+    case'av-cancelar':if(b.dataset.sure){const r=S.avals[d.r];put('avaliacoes/'+d.r,{...r,status:'cancelada'});closeSheet();toast('Avaliação cancelada.')}else{b.dataset.sure='1';b.textContent='Toque de novo para cancelar'}break;
+    case'av-abrir':UI.avi=0;{const ra=rodadaAberta();if(ra){const mv=meusAv(ra[0]),ids=paraMimAvaliar(ra[1]);const i=ids.findIndex(x=>!feitoAv(x,mv[x]));UI.avi=i<0?0:i}}sheetAvaliar();break;
+    case'av-ir':UI.avi=Number(d.v);sheetAvaliar();document.querySelector('.sheet').scrollTop=0;break;
+    case'av-voto':{const v=Number(d.v);votarAv(d.j,cur=>{const n={...cur};delete n.ns;n[d.c]=n[d.c]===v?0:v;return n});sheetAvaliar();break}
+    case'av-ns':votarAv(d.j,cur=>cur.ns?{}:{ns:true});sheetAvaliar();break;
     case'notas-pel':sheetNotasPelada(d.p);break;
     case'voto-abrir':UI.votoAberto=UI.votoAberto===d.p?null:d.p;render();break;
     case'lanc-step':{const doc=S.pres[myId]||{},L=(doc.lanc||{})[d.p],ap=(S.pel[d.p].stats||{})[doc.jogador]||{};
@@ -1431,6 +1553,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',e=>{
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
   const t=e.target;
+  if(t.dataset.act==='cmp'){UI.cmp=t.value||null;const sc=document.querySelector('.sheet').scrollTop;sheetVerJog(t.dataset.j);document.querySelector('.sheet').scrollTop=sc}
   if(t.dataset.act==='premio'){patch('peladas/'+t.dataset.p,{premios:{[t.dataset.f]:t.value||null}})}
   if(t.dataset.act==='ano'){UI.ano=Number(t.value);render()}
   if(t.id==='f-foto'&&t.files&&t.files[0]&&F){toast('Preparando a foto…');window.redimFoto(t.files[0]).then(d=>{F.foto=d;renderJogForm()},()=>toast('Não consegui abrir essa foto. Tente outra.'))}
@@ -1539,6 +1662,7 @@ function startDemo(){
     avisos:{a1:{tipo:'convocacao',dia:2,hora:'09:00',ativo:true},a2:{tipo:'cobrar',dia:4,hora:'19:00',ativo:true},a3:{tipo:'lista',dia:5,hora:'20:00',ativo:true},a4:{tipo:'times',dia:6,hora:'07:00',ativo:true}},
     mural:{items:[{id:'m1',t:Date.now()-3*36e5,titulo:'Recado do administrador',txt:'Galera, sábado tem pelada na Arena Boa Viagem às 8h. Chegar 15 min antes para dividir os coletes. Quem ainda não confirmou, confirma no app!'}]},
     feed:{visto:0,items:[{id:'e2',tipo:'confirmou',texto:`Lipe confirmou presença (16/10) · ${dShort(prox)}`,t:Date.now()-36e5},{id:'e1',tipo:'desistiu',texto:`Alemão desistiu · ${dShort(prox)}`,t:Date.now()-72e5}]}};
+  S.votos={};S.avals={};S.membros=S.membros||{};
   S.pres={'demo-x':{jogador:'d8',pel:{p_demo2:{s:'sim',t:Date.now()-18e5,a:null}},avalCampo:{p_demo1:{gram:3,atend:4,amb:5,banh:2,tam:4}}},'demo-w':{jogador:'d5',pel:{},avalCampo:{p_demo1:{gram:4,atend:4,amb:4,banh:3,tam:5}}},'demo-y':{jogador:'d19',pel:{p_demo2:{s:'sim',t:Date.now()-6e5,a:null}}}};
   UI.tab='jogo';UI.sub='presenca';render();window.scrollTo(0,0);
 }
@@ -1547,18 +1671,18 @@ function stopDemo(){if(!REAL||!db){if(window.voltarGrupos)window.voltarGrupos();
 /* ---------- conexão com o banco (Firebase via app.js) ---------- */
 window.iniciarPelada=function(ctx){
   window.pararPelada();
-  S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{}};
+  S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};
   demo=false;REAL=null;ready=false;loaded=0;db=ctx.db;myId=ctx.uid;isAdmin=!!ctx.isAdmin;dl=ctx.dl||null;GRUPO=ctx.grupo;GID=ctx.gid;
   UI.tab='jogo';UI.sub='presenca';UI.npLoc=undefined;UI.comoJogador=false;PUSH_PRONTO=false;PUSH_VISTOS.clear();
   closeSheet();render();window.scrollTo(0,0);
-  const N=10;const done=()=>{if(++loaded===N){ready=true;render()}};
+  const N=11;const done=()=>{if(++loaded===N){ready=true;render()}};
   const onErr=e=>{console.warn(e);toast('Não foi possível carregar os dados. Verifique a internet.')};
   const one=(path,key)=>{let first=true;db.doc(path).onSnapshot(snap=>{const tgt=demo?REAL:S;tgt[key]=snap.exists?snap.data():null;if(first){first=false;done()}else if(!demo)render()},e=>{onErr(e);if(first){first=false;done()}})};
   const live=(name,key)=>{let first=true;db.collection(name).onSnapshot(snap=>{
     const m={};snap.docs.forEach(x=>m[x.id]=x.data());const tgt=demo?REAL:S;tgt[key]=withPending(name,m);
     if(first){first=false;done()}else if(!demo)render()},e=>{onErr(e);if(first){first=false;done()}})};
   one('eventos/feed','feed');one('config/geral','config');one('mural/geral','mural');
-  live('jogadores','jog');live('peladas','pel');live('caixa','caixa');live('avisos','avisos');live('presencas','pres');live('locais','locais');live('membros','membros');
+  live('jogadores','jog');live('peladas','pel');live('caixa','caixa');live('avisos','avisos');live('presencas','pres');live('locais','locais');live('membros','membros');live('avaliacoes','avals');
   ouvirVotos();
 };
 // votos: o administrador lê todos (para apurar quando a avaliação fecha); o jogador lê só os dele
@@ -1569,4 +1693,4 @@ function ouvirVotos(){if(unsubVotos){try{unsubVotos()}catch(e){}unsubVotos=null}
   else unsubVotos=db.doc('votos/'+myId).onSnapshot(snap=>{S.votos={...(S.votos||{}),[myId]:snap.exists?snap.data():undefined};if(!snap.exists)delete S.votos[myId];fim()},e=>console.warn(e))}
 window.pararPelada=function(){if(db&&db.unsubs)db.unsubs.splice(0).forEach(u=>{try{u()}catch(e){}});db=null;ready=false;demo=false;REAL=null};
 window.atualizarGrupo=function(g){GRUPO=g;const adm=!!(g&&(g.admins||[]).includes(myId));if(adm!==isAdmin){isAdmin=adm;ouvirVotos();if(!adm&&['avisos','caixa'].includes(UI.tab))UI.tab='jogo'}render();renderAdmins()};
-window.abrirDemo=function(){window.pararPelada();S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{}};myId=null;isAdmin=true;GRUPO={codigo:'DEMO01',admins:[]};ready=true;startDemo()};
+window.abrirDemo=function(){window.pararPelada();S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};myId=null;isAdmin=true;GRUPO={codigo:'DEMO01',admins:[]};ready=true;startDemo()};
