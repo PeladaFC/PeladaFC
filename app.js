@@ -281,6 +281,9 @@ async function carregarPerfil() {
     }, e => { console.warn(e); if (first) { first = false; res(); } });
   });
 }
+// Histórico pessoal de locais (vale para todas as peladas da pessoa)
+window.meusLocais = () => (PERFIL && PERFIL.locais) || {};
+window.salvarMeuLocal = (id, L) => { if (!EU) return; PERFIL = PERFIL || {}; PERFIL.locais = { ...(PERFIL.locais || {}), [id]: L }; B.set('users/' + EU.uid, { locais: { [id]: L } }, { merge: true }).catch(e => console.warn(e)); };
 async function depoisDoLogin() {
   await carregarPerfil();
   if (!PERFIL || !PERFIL.apelido && !PERFIL.pos) { ir('perfil'); return; }

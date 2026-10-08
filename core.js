@@ -208,97 +208,82 @@ function relTempo(d){const ms=d-new Date(),h=Math.round(Math.abs(ms)/36e5);
   if(ms<0)return h<1?'agora':'há '+h+'h';if(h<1)return'em menos de 1h';if(h<36)return'em '+h+'h';return'em '+Math.round(h/24)+' dias'}
 
 /* ---------- locais ---------- */
-function buscaURL(q){return'https://www.google.com/maps/search/'+encodeURIComponent(q&&q.trim()?q.trim():'quadra society campo de futebol aluguel')}
+// Cadastro manual. Cada local fica salvo na pelada e também no histórico da pessoa (users/{uid}.locais).
 function selLocais(id,sel,vazio){const ls=Object.entries(S.locais).sort((a,b)=>a[1].nome.localeCompare(b[1].nome));
-  return`<select id="${id}"><option value="">${ls.length?vazio:'Nenhum local salvo'}</option>${ls.map(([k,L])=>`<option value="${k}" ${sel===k?'selected':''}>${esc(L.nome)}${L.valor?' · '+BRL(L.valor)+'/h':''}</option>`).join('')}</select>`}
-function buscaArenaHTML(){return`<div class="field"><span>Buscar arena pelo nome</span><div class="row" style="flex-wrap:nowrap"><input type="text" id="arena-q" class="grow" placeholder="Ex.: Arena Boa Viagem" data-busca="arena-link">
-  <a class="btn" id="arena-link" target="_blank" rel="noopener" href="${buscaURL('')}">Buscar no Maps</a></div>
-  <div class="row" style="gap:6px"><button class="btn sm primary" data-act="arena-add">+ Salvar como local</button><span class="sub">Com o campo vazio, a busca mostra quadras e campos de aluguel.</span></div></div>`}
-const BUSCA_QUADRAS='https://www.google.com/maps/search/'+encodeURIComponent('quadra society campo de futebol aluguel');
+  return`<select id="${id}"><option value="">${ls.length?vazio:'Nenhum local salvo'}</option>${ls.map(([k,L])=>`<option value="${k}" ${sel===k?'selected':''}>${esc(L.nome)}</option>`).join('')}</select>`}
 function mapaURL(nome,end){const q=[nome,end].filter(Boolean).join(', ');return q?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q):''}
 function localDe(p){const lid=(p&&p.localId)||(!p||!p.local?cfg().localId:null),L=lid&&S.locais[lid];
-  if(L)return{nome:L.nome,end:L.end,url:L.mapa||mapaURL(L.nome,L.end)};
-  const nome=(p&&p.local)||cfg().local;return nome?{nome,end:'',url:mapaURL(nome,'')}:null}
+  if(L)return{id:lid,nome:L.nome,end:L.end||'',tel:L.tel||'',url:L.end?mapaURL(L.nome,L.end):''};
+  const nome=(p&&p.local)||cfg().local;return nome?{nome,end:'',tel:'',url:''}:null}
+// mapa e botões de navegação a partir do endereço
+const navQ=(nome,end)=>[nome,end].filter(Boolean).join(', ');
+function mapaEmbed(nome,end){return`<iframe class="mapa" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Mapa do local" src="https://maps.google.com/maps?q=${encodeURIComponent(navQ(nome,end))}&z=16&output=embed"></iframe>`}
+function navBotoes(nome,end){const q=encodeURIComponent(navQ(nome,end)),qe=encodeURIComponent(end);
+  return`<div class="navs"><a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${q}">Google Maps</a><a class="btn sm" target="_blank" rel="noopener" href="https://waze.com/ul?q=${qe}&navigate=yes">Waze</a><a class="btn sm" target="_blank" rel="noopener" href="https://maps.apple.com/?daddr=${q}">Mapas (iPhone)</a></div>`}
+function blocoMapa(nome,end){return end?mapaEmbed(nome,end)+navBotoes(nome,end):''}
+function telLink(tel){const t=String(tel||'').replace(/\D/g,'');return t?`<a class="btn sm" href="tel:${t}">Ligar</a>${waLink(tel,'Olá! Gostaria de saber sobre horário para uma pelada.')?`<a class="btn sm" target="_blank" rel="noopener" href="${waLink(tel,'Olá! Gostaria de saber sobre horário para uma pelada.')}">WhatsApp</a>`:''}`:''}
+function formLocal(L,pre){L=L||{};
+  return`<label class="field"><span>Nome do local</span><input type="text" id="l-nome" value="${esc(L.nome||pre||'')}" placeholder="Ex.: Arena Boa Viagem"></label>
+    <label class="field"><span>Endereço <i class="opc">opcional</i></span><input type="text" id="l-end" value="${esc(L.end||'')}" placeholder="Rua, número, bairro, cidade" data-mapa="l-mapa-prev" autocomplete="street-address"></label>
+    <div id="l-mapa-prev">${blocoMapa(L.nome,L.end)}</div>
+    <label class="field"><span>Telefone <i class="opc">opcional</i></span><input type="tel" id="l-tel" value="${esc(L.tel||'')}" placeholder="(81) 99999-9999"></label>`}
+function lerFormLocal(){const g=x=>(document.getElementById(x)||{value:''}).value.trim();return{nome:g('l-nome'),end:g('l-end'),tel:g('l-tel')}}
+let mapaT=null;
+function atualizarPrevia(inp){clearTimeout(mapaT);mapaT=setTimeout(()=>{const box=document.getElementById(inp.dataset.mapa);if(!box)return;
+  const nome=(document.getElementById('l-nome')||{}).value||'',end=inp.value.trim();box.innerHTML=end.length>=6?blocoMapa(nome.trim(),end):''},800)}
+// histórico pessoal (fica no perfil da pessoa, vale para todas as peladas dela)
+function historicoLocais(){return demo?{}:((window.meusLocais&&window.meusLocais())||{})}
+function guardarNoHistorico(id,L){if(demo||!window.salvarMeuLocal)return;window.salvarMeuLocal(id,{nome:L.nome||'',end:L.end||'',tel:L.tel||'',t:Date.now()})}
 function sheetLocal(id,pre){
-  const L=id?S.locais[id]:{nome:pre||'',end:'',mapa:'',valor:'',tipo:'Society',obs:''};
-  openSheet(id?'Editar local':'Novo local',`<div class="stack">
-    <label class="field"><span>Nome do local</span><input type="text" id="l-nome" value="${esc(L.nome)}" placeholder="Arena Boa Viagem" data-busca="l-busca"></label>
-    <label class="field"><span>Endereço</span><input type="text" id="l-end" value="${esc(L.end)}" placeholder="Rua, número, bairro"></label>
-    <div class="grid2"><label class="field"><span>Estado</span><select id="l-uf" data-ufsel="l-cid-list"><option value="">—</option>${UFS.map(u=>`<option value="${u}" ${L.uf===u?'selected':''}>${esc(BR[u].n)}</option>`).join('')}</select></label>
-    <label class="field"><span>Município</span><input type="text" id="l-cid" list="l-cid-list" value="${esc(L.cidade||'')}"><datalist id="l-cid-list">${L.uf?BR[L.uf].c.map(c=>`<option value="${esc(c)}">`).join(''):''}</datalist></label></div>
-    <div class="grid2"><label class="field"><span>Tipo</span><select id="l-tipo">${['Society','Campo','Quadra','Areia'].map(t=>`<option ${L.tipo===t?'selected':''}>${t}</option>`).join('')}</select></label>
-    <label class="field"><span>Valor por hora (R$)</span><input type="number" id="l-valor" min="0" step="1" value="${esc(L.valor)}"></label></div>
-    <label class="field"><span>Link do Google Maps (opcional)</span><input type="url" id="l-mapa" value="${esc(L.mapa)}" placeholder="Cole aqui o link de compartilhar do Maps"></label>
-    <label class="field"><span>Contato do local (WhatsApp)</span><input type="tel" id="l-tel" value="${esc(L.tel||'')}" placeholder="(81) 99999-9999"></label>
-    <label class="field"><span>Observações</span><input type="text" id="l-obs" value="${esc(L.obs)}" placeholder="Estacionamento, vestiário…"></label>
-
-    <a class="btn block" id="l-busca" target="_blank" rel="noopener" href="${buscaURL(L.nome)}">Confirmar endereço no Google Maps</a>
-    <p class="sub" style="margin:0">O botão busca pelo nome digitado. No Maps, toque em Compartilhar, copie o link e cole acima.</p>
+  const L=id?S.locais[id]:null;
+  openSheet(id?'Editar local':'Novo local',`<div class="stack">${formLocal(L,pre)}
     <button class="btn primary block" data-act="save-local" data-l="${id||''}">Salvar local</button>
     ${id?`<button class="btn danger block" data-act="del-local" data-l="${id}">Apagar local</button>`:''}</div>`);
 }
 function sheetLocais(){
   const ls=Object.entries(S.locais).sort((a,b)=>a[1].nome.localeCompare(b[1].nome));
   openSheet('Locais',`<div class="stack"><div class="panel"><div class="list">
-    ${ls.length?ls.map(([id,L])=>`<div class="item"><div class="grow"><div class="name">${esc(L.nome)}</div><div class="sub">${esc(L.tipo||'')}${L.valor?' · '+BRL(L.valor)+'/h':''}${L.end?' · '+esc(L.end):''}</div>${notaCampoHTML(id)}</div>
-      <div class="row" style="gap:4px;flex-wrap:nowrap"><a class="btn sm" target="_blank" rel="noopener" href="${esc(L.mapa||mapaURL(L.nome,L.end))}">Mapa</a><button class="btn sm" data-act="edit-local" data-l="${id}" aria-label="Editar">✎</button></div></div>`).join(''):'<div class="empty">Nenhum local salvo ainda.</div>'}
+    ${ls.length?ls.map(([id,L])=>`<div class="item"><div class="grow"><div class="name">${esc(L.nome)}</div><div class="sub">${esc([L.end,L.tel].filter(Boolean).join(' · ')||'Sem endereço')}</div>${notaCampoHTML(id)}</div>
+      <button class="btn sm" data-act="edit-local" data-l="${id}" aria-label="Editar">✎</button></div>`).join(''):'<div class="empty">Nenhum local salvo ainda.</div>'}
     </div></div>
     <button class="btn block" data-act="add-local">+ Cadastrar local</button></div>`);
 }
 
-/* ---------- escolher local por região ---------- */
-const UFS=Object.keys(BR).sort((a,b)=>BR[a].n.localeCompare(BR[b].n));
-const norm=x=>String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-function locaisEm(uf,cid){return Object.entries(S.locais).filter(([,L])=>L.uf===uf&&(!cid||norm(L.cidade)===norm(cid))).sort((a,b)=>a[1].nome.localeCompare(b[1].nome))}
+/* ---------- escolher o local da pelada ---------- */
 let LP=null;
-function abrirSeletor(alvo){LP={alvo,step:'uf',uf:null,cid:null,q:''};
-  const comLocal=[...new Set(Object.values(S.locais).map(L=>L.uf).filter(Boolean))];
-  if(comLocal.length===1){LP.uf=comLocal[0];LP.step='cid'}
-  openSheet('Onde vai ser a pelada?','<div id="lp"></div>');renderSeletor()}
+function abrirSeletor(alvo){LP={alvo,step:'lista'};openSheet('Onde vai ser a pelada?','<div id="lp"></div>');renderSeletor()}
+function locaisDisponiveis(){
+  const out={},hist=historicoLocais();
+  for(const[id,L] of Object.entries(S.locais))out[id]={...L,t:Math.max(L.usadoEm||0,(hist[id]||{}).t||0),daPelada:true};
+  for(const[id,L] of Object.entries(hist))if(!out[id]&&L&&L.nome)out[id]={...L,daPelada:false};
+  return Object.entries(out).sort((a,b)=>(b[1].t||0)-(a[1].t||0)||a[1].nome.localeCompare(b[1].nome));
+}
 function renderSeletor(){
-  const el=document.getElementById('lp');if(!el||!LP)return;
-  const q=norm(LP.q);let h='';
-  const crumbs=`<div class="crumbs"><button data-act="lp-go" data-v="uf">Estados</button>${LP.uf?` › <button data-act="lp-go" data-v="cid">${esc(BR[LP.uf].n)}</button>`:''}${LP.cid?` › ${LP.step==='det'||LP.step==='outro'?`<button data-act="lp-go" data-v="arena">${esc(LP.cid)}</button>`:`<b>${esc(LP.cid)}</b>`}`:''}</div>`;
-  const busca=ph=>`<input type="text" id="lp-q" placeholder="${ph}" value="${esc(LP.q)}" data-lp="1" style="margin-bottom:8px">`;
-  if(LP.step==='uf'){
-    const cont=uf=>locaisEm(uf).length;
-    const ufs=UFS.filter(uf=>!q||norm(BR[uf].n).includes(q)||norm(uf).includes(q)).sort((a,b)=>(cont(b)>0)-(cont(a)>0));
-    h+=`<div class="sub" style="margin-bottom:8px">Escolha o estado.</div>${busca('Buscar estado')}<div class="panel"><div class="list">`+
-      ufs.map(uf=>`<button class="pickrow" data-act="lp-uf" data-v="${uf}"><span class="grow"><b>${esc(BR[uf].n)}</b><span class="sub">${uf}</span></span>${cont(uf)?`<span class="cnt">${cont(uf)} ${cont(uf)>1?'locais':'local'}</span>`:''}<span class="go">›</span></button>`).join('')+'</div></div>';
-  }else if(LP.step==='cid'){
-    const B=BR[LP.uf],cont=c=>locaisEm(LP.uf,c).length;
-    const comL=B.c.filter(c=>cont(c)>0);
-    let cs=B.c.filter(c=>!q||norm(c).includes(q));
-    cs.sort((a,b)=>(cont(b)>0)-(cont(a)>0)||(b===B.cap)-(a===B.cap));
-    const lim=q?cs:cs.slice(0,60);
-    h+=crumbs+`<div class="sub" style="margin-bottom:8px">Escolha o município. ${B.c.length} em ${esc(B.n)}.</div>${busca('Buscar município')}<div class="panel"><div class="list">`+
-      lim.map(c=>`<button class="pickrow" data-act="lp-cid" data-v="${esc(c)}"><span class="grow"><b>${esc(c)}</b>${c===B.cap?'<span class="sub">Capital</span>':''}</span>${cont(c)?`<span class="cnt">${cont(c)} ${cont(c)>1?'locais':'local'}</span>`:''}<span class="go">›</span></button>`).join('')+
-      (!lim.length?'<div class="empty">Nenhum município com esse nome.</div>':'')+'</div></div>'+
-      (!q&&cs.length>lim.length?`<p class="sub">Mostrando ${lim.length} de ${cs.length}. Digite o nome para achar os outros.</p>`:'');
-  }else if(LP.step==='arena'){
-    const ls=locaisEm(LP.uf,LP.cid).filter(([,L])=>!q||norm(L.nome).includes(q));
-    h+=crumbs+`<div class="sub" style="margin-bottom:8px">Arenas e campos em ${esc(LP.cid)} cadastrados no app.</div>`+(locaisEm(LP.uf,LP.cid).length>5?busca('Buscar arena'):'')+'<div class="panel"><div class="list">'+
-      ls.map(([id,L])=>{const nl=slotsLivres(L).filter(x=>x.livre).length;return`<button class="pickrow" data-act="lp-det" data-v="${id}"><span class="grow"><b>${esc(L.nome)}</b><span class="sub">${esc([L.tipo,L.valor?BRL(L.valor)+'/h':'',L.end].filter(Boolean).join(' · '))}</span>${notaCampoHTML(id)?`<span class="livre">${notaCampoHTML(id)}</span>`:''}${L.tel?`<span class="sub">Contato: ${esc(L.tel)}</span>`:''}</span><span class="go">›</span></button>`}).join('')+
-      (!ls.length?`<div class="empty">Ainda não tem nenhum local cadastrado em ${esc(LP.cid)}.</div>`:'')+
-      `<button class="pickrow" data-act="lp-go" data-v="outro"><span class="grow"><b>Outro local</b><span class="sub">Não achou? Procure pelo nome</span></span><span class="go">+</span></button></div></div>`;
-  }else if(LP.step==='det'){
-    h+=crumbs+detalheLocal(LP.lid);
-  }else if(LP.step==='outro'){
-    const onde=[LP.cid,LP.uf].filter(Boolean).join(' - ');
-    h+=crumbs+`<div class="stack">
-      <label class="field"><span>Nome da arena ou campo</span><div class="row" style="flex-wrap:nowrap"><input type="text" id="o-nome" class="grow" placeholder="Ex.: Arena Boa Viagem" data-busca="o-link" data-onde="${esc(onde)}">
-      <a class="btn" id="o-link" target="_blank" rel="noopener" href="${buscaURL('quadra society campo de futebol '+onde)}">Buscar no Maps</a></div></label>
-      <p class="sub" style="margin:0">Com o nome vazio, o Maps mostra quadras e campos em ${esc(LP.cid||'sua região')}. Achou? Copie o endereço e o link de compartilhar.</p>
-      <label class="field"><span>Endereço</span><input type="text" id="o-end" placeholder="Rua, número, bairro"></label>
-      <label class="field"><span>Contato do local (WhatsApp)</span><input type="tel" id="o-tel" placeholder="(81) 99999-9999"></label>
-      <div class="grid2"><label class="field"><span>Tipo</span><select id="o-tipo">${['Society','Campo','Quadra','Areia'].map(t=>`<option>${t}</option>`).join('')}</select></label>
-      <label class="field"><span>Valor por hora (R$)</span><input type="number" id="o-valor" min="0"></label></div>
-      <label class="field"><span>Link do Google Maps (opcional)</span><input type="url" id="o-mapa" placeholder="Cole o link de compartilhar"></label>
-      <button class="btn primary block" data-act="lp-salvar">Salvar e usar este local</button></div>`;
+  const el=document.getElementById('lp');if(!el||!LP)return;let h='';
+  if(LP.step==='lista'){
+    const ls=locaisDisponiveis();
+    h+=`<button class="btn primary block" data-act="lp-novo" style="margin-bottom:12px">+ Cadastrar novo local</button>`;
+    h+=ls.length?`<div class="sub" style="margin-bottom:6px;font-weight:700">LOCAIS QUE VOCÊ JÁ USOU</div><div class="panel"><div class="list">`+
+      ls.map(([id,L])=>`<button class="pickrow" data-act="lp-sel" data-v="${id}"><span class="grow"><b>${esc(L.nome)}</b><span class="sub">${esc([L.end,L.tel].filter(Boolean).join(' · ')||'Sem endereço')}</span>${L.daPelada&&notaCampoHTML(id)?`<span class="livre">${notaCampoHTML(id)}</span>`:''}${!L.daPelada?'<span class="sub">De outra pelada sua</span>':''}</span><span class="go">›</span></button>`).join('')+'</div></div>'
+      :`<div class="empty">Você ainda não cadastrou nenhum local. Os locais que você usar ficam guardados aqui para as próximas vezes.</div>`;
+  }else{
+    h+=`<div class="crumbs"><button data-act="lp-voltar">‹ Locais que você já usou</button></div><div class="stack">${formLocal(null,'')}
+      <button class="btn primary block" data-act="lp-salvar">Salvar e usar este local</button>
+      <p class="sub" style="margin:0">Fica salvo só na sua pelada e no seu histórico de locais.</p></div>`;
   }
   el.innerHTML=h;
-  const qi=document.getElementById('lp-q');if(qi&&LP.focus){qi.focus();qi.setSelectionRange(qi.value.length,qi.value.length)}
 }
+function usarLocal(id){
+  const alvo=LP&&LP.alvo;LP=null;
+  if(!S.locais[id]){const H=historicoLocais()[id];if(H)put('locais/'+id,{nome:H.nome,end:H.end||'',tel:H.tel||'',usadoEm:Date.now()})}
+  const L=S.locais[id]||historicoLocais()[id]||{};guardarNoHistorico(id,L);
+  closeSheet();
+  if(alvo==='np'){UI.npLoc=id;render()}
+  else if(alvo&&S.pel[alvo]){patch('peladas/'+alvo,{localId:id,local:L.nome||''});toast('Local atualizado.')}
+}
+function sheetComoChegar(pid){const LL=localDe(S.pel[pid]);if(!LL)return;
+  openSheet(LL.nome,`<div class="stack">${LL.end?`<div class="sub">📍 ${esc(LL.end)}</div>${blocoMapa(LL.nome,LL.end)}`:'<div class="sub">Este local ainda não tem endereço.</div>'}
+    ${LL.tel?`<div class="row" style="gap:6px"><span class="sub num">📞 ${esc(LL.tel)}</span>${telLink(LL.tel)}</div>`:''}</div>`)}
 /* avaliação dos campos */
 const CRIT_CAMPO=[['gram','Gramado'],['atend','Atendimento'],['amb','Ambiente'],['banh','Banheiros'],['tam','Tamanho do campo']];
 function avalLocal(lid){
@@ -358,11 +343,6 @@ function sheetDono(){const ls=Object.entries(S.locais).sort((a,b)=>a[1].nome.loc
     <div class="panel"><div class="list">${ls.length?ls.map(([id,L])=>{const pend=Object.values(L.reservas||{}).filter(v=>v.s==='pedido').length;
       return`<button class="pickrow" data-act="agenda" data-l="${id}"><span class="grow"><b>${esc(L.nome)}</b><span class="sub">${(L.horarios||[]).length} horários por semana${L.cidade?' · '+esc(L.cidade):''}</span></span>${pend?`<span class="cnt">${pend} pedido${pend>1?'s':''}</span>`:''}<span class="go">›</span></button>`}).join(''):'<div class="empty">Cadastre um local primeiro.</div>'}</div></div></div>`)}
 
-function usarLocal(id){
-  const alvo=LP&&LP.alvo;LP=null;closeSheet();
-  if(alvo==='np'){UI.npLoc=id;render()}
-  else if(alvo&&S.pel[alvo]){patch('peladas/'+alvo,{localId:id,local:S.locais[id].nome});toast('Local atualizado.')}
-}
 
 /* ---------- mensagens para o WhatsApp ---------- */
 function msg(tipo,ctx={}){
@@ -772,12 +752,12 @@ function tJogo(A){
     if(A){
       if(UI.npLoc===undefined)UI.npLoc=(c.localId&&S.locais[c.localId])?c.localId:null;
       const L=UI.npLoc&&S.locais[UI.npLoc];
-      const rec=Object.entries(S.locais).filter(([id])=>id!==UI.npLoc).sort((a,b)=>(b[1].usadoEm||0)-(a[1].usadoEm||0)).slice(0,4);
+      const rec=locaisDisponiveis().filter(([id])=>id!==UI.npLoc).slice(0,4);
       h+=`<div class="panel stack" style="margin-top:12px"><h3>Marcar a próxima</h3>
       <div class="field"><span><i class="stepn">1</i>Onde vai ser?</span>
-      ${L?`<div class="loccard"><div class="pin">📍</div><div class="grow"><div class="name">${esc(L.nome)}</div><div class="sub">${esc([L.end,L.cidade,L.uf].filter(Boolean).join(' · '))}${L.valor?' · '+BRL(L.valor)+'/h':''}</div></div><button class="btn sm" data-act="lp-abrir" data-v="np">Trocar</button></div>`
-        :`<button class="btn primary block" data-act="lp-abrir" data-v="np">Escolher local por região</button>`}
-      ${rec.length?`<div class="sub" style="margin-top:4px">Usados recentemente</div><div class="quick">${rec.map(([id,R])=>`<button data-act="np-rapido" data-v="${id}">${esc(R.nome)}<small>${esc(R.cidade||'')}</small></button>`).join('')}</div>`:''}</div>
+      ${L?`<div class="loccard"><div class="pin">📍</div><div class="grow"><div class="name">${esc(L.nome)}</div><div class="sub">${esc([L.end,L.tel].filter(Boolean).join(' · ')||'Sem endereço')}</div></div><button class="btn sm" data-act="lp-abrir" data-v="np">Trocar</button></div>${L.end?blocoMapa(L.nome,L.end):''}`
+        :`<button class="btn primary block" data-act="lp-abrir" data-v="np">Escolher o local</button>`}
+      ${rec.length?`<div class="sub" style="margin-top:4px">Usados recentemente</div><div class="quick">${rec.map(([id,R])=>`<button data-act="np-rapido" data-v="${id}">${esc(R.nome)}<small>${esc(R.end?R.end.split(',').slice(-2).join(',').trim():'')}</small></button>`).join('')}</div>`:''}</div>
       ${L?`<div class="field"><span><i class="stepn">2</i>Quando?</span><div class="grid2">
       <label class="field"><span>Data</span><input type="date" id="np-data" value="${UI.npData||proximaData()}"></label>
       <label class="field"><span>Horário</span><input type="time" id="np-hora" value="${esc(UI.npHora||c.hora)}"></label></div>
@@ -787,7 +767,7 @@ function tJogo(A){
     return h+renderHist(A);
   }
   const[pid,p]=cur,l=lista(p);
-  h+=`<div class="board"><div class="when">${dShort(p.data)}<br>${esc(p.hora||c.hora)}</div><div class="where row" style="gap:8px">${(()=>{const LL=localDe(p);return LL?`<span>📍 ${esc(LL.nome)}${LL.end?' · '+esc(LL.end):''}</span>${LL.url?`<a class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" target="_blank" rel="noopener" href="${esc(LL.url)}">Ver no mapa</a>`:''}`:'Local a definir'})()}${A?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="trocar-local" data-p="${pid}">${localDe(p)?'Trocar local':'Definir local'}</button>`:''}</div>
+  h+=`<div class="board"><div class="when">${dShort(p.data)}<br>${esc(p.hora||c.hora)}</div><div class="where row" style="gap:8px">${(()=>{const LL=localDe(p);return LL?`<span>📍 ${esc(LL.nome)}${LL.end?' · '+esc(LL.end):''}</span>${LL.end||LL.tel?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="como-chegar" data-p="${pid}">${LL.end?'🗺️ Como chegar':'📞 Contato'}</button>`:''}`:'Local a definir'})()}${A?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="trocar-local" data-p="${pid}">${localDe(p)?'Trocar local':'Definir local'}</button>`:''}</div>
     <div class="stats"><div class="stat"><b class="num">${l.escalados.length}/${l.vagas}</b><span>Linha</span></div><div class="stat"><b class="num">${l.gks.length}</b><span>Goleiros</span></div><div class="stat"><b class="num">${l.espera.length}</b><span>Espera</span></div><div class="stat"><b class="num">${l.pend.length}</b><span>Sem resposta</span></div></div></div>`;
   h+=`<div class="seg" style="margin-block:12px" role="group">${[['presenca','Presença'],['times','Times'],['pos','Pós-jogo']].map(([k,n])=>`<button data-act="sub" data-v="${k}" aria-pressed="${UI.sub===k}">${n}</button>`).join('')}</div>`;
   if(!A)h+=painelJogador(pid,p,l);
@@ -1199,15 +1179,10 @@ document.addEventListener('click',e=>{
     case'tab-jogo':UI.tab='jogo';closeSheet();render();break;
     case'locais':sheetLocais();break;
     case'msg-reset':{const t=document.getElementById('msg-text');t.value=MSG_ORIG;t.dispatchEvent(new Event('input',{bubbles:true}));toast('Texto original restaurado.');break}
-    case'arena-add':{const q=(document.getElementById('arena-q')||{}).value||'';sheetLocal(null,q.trim());break}
     case'trocar-local':abrirSeletor(d.p);break;
     case'lp-abrir':abrirSeletor(d.v);break;
-    case'np-rapido':UI.npLoc=d.v;render();break;
-    case'lp-uf':LP.uf=d.v;LP.cid=null;LP.step='cid';LP.q='';LP.focus=false;renderSeletor();document.querySelector('.sheet').scrollTop=0;break;
-    case'lp-cid':LP.cid=d.v;LP.step='arena';LP.q='';LP.focus=false;renderSeletor();document.querySelector('.sheet').scrollTop=0;break;
-    case'lp-go':if(d.v==='uf'){LP.uf=null;LP.cid=null}if(d.v==='cid')LP.cid=null;LP.step=d.v;LP.q='';LP.focus=false;renderSeletor();break;
+    case'np-rapido':LP={alvo:'np'};usarLocal(d.v);break;
     case'lp-sel':UI.npData=UI.npHora=null;usarLocal(d.v);break;
-    case'lp-det':LP.lid=d.v;LP.step='det';LP.slot=null;renderSeletor();document.querySelector('.sheet').scrollTop=0;break;
     case'lp-slot':LP.slot=LP.slot===d.v?null:d.v;renderSeletor();break;
     case'lp-reservar':{const L=S.locais[d.v],k=LP.slot;
       put('locais/'+d.v,{...L,reservas:{...(L.reservas||{}),[k]:{s:'pedido',quem:cfg().nome,t:Date.now()}}});
@@ -1219,15 +1194,17 @@ document.addEventListener('click',e=>{
     case'del-hor':{const L=S.locais[d.l];put('locais/'+d.l,{...L,horarios:(L.horarios||[]).filter((_,i)=>i!==Number(d.i))});sheetAgenda(d.l);break}
     case'res':{const L=S.locais[d.l],rs={...(L.reservas||{})};if(d.v==='del')delete rs[d.k];else rs[d.k]={...rs[d.k],s:d.v,tr:Date.now()};
       put('locais/'+d.l,{...L,reservas:rs});sheetAgenda(d.l);toast(d.v==='confirmada'?'Reserva confirmada.':d.v==='recusada'?'Reserva recusada.':'Horário liberado.');break}
-    case'lp-salvar':{const g=x=>document.getElementById(x).value.trim();if(!g('o-nome')){toast('Coloque o nome da arena.');document.getElementById('o-nome').focus();return}
-      const id=uid('l');put('locais/'+id,{nome:g('o-nome'),end:g('o-end'),tel:g('o-tel'),uf:LP.uf||'',cidade:LP.cid||'',tipo:document.getElementById('o-tipo').value,valor:Number(g('o-valor'))||'',mapa:g('o-mapa'),obs:''});
-      toast('Local salvo.');usarLocal(id);break}
+    case'lp-novo':LP.step='novo';renderSeletor();document.querySelector('.sheet').scrollTop=0;break;
+    case'lp-voltar':LP.step='lista';renderSeletor();break;
+    case'como-chegar':sheetComoChegar(d.p);break;
+    case'lp-salvar':{const f=lerFormLocal();if(!f.nome){toast('Coloque o nome do local.');document.getElementById('l-nome').focus();return}
+      const id=uid('l');put('locais/'+id,{...f,usadoEm:Date.now()});guardarNoHistorico(id,f);toast('Local salvo.');setTimeout(()=>usarLocal(id),0);break}
     case'salvar-trocar':{const v=document.getElementById('tl-loc').value;if(!v){toast('Escolha um local salvo ou salve um novo.');return}
       patch('peladas/'+d.p,{localId:v,local:S.locais[v].nome});closeSheet();toast('Local atualizado.');break}
     case'add-local':sheetLocal(null);break;
     case'edit-local':sheetLocal(d.l);break;
-    case'save-local':{const g=x=>document.getElementById(x).value.trim();if(!g('l-nome')){toast('Coloque o nome do local.');return}
-      const id=d.l||uid('l');if(!d.l)UI.novoLocal=id;put('locais/'+id,{...(d.l?S.locais[d.l]:{}),nome:g('l-nome'),end:g('l-end'),uf:document.getElementById('l-uf').value,cidade:g('l-cid'),tipo:document.getElementById('l-tipo').value,valor:Number(g('l-valor'))||'',mapa:g('l-mapa'),obs:g('l-obs'),tel:g('l-tel')});
+    case'save-local':{const f=lerFormLocal();if(!f.nome){toast('Coloque o nome do local.');return}
+      const id=d.l||uid('l');if(!d.l)UI.novoLocal=id;put('locais/'+id,{...(d.l?S.locais[d.l]:{}),...f});guardarNoHistorico(id,f);
       closeSheet();toast('Local salvo.');break}
     case'del-local':del('locais/'+d.l);closeSheet();toast('Local apagado.');break;
     case'liberar':{const p=S.pel[d.p],l=lista(p,d.p);
@@ -1285,15 +1262,13 @@ document.addEventListener('change',e=>{
   if(t.dataset.act==='premio'){patch('peladas/'+t.dataset.p,{premios:{[t.dataset.f]:t.value||null}})}
   if(t.dataset.act==='ano'){UI.ano=Number(t.value);render()}
   if(t.id==='f-foto'&&t.files&&t.files[0]&&F){toast('Preparando a foto…');window.redimFoto(t.files[0]).then(d=>{F.foto=d;renderJogForm()},()=>toast('Não consegui abrir essa foto. Tente outra.'))}
-  if(t.dataset.ufsel){const dl=document.getElementById(t.dataset.ufsel);if(dl)dl.innerHTML=t.value?BR[t.value].c.map(c=>`<option value="${esc(c)}">`).join(''):''}
   if(t.dataset.f&&F){F[t.dataset.f]=t.value}
 });
 document.addEventListener('input',e=>{
   const t=e.target;
   if(t.dataset.in==='busca'){UI.busca=t.value;render()}
   if(t.dataset.f&&F)F[t.dataset.f]=t.value;
-  if(t.dataset.busca){const a=document.getElementById(t.dataset.busca),o=t.dataset.onde||'';if(a)a.href=buscaURL(t.value.trim()?t.value+(o?', '+o:''):(o?'quadra society campo de futebol '+o:''))}
-  if(t.dataset.lp&&LP){LP.q=t.value;LP.focus=true;renderSeletor()}
+  if(t.dataset.mapa)atualizarPrevia(t);
   if(t.id==='msg-text'){const a=document.getElementById('wa-link');if(a)a.href=a.href.split('?')[0]+'?text='+encodeURIComponent(t.value)}
 });
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(document.getElementById('sheet').innerHTML)closeSheet();else if(!document.getElementById('ob').hidden)obFechar()});
@@ -1351,7 +1326,7 @@ function obRender(){
     <label class="field"><span>Nome da pelada</span><input type="text" id="ob-pn" value="Pelada do Sábado"></label>
     <div class="grid2"><label class="field"><span>Dia fixo</span><select id="ob-pd">${DIAS.map((d,i)=>`<option ${i===6?'selected':''}>${d}</option>`).join('')}</select></label>
     <label class="field"><span>Horário</span><input type="time" id="ob-ph" value="08:00"></label></div>
-    <div class="field"><span>Onde?</span><button class="btn block" data-act="ob-toast" data-v="Aqui abriria a escolha por Estado › Município › Arena, igual à do app.">📍 Escolher local por região</button></div>
+    <div class="field"><span>Onde?</span><button class="btn block" data-act="ob-toast" data-v="Aqui você escolhe um local que já usou ou cadastra um novo.">📍 Escolher o local</button></div>
     <div class="grid2"><label class="field"><span>Times</span><select id="ob-pt"><option>2</option><option>3</option><option>4</option></select></label>
     <label class="field"><span>Jogadores de linha por time</span><input type="number" id="ob-pp" value="5" min="3" max="11"></label></div>
     <div class="grid2"><label class="field"><span>Mensalidade (R$)</span><input type="number" id="ob-pm" value="80"></label><label class="field"><span>Diária (R$)</span><input type="number" id="ob-pdi" value="20"></label></div>
