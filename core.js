@@ -819,6 +819,10 @@ function renderTab(){
   return({jogo:tJogo,elenco:tElenco,avisos:tAvisos,ranking:tRanking,caixa:tCaixa}[UI.tab]||tJogo)(A);
 }
 
+// guarda data e horários da próxima pelada; o término acompanha o início até ser mudado à mão
+function guardarNp(t){UI[t.dataset.np]=t.value;
+  if(t.dataset.np==='npFim')UI.npFimManual=true;
+  if(t.dataset.np==='npHora'&&!UI.npFimManual&&t.value){const f=document.getElementById('np-fim');UI.npFim=maisHora(t.value,60);if(f)f.value=UI.npFim}}
 function bannerPendente(){return`<div class="banner due" style="margin-top:12px"><span><b>⏳ Sua entrada está esperando a autorização do administrador.</b><br>Assim que ele autorizar, seu nome entra no elenco e você já pode confirmar presença.</span></div>`}
 /* --- Jogo --- */
 function tJogo(A){
@@ -837,18 +841,17 @@ function tJogo(A){
     if(A){
       if(UI.npLoc===undefined)UI.npLoc=(c.localId&&S.locais[c.localId])?c.localId:null;
       const L=UI.npLoc&&S.locais[UI.npLoc];
-      const rec=locaisDisponiveis().filter(([id])=>id!==UI.npLoc).slice(0,4);
       h+=`<div class="panel stack" style="margin-top:12px"><h3>Marcar a próxima</h3>
       <div class="field"><span><i class="stepn">1</i>Onde vai ser?</span>
-      ${L?`<div class="loccard"><div class="pin">📍</div><div class="grow"><div class="name">${esc(L.nome)}</div><div class="sub">${esc([L.end,L.tel].filter(Boolean).join(' · ')||'Sem endereço')}</div></div><button class="btn sm" data-act="lp-abrir" data-v="np">Trocar</button></div>${L.end?blocoMapa(L.nome,L.end):''}`
+      ${L?`<div class="loccard"><div class="pin">📍</div><div class="grow"><div class="name">${esc(L.nome)}</div><div class="sub">${esc([L.end,L.tel].filter(Boolean).join(' · ')||'Sem endereço')}</div></div></div><div class="lado" style="margin-top:6px"><button class="btn sm" data-act="lp-abrir" data-v="np">Trocar local</button><button class="btn sm" data-act="edit-local" data-l="${UI.npLoc}">Editar informações</button></div>${L.end?blocoMapa(L.nome,L.end):''}`
         :`<button class="btn primary block" data-act="lp-abrir" data-v="np">Escolher o local</button>`}
-      ${rec.length?`<div class="sub" style="margin-top:4px">Usados recentemente</div><div class="quick">${rec.map(([id,R])=>`<button data-act="np-rapido" data-v="${id}">${esc(R.nome)}<small>${esc(R.end?R.end.split(',').slice(-2).join(',').trim():'')}</small></button>`).join('')}</div>`:''}</div>
-      ${L?`<div class="field"><span><i class="stepn">2</i>Quando?</span><div class="grid2">
-      <label class="field"><span>Data</span><input type="date" id="np-data" value="${UI.npData||proximaData()}"></label>
-      <label class="field"><span>Início</span><input type="time" id="np-hora" value="${esc(UI.npHora||c.hora)}"></label></div>
-      <label class="field"><span>Término</span><input type="time" id="np-fim" value="${esc(UI.npFim||horaFimDe(null))}"></label>
+      </div>
+      ${L?`<div class="field"><span><i class="stepn">2</i>Quando?</span>
+      <label class="field"><span>Data</span><input type="date" id="np-data" data-np="npData" value="${UI.npData||proximaData()}"></label>
+      <div class="lado"><label class="field"><span>Início</span><input type="time" id="np-hora" data-np="npHora" value="${esc(UI.npHora||c.hora)}"></label>
+      <label class="field"><span>Término</span><input type="time" id="np-fim" data-np="npFim" value="${esc(UI.npFim||horaFimDe(null))}"></label></div>
 </div>
-      <button class="btn primary" data-act="nova-pel">Abrir lista de presença</button>`
+      <button class="btn primary block btn-grande" data-act="nova-pel">Abrir lista de presença</button>`
       :`<p class="sub" style="margin:0">Depois de escolher o local, você define a data e o horário.</p>`}</div>`}
     return h+renderHist(A);
   }
@@ -1266,7 +1269,7 @@ document.addEventListener('click',e=>{
       const hi=document.getElementById('np-hora').value||cfg().hora;
       put('peladas/'+id,{data,hora:hi,horaFim:document.getElementById('np-fim').value||maisHora(hi,60),localId:UI.npLoc||null,local:(S.locais[UI.npLoc]||{}).nome||'',status:'aberta',resp:{},criadoEm:Date.now()});
       if(UI.npLoc&&S.locais[UI.npLoc])put('locais/'+UI.npLoc,{...S.locais[UI.npLoc],usadoEm:Date.now()});
-      UI.npLoc=undefined;UI.npData=UI.npHora=null;UI.sub='presenca';toast('Pelada marcada. Agora é só convocar.');break}
+      UI.npLoc=undefined;UI.npData=UI.npHora=UI.npFim=null;UI.npFimManual=false;UI.sub='presenca';toast('Pelada marcada. Agora é só convocar.');break}
     case'cancel-pel':if(b.dataset.sure){del('peladas/'+d.p);toast('Pelada cancelada.')}else{b.dataset.sure='1';b.textContent='Toque de novo para cancelar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Cancelar esta pelada'}},3500)}break;
     case'rsvp':{const p=S.pel[d.p],cur=respDe(p,d.p)[d.j]?.s;const v=cur===d.v?null:d.v;const before=lista(p,d.p);
       const now=Date.now(),cheia=before.escalados.length>=before.vagas&&J(d.j).pos!=='GOL'&&!before.escalados.includes(d.j);
@@ -1426,6 +1429,7 @@ document.addEventListener('click',e=>{
   }
 });
 document.addEventListener('change',e=>{
+  if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
   const t=e.target;
   if(t.dataset.act==='premio'){patch('peladas/'+t.dataset.p,{premios:{[t.dataset.f]:t.value||null}})}
   if(t.dataset.act==='ano'){UI.ano=Number(t.value);render()}
@@ -1437,6 +1441,7 @@ document.addEventListener('input',e=>{
   if(t.dataset.in==='busca'){UI.busca=t.value;render()}
   if(t.dataset.f&&F)F[t.dataset.f]=t.value;
   if(t.dataset.mapa)atualizarPrevia(t);
+  if(t.dataset.np)guardarNp(t);
   if(t.id==='msg-text'){const a=document.getElementById('wa-link');if(a)a.href=a.href.split('?')[0]+'?text='+encodeURIComponent(t.value)}
 });
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(document.getElementById('sheet').innerHTML)closeSheet();else if(!document.getElementById('ob').hidden)obFechar()});
