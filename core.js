@@ -846,10 +846,11 @@ function tJogo(A){
       <div class="sub" style="margin-bottom:4px">${esc(L.nome)} · pelada de ${dShort(p.data)}</div>${formAvalCampo(pid,(d.avalCampo||{})[pid],'me')}
       <div class="sub" style="margin-top:4px">Sua avaliação ajuda a galera a escolher onde jogar.</div></div>`}}
   h+=cartaoAvCompleta();
-  if(A&&!demo&&!rodadaAberta()){const semAv=ativos().filter(x=>!S.jog[x].critGalera);if(semAv.length>=3)h+=`<div class="panel stack" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Notas pela galera</h3><span class="sub">${semAv.length} sem avaliação</span></div>
-    <div class="sub" style="margin-top:-4px">Todo mundo se conhece? Abra uma avaliação geral antes da pelada: cada um avalia todos nos 5 critérios e as notas deixam de depender só do administrador.</div>
-    <div class="row" style="gap:4px;flex-wrap:nowrap;overflow:hidden">${semAv.slice(0,8).map(id=>avHTML(id)).join('')}${semAv.length>8?`<span class="sub">+${semAv.length-8}</span>`:''}</div>
-    <button class="btn warn block" data-act="av-admin">Abrir avaliação da galera</button></div>`}
+  if(A&&!rodadaAberta()&&ativos().length){const semAv=ativos().filter(x=>!S.jog[x].critGalera);
+    h+=`<div class="panel stack" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Notas pela galera</h3><span class="sub">${semAv.length?semAv.length+' sem avaliação':'todos avaliados'}</span></div>
+    <div class="sub" style="margin-top:-4px">${semAv.length?'Quer que a galera avalie? Todo mundo avalia todo mundo nos 5 critérios e as notas deixam de depender só do administrador.':'Todos já têm avaliação da galera. Quer abrir uma nova rodada para atualizar as notas?'}</div>
+    <div class="row" style="gap:4px;flex-wrap:nowrap;overflow:hidden">${(semAv.length?semAv:ativos()).slice(0,8).map(id=>avHTML(id)).join('')}${(semAv.length||ativos().length)>8?`<span class="sub">+${(semAv.length||ativos().length)-8}</span>`:''}</div>
+    <div class="lado"><button class="btn warn" data-act="av-todos">Todos avaliam todos</button><button class="btn" data-act="av-admin">Escolher jogadores</button></div></div>`}
   h+=painelPosJogo();
   if(A)h+=painelAprovar();
   if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar: ${esc(AVISOS[v.a.tipo]?.n||'')}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
@@ -1532,6 +1533,7 @@ document.addEventListener('click',e=>{
       const{st}=temporada(UI.ano);if(Number(d.d)<0&&(st[d.j][d.f]||0)<=0)return;
       cur[d.f]=(cur[d.f]||0)+Number(d.d);put('jogadores/'+d.j,{...j,ajustes:{...(j.ajustes||{}),[k]:cur}});sheetVerJog(d.j);break}
     case'av-admin':UI.avSel=null;sheetAvAdmin();break;
+    case'av-todos':UI.avSel=new Set(ativos());sheetAvAdmin();break;
     case'av-tog':{UI.avSel.has(d.j)?UI.avSel.delete(d.j):UI.avSel.add(d.j);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
     case'av-sel':{const ids=ativos();UI.avSel=new Set(d.v==='todos'?ids:d.v==='novos'?ids.filter(x=>!S.jog[x].critGalera):[]);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
     case'av-criar':{if(!UI.avSel||!UI.avSel.size)return;const dias=Number(document.getElementById('av-prazo').value)||3,rid=uid('r');
