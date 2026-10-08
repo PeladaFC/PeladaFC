@@ -467,7 +467,7 @@ function msg(tipo,ctx={}){
     return out.filter((x,i,a)=>!(x===''&&a[i-1]==='')).join('\n')}
   if(tipo==='times'){if(!p.times)return head+'\n'+quando+'\n\nOs times ainda não foram sorteados.';
     const out=[head,quando,'','*TIMES SORTEADOS*'];
-    p.times.forEach(t=>{const co=CORES[t.cor];out.push('',`${co.e} *${nomeTime(t.cor).toUpperCase()}* · média ${ovr(teamMedia(t))}`);
+    p.times.forEach(t=>{const co=CORES[t.cor];const pub=cfg().mostrarAval!==false&&[t.gk,...t.ids].filter(Boolean).every(id=>(J(id)||{}).critGalera);out.push('',`${co.e} *${nomeTime(t.cor).toUpperCase()}*${pub?` · média ${ovr(teamMedia(t))}`:''}`);
       if(t.gk)out.push('🧤 '+nm(t.gk));t.ids.forEach(id=>out.push(`${posLinha(id)} ${nm(id)}`))});
     {const gx=(p.goleiros||[]).filter(id=>S.jog[id]);if(gx.length)out.push('','🧤 *GOLEIROS*',...gx.map(id=>nm(id)))}
     out.push('','Bom jogo! ⚽');return out.join('\n')}
