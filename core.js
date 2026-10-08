@@ -925,7 +925,7 @@ function subTimes(pid,p,l,A){
     <button class="btn primary" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div></div>`;
   {const sn=[...l.escalados,...l.gks].filter(semAvaliacao);if(A&&sn.length)h=`<div class="banner due" style="margin-bottom:12px;display:block"><b>⚠️ ${sn.length} jogador${sn.length>1?'es':''} sem nota confirmado${sn.length>1?'s':''}</b><br><span class="sub" style="color:inherit">${sn.map(x=>esc(nm(x))).join(', ')}. Avalie antes do sorteio para os times saírem equilibrados.</span>
       <div class="avstrip" style="margin-top:6px">${sn.map(x=>`<button class="avthumb on" data-act="edit-jog" data-j="${x}" aria-label="Avaliar ${esc(nm(x))}">${avHTML(x)}</button>`).join('')}</div>
-      <div class="lado" style="margin-top:6px"><button class="btn sm" data-act="edit-jog" data-j="${sn[0]}">Eu avalio agora</button><button class="btn sm warn" data-act="av-semnota" data-v="${sn.join(',')}">Pedir para a galera</button></div></div>`+h}
+      <div class="lado" style="margin-top:6px"><button class="btn sm" data-act="edit-jog" data-j="${sn[0]}" data-agora="1">Eu avalio agora</button><button class="btn sm warn" data-act="av-semnota" data-v="${sn.join(',')}">Pedir para a galera</button></div></div>`+h}
   if(!p.times)return h+`<div class="empty">Os times aparecem aqui depois do sorteio.</div>`;
   const med=p.times.map(teamMedia),mx=Math.max(...med),mn=Math.min(...med);
   if(A)h+=`<div class="panel" style="margin-block:12px"><div class="row between"><b>Equilíbrio</b><span class="num small muted">diferença de ${ovr(mx-mn)} ponto${ovr(mx-mn)===1?'':'s'} na média</span></div><div class="meter" style="margin-top:8px"><i style="width:${Math.max(5,100-(mx-mn)*60)}%"></i></div>${A?'<div class="sub" style="margin-top:6px">Toque em um jogador e depois em outro de outro time para trocar os dois.</div>':''}</div>`;
@@ -1334,6 +1334,7 @@ function renderRestr(){const el=document.getElementById('restr');if(!el)return;
 function sheetJog(id){
   const j=id?S.jog[id]:null;
   F=j?JSON.parse(JSON.stringify({...j,_id:id})):{nome:'',apelido:'',tel:'',pos:'MEI',pos2:'',tipo:'mensalista',conv:'',crit:{},_id:null};
+  F._depois=!!(j&&j.semNota&&!j.critGalera);
   openSheet(id?'Editar jogador':'Novo jogador','<div id="jf"></div>');renderJogForm();
 }
 function renderJogForm(){
@@ -1351,9 +1352,10 @@ function renderJogForm(){
     <label class="field"><span>Também joga de</span><select id="f-pos2" data-f="pos2"><option value="">Só na principal</option>${Object.entries(POS).filter(([k])=>k!==F.pos).map(([k,n])=>`<option value="${k}" ${F.pos2===k?'selected':''}>${n}</option>`).join('')}</select></label>
     ${EV()?'':`<div class="field"><span>Tipo</span><div class="pick"><button data-act="f-tipo" data-v="mensalista" aria-pressed="${F.tipo!=='diarista'}">Mensalista</button><button data-act="f-tipo" data-v="diarista" aria-pressed="${F.tipo==='diarista'}">Diarista</button></div></div>`}
     <label class="field"><span>Convidado por</span><select id="f-conv" data-f="conv"><option value="">—</option>${Object.keys(S.jog).filter(x=>x!==F._id).map(x=>`<option value="${x}" ${F.conv===x?'selected':''}>${esc(nm(x))}</option>`).join('')}</select></label>
-    <div class="panel"><div class="row between"><h3>Avaliação inicial</h3><span class="nota num">${ovr(ini)}</span></div>
+    ${F.critGalera?'':`<div class="field"><span>Avaliação</span><div class="pick"><button data-act="f-depois" data-v="0" aria-pressed="${!F._depois}">Eu avalio agora</button><button data-act="f-depois" data-v="1" aria-pressed="${!!F._depois}">Avaliar depois</button></div></div>`}
+    ${F._depois&&!F.critGalera?`<div class="panel"><h3 style="margin-bottom:4px">Avaliação depois</h3><div class="sub">O jogador entra com nota neutra e a etiqueta SEM NOTA. Antes do sorteio, aparece um aviso para você avaliar ou pedir para a galera avaliar.</div></div>`:`<div class="panel"><div class="row between"><h3>Avaliação inicial</h3><span class="nota num">${ovr(ini)}</span></div>
       <div class="sub" style="margin:4px 0 6px">${F._id&&encerradas().length?'Base da nota. Depois de cada pelada, a nota se ajusta com as avaliações do jogo.':'Quem convidou dá de 1 a 5 em cada item. Depois de cada pelada, a nota se ajusta com as avaliações do jogo.'}</div>
-      ${cr.map(([k,n])=>`<div class="crit"><span>${n}</span><div class="dots">${[1,2,3,4,5].map(v=>`<button data-act="f-crit" data-k="${k}" data-v="${v}" class="${Number(F.crit[k]||3)>=v?'on':''}" aria-label="${n} ${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>
+      ${cr.map(([k,n])=>`<div class="crit"><span>${n}</span><div class="dots">${[1,2,3,4,5].map(v=>`<button data-act="f-crit" data-k="${k}" data-v="${v}" class="${Number(F.crit[k]||3)>=v?'on':''}" aria-label="${n} ${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>`}
     <button class="btn primary block" data-act="save-jog">${F._id?'Salvar':'Adicionar ao elenco'}</button>
     ${F._id?`<div class="row"><button class="btn grow" data-act="msg" data-v="convite" data-j="${F._id}">Mandar convite</button><button class="btn ${S.jog[F._id]?.ativo===false?'':'danger'} grow" data-act="toggle-ativo" data-j="${F._id}">${S.jog[F._id]?.ativo===false?'Reativar':'Inativar'}</button></div>`:''}</div>`;
 }
@@ -1406,16 +1408,17 @@ document.addEventListener('click',e=>{
     case'demo-off':stopDemo();break;
     case'add-jog':if(A)sheetJog(null);break;
     case'ver-jog':sheetVerJog(d.j);break;
-    case'edit-jog':sheetJog(d.j);break;
+    case'edit-jog':sheetJog(d.j);if(d.agora&&F){F._depois=false;renderJogForm()}break;
     case'f-pos':F.pos=d.v;if(F.pos2===d.v)F.pos2='';renderJogForm();break;
     case'f-tipo':F.tipo=d.v;renderJogForm();break;
     case'f-foto-rem':F.foto=null;renderJogForm();break;
     case'f-crit':F.crit[d.k]=Number(d.v);renderJogForm();break;
+    case'f-depois':F._depois=d.v==='1';renderJogForm();break;
     case'save-jog':{if(!F.nome.trim()){toast('Coloque o nome do jogador.');document.getElementById('f-nome')?.focus();return}
-      const id=F._id||uid('j');const{_id,...data}=F;data.nome=data.nome.trim();data.apelido=(data.apelido||'').trim();
-      const crit={};critKey(data.pos).forEach(([k])=>crit[k]=Number(data.crit[k]||3));data.crit=crit;
+      const id=F._id||uid('j');const{_id,_depois,...data}=F;data.nome=data.nome.trim();data.apelido=(data.apelido||'').trim();
+      const crit={};critKey(data.pos).forEach(([k])=>crit[k]=_depois&&!data.critGalera?3:Number(data.crit[k]||3));data.crit=crit;
       if(!_id){data.ativo=true;data.criadoEm=Date.now()}
-      data.semNota=false; // o administrador avaliou pelo formulário
+      data.semNota=!!_depois&&!data.critGalera; // avaliar depois: nota neutra até alguém avaliar
       const uidM=data._uid;delete data._uid;
       put('jogadores/'+id,data);if(uidM)put('presencas/'+uidM,{...(S.pres[uidM]||{pel:{}}),jogador:id});closeSheet();toast(_id?'Jogador atualizado.':'Jogador adicionado.');break}
     case'toggle-ativo':{const j=S.jog[d.j];put('jogadores/'+d.j,{...j,ativo:j.ativo===false});closeSheet();toast(j.ativo===false?'Jogador reativado.':'Jogador inativado.');break}
