@@ -40,6 +40,8 @@ async function backendReal() {
     del: p => F.deleteDoc(ref(p)).catch(erro),
     listenDoc: (p, cb, err) => F.onSnapshot(ref(p), s => cb({ exists: s.exists(), data: s.exists() ? s.data() : null }), e => err && err(e)),
     listenCol: (p, cb, err) => F.onSnapshot(F.collection(fs, p), s => cb(s.docs.map(d => ({ id: d.id, data: d.data() }))), e => err && err(e)),
+    listar: async p => (await F.getDocs(F.collection(fs, p)).catch(erro)).docs.map(d => d.id),
+    tirarGrupo: (uid, gid) => F.updateDoc(ref('users/' + uid), { ['grupos.' + gid]: F.deleteField() }).catch(erro),
     batch: async ops => { const b = F.writeBatch(fs); for (const o of ops) { if (o.op === 'del') b.delete(ref(o.path)); else b.set(ref(o.path), o.data, o.op === 'merge' ? { merge: true } : {}); } await b.commit().catch(erro); }
   };
 }
@@ -68,6 +70,8 @@ function backendMock() {
     del: async p => { store.delete(p); fire(p); },
     listenDoc: (p, cb) => { setTimeout(() => cb({ exists: store.has(p), data: clone(store.get(p)) ?? null }), 0); return add(docL, p, cb); },
     listenCol: (p, cb) => { setTimeout(() => cb(colDocs(p)), 0); return add(colL, p, cb); },
+    listar: async p => colDocs(p).map(d => d.id),
+    tirarGrupo: async (uid, gid) => { const p = 'users/' + uid, u = clone(store.get(p)) || {}; if (u.grupos) delete u.grupos[gid]; store.set(p, u); fire(p); },
     batch: async ops => { for (const o of ops) { if (o.op === 'del') await api.del(o.path); else await api.set(o.path, o.data, { merge: o.op === 'merge' }); } }
   };
   window.__mock = { store, users, trocar: async (e, s) => { await api.sair(); await api.login(e, s); } };
@@ -377,7 +381,7 @@ function abrirGrupo(gid) {
   ABERTO = gid; ls.set('pelada.ultimo', gid); mostrarCasca(false);
   window.iniciarPelada({ db: makeDb(gid), uid: EU.uid, isAdmin: (G.admins || []).includes(EU.uid), grupo: { ...G }, gid, dl: compartilhar });
   if (unsubGrupo) unsubGrupo();
-  unsubGrupo = B.listenDoc('grupos/' + gid, s => { if (!s.exists) return; GRUPOS[gid] = s.data; window.atualizarGrupo({ ...s.data }); }, e => console.warn(e));
+  unsubGrupo = B.listenDoc('grupos/' + gid, s => { if (!s.exists) { if (ABERTO === gid) { delete GRUPOS[gid]; aviso('Este grupo foi apagado.'); window.voltarGrupos(); } return; } GRUPOS[gid] = s.data; window.atualizarGrupo({ ...s.data }); }, e => console.warn(e));
 }
 window.voltarGrupos = () => {
   window.pararPelada(); if (unsubGrupo) { unsubGrupo(); unsubGrupo = null; }
@@ -390,6 +394,34 @@ window.mudarAdmins = async admins => {
   admins = [...new Set(admins)];
   if (!admins.length) { aviso('A pelada precisa de pelo menos um administrador.'); return; }
   try { await B.set('grupos/' + ABERTO, { admins }, { merge: true }); aviso('Administradores atualizados.'); } catch (e) { aviso(msgErro(e)); }
+};
+// Apagar o grupo (só quem criou): limpa as coleções, o código do convite e o grupo.
+const COLS_GRUPO = ['config', 'jogadores', 'peladas', 'presencas', 'locais', 'caixa', 'avisos', 'mural', 'avaliacoes', 'notificacoes', 'membros'];
+window.apagarGrupo = async () => {
+  const gid = ABERTO, G = GRUPOS[gid]; if (!gid || !G || G.dono !== EU.uid) { aviso('Só quem criou o grupo pode apagá-lo.'); return; }
+  try {
+    for (const c of COLS_GRUPO) {
+      const ids = await B.listar(`grupos/${gid}/${c}`).catch(() => []);
+      const alvo = c === 'membros' ? ids.filter(u => u !== EU.uid) : ids;
+      for (let i = 0; i < alvo.length; i += 400) await B.batch(alvo.slice(i, i + 400).map(id => ({ op: 'del', path: `grupos/${gid}/${c}/${id}` }))).catch(e => console.warn(e));
+    }
+    await B.del(`grupos/${gid}/votos/${EU.uid}`).catch(() => { });
+    if (G.codigo) await B.del('codigos/' + G.codigo).catch(e => console.warn(e));
+    await B.del(`grupos/${gid}/membros/${EU.uid}`).catch(() => { });
+    await B.del('grupos/' + gid);
+    await B.tirarGrupo(EU.uid, gid).catch(e => console.warn(e));
+    delete GRUPOS[gid]; aviso('Grupo apagado.'); window.voltarGrupos();
+  } catch (e) { aviso(msgErro(e)); }
+};
+// Sair do grupo (quem não criou): deixa de ser membro e de ser administrador.
+window.sairGrupo = async () => {
+  const gid = ABERTO, G = GRUPOS[gid]; if (!gid || !G) return;
+  try {
+    if ((G.admins || []).includes(EU.uid)) await B.set('grupos/' + gid, { admins: G.admins.filter(u => u !== EU.uid) }, { merge: true });
+    await B.del(`grupos/${gid}/membros/${EU.uid}`).catch(e => console.warn(e));
+    await B.tirarGrupo(EU.uid, gid);
+    delete GRUPOS[gid]; aviso('Você saiu do grupo.'); window.voltarGrupos();
+  } catch (e) { aviso(msgErro(e)); }
 };
 window.sincronizarGrupo = async d => { if (ABERTO) try { GRUPOS[ABERTO] = { ...(GRUPOS[ABERTO] || {}), ...d }; await B.set('grupos/' + ABERTO, d, { merge: true }); } catch (e) { console.warn(e); } };
 

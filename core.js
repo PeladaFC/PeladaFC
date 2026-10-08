@@ -1323,7 +1323,9 @@ function sheetCfg(){
       <div class="grid2" style="margin-top:8px"><select id="r-a"><option value="">Jogador</option>${Object.keys(S.jog).map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('')}</select>
       <select id="r-b"><option value="">Jogador</option>${Object.keys(S.jog).map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('')}</select></div>
       <div class="row" style="margin-top:8px"><button class="btn sm" data-act="add-restr" data-v="separar">Separar</button><button class="btn sm" data-act="add-restr" data-v="juntar">Sempre juntos</button></div></div>
-    <button class="btn primary block" data-act="save-cfg">Salvar ajustes</button></div>`);
+    <button class="btn primary block" data-act="save-cfg">Salvar ajustes</button>
+    ${!demo&&GRUPO?(GRUPO.dono===myId?`<div class="panel" style="margin-top:14px"><h3 style="margin-bottom:4px">Apagar grupo</h3><div class="sub" style="margin-bottom:8px">Apaga a pelada inteira para todo mundo: elenco, peladas, caixa, avisos e notas. Não dá para desfazer.</div><button class="btn danger block" data-act="apagar-grupo">Apagar este grupo</button></div>`
+      :`<div class="panel" style="margin-top:14px"><h3 style="margin-bottom:4px">Sair do grupo</h3><div class="sub" style="margin-bottom:8px">Só quem criou o grupo pode apagá-lo. Você pode sair dele, e ele some da sua lista.</div><button class="btn danger block" data-act="sair-grupo">Sair deste grupo</button></div>`):''}</div>`);
   renderRestr();renderAdmins();
 }
 function renderRestr(){const el=document.getElementById('restr');if(!el)return;
@@ -1461,6 +1463,12 @@ document.addEventListener('click',e=>{
     case'membro-vinc-ok':{const jid=document.getElementById('vinc-sel').value;if(!jid){toast('Escolha o jogador.');return}
       put('presencas/'+d.u,{...(S.pres[d.u]||{pel:{}}),jogador:jid});closeSheet();toast('Vinculado.');break}
     case'adm-add':{const u=document.getElementById('adm-novo').value;if(!u)return;window.mudarAdmins&&window.mudarAdmins([...(GRUPO.admins||[]),u]);break}
+    case'apagar-grupo':openSheet('Apagar grupo?',`<div class="stack"><p style="margin:0">Você vai apagar <b>${esc((GRUPO||{}).nome||cfg().nome)}</b> para todo mundo. Elenco, peladas, caixa, avisos, notas e o link de convite deixam de existir.</p><p class="sub" style="margin:0">Não dá para desfazer.</p>
+      <button class="btn danger block" data-act="apagar-grupo-ok">Sim, apagar para sempre</button><button class="btn block" data-act="cfg">Cancelar</button></div>`);break;
+    case'apagar-grupo-ok':closeSheet();toast('Apagando o grupo…');window.apagarGrupo&&window.apagarGrupo();break;
+    case'sair-grupo':openSheet('Sair do grupo?',`<div class="stack"><p style="margin:0">Você vai sair de <b>${esc((GRUPO||{}).nome||cfg().nome)}</b>. Para voltar, vai precisar do convite e da autorização de um administrador.</p>
+      <button class="btn danger block" data-act="sair-grupo-ok">Sim, sair</button><button class="btn block" data-act="cfg">Cancelar</button></div>`);break;
+    case'sair-grupo-ok':closeSheet();window.sairGrupo&&window.sairGrupo();break;
     case'adm-rem':window.mudarAdmins&&window.mudarAdmins((GRUPO.admins||[]).filter(x=>x!==d.u));break;
     case'aval-campo':{const v=Number(d.v);
       if(d.q==='adm'){patch('peladas/'+d.p,{avalCampo:{[d.c]:v}});break}
