@@ -89,6 +89,11 @@ function withPending(colName,map){for(const p in pending){const[c,id]=p.split('/
 function critKey(pos){return pos==='GOL'?CRIT.GOL:CRIT.linha}
 /* avaliação do jogador na escala de 0 a 100 (como no FIFA); a nota do jogo continua de 0 a 10 */
 const ovr=n=>Math.round((Number(n)||0)*10);
+/* quem pode ver a avaliação de um jogador: administradores sempre; os jogadores só depois que ele passou
+   por uma avaliação completa da galera (e se a opção "Mostrar avaliações" estiver ligada nos Ajustes) */
+function podeVerAval(id){if(ADM())return true;if(cfg().mostrarAval===false)return false;return!!(J(id)||{}).critGalera}
+function ovrTxt(id){return podeVerAval(id)?String(ovr(notaAtual(id))):'—'}
+const semAvaliacao=id=>{const j=J(id)||{};return!!j.semNota&&!j.critGalera};
 function nomeTime(cor){const v=((cfg().nomesTimes||[])[cor]||'').trim();return v||(CORES[cor]||{n:'Time'}).n}
 /* evento livre: sem cobrança e sem dia fixo; o administrador marca cada pelada na data que quiser.
    Sem mensalista nem diarista: todo mundo confirma direto e quem passa das vagas vai para a espera.
@@ -693,7 +698,7 @@ const TIERS=[{min:8,n:'OURO',a:'#7A5A0C',b:'#F3D27A',c:'#FFF4CF',ink:'#2B1E00'},
 function tierDe(n){return TIERS.find(t=>n>=t.min)}
 function arteCarta(id){
   const W=1080,H=1350,cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
-  const j=J(id),n=notaAtual(id),t=tierDe(n),FAM='"Saira Condensed", Impact, sans-serif';
+  const j=J(id),n=notaAtual(id),t=podeVerAval(id)?tierDe(n):{...TIERS[1],n:'EM AVALIAÇÃO'},FAM='"Saira Condensed", Impact, sans-serif';
   // fundo
   const bg=ctx.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#0B1A12');bg.addColorStop(1,'#13301F');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
   ctx.strokeStyle='rgba(255,255,255,.05)';ctx.lineWidth=4;for(let x=-H;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+H,H);ctx.stroke()}
@@ -719,7 +724,7 @@ function arteCarta(id){
   ctx.lineWidth=3;ctx.strokeStyle='rgba(255,255,255,.6)';ctx.save();ctx.translate(W/2,cy+ch/2);ctx.scale(.965,.97);ctx.translate(-W/2,-(cy+ch/2));shape();ctx.stroke();ctx.restore();
   // nota e posição
   ctx.fillStyle=t.ink;ctx.textAlign='center';
-  ctx.font=`800 170px ${FAM}`;ctx.fillText(String(ovr(n)),cx+175,cy+230);
+  ctx.font=`800 170px ${FAM}`;ctx.fillText(podeVerAval(id)?String(ovr(n)):'?',cx+175,cy+230);
   ctx.font=`700 70px ${FAM}`;ctx.fillText(j.pos,cx+175,cy+310);
   ctx.fillRect(cx+110,cy+340,130,5);
   ctx.font='600 30px Figtree, sans-serif';ctx.fillText(t.n,cx+175,cy+395);
@@ -735,7 +740,7 @@ function arteCarta(id){
   ctx.fillStyle=t.ink;ctx.fillRect(-(cw-90)/2,-78,cw-90,112);ctx.fillStyle=t.b;ctx.fillRect(-(cw-90)/2,30,cw-90,8);ctx.restore();
   ctx.fillStyle=t.c;fit(ctx,nm(id).toUpperCase(),cw-170,108,800,FAM);ctx.fillText(nm(id).toUpperCase(),W/2,cy+630);
   // atributos (critérios de 1 a 5 viram 2 a 10)
-  const cr=critKey(j.pos).map(([k,lb])=>[lb.slice(0,3).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace('POS','POS'),Math.round(Number((j.critGalera||{})[k]??j.crit?.[k]??3)*20)]);
+  const cr=critKey(j.pos).map(([k,lb])=>[lb.slice(0,3).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace('POS','POS'),podeVerAval(id)?Math.round(Number((j.critGalera||{})[k]??j.crit?.[k]??3)*20):'?']);
   const{st}=temporada(UI.ano);const s=st[id]||{};
   cr.push([j.pos==='GOL'?'JOG':'GOL',j.pos==='GOL'?(s.j||0):(s.g||0)]);
   cr.forEach(([lb,v],i)=>{const col=i<3?0:1,row=i%3,x=col?W/2+60:cx+130,y=cy+770+row*95;
@@ -792,8 +797,9 @@ function painelPendentes(){const adms=(GRUPO&&GRUPO.admins)||[];const ms=membros
 function painelMembros(){const ms=membrosSemCadastro();
   return`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Pendentes</h3><span class="cnt" style="font-size:12px;font-weight:700;background:var(--card);color:var(--card-ink);border-radius:10px;padding:2px 8px">${ms.length}</span></div>
     <div class="sub" style="margin-bottom:6px">Estão esperando sua autorização. Toque em Autorizar para colocar no elenco com a nota inicial, ou em Já está se a pessoa já foi cadastrada.</div><div class="list">
-    ${ms.map(([u,m])=>`<div class="item"><div class="av bg-${m.pos||'MEI'}" style="${fotoStyle(m.foto)}">${m.foto?'':esc(initials(m.apelido||m.nome))}</div><div class="grow"><div class="name">${esc(m.apelido||m.nome||'Sem nome')}${u===myId?' (você)':''}</div><div class="sub">${esc([POS[m.pos]||'',m.prefere?'quer ser '+m.prefere:'',m.tel||''].filter(Boolean).join(' · '))}</div></div>
-      <div class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm primary" data-act="membro-cad" data-u="${u}">${(GRUPO&&(GRUPO.admins||[]).includes(u))?'Entrar no elenco':'Autorizar'}</button><button class="btn sm" data-act="membro-vinc" data-u="${u}" aria-label="Já está no elenco">Já está</button></div></div>`).join('')}</div></div>`}
+    ${ms.map(([u,m])=>`<div class="item" style="flex-wrap:wrap"><div class="av bg-${m.pos||'MEI'}" style="${fotoStyle(m.foto)}">${m.foto?'':esc(initials(m.apelido||m.nome))}</div><div class="grow"><div class="name">${esc(m.apelido||m.nome||'Sem nome')}${u===myId?' (você)':''}</div><div class="sub">${esc([POS[m.pos]||'',m.prefere?'quer ser '+m.prefere:'',m.tel||''].filter(Boolean).join(' · '))}</div></div>
+      <div class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm primary" data-act="membro-cad" data-u="${u}">${(GRUPO&&(GRUPO.admins||[]).includes(u))?'Entrar no elenco':'Autorizar'}</button><button class="btn sm" data-act="membro-vinc" data-u="${u}" aria-label="Já está no elenco">Já está</button></div>
+      ${(GRUPO&&(GRUPO.admins||[]).includes(u))?'':`<button class="btn sm" style="flex-basis:100%;margin-top:2px" data-act="membro-semnota" data-u="${u}">Autorizar sem nota (a galera avalia depois)</button>`}</div>`).join('')}</div></div>`}
 function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GRUPO)return;const adms=GRUPO.admins||[];
   const nome=u=>{const m=(S.membros||{})[u];const j=S.pres[u]&&S.jog[S.pres[u].jogador];return(j&&(j.apelido||j.nome))||(m&&(m.apelido||m.nome))||'Sem nome'};
   const outros=Object.keys(S.membros||{}).filter(u=>!adms.includes(u));
@@ -917,19 +923,22 @@ function subTimes(pid,p,l,A){
   if(A)h+=`<div class="panel stack"><div class="row between"><div><b>${l.escalados.length} na linha · ${l.gks.length} goleiro(s)</b><div class="sub">${c.golSorteio?'Goleiros entram no sorteio':'Goleiros ficam fora do sorteio (extra)'} · equilibra por nota e posição${(c.restr||[]).length?' · respeita '+c.restr.length+' regra(s)':''}</div></div>
     <div class="row"><select id="nt" aria-label="Número de times" style="width:auto">${[2,3,4].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
     <button class="btn primary" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div></div>`;
+  {const sn=[...l.escalados,...l.gks].filter(semAvaliacao);if(A&&sn.length)h=`<div class="banner due" style="margin-bottom:12px;display:block"><b>⚠️ ${sn.length} jogador${sn.length>1?'es':''} sem nota confirmado${sn.length>1?'s':''}</b><br><span class="sub" style="color:inherit">${sn.map(x=>esc(nm(x))).join(', ')}. Avalie antes do sorteio para os times saírem equilibrados.</span>
+      <div class="avstrip" style="margin-top:6px">${sn.map(x=>`<button class="avthumb on" data-act="edit-jog" data-j="${x}" aria-label="Avaliar ${esc(nm(x))}">${avHTML(x)}</button>`).join('')}</div>
+      <div class="lado" style="margin-top:6px"><button class="btn sm" data-act="edit-jog" data-j="${sn[0]}">Eu avalio agora</button><button class="btn sm warn" data-act="av-semnota" data-v="${sn.join(',')}">Pedir para a galera</button></div></div>`+h}
   if(!p.times)return h+`<div class="empty">Os times aparecem aqui depois do sorteio.</div>`;
   const med=p.times.map(teamMedia),mx=Math.max(...med),mn=Math.min(...med);
-  h+=`<div class="panel" style="margin-block:12px"><div class="row between"><b>Equilíbrio</b><span class="num small muted">diferença de ${ovr(mx-mn)} ponto${ovr(mx-mn)===1?'':'s'} na média</span></div><div class="meter" style="margin-top:8px"><i style="width:${Math.max(5,100-(mx-mn)*60)}%"></i></div>${A?'<div class="sub" style="margin-top:6px">Toque em um jogador e depois em outro de outro time para trocar os dois.</div>':''}</div>`;
+  if(A)h+=`<div class="panel" style="margin-block:12px"><div class="row between"><b>Equilíbrio</b><span class="num small muted">diferença de ${ovr(mx-mn)} ponto${ovr(mx-mn)===1?'':'s'} na média</span></div><div class="meter" style="margin-top:8px"><i style="width:${Math.max(5,100-(mx-mn)*60)}%"></i></div>${A?'<div class="sub" style="margin-top:6px">Toque em um jogador e depois em outro de outro time para trocar os dois.</div>':''}</div>`;
   h+='<div class="teams">';
   p.times.forEach((t,ti)=>{const co=CORES[t.cor];
-    h+=`<div class="team"><div class="team-h"><div class="row"><span class="sw" style="background:${co.c}"></span>${A?`<button class="tnome" data-act="time-nome" data-c="${t.cor}" aria-label="Mudar o nome do time">${esc(nomeTime(t.cor))} ✎</button>`:`<b>${esc(nomeTime(t.cor))}</b>`}</div><span class="nota num" style="font-size:20px">${ovr(teamMedia(t))}</span></div><ul>`;
+    h+=`<div class="team"><div class="team-h"><div class="row"><span class="sw" style="background:${co.c}"></span>${A?`<button class="tnome" data-act="time-nome" data-c="${t.cor}" aria-label="Mudar o nome do time">${esc(nomeTime(t.cor))} ✎</button>`:`<b>${esc(nomeTime(t.cor))}</b>`}</div><span class="nota num" style="font-size:20px">${A||[t.gk,...t.ids].filter(Boolean).every(podeVerAval)?ovr(teamMedia(t)):'—'}</span></div><ul>`;
     const ids=(t.gk?[['GOL',t.gk]]:[]).concat(t.ids.map(id=>[posLinha(id),id]));
     for(const[pos,id] of ids){const isSel=UI.sel&&UI.sel.id===id;
-      const inner=`<span class="chip p-${pos}" style="min-width:38px;justify-content:center">${pos}</span><span class="grow name">${esc(nm(id))}</span><span class="num muted small">${ovr(notaAtual(id))}</span>`;
+      const inner=`<span class="chip p-${pos}" style="min-width:38px;justify-content:center">${pos}</span><span class="grow name">${esc(nm(id))}</span><span class="num muted small">${ovrTxt(id)}</span>`;
       h+=`<li class="${isSel?'sel':''}">${A?`<button data-act="swap" data-p="${pid}" data-t="${ti}" data-j="${id}">${inner}</button>`:inner}</li>`}
     h+='</ul></div>'});
   h+='</div>';
-  {const gx=(p.goleiros||[]).filter(id=>S.jog[id]);if(gx.length)h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>🧤 Goleiros</h3><span class="sub">extra · fora do sorteio</span></div><div class="list">${gx.map(id=>`<div class="item">${avHTML(id)}<div class="grow name">${esc(nm(id))}</div><span class="num muted small">${ovr(notaAtual(id))}</span></div>`).join('')}</div></div>`}
+  {const gx=(p.goleiros||[]).filter(id=>S.jog[id]);if(gx.length)h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>🧤 Goleiros</h3><span class="sub">extra · fora do sorteio</span></div><div class="list">${gx.map(id=>`<div class="item">${avHTML(id)}<div class="grow name">${esc(nm(id))}</div><span class="num muted small">${ovrTxt(id)}</span></div>`).join('')}</div></div>`}
   if(A)h+=`<button class="btn block primary" style="margin-top:12px" data-act="msg" data-v="times">Mandar times no WhatsApp</button>`;
   return h;
 }
@@ -1129,7 +1138,7 @@ function radarSVG(labels,series){const W=300,H=260,cx=150,cy=136,R=92,n=labels.l
 function painelEstrela(id){const j=J(id),labels=critDe(id).map(([,n])=>n),cmp=UI.cmp&&S.jog[UI.cmp]&&UI.cmp!==id&&critKey(J(UI.cmp).pos)===critKey(j.pos)?UI.cmp:null;
   const series=[{vals:valoresCrit(id),cor:'#1B6A36'}];if(cmp)series.push({vals:valoresCrit(cmp),cor:'#E8742A'});
   const fonte=j.critGalera?`Avaliação da galera · ${j.critN||''} voto(s) · ${new Date(j.critEm).toLocaleDateString('pt-BR',{month:'short',year:'numeric'})}`:'Avaliação inicial do cadastro';
-  const outros=ativos().filter(x=>x!==id&&critKey(J(x).pos)===critKey(j.pos)).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  const outros=ativos().filter(x=>x!==id&&critKey(J(x).pos)===critKey(j.pos)&&podeVerAval(x)).sort((a,b)=>nm(a).localeCompare(nm(b)));
   return`<div class="panel"><div class="panel-h"><h3>⭐ Estrela</h3><span class="sub">${esc(fonte)}</span></div>${radarSVG(labels,series)}
     <div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><span class="legenda" style="--c:#1B6A36">${esc(nm(id))}</span>${cmp?`<span class="legenda" style="--c:#E8742A">${esc(nm(cmp))}</span>`:''}</div>
     <label class="field" style="margin-top:8px"><span>Comparar com</span><select data-act="cmp" data-j="${id}"><option value="">Ninguém</option>${outros.map(x=>`<option value="${x}" ${x===cmp?'selected':''}>${esc(nm(x))}</option>`).join('')}</select></label></div>`}
@@ -1162,7 +1171,7 @@ function tElenco(A){
   }
   const linha=(id,tag='')=>{const s=st[id]||{};
     return`<button class="item" data-act="ver-jog" data-j="${id}" style="all:unset;display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);cursor:pointer">
-      ${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${S.jog[id].pos}">${S.jog[id].pos}</span>${tag}<span>${tipoTxt(id)} · ${s.j||0} jogos · ${s.g||0} gols</span></div></div><span class="nota num">${ovr(notaAtual(id))}</span></button>`};
+      ${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${S.jog[id].pos}">${S.jog[id].pos}</span>${tag}<span>${tipoTxt(id)}${A&&semAvaliacao(id)?' · <b style="color:var(--red,#c0392b)">SEM NOTA</b>':''} · ${s.j||0} jogos · ${s.g||0} gols</span></div></div>${podeVerAval(id)?`<span class="nota num">${ovr(notaAtual(id))}</span>`:`<span class="sub" style="font-size:11px;text-align:right;line-height:1.2">Em<br>avaliação</span>`}</button>`};
   if(UI.filtro==='inativos'){h+='<div class="panel"><div class="list">'+(ids.length?ids.map(id=>linha(id)).join(''):'<div class="empty">Nenhum jogador aqui.</div>')+'</div></div>';return h}
   const set=new Set(ids),cur=atual();
   const exc=cur?lista(cur[1],cur[0]).espera.filter(id=>set.has(id)):[];
@@ -1299,6 +1308,7 @@ function sheetCfg(){
     <label class="field"><span>Diária (R$)</span><input type="number" id="c-diaria" min="0" step="0.01" value="${c.diaria}"></label></div>
     <label class="field"><span>Chave Pix</span><input type="text" id="c-pix" value="${esc(c.pix)}" placeholder="Telefone, e-mail ou chave aleatória"></label>
     <label class="row"><input type="checkbox" id="c-nivelpub" ${c.nivelPublico?'checked':''}> Mostrar o nível da pelada (estrelas) para os jogadores</label>
+    <label class="row"><input type="checkbox" id="c-mostraval" ${c.mostrarAval===false?'':'checked'}> Mostrar as avaliações dos jogadores (0 a 100) para todos. Mesmo ligado, só aparece depois da avaliação da galera.</label>
     <div class="panel"><h3 style="margin-bottom:6px">Convite</h3><div class="sub">Link para a galera entrar na pelada</div><div class="num" style="font-weight:700;word-break:break-all;margin:4px 0">${esc(linkConvite())}</div><div class="sub">Código: <b>${esc((GRUPO||{}).codigo||'')}</b></div>
       <div class="row" style="margin-top:8px"><button class="btn sm" data-act="msg" data-v="convite">Mensagem de convite</button><button class="btn sm" data-act="copiar-link">Copiar link</button><button class="btn sm" data-act="qr-pelada">QR Code</button></div></div>
     <div class="panel"><h3 style="margin-bottom:6px">Administradores</h3><div id="adm-list"></div></div>
@@ -1350,14 +1360,14 @@ function sheetVerJog(id){
   const hist=historicoNotas(id).slice(0,8).map(x=>[x.pid,S.pel[x.pid],x.n]);
   const mesK=mesAtual(),aj=(j.ajustes||{})[mesK]||{};
   openSheet(nm(id),`<div class="stack">
-    <div class="board"><div class="row between"><div><div class="when" style="font-size:56px">${ovr(notaAtual(id))}</div><div class="where">${POS[j.pos]}${j.pos2?' · também '+POS[j.pos2].toLowerCase():''} · ${j.tipo==='diarista'?'Diarista':'Mensalista'}</div></div></div>
+    <div class="board"><div class="row between"><div><div class="when" style="font-size:${podeVerAval(id)?56:30}px">${podeVerAval(id)?ovr(notaAtual(id)):'Em avaliação'}</div><div class="where">${POS[j.pos]}${j.pos2?' · também '+POS[j.pos2].toLowerCase():''} · ${tipoTxt(id)}</div></div></div>
     <div class="stats"><div class="stat"><b>${s.j||0}</b><span>Jogos ${UI.ano}</span></div><div class="stat"><b>${s.g||0}</b><span>Gols</span></div><div class="stat"><b>${s.a||0}</b><span>Assist.</span></div><div class="stat"><b>${s.mvp||0}</b><span>Craque</span></div></div></div>
-    <div class="panel small"><div class="row between"><span>${j.critGalera?'Base da avaliação da galera':'Nota inicial'}</span><b class="num">${ovr(notaInicial(j))}</b></div>${j.conv?`<div class="row between" style="margin-top:4px"><span>Convidado por</span><b>${esc(nm(j.conv))}</b></div>`:''}<div class="row between" style="margin-top:4px"><span>Confirma pelo app</span><b>${vinculo(id)?'Sim':'Ainda não'}</b></div>${j.tel?`<div class="row between" style="margin-top:4px"><span>WhatsApp</span><b class="num">${esc(j.tel)}</b></div>`:''}
+    <div class="panel small">${A?`<div class="row between"><span>${j.critGalera?'Base da avaliação da galera':'Nota inicial'}${semAvaliacao(id)?' <b style="color:var(--red,#c0392b)">· sem nota</b>':''}</span><b class="num">${ovr(notaInicial(j))}</b></div>`:''}${j.conv?`<div class="row between" style="margin-top:4px"><span>Convidado por</span><b>${esc(nm(j.conv))}</b></div>`:''}<div class="row between" style="margin-top:4px"><span>Confirma pelo app</span><b>${vinculo(id)?'Sim':'Ainda não'}</b></div>${j.tel?`<div class="row between" style="margin-top:4px"><span>WhatsApp</span><b class="num">${esc(j.tel)}</b></div>`:''}
       ${hist.length?`<div style="margin-top:8px"><span class="muted">Últimas notas</span><div class="row" style="margin-top:4px">${hist.map(([,p,n])=>`<span class="chip solid num">${dShort(p.data).slice(4)} · ${fmtN(n)}</span>`).join('')}</div></div>`:''}</div>
     ${A?`<div class="panel"><div class="panel-h"><h3>Ajustar total de ${UI.ano}</h3></div><div class="sub" style="margin-bottom:8px">Corrija gols e assistências que não foram lançados nas peladas. O ajuste entra no mês atual.</div>
       <div class="row" style="gap:16px">${[['g','Gols',s.g||0],['a','Assist.',s.a||0]].map(([f,lbl,v])=>`<div class="stepbox"><div class="step"><button data-act="ajuste" data-j="${id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${v}</output><button data-act="ajuste" data-j="${id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`).join('')}</div>
       ${(s.ajG||s.ajA)?`<div class="sub" style="margin-top:6px">Inclui ajustes do administrador: ${s.ajG>0?'+':''}${s.ajG||0} gol(s) e ${s.ajA>0?'+':''}${s.ajA||0} assist.</div>`:''}</div>`:''}
-    ${painelEstrela(id)}
+    ${podeVerAval(id)?painelEstrela(id):`<div class="panel"><div class="panel-h"><h3>⭐ Estrela</h3></div><div class="sub">A avaliação aparece depois que ${esc(nm(id))} passar por uma avaliação completa da galera.</div></div>`}
     <button class="btn warn block" data-act="carta" data-j="${id}">Ver carta do jogador</button>
     ${A?`<div class="row"><button class="btn primary grow" data-act="edit-jog" data-j="${id}">Editar</button><button class="btn grow" data-act="msg" data-v="convite" data-j="${id}">Convite</button></div>`:''}</div>`);
 }
@@ -1403,6 +1413,7 @@ document.addEventListener('click',e=>{
       const id=F._id||uid('j');const{_id,...data}=F;data.nome=data.nome.trim();data.apelido=(data.apelido||'').trim();
       const crit={};critKey(data.pos).forEach(([k])=>crit[k]=Number(data.crit[k]||3));data.crit=crit;
       if(!_id){data.ativo=true;data.criadoEm=Date.now()}
+      data.semNota=false; // o administrador avaliou pelo formulário
       const uidM=data._uid;delete data._uid;
       put('jogadores/'+id,data);if(uidM)put('presencas/'+uidM,{...(S.pres[uidM]||{pel:{}}),jogador:id});closeSheet();toast(_id?'Jogador atualizado.':'Jogador adicionado.');break}
     case'toggle-ativo':{const j=S.jog[d.j];put('jogadores/'+d.j,{...j,ativo:j.ativo===false});closeSheet();toast(j.ativo===false?'Jogador reativado.':'Jogador inativado.');break}
@@ -1545,6 +1556,11 @@ document.addEventListener('click',e=>{
     case'ajuste':{const j=S.jog[d.j];if(!j)return;const k=mesAtual(),cur={...((j.ajustes||{})[k]||{})};
       const{st}=temporada(UI.ano);if(Number(d.d)<0&&(st[d.j][d.f]||0)<=0)return;
       cur[d.f]=(cur[d.f]||0)+Number(d.d);put('jogadores/'+d.j,{...j,ajustes:{...(j.ajustes||{}),[k]:cur}});sheetVerJog(d.j);break}
+    case'membro-semnota':{const m=S.membros[d.u]||{};if(S.pres[d.u]&&S.jog[S.pres[d.u].jogador])return;
+      const id=uid('j'),pos=m.pos||'MEI',crit={};critKey(pos).forEach(([k])=>crit[k]=3);
+      put('jogadores/'+id,{nome:m.nome||m.apelido||'Sem nome',apelido:m.apelido||'',tel:m.tel||'',pos,pos2:'',tipo:m.prefere==='diarista'?'diarista':'mensalista',foto:m.foto||null,conv:'',crit,semNota:true,ativo:true,criadoEm:Date.now()});
+      put('presencas/'+d.u,{...(S.pres[d.u]||{pel:{}}),jogador:id});toast(`${m.apelido||m.nome||'Jogador'} entrou sem nota. Avalie antes do sorteio.`);break}
+    case'av-semnota':{UI.avSel=new Set(d.v.split(','));sheetAvAdmin();break}
     case'av-admin':UI.avSel=null;sheetAvAdmin();break;
     case'av-todos':UI.avSel=new Set(ativos());sheetAvAdmin();break;
     case'av-tog':{UI.avSel.has(d.j)?UI.avSel.delete(d.j):UI.avSel.add(d.j);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
@@ -1576,7 +1592,7 @@ document.addEventListener('click',e=>{
       document.getElementById('gol-txt').textContent=F.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
       const ev=g('c-tipo')==='evento',dataEv=null,diaEv=Number(g('c-dia'));
-      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),porTime:Math.max(3,Math.min(11,Number(g('c-portime'))||5)),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,golSorteio:F.golSorteio,janelaAval:Number(g('c-janela'))||24,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
+      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),porTime:Math.max(3,Math.min(11,Number(g('c-portime'))||5)),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:Number(g('c-janela'))||24,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',evento:ev,data:dataEv});
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':{const cx=S.caixa[d.m]||{mens:{},desp:[]};put('caixa/'+d.m,{...cx,mens:{...(cx.mens||{}),[d.j]:!(cx.mens||{})[d.j]}});break}
