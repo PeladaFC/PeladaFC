@@ -73,4 +73,9 @@ t('avaliação completa aberta avisa todo mundo com o prazo em horário de Recif
   const av = R.rodadaNova({ status: 'aberta', alvos: ['jA', 'jB'], fim: Date.parse('2026-10-11T15:00:00-03:00') }, ctx);
   assert.deepStrictEqual(av[0].para.sort(), ['uA', 'uB', 'uC']); assert.match(av[0].texto, /Avalie 2 jogadores nos 5 critérios até dom 11\/10 15:00/);
 });
+t('nome do time personalizado aparece no aviso do sorteio', () => {
+  const c2 = { ...ctx, cfg: { ...ctx.cfg, nomesTimes: ['Cobra', ''] } };
+  const av = R.pelAtualizada({ data: '2026-10-10' }, { data: '2026-10-10', sorteadoEm: 5, times: [{ cor: 0, ids: ['jA'] }, { cor: 1, ids: ['jB'] }] }, 'p1', c2);
+  assert.match(av[0].texto, /time Cobra/); assert.match(av[1].texto, /time Azul/);
+});
 console.log(`\n${n} testes passaram.`);
