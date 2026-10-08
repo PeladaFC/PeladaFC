@@ -82,6 +82,11 @@ const novoId = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b =>
 const novoCodigo = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('');
 const POSN = { GOL: 'Goleiro', ZAG: 'Zagueiro', MEI: 'Meio-campo', ATA: 'Atacante' };
 const DIASN = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+// texto de quando é a pelada: fixa (toda semana) ou evento único (uma data)
+function dataBR(iso) { const [y, m, d] = String(iso).split('-').map(Number); const dt = new Date(y, m - 1, d); return `${DIASN[dt.getDay()].toLowerCase()}, ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`; }
+function quandoG(G, curto) { if (G.evento && G.data) return (curto ? '' : '📅 ') + dataBR(G.data) + (G.hora ? (curto ? ' ' : ' às ') + G.hora : '');
+  if (G.dia == null) return G.hora || ''; return curto ? DIASN[G.dia] + ' ' + (G.hora || '') : `📅 ${[0, 6].includes(Number(G.dia)) ? 'Todo' : 'Toda'} ${DIASN[G.dia].toLowerCase()}${G.hora ? ' às ' + G.hora : ''}`; }
+function proxSabado() { const d = new Date(); d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7)); return d.toISOString().slice(0, 10); }
 const ERROS = {
   'invalid-credential': 'E-mail ou senha incorretos.', 'wrong-password': 'E-mail ou senha incorretos.', 'user-not-found': 'Não existe conta com esse e-mail.',
   'email-already-in-use': 'Já existe uma conta com esse e-mail. Toque em "Já tenho conta".', 'invalid-email': 'Esse e-mail não parece válido.',
@@ -206,7 +211,7 @@ function render() {
       <button class="btn primary block" type="submit">Salvar</button></form>
     ${p.apelido ? `<button class="btn block" data-sh="sair">Sair da conta</button><p class="sub" style="text-align:center">${escH(EU.email || '')}</p>` : ''}`; }
   if (t === 'minhas') { const ids = Object.keys(GRUPOS); const adm = ids.filter(g => (GRUPOS[g].admins || []).includes(EU.uid)), jog = ids.filter(g => !adm.includes(g));
-    const card = (g, papel) => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="abrir" data-v="${g}"><div class="av bg-${papel === 'ADMIN' ? 'MEI' : 'ATA'}">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.dia != null ? DIASN[G.dia] + ' ' : ''}${escH(G.hora || '')}</span></span><span class="badge2 ${papel === 'ADMIN' ? '' : 'j'}">${papel}</span></button>`; };
+    const card = (g, papel) => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="abrir" data-v="${g}"><div class="av bg-${papel === 'ADMIN' ? 'MEI' : 'ATA'}">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.evento ? '<b style="display:inline;font-size:10px;letter-spacing:.05em;color:var(--card-ink);background:var(--card);border-radius:5px;padding:1px 5px;margin-right:4px">EVENTO</b>' : ''}${escH(quandoG(G, true))}</span></span><span class="badge2 ${papel === 'ADMIN' ? '' : 'j'}">${papel}</span></button>`; };
     h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELADA FC</span><button class="btn sm" data-sh="ir" data-v="perfil">${escH(PERFIL?.apelido || PERFIL?.nome || 'Perfil')}</button></div>
     <h2>Minhas peladas</h2>
     ${cartaoPush()}
@@ -221,12 +226,16 @@ function render() {
   if (t === 'nova') h = topo('minhas') + `<h2>Criar sua pelada</h2><p class="lead">Depois você ajusta tudo nos Ajustes.</p>
     <form id="f-nova" class="stack" novalidate>
       <label class="field"><span>Nome da pelada</span><input type="text" id="n-nome" placeholder="Pelada do Sábado" required></label>
-      <div class="grid2"><label class="field"><span>Dia fixo</span><select id="n-dia">${DIASN.map((d, i) => `<option value="${i}" ${i === 6 ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
+      <div class="field"><span>Tipo</span><div class="pick" id="n-tipo"><button type="button" data-sh="tipo-pel" data-v="fixa" aria-pressed="true">Fixa (toda semana)</button><button type="button" data-sh="tipo-pel" data-v="evento" aria-pressed="false">Evento único</button></div>
+        <p class="sub" id="n-tipo-txt" style="margin:4px 0 0">Tem mensalistas e diaristas, e acontece toda semana no mesmo dia.</p></div>
+      <label class="field" id="n-data-box" hidden><span>Data do evento</span><input type="date" id="n-data" value="${proxSabado()}"></label>
+      <div class="grid2"><label class="field" id="n-dia-box"><span>Dia fixo</span><select id="n-dia">${DIASN.map((d, i) => `<option value="${i}" ${i === 6 ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
       <label class="field"><span>Início</span><input type="time" id="n-hora" value="08:00"></label></div>
       <label class="field"><span>Término</span><input type="time" id="n-fim" value="09:00"></label>
       <div class="grid2"><label class="field"><span>Times</span><select id="n-times"><option>2</option><option>3</option><option>4</option></select></label>
       <label class="field"><span>Jogadores de linha por time</span><input type="number" id="n-por" value="5" min="3" max="11"></label></div>
-      <div class="grid2"><label class="field"><span>Mensalidade (R$)</span><input type="number" id="n-mens" value="80" min="0"></label><label class="field"><span>Diária (R$)</span><input type="number" id="n-dia2" value="20" min="0"></label></div>
+      <div class="grid2" id="n-fixa-box"><label class="field"><span>Mensalidade (R$)</span><input type="number" id="n-mens" value="80" min="0"></label><label class="field"><span>Diária (R$)</span><input type="number" id="n-dia2" value="20" min="0"></label></div>
+      <label class="field" id="n-valor-box" hidden><span>Valor por pessoa (R$, opcional)</span><input type="number" id="n-valor" min="0" placeholder="0"></label>
       <button class="btn primary block" type="submit">Criar pelada</button></form>`;
   if (t === 'codigo') h = topo('minhas') + `<h2>Entrar numa pelada</h2><p class="lead">Leia o QR Code de quem já está na pelada, ou digite o código de 6 letras.</p>
     <button class="btn primary block" data-sh="ler-qr" style="padding-block:16px;font-size:16px">📷 Ler QR Code do convite</button>
@@ -236,16 +245,16 @@ function render() {
   if (t === 'convite' && CONVITE) { const G = CONVITE.grupo; const pre = UIp.prefere || 'mensalista';
     h = topo('minhas') + `<h2>Você foi convidado!</h2>
     <div class="ob-inv"><div class="h"><span class="sub" style="color:inherit;opacity:.85">Convite para</span><b>${escH(G.nome || 'Pelada')}</b></div>
-    <div class="b">${G.dia != null ? `<div>📅 ${[0,6].includes(Number(G.dia))?'Todo':'Toda'} ${escH(DIASN[G.dia].toLowerCase())}, ${escH(G.hora || '')}</div>` : ''}<div class="sub">Código ${escH(CONVITE.codigo)}</div></div></div>
-    <div class="field"><span>Quero entrar como</span><div class="pick"><button data-sh="pref" data-v="mensalista" aria-pressed="${pre === 'mensalista'}">Mensalista</button><button data-sh="pref" data-v="diarista" aria-pressed="${pre === 'diarista'}">Diarista</button></div>
-    <p class="sub" style="margin:4px 0 0">${pre === 'mensalista' ? 'Mensalista entra direto na lista quando tem vaga. O administrador confirma.' : 'Diarista pede vaga a cada pelada e o administrador libera.'}</p></div>
+    <div class="b">${(G.dia != null || G.data) ? `<div>${escH(quandoG(G))}${G.evento ? ' · <b>evento único</b>' : ''}</div>` : ''}<div class="sub">Código ${escH(CONVITE.codigo)}</div></div></div>
+    ${G.evento ? '<p class="sub" style="margin:0">É um evento único: depois de entrar, é só confirmar presença. Quem confirma primeiro garante a vaga.</p>' : `<div class="field"><span>Quero entrar como</span><div class="pick"><button data-sh="pref" data-v="mensalista" aria-pressed="${pre === 'mensalista'}">Mensalista</button><button data-sh="pref" data-v="diarista" aria-pressed="${pre === 'diarista'}">Diarista</button></div>
+    <p class="sub" style="margin:4px 0 0">${pre === 'mensalista' ? 'Mensalista entra direto na lista quando tem vaga. O administrador confirma.' : 'Diarista pede vaga a cada pelada e o administrador libera.'}</p></div>`}
     <button class="btn primary block" data-sh="aceitar">Entrar na pelada</button>
     <div class="banner due"><span><b>⏳ Sua entrada vai esperar a autorização do administrador.</b><br>Até ele autorizar, seu nome aparece como pendente no Elenco.</span></div>`; }
   if (t === 'convidar-pelada') { const ids = Object.keys(GRUPOS).sort((a, b) => (GRUPOS[a].nome || '').localeCompare(GRUPOS[b].nome || ''));
     h = topo('minhas') + `<h2>Convidar para minha pelada</h2><p class="lead">Escolha a pelada. A pessoa instala o app e já entra nela.</p>
-    ${ids.map(g => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="qr-grupo" data-v="${g}"><div class="av bg-MEI">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.dia != null ? DIASN[G.dia] + ' ' : ''}${escH(G.hora || '')} · código ${escH(G.codigo || '')}</span></span><span class="badge2">QR CODE</span></button>`; }).join('')}`; }
+    ${ids.map(g => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="qr-grupo" data-v="${g}"><div class="av bg-MEI">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${escH(quandoG(G, true))} · código ${escH(G.codigo || '')}</span></span><span class="badge2">QR CODE</span></button>`; }).join('')}`; }
   if (t === 'qr-grupo' && UIp.qrg && GRUPOS[UIp.qrg]) { const G = GRUPOS[UIp.qrg], link = LINK_APP + '?c=' + G.codigo;
-    const quando = G.dia != null ? `📅 ${[0, 6].includes(Number(G.dia)) ? 'Todo' : 'Toda'} ${DIASN[G.dia].toLowerCase()} às ${G.hora || ''}\n` : '';
+    const quando = (G.dia != null || G.data) ? quandoG(G) + '\n' : '';
     const txt = `⚽ Você está convidado pra *${G.nome || 'pelada'}*!\n${quando}\nEntre na pelada pelo app: ${link}\n\n📲 *Para ter o app no celular:*\niPhone: abra o link no Safari → Compartilhar → Adicionar à Tela de Início\nAndroid: abra no Chrome → menu ⋮ → Instalar app`;
     UIp.qrLink = link; UIp.qrTxt = txt;
     h = topo('convidar-pelada') + `<h2>${escH(G.nome || 'Pelada')}</h2><p class="lead">Com este QR Code, a pessoa instala o app e <b>já entra nesta pelada</b>.</p>
@@ -312,7 +321,7 @@ async function aceitarConvite() {
   const { gid, codigo, grupo } = CONVITE, p = PERFIL || {};
   try {
     await B.batch([
-      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: UIp.prefere || 'mensalista', codigo, t: Date.now() } },
+      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: grupo.evento ? null : (UIp.prefere || 'mensalista'), codigo, t: Date.now() } },
       { op: 'merge', path: 'users/' + EU.uid, data: { grupos: { [gid]: { t: Date.now() } } } }
     ]);
     GRUPOS[gid] = grupo; CONVITE = null; aviso('Pronto! Agora é só esperar o administrador autorizar sua entrada.');
@@ -323,16 +332,16 @@ async function aceitarConvite() {
 async function criarGrupo(f) {
   if (OCUPADO) return; OCUPADO = true;
   const gid = novoId(), codigo = novoCodigo(), p = PERFIL || {}, now = Date.now();
-  const cfg = { nome: f.nome, dia: f.dia, hora: f.hora, horaFim: f.fim, golSorteio: false, local: '', times: f.times, porTime: f.por, mensal: f.mens, diaria: f.diaria, pix: '', restr: [], nivelPublico: false };
+  const cfg = { nome: f.nome, dia: f.dia, hora: f.hora, horaFim: f.fim, golSorteio: false, local: '', times: f.times, porTime: f.por, mensal: f.evento ? 0 : f.mens, diaria: f.evento ? f.valor : f.diaria, pix: '', restr: [], nivelPublico: false, evento: !!f.evento, dataEvento: f.data || null };
   try {
     await B.batch([
-      { op: 'set', path: 'grupos/' + gid, data: { nome: f.nome, dia: f.dia, hora: f.hora, dono: EU.uid, admins: [EU.uid], codigo, criadoEm: now } },
+      { op: 'set', path: 'grupos/' + gid, data: { nome: f.nome, dia: f.dia, hora: f.hora, evento: !!f.evento, data: f.data || null, dono: EU.uid, admins: [EU.uid], codigo, criadoEm: now } },
       { op: 'set', path: 'codigos/' + codigo, data: { gid } },
       { op: 'set', path: `grupos/${gid}/config/geral`, data: cfg },
-      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: 'mensalista', codigo, t: now } },
+      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: f.evento ? null : 'mensalista', codigo, t: now } },
       { op: 'merge', path: 'users/' + EU.uid, data: { grupos: { [gid]: { t: now } } } }
     ]);
-    GRUPOS[gid] = { nome: f.nome, dia: f.dia, hora: f.hora, dono: EU.uid, admins: [EU.uid], codigo };
+    GRUPOS[gid] = { nome: f.nome, dia: f.dia, hora: f.hora, evento: !!f.evento, data: f.data || null, dono: EU.uid, admins: [EU.uid], codigo };
     aviso('Pelada criada! Agora cadastre o elenco e convide a galera.');
     abrirGrupo(gid);
   } catch (e) { aviso(msgErro(e)); }
@@ -383,7 +392,7 @@ window.mudarAdmins = async admins => {
   if (!admins.length) { aviso('A pelada precisa de pelo menos um administrador.'); return; }
   try { await B.set('grupos/' + ABERTO, { admins }, { merge: true }); aviso('Administradores atualizados.'); } catch (e) { aviso(msgErro(e)); }
 };
-window.sincronizarGrupo = async d => { if (ABERTO) try { await B.set('grupos/' + ABERTO, d, { merge: true }); } catch (e) { console.warn(e); } };
+window.sincronizarGrupo = async d => { if (ABERTO) try { GRUPOS[ABERTO] = { ...(GRUPOS[ABERTO] || {}), ...d }; await B.set('grupos/' + ABERTO, d, { merge: true }); } catch (e) { console.warn(e); } };
 
 /* ================= Notificações no celular (Web Push) ================= */
 const URL_CHAVE = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/chavePush';
@@ -465,6 +474,10 @@ document.addEventListener('click', async e => {
   if (a === 'reset') { const em = ($('l-email') || {}).value || ''; if (!em) { aviso('Digite seu e-mail acima e toque de novo em "Esqueci minha senha".'); return; } try { await B.reset(em.trim()); aviso('Mandamos um link para criar uma nova senha no seu e-mail.'); } catch (err) { aviso(msgErro(err)); } }
   if (a === 'sair') { ls.set('pelada.ultimo', null); await B.sair(); }
   if (a === 'abrir') abrirGrupo(v);
+  if (a === 'tipo-pel') { const ev = v === 'evento'; UIp.tipoPel = v;
+    document.querySelectorAll('#n-tipo button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === v)));
+    $('n-data-box').hidden = !ev; $('n-dia-box').hidden = ev; $('n-fixa-box').hidden = ev; $('n-valor-box').hidden = !ev;
+    $('n-tipo-txt').textContent = ev ? 'Uma pelada só, numa data. Sem mensalista nem diarista: quem confirma primeiro entra, e quem passar das vagas vai para a espera.' : 'Tem mensalistas e diaristas, e acontece toda semana no mesmo dia.'; }
   if (a === 'push-ativar') ativarPush();
   if (a === 'ler-qr') abrirLeitor();
   if (a === 'fechar-leitor') fecharLeitor();
@@ -500,7 +513,8 @@ document.addEventListener('submit', async e => {
     return;
   }
   if (f.id === 'f-nova') { if (!val('n-nome')) { aviso('Dê um nome para a pelada.'); return; }
-    criarGrupo({ nome: val('n-nome'), dia: Number($('n-dia').value), hora: $('n-hora').value || '08:00', fim: $('n-fim').value || '', times: Number($('n-times').value) || 2, por: Math.max(3, Math.min(11, Number($('n-por').value) || 5)), mens: Number($('n-mens').value) || 0, diaria: Number($('n-dia2').value) || 0 }); }
+    const ev = UIp.tipoPel === 'evento', dataEv = ev ? ($('n-data').value || proxSabado()) : null;
+    criarGrupo({ evento: ev, data: dataEv, valor: ev ? Number($('n-valor').value) || 0 : 0, nome: val('n-nome'), dia: ev ? new Date(dataEv + 'T12:00').getDay() : Number($('n-dia').value), hora: $('n-hora').value || '08:00', fim: $('n-fim').value || '', times: Number($('n-times').value) || 2, por: Math.max(3, Math.min(11, Number($('n-por').value) || 5)), mens: Number($('n-mens').value) || 0, diaria: Number($('n-dia2').value) || 0 }); }
   if (f.id === 'f-codigo') buscarCodigo(val('cod'));
 });
 

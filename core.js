@@ -90,6 +90,11 @@ function critKey(pos){return pos==='GOL'?CRIT.GOL:CRIT.linha}
 /* avaliação do jogador na escala de 0 a 100 (como no FIFA); a nota do jogo continua de 0 a 10 */
 const ovr=n=>Math.round((Number(n)||0)*10);
 function nomeTime(cor){const v=((cfg().nomesTimes||[])[cor]||'').trim();return v||(CORES[cor]||{n:'Time'}).n}
+/* evento único: sem mensalista nem diarista; todo mundo confirma direto e quem passa das vagas vai para a espera */
+const EV=()=>!!cfg().evento;
+const ehDiarista=id=>!EV()&&J(id).tipo==='diarista';
+const pagaPorJogo=id=>EV()||J(id).tipo==='diarista';
+const tipoTxt=id=>EV()?'Participante':J(id).tipo==='diarista'?'Diarista':'Mensalista';
 function notaInicial(j){const g=j.critGalera||{};const k=critKey(j.pos).map(([c])=>Number(g[c]??j.crit?.[c]??3));return sum(k)/k.length*2}
 function encerradas(){return Object.entries(S.pel).filter(([,p])=>p.status==='encerrada').sort((a,b)=>b[1].data.localeCompare(a[1].data))}
 let NOTA_CACHE=null;
@@ -130,7 +135,7 @@ function lista(p,pid){
   // liberado: o administrador autorizou depois do pedido
   const lib=id=>aprov[id]&&aprov[id]>=(resp[id].t||0)-1000;
   // precisa de liberação: diarista que confirmou pelo app, ou quem confirmou com a lista cheia
-  const precisa=id=>resp[id].esp||(J(id).tipo==='diarista'&&resp[id].app);
+  const precisa=id=>resp[id].esp||(ehDiarista(id)&&resp[id].app);
   const ok=id=>!precisa(id)||lib(id);
   const gks=sim.filter(id=>J(id).pos==='GOL'&&ok(id)).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0));
   const gkAguard=sim.filter(id=>J(id).pos==='GOL'&&!ok(id));
@@ -139,7 +144,7 @@ function lista(p,pid){
   const elig=line.filter(ok).sort((a,b)=>{const ma=lib(a)?1:0,mb=lib(b)?1:0;return ma-mb||key(a)-key(b)});
   const aguard=line.filter(id=>!ok(id)).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0));
   // na espera, mensalista sempre vem antes de diarista (mantendo a ordem de chegada dentro de cada grupo)
-  const esp=elig.slice(vagas).concat(aguard),ehD=id=>J(id).tipo==='diarista'?1:0;
+  const esp=elig.slice(vagas).concat(aguard),ehD=id=>ehDiarista(id)?1:0;
   const espera=esp.map((id,i)=>[id,i]).sort((a,b)=>ehD(a[0])-ehD(b[0])||a[1]-b[1]).map(x=>x[0]);
   return{vagas,gks,escalados:elig.slice(0,vagas),espera,aguardando:aguard.concat(gkAguard),
     nao:ativos().filter(id=>resp[id]?.s==='nao'),
@@ -438,15 +443,15 @@ function sheetDono(){const ls=Object.entries(S.locais).sort((a,b)=>a[1].nome.loc
 /* ---------- mensagens para o WhatsApp ---------- */
 function msg(tipo,ctx={}){
   const c=cfg(),pe=atual(),p=ctx.pel||(pe&&pe[1]);
-  const quando=p?`📅 *${dLong(p.data)}* das *${horaIniDe(p)}* às *${horaFimDe(p)}*`:`📅 *${DIAS[c.dia]}* das *${c.hora}* às *${horaFimDe(null)}*`;
+  const quando=p?`📅 *${dLong(p.data)}* das *${horaIniDe(p)}* às *${horaFimDe(p)}*`:EV()&&c.dataEvento?`📅 *${dLong(c.dataEvento)}* das *${c.hora}* às *${horaFimDe(null)}*`:`📅 *${DIAS[c.dia]}* das *${c.hora}* às *${horaFimDe(null)}*`;
   const LL=localDe(p),onde=LL?LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):'';
   const head=`⚽ *${c.nome.toUpperCase()}*`;
-  if(tipo==='convocacao')return[head,quando,onde?'📍 '+onde:'','',`São ${c.times*c.porTime} vagas na linha + goleiros. Mensalista tem prioridade.`,'Responda aqui: ✅ vou  |  ❌ não vou'].filter((x,i)=>x!==''||i===3).join('\n');
+  if(tipo==='convocacao')return[head,quando,onde?'📍 '+onde:'','',`São ${c.times*c.porTime} vagas na linha + goleiros.${EV()?' Quem confirmar primeiro garante a vaga.':' Mensalista tem prioridade.'}`,'Responda aqui: ✅ vou  |  ❌ não vou'].filter((x,i)=>x!==''||i===3).join('\n');
   if(!p&&tipo!=='pagamento'&&tipo!=='convite')return head+'\n\nAinda não tem pelada marcada. Marque a próxima no app.';
   if(tipo==='cobrar'){const l=lista(p);if(!l.pend.length)return head+'\n'+quando+'\n\nTodo mundo já respondeu. Valeu! 🙌';
     return[head,quando,'',`⏰ Ainda faltam ${l.pend.length} responder:`,...l.pend.map(id=>'• '+nm(id)),'','Confirma aí pra gente fechar a lista! ✅ ou ❌'].join('\n')}
   if(tipo==='lista'){const l=lista(p),out=[head,quando,onde?'📍 '+onde:'',''];
-    out.push(`✅ *Confirmados* (${l.escalados.length}/${l.vagas})`);l.escalados.forEach((id,i)=>out.push(`${i+1}. ${nm(id)}${J(id).tipo==='diarista'?' (D)':''}`));
+    out.push(`✅ *Confirmados* (${l.escalados.length}/${l.vagas})`);l.escalados.forEach((id,i)=>out.push(`${i+1}. ${nm(id)}${ehDiarista(id)?' (D)':''}`));
     if(l.gks.length){out.push('','🧤 *Goleiros*');l.gks.forEach(id=>out.push('• '+nm(id)))}
     if(l.espera.length){out.push('','⏳ *Lista de espera*');l.espera.forEach((id,i)=>out.push(`${i+1}. ${nm(id)}${l.aguardando.includes(id)?' (aguardando liberação)':''}`))}
     if(l.nao.length)out.push('','❌ Não vão: '+l.nao.map(nm).join(', '));
@@ -484,9 +489,9 @@ function msg(tipo,ctx={}){
 /* ---------- caixa ---------- */
 function mesAtual(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)}
 function devedores(m){
-  const cx=S.caixa[m]||{},mens=ativos().filter(id=>J(id).tipo==='mensalista'&&!(cx.mens||{})[id]);
+  const cx=S.caixa[m]||{},mens=EV()?[]:ativos().filter(id=>J(id).tipo==='mensalista'&&!(cx.mens||{})[id]);
   const dia=[];for(const[,p] of Object.entries(S.pel)){if(!p.data.startsWith(m)||p.status!=='encerrada')continue;
-    for(const id of jogaram(p))if(J(id).tipo==='diarista'&&!(p.diarias||{})[id])dia.push({id,data:p.data})}
+    for(const id of jogaram(p))if(pagaPorJogo(id)&&!(p.diarias||{})[id])dia.push({id,data:p.data})}
   return{mens,dia};
 }
 
@@ -738,7 +743,7 @@ function arteCarta(id){
   ctx.fillRect(W/2-2,cy+700,4,270);
   // rodapé
   ctx.textAlign='center';ctx.font='600 30px Figtree, sans-serif';ctx.fillText(cfg().nome.toUpperCase(),W/2,cy+ch-120);
-  ctx.font='500 24px Figtree, sans-serif';ctx.fillText(j.tipo==='diarista'?'DIARISTA':'MENSALISTA',W/2,cy+ch-82);
+  ctx.font='500 24px Figtree, sans-serif';ctx.fillText(tipoTxt(id).toUpperCase(),W/2,cy+ch-82);
   const nv=nivelPelada();
   if(nv!=null&&cfg().nivelPublico){const r0=18,gap=44,x0=W/2-gap*2,y0=cy+ch-168;
     const star=(x,y)=>{ctx.beginPath();for(let k=0;k<10;k++){const rr=k%2?r0*.45:r0,a=-Math.PI/2+k*Math.PI/5;ctx.lineTo(x+rr*Math.cos(a),y+rr*Math.sin(a))}ctx.closePath()};
@@ -856,7 +861,7 @@ function tJogo(A){
   if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar: ${esc(AVISOS[v.a.tipo]?.n||'')}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
   const cur=atual();
   if(!cur){
-    h+=`<div class="board"><div class="when">Sem pelada<br>marcada</div><div class="where">${esc(DIAS[c.dia])} das ${esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div></div>`;
+    h+=`<div class="board"><div class="when">Sem pelada<br>marcada</div><div class="where">${EV()&&c.dataEvento?'Evento único · '+esc(dLong(c.dataEvento)):esc(DIAS[c.dia])} das ${esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div></div>`;
     if(A){
       if(UI.npLoc===undefined)UI.npLoc=(c.localId&&S.locais[c.localId])?c.localId:null;
       const L=UI.npLoc&&S.locais[UI.npLoc];
@@ -866,7 +871,7 @@ function tJogo(A){
         :`<button class="btn primary block" data-act="lp-abrir" data-v="np">Escolher o local</button>`}
       </div>
       ${L?`<div class="field"><span><i class="stepn">2</i>Quando?</span>
-      <label class="field"><span>Data</span><input type="date" id="np-data" data-np="npData" value="${UI.npData||proximaData()}"></label>
+      <label class="field"><span>Data</span><input type="date" id="np-data" data-np="npData" value="${UI.npData||(EV()&&c.dataEvento)||proximaData()}"></label>
       <div class="lado"><label class="field"><span>Início</span><input type="time" id="np-hora" data-np="npHora" value="${esc(UI.npHora||c.hora)}"></label>
       <label class="field"><span>Término</span><input type="time" id="np-fim" data-np="npFim" value="${esc(UI.npFim||horaFimDe(null))}"></label></div>
 </div>
@@ -886,7 +891,7 @@ function tJogo(A){
 }
 function rowPlayer(id,right,extra=''){
   const j=J(id);
-  return`<div class="item">${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${j.pos}">${j.pos}</span><span>${j.tipo==='diarista'?'Diarista':'Mensalista'}</span>${extra}</div></div>${right}</div>`;
+  return`<div class="item">${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${j.pos}">${j.pos}</span><span>${tipoTxt(id)}</span>${extra}</div></div>${right}</div>`;
 }
 function subPresenca(pid,p,l,A){
   const resp=respDe(p,pid);
@@ -1010,7 +1015,7 @@ function painelJogador(pid,p,l){
   if(!doc||!S.jog[doc.jogador]){
     const tomados=new Set(Object.values(S.pres).map(x=>x.jogador));
     const ops=ativos().filter(id=>!tomados.has(id)).sort((a,b)=>nm(a).localeCompare(nm(b)));
-    return`<div class="panel stack" style="margin-bottom:12px"><h3>Quem é você?</h3><div class="sub">Escolha seu nome uma vez. Depois é só tocar em "Vou" ou "Não vou". Mensalista com vaga entra na hora; diarista e lista de espera dependem da liberação do administrador.</div>
+    return`<div class="panel stack" style="margin-bottom:12px"><h3>Quem é você?</h3><div class="sub">Escolha seu nome uma vez. Depois é só tocar em "Vou" ou "Não vou". ${EV()?'Quem confirma primeiro garante a vaga; depois das vagas, vai para a espera.':'Mensalista com vaga entra na hora; diarista e lista de espera dependem da liberação do administrador.'}</div>
       <div class="row" style="flex-wrap:nowrap"><select id="eu-sou" class="grow"><option value="">Seu nome no elenco</option>${ops.map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('')}</select><button class="btn primary" data-act="eu-sou">Sou eu</button></div>
       <div class="sub">Não achou seu nome? Peça ao administrador para te cadastrar.</div></div>`}
   const j=doc.jogador,s=respDe(p,pid)[j]?.s;
@@ -1139,7 +1144,7 @@ function tElenco(A){
   ids.sort((a,b)=>notaAtual(b)-notaAtual(a));
   let h=`<div class="row between" style="margin-bottom:10px"><h2>Elenco <span class="muted num">${ativos().length}</span></h2>${A?'<button class="btn primary" data-act="add-jog">+ Jogador</button>':''}</div>
     <input type="text" id="busca" placeholder="Buscar jogador" value="${esc(UI.busca)}" data-in="busca" style="margin-bottom:10px">
-    <div class="pick" style="margin-bottom:12px">${[['todos','Todos'],['GOL','GOL'],['ZAG','ZAG'],['MEI','MEI'],['ATA','ATA'],['mensalista','Mensalistas'],['diarista','Diaristas'],['inativos','Inativos']].map(([k,n])=>`<button data-act="filtro" data-v="${k}" aria-pressed="${UI.filtro===k}">${n}</button>`).join('')}</div>`;
+    <div class="pick" style="margin-bottom:12px">${[['todos','Todos'],['GOL','GOL'],['ZAG','ZAG'],['MEI','MEI'],['ATA','ATA'],...(EV()?[]:[['mensalista','Mensalistas'],['diarista','Diaristas']]),['inativos','Inativos']].map(([k,n])=>`<button data-act="filtro" data-v="${k}" aria-pressed="${UI.filtro===k}">${n}</button>`).join('')}</div>`;
   if(A){const ra=rodadaAberta();h+=`<button class="btn block ${ra?'':'warn'}" data-act="av-admin" style="margin-bottom:12px">${ra?`⭐ Avaliação completa aberta · até ${quandoFim(ra[1].fim)}`:'⭐ Nova avaliação completa (5 critérios)'}</button>`}
   h+=cartaoAvCompleta();
   if(membrosSemCadastro().length&&!demo)h+=A?painelMembros():painelPendentes();
@@ -1155,10 +1160,13 @@ function tElenco(A){
   }
   const linha=(id,tag='')=>{const s=st[id]||{};
     return`<button class="item" data-act="ver-jog" data-j="${id}" style="all:unset;display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);cursor:pointer">
-      ${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${S.jog[id].pos}">${S.jog[id].pos}</span>${tag}<span>${S.jog[id].tipo==='diarista'?'Diarista':'Mensalista'} · ${s.j||0} jogos · ${s.g||0} gols</span></div></div><span class="nota num">${ovr(notaAtual(id))}</span></button>`};
+      ${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${S.jog[id].pos}">${S.jog[id].pos}</span>${tag}<span>${tipoTxt(id)} · ${s.j||0} jogos · ${s.g||0} gols</span></div></div><span class="nota num">${ovr(notaAtual(id))}</span></button>`};
   if(UI.filtro==='inativos'){h+='<div class="panel"><div class="list">'+(ids.length?ids.map(id=>linha(id)).join(''):'<div class="empty">Nenhum jogador aqui.</div>')+'</div></div>';return h}
   const set=new Set(ids),cur=atual();
   const exc=cur?lista(cur[1],cur[0]).espera.filter(id=>set.has(id)):[];
+  if(EV()){h+=`<div class="panel" style="margin-bottom:12px"><div class="panel-h"><h3>Participantes <span class="muted num">${ids.length}</span></h3></div><div class="list">${ids.length?ids.map(id=>linha(id)).join(''):'<div class="empty">Ninguém aqui.</div>'}</div></div>`;
+    if(exc.length)h+=`<div class="panel"><div class="panel-h"><h3>Lista de espera <span class="muted num">${exc.length}</span></h3></div><div class="sub" style="margin-bottom:4px">Quem confirmou com a lista cheia, por ordem de chegada.</div><div class="list">${exc.map((id,i)=>linha(id,`<span class="chip" style="background:var(--card);color:var(--card-ink)">${i+1}º na espera</span>`)).join('')}</div></div>`;
+    return h}
   const mens=ids.filter(id=>S.jog[id].tipo!=='diarista');
   const espIds=exc.concat(ids.filter(id=>S.jog[id].tipo==='diarista'&&!exc.includes(id)));
   if(UI.filtro!=='diarista')h+=`<div class="panel" style="margin-bottom:12px"><div class="panel-h"><h3>Mensalistas <span class="muted num">${mens.length}</span></h3></div><div class="list">${mens.length?mens.map(id=>linha(id)).join(''):'<div class="empty">Nenhum mensalista aqui.</div>'}</div></div>`;
@@ -1219,27 +1227,29 @@ function tRanking(){
 /* --- Caixa --- */
 function tCaixa(A){
   const m=UI.mes||mesAtual(),[y,mm]=m.split('-').map(Number),c=cfg(),cx=S.caixa[m]||{};
-  const mensal=ativos().filter(id=>J(id).tipo==='mensalista');
+  const mensal=EV()?[]:ativos().filter(id=>J(id).tipo==='mensalista');
   const pagosM=mensal.filter(id=>(cx.mens||{})[id]);
-  const pels=Object.entries(S.pel).filter(([,p])=>p.data.startsWith(m)&&p.status==='encerrada').sort((a,b)=>a[1].data.localeCompare(b[1].data));
-  let diariasPagas=0;for(const[,p] of pels)for(const id of jogaram(p))if(J(id).tipo==='diarista'&&(p.diarias||{})[id])diariasPagas++;
+  const pels=Object.entries(S.pel).filter(([,p])=>p.data.startsWith(m)&&(p.status==='encerrada'||EV())).sort((a,b)=>a[1].data.localeCompare(b[1].data));
+  let diariasPagas=0;for(const[,p] of pels)for(const id of jogaram(p))if(pagaPorJogo(id)&&(p.diarias||{})[id])diariasPagas++;
   const desp=cx.desp||[],totDesp=sum(desp.map(d=>Number(d.v)||0));
   const ent=pagosM.length*c.mensal+diariasPagas*c.diaria;
   let h=`<div class="row between" style="margin-bottom:10px"><h2>Caixa</h2><div class="row" style="gap:4px"><button class="iconbtn" data-act="mes" data-d="-1" aria-label="Mês anterior">‹</button><b style="min-width:110px;text-align:center">${MESES[mm-1]} ${y}</b><button class="iconbtn" data-act="mes" data-d="1" aria-label="Próximo mês">›</button></div></div>
     <div class="money"><div><span>Entradas</span><b class="num">${BRL(ent)}</b></div><div><span>Saídas</span><b class="num">${BRL(totDesp)}</b></div><div><span>Saldo</span><b class="num" style="color:${ent-totDesp<0?'var(--red)':'var(--pitch)'}">${BRL(ent-totDesp)}</b></div></div>`;
   if(A)h+=`<button class="btn block warn" style="margin-top:12px" data-act="msg" data-v="pagamento" data-m="${m}">Cobrar pendências no WhatsApp</button>`;
-  h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Mensalidades</h3><span class="sub num">${pagosM.length}/${mensal.length} · ${BRL(c.mensal)}</span></div><div class="list">`;
+  if(!EV())h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Mensalidades</h3><span class="sub num">${pagosM.length}/${mensal.length} · ${BRL(c.mensal)}</span></div><div class="list">`;
+  if(!EV()){
   if(!mensal.length)h+='<div class="empty">Nenhum mensalista.</div>';
   for(const id of mensal.sort((a,b)=>nm(a).localeCompare(nm(b)))){const ok=(cx.mens||{})[id];
     h+=`<div class="item"><div class="grow name">${esc(nm(id))}</div>${A?`<button class="paid ${ok?'on':''}" data-act="pagou-m" data-m="${m}" data-j="${id}">${ok?'PAGO':'DEVE'}</button>`:`<span class="paid ${ok?'on':''}">${ok?'PAGO':'DEVE'}</span>`}</div>`}
   h+='</div></div>';
-  h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Diárias</h3><span class="sub">${BRL(c.diaria)} por jogo</span></div>`;
+  }
+  h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>${EV()?'Pagamentos do evento':'Diárias'}</h3><span class="sub">${BRL(c.diaria)} ${EV()?'por pessoa':'por jogo'}</span></div>`;
   let any=false;
-  for(const[pid,p] of pels){const ds=jogaram(p).filter(id=>J(id).tipo==='diarista');if(!ds.length)continue;any=true;
+  for(const[pid,p] of pels){const ds=jogaram(p).filter(id=>pagaPorJogo(id));if(!ds.length)continue;any=true;
     h+=`<div class="sub" style="margin-top:8px;font-weight:700">${dShort(p.data)}</div><div class="list">`;
     for(const id of ds){const ok=(p.diarias||{})[id];h+=`<div class="item"><div class="grow name">${esc(nm(id))}</div>${A?`<button class="paid ${ok?'on':''}" data-act="pagou-d" data-p="${pid}" data-j="${id}">${ok?'PAGO':'DEVE'}</button>`:`<span class="paid ${ok?'on':''}">${ok?'PAGO':'DEVE'}</span>`}</div>`}
     h+='</div>'}
-  if(!any)h+='<div class="empty">Nenhum diarista jogou neste mês.</div>';
+  if(!any)h+=(EV()?'<div class="empty">Ninguém confirmado ainda.</div>':'<div class="empty">Nenhum diarista jogou neste mês.</div>');
   h+='</div>';
   h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Despesas</h3><span class="sub num">${BRL(totDesp)}</span></div><div class="list">`;
   desp.forEach(d=>{h+=`<div class="item"><div class="grow"><div class="name">${esc(d.d)}</div></div><b class="num">${BRL(d.v)}</b>${A?`<button class="btn sm" data-act="del-desp" data-m="${m}" data-id="${d.id}" aria-label="Apagar despesa">✕</button>`:''}</div>`});
@@ -1278,6 +1288,8 @@ function sheetCfg(){
     <div class="grid2"><label class="field"><span>Dia fixo</span><select id="c-dia">${DIAS.map((d,i)=>`<option value="${i}" ${c.dia==i?'selected':''}>${d}</option>`).join('')}</select></label>
     <label class="field"><span>Início</span><input type="time" id="c-hora" value="${esc(c.hora)}"></label></div>
     <label class="field"><span>Término</span><input type="time" id="c-fim" value="${esc(horaFimDe(null))}"></label>
+    <div class="field"><span>Tipo de pelada</span><select id="c-tipo"><option value="fixa" ${c.evento?'':'selected'}>Fixa (toda semana, com mensalistas e diaristas)</option><option value="evento" ${c.evento?'selected':''}>Evento único (sem mensalista nem diarista)</option></select></div>
+    <label class="field"><span>Data do evento (se for evento único)</span><input type="date" id="c-dataev" value="${esc(c.dataEvento||'')}"></label>
     <label class="field"><span>Local padrão</span>${selLocais('c-localid',c.localId,'Sem local padrão')}</label>
     <button class="btn sm" data-act="locais">Gerenciar locais</button>
     <div class="grid2"><label class="field"><span>Times por pelada</span><select id="c-times">${[2,3,4].map(n=>`<option ${c.times==n?'selected':''}>${n}</option>`).join('')}</select></label>
@@ -1324,7 +1336,7 @@ function renderJogForm(){
     <label class="field"><span>WhatsApp</span><input type="tel" id="f-tel" data-f="tel" value="${esc(F.tel)}" placeholder="(81) 99999-9999"></label></div>
     <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POS).map(([k,n])=>`<button data-act="f-pos" data-v="${k}" aria-pressed="${F.pos===k}">${n}</button>`).join('')}</div></div>
     <label class="field"><span>Também joga de</span><select id="f-pos2" data-f="pos2"><option value="">Só na principal</option>${Object.entries(POS).filter(([k])=>k!==F.pos).map(([k,n])=>`<option value="${k}" ${F.pos2===k?'selected':''}>${n}</option>`).join('')}</select></label>
-    <div class="field"><span>Tipo</span><div class="pick"><button data-act="f-tipo" data-v="mensalista" aria-pressed="${F.tipo!=='diarista'}">Mensalista</button><button data-act="f-tipo" data-v="diarista" aria-pressed="${F.tipo==='diarista'}">Diarista</button></div></div>
+    ${EV()?'':`<div class="field"><span>Tipo</span><div class="pick"><button data-act="f-tipo" data-v="mensalista" aria-pressed="${F.tipo!=='diarista'}">Mensalista</button><button data-act="f-tipo" data-v="diarista" aria-pressed="${F.tipo==='diarista'}">Diarista</button></div></div>`}
     <label class="field"><span>Convidado por</span><select id="f-conv" data-f="conv"><option value="">—</option>${Object.keys(S.jog).filter(x=>x!==F._id).map(x=>`<option value="${x}" ${F.conv===x?'selected':''}>${esc(nm(x))}</option>`).join('')}</select></label>
     <div class="panel"><div class="row between"><h3>Avaliação inicial</h3><span class="nota num">${ovr(ini)}</span></div>
       <div class="sub" style="margin:4px 0 6px">${F._id&&encerradas().length?'Base da nota. Depois de cada pelada, a nota se ajusta com as avaliações do jogo.':'Quem convidou dá de 1 a 5 em cada item. Depois de cada pelada, a nota se ajusta com as avaliações do jogo.'}</div>
@@ -1413,7 +1425,7 @@ document.addEventListener('click',e=>{
       if(prev===d.v)return;
       const l0=lista(p,d.p),jj=doc.jogador,cheia=d.v==='sim'&&J(jj).pos!=='GOL'&&!l0.escalados.includes(jj)&&l0.escalados.length>=l0.vagas;
       const pel=Object.fromEntries(Object.entries({...(doc.pel||{}),[d.p]:{s:d.v,t:Date.now(),a:prev,esp:cheia}}).sort((x,y)=>x[1].t-y[1].t).slice(-10));
-      put('presencas/'+myId,{...doc,pel});toast(d.v!=='sim'?'Resposta enviada: não vai.':(cheia||J(jj).tipo==='diarista')?'Pedido enviado. Agora é só aguardar o administrador liberar.':'Presença confirmada!');break}
+      put('presencas/'+myId,{...doc,pel});toast(d.v!=='sim'?'Resposta enviada: não vai.':(cheia||ehDiarista(jj))?'Pedido enviado. Agora é só aguardar o administrador liberar.':'Presença confirmada!');break}
     case'como-jogador':document.getElementById('push').hidden=true;PUSH_PRONTO=false;PUSH_VISTOS.clear();UI.comoJogador=!UI.comoJogador;UI.sub='presenca';closeSheet();render();window.scrollTo(0,0);break
     case'notif':sheetNotif();break;
     case'voltar-grupos':if(window.voltarGrupos)window.voltarGrupos();break;
@@ -1562,8 +1574,9 @@ document.addEventListener('click',e=>{
     case'gol-sorteio':{F.golSorteio=d.v==='1';document.querySelectorAll('#gol-pick button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===d.v)));
       document.getElementById('gol-txt').textContent=F.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
-      put('config/geral',{...(S.config||{}),nome:g('c-nome').trim()||DEF_CFG.nome,dia:Number(g('c-dia')),hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),porTime:Math.max(3,Math.min(11,Number(g('c-portime'))||5)),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,golSorteio:F.golSorteio,janelaAval:Number(g('c-janela'))||24,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
-      if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:Number(g('c-dia')),hora:g('c-hora')||'08:00'});
+      const ev=g('c-tipo')==='evento',dataEv=ev?(g('c-dataev')||proximaData()):null,diaEv=ev?parseD(dataEv).getDay():Number(g('c-dia'));
+      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),porTime:Math.max(3,Math.min(11,Number(g('c-portime'))||5)),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,golSorteio:F.golSorteio,janelaAval:Number(g('c-janela'))||24,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
+      if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',evento:ev,data:dataEv});
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':{const cx=S.caixa[d.m]||{mens:{},desp:[]};put('caixa/'+d.m,{...cx,mens:{...(cx.mens||{}),[d.j]:!(cx.mens||{})[d.j]}});break}
     case'pagou-d':{const p=S.pel[d.p];patch('peladas/'+d.p,{diarias:{[d.j]:!(p.diarias||{})[d.j]}});break}
