@@ -1,0 +1,13 @@
+{
+  "name": "pelada-fc-servidor",
+  "private": true,
+  "description": "Servidor de notificações do Pelada FC (Firebase Cloud Functions)",
+  "main": "index.js",
+  "engines": { "node": "22" },
+  "scripts": { "test": "node teste.js" },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.1.0",
+    "web-push": "^3.6.7"
+  }
+}

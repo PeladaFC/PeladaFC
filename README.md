@@ -15,11 +15,20 @@ App para organizar pelada: elenco com notas, presença (mensalistas e diaristas)
 | `app.js` | Login, Minhas peladas, convites e ligação com o Firebase |
 | `br.js` | Estados e municípios (IBGE) |
 | `firestore.rules` | Regras de segurança do banco |
+| `sw.js` | Recebe e mostra as notificações no celular |
+| `functions/` | Servidor de notificações (Firebase Cloud Functions, Web Push) |
+| `instalar.sh` | Publica o servidor e as regras pelo Cloud Shell do Google |
 | `manifest.webmanifest`, ícones | Instalação na tela de início |
 
-## Regras de segurança
+## Publicar servidor e regras
 
-Copie o conteúdo de `firestore.rules` e cole em **Firebase → Firestore Database → Regras → Publicar**.
+No Cloud Shell do Google (shell.cloud.google.com), com a conta dona do projeto:
+
+```
+curl -sL https://raw.githubusercontent.com/PeladaFC/PeladaFC/main/instalar.sh | bash
+```
+
+Isso publica o servidor de notificações e as regras de `firestore.rules`. Exige o plano Blaze.
 
 ## Teste local
 

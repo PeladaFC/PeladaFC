@@ -209,6 +209,7 @@ function render() {
     const card = (g, papel) => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="abrir" data-v="${g}"><div class="av bg-${papel === 'ADMIN' ? 'MEI' : 'ATA'}">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.dia != null ? DIASN[G.dia] + ' ' : ''}${escH(G.hora || '')}</span></span><span class="badge2 ${papel === 'ADMIN' ? '' : 'j'}">${papel}</span></button>`; };
     h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELADA FC</span><button class="btn sm" data-sh="ir" data-v="perfil">${escH(PERFIL?.apelido || PERFIL?.nome || 'Perfil')}</button></div>
     <h2>Minhas peladas</h2>
+    ${cartaoPush()}
     <button class="ob-opt" data-sh="ir" data-v="compartilhar" style="padding:12px 14px"><span class="ic" style="background:var(--card)">📲</span><span class="grow"><b>Convidar para o app</b><span class="sub">Mostre o QR Code ou mande o link do app</span></span></button>
     ${ids.length ? `<button class="ob-opt" data-sh="ir" data-v="convidar-pelada" style="padding:12px 14px"><span class="ic" style="background:var(--pitch-soft)">⚽</span><span class="grow"><b>Convidar para minha pelada</b><span class="sub">QR Code ou link que já entra na pelada</span></span></button>` : ''}
     ${!ids.length ? `<p class="lead">Você ainda não está em nenhuma pelada. Crie a sua ou entre com o código de um convite.</p>` : ''}
@@ -292,6 +293,7 @@ async function depoisDoLogin() {
   if (conv) { ls.set('pelada.convite', null); await buscarCodigo(conv); return; }
   // Ao abrir o app (ícone ou site), sempre começa em "Minhas peladas".
   ir('minhas');
+  renovarPush();
 }
 async function buscarCodigo(cod) {
   cod = String(cod || '').trim().toUpperCase();
@@ -383,6 +385,75 @@ window.mudarAdmins = async admins => {
 };
 window.sincronizarGrupo = async d => { if (ABERTO) try { await B.set('grupos/' + ABERTO, d, { merge: true }); } catch (e) { console.warn(e); } };
 
+/* ================= Notificações no celular (Web Push) ================= */
+const URL_CHAVE = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/chavePush';
+const PUSH = { pub: null, estado: 'carregando' }; if (MOCK) window.__PUSH = PUSH;
+const ehIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const noIcone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const temPush = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+function b64u(s) { const p = '='.repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, c => c.charCodeAt(0)); }
+function idSub(endpoint) { let h = 5381; for (let i = 0; i < endpoint.length; i++) h = ((h << 5) + h + endpoint.charCodeAt(i)) >>> 0; return 'd' + h.toString(36) + endpoint.length.toString(36); }
+async function chavePublica() {
+  if (PUSH.pub) return PUSH.pub;
+  if (MOCK) return (PUSH.pub = 'mock');
+  const r = await fetch(URL_CHAVE, { cache: 'no-store' }); if (!r.ok) throw new Error('sem servidor');
+  return (PUSH.pub = (await r.json()).publica);
+}
+async function regSW() { if (!('serviceWorker' in navigator)) return null; try { return await navigator.serviceWorker.register('sw.js', { scope: './' }); } catch (e) { console.warn(e); return null; } }
+async function avaliarPush() {
+  let est;
+  if (ehIOS && !noIcone()) est = 'abrir-icone';
+  else if (!temPush()) est = 'sem-suporte';
+  else {
+    try { await chavePublica(); } catch (e) { PUSH.estado = 'indisponivel'; return PUSH.estado; }
+    if (Notification.permission === 'denied') est = 'bloqueado';
+    else if (Notification.permission === 'granted') { const reg = await navigator.serviceWorker.ready; est = (await reg.pushManager.getSubscription()) ? 'ativo' : 'desligado'; }
+    else est = 'desligado';
+  }
+  PUSH.estado = est; return est;
+}
+async function salvarSub(sub) {
+  const j = sub.toJSON();
+  await B.set(`users/${EU.uid}/push/${idSub(j.endpoint)}`, { endpoint: j.endpoint, keys: j.keys, ua: navigator.userAgent.slice(0, 140), t: Date.now() }, { merge: true });
+  ls.set('pelada.pushKey', PUSH.pub);
+}
+async function inscrever() {
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (sub && ls.get('pelada.pushKey') && ls.get('pelada.pushKey') !== PUSH.pub) { await sub.unsubscribe().catch(() => {}); sub = null; }
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(PUSH.pub) });
+  await salvarSub(sub);
+}
+function ativarPush() {
+  if (!temPush() || !PUSH.pub) { aviso('As notificações ainda não estão disponíveis.'); return; }
+  // o pedido de permissão precisa sair direto do toque (exigência do iPhone)
+  Notification.requestPermission().then(async perm => {
+    if (perm !== 'granted') { PUSH.estado = perm === 'denied' ? 'bloqueado' : 'desligado'; aviso('Sem permissão, as notificações não chegam.'); render(); return; }
+    try { await inscrever(); PUSH.estado = 'ativo'; aviso('Notificações ativadas! Já já chega um aviso de teste.'); }
+    catch (e) { console.warn(e); aviso('Não deu para ativar agora. Tente de novo.'); }
+    render();
+  });
+}
+// toda vez que o app abre: renova a inscrição (o iPhone às vezes "esquece")
+async function renovarPush() {
+  PUSH.iniciado = true;
+  try { await regSW(); if (!EU) return; const est = await avaliarPush();
+    if (!MOCK && temPush() && Notification.permission === 'granted' && PUSH.pub) await inscrever();
+    if (TELA === 'minhas' && est !== 'carregando') render();
+  } catch (e) { console.warn(e); }
+}
+function cartaoPush() {
+  const e = PUSH.estado;
+  if (e === 'carregando' && !PUSH.iniciado) setTimeout(renovarPush, 0);
+  if (e === 'carregando' || e === 'indisponivel') return '';
+  if (e === 'ativo') return `<div class="sub" style="text-align:center">🔔 Notificações ativadas neste celular</div>`;
+  const box = (ic, tit, txt, btn) => `<div class="ob-opt" style="padding:12px 14px;cursor:default"><span class="ic" style="background:var(--pitch-soft)">${ic}</span><span class="grow"><b>${tit}</b><span class="sub">${txt}</span>${btn || ''}</span></div>`;
+  if (e === 'abrir-icone') return box('📲', 'Receba os avisos da pelada', 'Para ativar as notificações, abra o Pelada FC pelo ícone na tela de início do iPhone.');
+  if (e === 'sem-suporte') return box('📵', 'Notificações indisponíveis', 'Este celular não aceita notificações de app da web. No iPhone, precisa do iOS 16.4 ou mais novo.');
+  if (e === 'bloqueado') return box('🔕', 'Notificações bloqueadas', 'Para liberar: Ajustes do celular → Notificações → Pelada FC → Permitir.');
+  return box('🔔', 'Receba os avisos da pelada', 'Pelada marcada, times, vaga liberada e notas chegam no celular, mesmo com o app fechado.', '<button class="btn primary sm" data-sh="push-ativar" style="margin-top:8px">Ativar notificações</button>');
+}
+
 /* ================= Eventos ================= */
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-sh]'); if (!b || !($('shell').contains(b) || $('leitor').contains(b))) return;
@@ -394,6 +465,7 @@ document.addEventListener('click', async e => {
   if (a === 'reset') { const em = ($('l-email') || {}).value || ''; if (!em) { aviso('Digite seu e-mail acima e toque de novo em "Esqueci minha senha".'); return; } try { await B.reset(em.trim()); aviso('Mandamos um link para criar uma nova senha no seu e-mail.'); } catch (err) { aviso(msgErro(err)); } }
   if (a === 'sair') { ls.set('pelada.ultimo', null); await B.sair(); }
   if (a === 'abrir') abrirGrupo(v);
+  if (a === 'push-ativar') ativarPush();
   if (a === 'ler-qr') abrirLeitor();
   if (a === 'fechar-leitor') fecharLeitor();
   if (a === 'qr-grupo') { UIp.qrg = v; ir('qr-grupo'); }

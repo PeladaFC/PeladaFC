@@ -15,6 +15,15 @@ service cloud.firestore {
     // Perfil de cada pessoa: só ela lê e escreve.
     match /users/{uid} {
       allow read, write: if logado() && eu() == uid;
+      // Celulares inscritos para receber notificações: cada pessoa só mexe nos seus.
+      match /push/{id} {
+        allow read, write: if logado() && eu() == uid;
+      }
+    }
+
+    // Chaves do servidor de notificações: só o servidor acessa (o app não lê nem grava).
+    match /servidor/{doc} {
+      allow read, write: if false;
     }
 
     // Código do convite → pelada. Qualquer pessoa logada pode procurar um código.
