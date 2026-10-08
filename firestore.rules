@@ -51,11 +51,18 @@ service cloud.firestore {
         allow write: if admin(gid) || (logado() && eu() == uid && membro(gid));
       }
 
+      // Avaliação pós-jogo (secreta): cada um lê e grava só o próprio voto.
+      // Os administradores leem para apurar a média quando a avaliação fecha.
+      match /votos/{uid} {
+        allow read: if (logado() && eu() == uid) || admin(gid);
+        allow write: if logado() && eu() == uid && membro(gid);
+      }
+
       // Todo o resto (elenco, peladas, caixa, avisos, locais, ajustes, mural, notificações):
       // membros leem, só administradores escrevem.
       match /{colecao}/{doc} {
-        allow read: if membro(gid) || admin(gid);
-        allow write: if colecao != 'membros' && colecao != 'presencas' && adminDepois(gid);
+        allow read: if colecao != 'votos' && (membro(gid) || admin(gid));
+        allow write: if colecao != 'membros' && colecao != 'presencas' && colecao != 'votos' && adminDepois(gid);
       }
     }
   }

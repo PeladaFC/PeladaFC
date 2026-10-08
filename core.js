@@ -39,14 +39,14 @@ const ICON={
 };
 
 /* ---------- estado ---------- */
-let S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{}};
+let S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{}};
 let REAL=null;               // estado real guardado enquanto a demonstração está aberta
 let dl=null, ARTS=[], REAL_ID=null, MSG_ORIG='';
 let db=null, isAdmin=false, demo=false, ready=false, loaded=0;
 let UI={tab:'jogo',sub:'presenca',filtro:'todos',busca:'',rk:'nota',ano:new Date().getFullYear(),mes:null,sel:null,confirmEnd:false,showHist:false};
 try{const t=localStorage.getItem('pelada.tab');if(t)UI.tab=t}catch(e){}
 const pending={}, timers={}, queues={};
-const COL={jogadores:'jog',peladas:'pel',caixa:'caixa',avisos:'avisos',presencas:'pres',locais:'locais',membros:'membros'};
+const COL={jogadores:'jog',peladas:'pel',caixa:'caixa',avisos:'avisos',presencas:'pres',locais:'locais',membros:'membros',votos:'votos'};
 let myId=null;
 const ADM=()=>demo?!UI.comoJogador:isAdmin;
 
@@ -90,13 +90,23 @@ function critKey(pos){return pos==='GOL'?CRIT.GOL:CRIT.linha}
 function notaInicial(j){const k=critKey(j.pos).map(([c])=>Number(j.crit?.[c]||3));return sum(k)/k.length*2}
 function encerradas(){return Object.entries(S.pel).filter(([,p])=>p.status==='encerrada').sort((a,b)=>b[1].data.localeCompare(a[1].data))}
 let NOTA_CACHE=null;
+/* Nota do jogador (0 a 10)
+   - Nota do jogo: média das estrelas recebidas × 2 (precisa de pelo menos 2 votos).
+   - Usa as últimas 10 peladas com nota, a mais recente pesa 1,0 e cada anterior pesa 10% menos (0,9; 0,81…).
+   - A nota inicial (dada pelo administrador) começa valendo como 3 peladas e perde meio ponto de peso
+     a cada pelada avaliada; depois de 6 peladas avaliadas ela não conta mais. */
+const ULTIMAS=10,DECAI=.9;
+function historicoNotas(jid){const out=[];
+  for(const[pid,p] of Object.entries(S.pel).sort((a,b)=>b[1].data.localeCompare(a[1].data))){if(!p.aval&&p.status!=='encerrada')continue;
+    const n=notaJogo(p,pid,jid);if(n!=null)out.push({pid,data:p.data,n});if(out.length>=ULTIMAS)break}
+  return out}
+function pesoInicial(qtd){return Math.max(0,3-.5*qtd)}
 function notaAtual(id){
   if(!NOTA_CACHE){NOTA_CACHE={};
-    const enc=encerradas();
     for(const jid in S.jog){
-      const ini=notaInicial(S.jog[jid]);let W=2,T=ini*2,k=0;
-      for(const[pid,p] of enc){const n=notaJogo(p,pid,jid);if(typeof n==='number'){const w=Math.pow(.85,k++);W+=w;T+=n*w;if(k>=15)break}}
-      NOTA_CACHE[jid]=T/W;
+      const ini=notaInicial(S.jog[jid]),hs=historicoNotas(jid);let W=pesoInicial(hs.length),T=ini*W;
+      hs.forEach((x,k)=>{const w=Math.pow(DECAI,k);W+=w;T+=x.n*w});
+      NOTA_CACHE[jid]=W?T/W:ini;
     }}
   return NOTA_CACHE[id]??5;
 }
@@ -178,18 +188,30 @@ function horaIniDe(p){return(p&&p.hora)||cfg().hora}
 function horaFimDe(p){return(p&&p.horaFim)||cfg().horaFim||maisHora(horaIniDe(p),60)}
 function horarioTxt(p){return horaIniDe(p)+' às '+horaFimDe(p)}
 function fimDe(p){const d=parseD(p.data),i=horaIniDe(p),f=horaFimDe(p),[h,m]=f.split(':').map(Number);d.setHours(h,m,0,0);if(f<=i)d.setDate(d.getDate()+1);return d}
-const JANELA_POS=48*36e5;
-function posAberto(p){const f=fimDe(p).getTime(),n=Date.now();return n>=f&&n<f+JANELA_POS}
-/* avaliação em estrelas: cada um vota em todo mundo que jogou, menos em si mesmo */
-let PV_CACHE={};
-function votosDe(pid){const out={};for(const d of Object.values(S.pres||{})){const v=d&&d.votos&&d.votos[pid];if(v&&d.jogador)out[d.jogador]=v}return out}
-function placarVotos(pid){if(PV_CACHE[pid])return PV_CACHE[pid];const r={};
+function janelaH(){const h=Number(cfg().janelaAval);return h>0?h:24}
+function fimAval(p){return fimDe(p).getTime()+janelaH()*36e5}
+function posAberto(p){const f=fimDe(p).getTime(),n=Date.now();return n>=f&&n<fimAval(p)}
+/* avaliação secreta em estrelas.
+   Cada voto fica em votos/{uid} (só a própria pessoa e os administradores conseguem ler).
+   Enquanto a avaliação está aberta ninguém vê médias. Quando fecha, o app de um administrador
+   consolida as médias na pelada (p.aval) e só então elas aparecem e entram na nota. */
+const MIN_VOTOS=2;
+function meusVotos(pid){const d=(S.votos||{})[myId];return(d&&d.v&&d.v[pid])||{}}
+function votosDe(pid){const out={};for(const[u,d] of Object.entries(S.votos||{})){const v=d&&d.v&&d.v[pid];const jog=(d&&d.jogador)||(S.pres[u]||{}).jogador;if(v&&jog)out[jog]=v}return out}
+function apurar(pid){const r={};
   for(const[voter,m] of Object.entries(votosDe(pid)))for(const[j,v] of Object.entries(m||{})){if(j===voter||!Number(v))continue;(r[j]=r[j]||[]).push(Number(v))}
-  const out={};for(const j in r)out[j]={m:sum(r[j])/r[j].length,n:r[j].length};return PV_CACHE[pid]=out}
-function notaJogo(p,pid,jid){const pv=placarVotos(pid)[jid];if(pv)return pv.m*2;const n=p.stats?.[jid]?.n;return typeof n==='number'?n:null}
-function craquePereba(pid){const pv=placarVotos(pid),ids=Object.keys(pv).filter(j=>S.jog[j]);if(ids.length<2)return{};
-  ids.sort((a,b)=>pv[b].m-pv[a].m||pv[b].n-pv[a].n);return{mvp:ids[0],per:ids[ids.length-1]}}
-function premiosDe(p,pid){pid=pid||pidOf(p);const pr={...(p.premios||{})},cp=craquePereba(pid);
+  const out={};for(const j in r)out[j]={m:Math.round(sum(r[j])/r[j].length*100)/100,n:r[j].length};return out}
+const FECHANDO=new Set();
+function consolidarAvaliacoes(){if(demo||!ADM()||!S.votosOk)return;const now=Date.now();
+  for(const[pid,p] of Object.entries(S.pel)){if(p.aval||FECHANDO.has(pid)||!jogaram(p).length||(!p.times&&p.status!=='encerrada'))continue;
+    if(now<fimAval(p))continue;FECHANDO.add(pid);patch('peladas/'+pid,{aval:apurar(pid),avalEm:now})}}
+function avalPublicada(p){return!!p.aval}
+// nota do jogo (0 a 10): média das estrelas recebidas × 2, com pelo menos 2 votos
+function notaJogo(p,pid,jid){const a=p.aval&&p.aval[jid];if(a&&a.n>=MIN_VOTOS)return a.m*2;const n=p.stats?.[jid]?.n;return typeof n==='number'?n:null}
+function rankingNotas(p,pid){return jogaram(p).filter(id=>S.jog[id]).map(id=>({id,n:notaJogo(p,pid,id),a:(p.aval||{})[id]}))
+  .sort((x,y)=>(y.n??-1)-(x.n??-1)||((y.a||{}).n||0)-((x.a||{}).n||0)||nm(x.id).localeCompare(nm(y.id)))}
+function craquePereba(p,pid){if(!p.aval)return{};const r=rankingNotas(p,pid).filter(x=>x.n!=null);if(r.length<2)return{};return{mvp:r[0].id,per:r[r.length-1].id}}
+function premiosDe(p,pid){pid=pid||pidOf(p);const pr={...(p.premios||{})},cp=craquePereba(p,pid);
   if(!pr.mvp&&cp.mvp)pr.mvp=cp.mvp;if(!pr.per&&cp.per)pr.per=cp.per;return pr}
 /* gols e assistências lançados pelo próprio jogador: ficam pendentes até um administrador aprovar */
 function lancStatus(p,u,L){if(!L)return null;if((p.lancOk||{})[u]>=L.t)return'ok';if((p.lancRec||{})[u]>=L.t)return'rec';return'pend'}
@@ -197,16 +219,23 @@ function lancPendentes(){const out=[];for(const[u,d] of Object.entries(S.pres||{
   for(const[pid,L] of Object.entries(d.lanc||{})){const p=S.pel[pid];if(p&&lancStatus(p,u,L)==='pend')out.push({u,pid,p,L,j:d.jogador})}}
   return out.sort((a,b)=>a.L.t-b.L.t)}
 function trim10(o){return Object.fromEntries(Object.entries(o||{}).sort((x,y)=>String(x[0]).localeCompare(String(y[0]))).slice(-10))}
-function temporada(ano){
-  const enc=encerradas().filter(([,p])=>!ano||p.data.startsWith(String(ano)));
-  const st={};for(const id in S.jog)st[id]={j:0,g:0,a:0,mvp:0,art:0,gar:0,gol:0};
-  for(const[,p] of enc){
-    for(const id of jogaram(p)){if(st[id])st[id].j++}
+/* estatísticas por período (datas 'AAAA-MM-DD', fim exclusivo). Ajustes do administrador entram pelo mês. */
+function estatPeriodo(ini,fim){
+  const dentro=d=>(!ini||d>=ini)&&(!fim||d<fim);
+  // conta a pelada encerrada ou com a avaliação já fechada
+  const enc=Object.entries(S.pel).filter(([,p])=>(p.status==='encerrada'||p.aval)&&dentro(p.data));
+  const st={};for(const id in S.jog)st[id]={j:0,g:0,a:0,mvp:0,art:0,gar:0,gol:0,per:0,notas:[],ajG:0,ajA:0};
+  for(const[pid,p] of enc){
+    for(const id of jogaram(p)){if(!st[id])continue;st[id].j++;const n=notaJogo(p,pid,id);if(n!=null)st[id].notas.push(n)}
     for(const id in p.stats||{}){if(!st[id])continue;st[id].g+=p.stats[id].g||0;st[id].a+=p.stats[id].a||0}
-    const pr=premiosDe(p);if(st[pr.mvp])st[pr.mvp].mvp++;if(st[pr.art])st[pr.art].art++;if(st[pr.gar])st[pr.gar].gar++;if(st[pr.gol])st[pr.gol].gol++;
+    const pr=premiosDe(p,pid);for(const k of['mvp','art','gar','gol','per'])if(st[pr[k]])st[pr[k]][k]++;
   }
+  for(const[id,j] of Object.entries(S.jog))for(const[mes,aj] of Object.entries(j.ajustes||{})){if(!st[id]||!dentro(mes+'-15'))continue;
+    st[id].g+=aj.g||0;st[id].a+=aj.a||0;st[id].ajG+=aj.g||0;st[id].ajA+=aj.a||0}
+  for(const id in st){const s=st[id];s.g=Math.max(0,s.g);s.a=Math.max(0,s.a);s.media=s.notas.length?sum(s.notas)/s.notas.length:null}
   return{st,total:enc.length};
 }
+function temporada(ano){return estatPeriodo(ano?ano+'-01-01':null,ano?(Number(ano)+1)+'-01-01':null)}
 function proximaData(){const c=cfg(),d=new Date();d.setHours(0,0,0,0);while(d.getDay()!==Number(c.dia))d.setDate(d.getDate()+1);return iso(d)}
 
 /* ---------- avisos programados ---------- */
@@ -401,6 +430,7 @@ function msg(tipo,ctx={}){
     if(pr.gar)out.push(`🅰️ Garçom: *${nm(pr.gar)}* (${st[pr.gar]?.a||0} assist.)`);
     if(pr.gol)out.push('🧤 Melhor goleiro: *'+nm(pr.gol)+'*');
     if(pr.per)out.push('🐢 Pereba da pelada: *'+nm(pr.per)+'*');
+    {const pid0=pidOf(p),rn=p.aval?rankingNotas(p,pid0).filter(x=>x.n!=null):[];if(rn.length){out.push('','*Notas da galera*');rn.forEach((x,i)=>out.push(`${i+1}º ${nm(x.id)} · ${fmtN(x.n)}`))}}
     const gols=Object.entries(st).filter(([,s])=>s.g>0).sort((a,b)=>b[1].g-a[1].g);
     if(gols.length){out.push('','*Gols*');gols.forEach(([id,s])=>out.push(`• ${nm(id)} ${s.g}`))}
     out.push('','Valeu, rapaziada! Até a próxima 💪');return out.join('\n')}
@@ -451,6 +481,8 @@ function itensJogador(){
   if(!j)return out.sort((a,b)=>b.t-a.t);
   const c=cfg();
   for(const[pid,p] of Object.entries(S.pel)){const q=dShort(p.data)+' das '+horarioTxt(p),LL=localDe(p),onde=LL?' · '+LL.nome:'';
+    if(p.avalEm&&jogaram(p).includes(j)){const rn=rankingNotas(p,pid).filter(x=>x.n!=null),i=rn.findIndex(x=>x.id===j);
+      out.push({id:'notas'+pid,tipo:'resultado',titulo:'Saíram as notas',texto:`Pelada de ${dShort(p.data)}: ${i>=0?`sua nota foi ${fmtN(rn[i].n)} (${i+1}º de ${rn.length}).`:'veja a relação das notas.'}`,t:p.avalEm,act:'notas',arg:pid})}
     if(p.status==='encerrada'){
       const st=(p.stats||{})[j],nj=notaJogo(p,pid,j);if(p.encerradaEm&&jogaram(p).includes(j))out.push({id:'enc'+pid,tipo:'resultado',titulo:'Resultado da pelada',texto:`Pelada de ${dShort(p.data)} encerrada.${typeof nj==='number'?' Sua nota: '+fmtN(nj)+'.':''}${st?.g?' Gols: '+st.g+'.':''}`,t:p.encerradaEm});
       const pr=premiosDe(p,pid);const nomes={mvp:'craque da pelada',art:'artilheiro',gar:'garçom',gol:'melhor goleiro'};
@@ -727,7 +759,7 @@ function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GR
 
 /* ---------- render ---------- */
 function render(){
-  NOTA_CACHE=null;PV_CACHE={};
+  NOTA_CACHE=null;consolidarAvaliacoes();
   const app=document.getElementById('app');
   const ae=document.activeElement,aid=ae&&ae.id,sel=aid&&ae.selectionStart!=null?[ae.selectionStart,ae.selectionEnd]:null;
   renderNav();setTimeout(checarPush,0);
@@ -849,29 +881,36 @@ function subTimes(pid,p,l,A){
   if(A)h+=`<button class="btn block primary" style="margin-top:12px" data-act="msg" data-v="times">Mandar times no WhatsApp</button>`;
   return h;
 }
-function statusVotacao(p,pid,ids){const f=fimDe(p),n=Date.now(),vot=Object.keys(votosDe(pid)).filter(j=>ids.includes(j)).length;
-  const hf=`${DIAS3[f.getDay()]} ${pad(f.getHours())}:${pad(f.getMinutes())}`;
-  if(n<f.getTime())return`A avaliação abre no término da pelada (${hf}).`;
-  const fim=new Date(f.getTime()+JANELA_POS);
-  return(n<fim.getTime()?`Avaliação aberta até ${DIAS3[fim.getDay()]} ${pad(fim.getHours())}:${pad(fim.getMinutes())}.`:'Avaliação encerrada.')+` ${vot} de ${ids.length} já votaram.`}
+function quandoCurto(t){const d=new Date(t);return`${DIAS3[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`}
+function statusVotacao(p,pid,ids){const f=fimDe(p).getTime(),n=Date.now(),fa=fimAval(p);
+  const cont=ADM()&&!p.aval?` ${Object.keys(votosDe(pid)).filter(j=>ids.includes(j)).length} de ${ids.length} já votaram.`:'';
+  if(p.aval)return'Avaliação encerrada. As notas abaixo são a média secreta da galera.';
+  if(n<f)return`A avaliação abre no término da pelada (${quandoCurto(f)}) e fica aberta por ${janelaH()}h.`;
+  if(n<fa)return`Avaliação aberta até ${quandoCurto(fa)}. Os votos são secretos e as notas só aparecem quando ela fechar.${cont}`;
+  return'Avaliação encerrada. As notas aparecem assim que um administrador abrir o app.'+cont}
+// relação das notas de uma pelada, da maior para a menor
+function tabelaNotas(pid,p,A){const st=p.stats||{},pr=premiosDe(p,pid),r=rankingNotas(p,pid);let pos=0;
+  return`<div class="list">${r.map(x=>{const s=st[x.id]||{};if(x.n!=null)pos++;
+    const step=(f,lbl,v)=>A?`<div class="stepbox"><div class="step"><button data-act="stat" data-p="${pid}" data-j="${x.id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${v}</output><button data-act="stat" data-p="${pid}" data-j="${x.id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`:'';
+    return`<div class="item" style="flex-wrap:wrap"><span class="pos num" style="width:22px;text-align:center;font-weight:800">${x.n!=null?pos+'º':'–'}</span>${avHTML(x.id)}<div class="grow" style="min-width:110px"><div class="name">${esc(nm(x.id))}${pr.mvp===x.id?' 🏆':''}${pr.per===x.id?' 🐢':''}</div>
+      <div class="sub">${x.n!=null?`${x.a?x.a.n+' voto'+(x.a.n>1?'s':''):''}`:(x.a?`só ${x.a.n} voto, não conta`:'sem votos')}${A?'':` · ⚽ ${s.g||0} · 🅰️ ${s.a||0}`}</div></div>
+      ${A?`<div class="row" style="gap:6px">${step('g','Gols',s.g||0)}${step('a','Assist.',s.a||0)}</div>`:''}<span class="nota num" style="min-width:44px;text-align:right">${x.n!=null?fmtN(x.n):'—'}</span></div>`}).join('')}</div>`}
+function sheetNotasPelada(pid){const p=S.pel[pid];if(!p)return;const A=ADM(),ids=jogaram(p);
+  openSheet('Pelada de '+dShort(p.data),`<div class="stack"><div class="sub">${statusVotacao(p,pid,ids)}</div>
+    ${p.aval||A?`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Gols e assistências'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div>${tabelaNotas(pid,p,A)}</div>`:''}
+    ${A?'<p class="sub" style="margin:0">Como administrador, você pode corrigir os gols e as assistências de cada jogador nesta pelada.</p>':''}</div>`)}
 function subPos(pid,p,A){
-  const ids=jogaram(p),st=p.stats||{},pr=premiosDe(p,pid),manual=p.premios||{},pv=placarVotos(pid);
+  const ids=jogaram(p),st=p.stats||{},pr=premiosDe(p,pid),manual=p.premios||{};
   if(!ids.length)return`<div class="empty">Confirme a presença e sorteie os times antes do pós-jogo.</div>`;
   let h='';
   if(p.times&&A){h+=`<div class="panel" style="margin-bottom:12px"><h3 style="margin-bottom:8px">Vitórias por time</h3><div class="row" style="gap:16px">`;
     p.times.forEach((t,i)=>{const v=(p.vit||[])[i]||0;h+=`<div class="stepbox"><div class="step"><button data-act="vit" data-p="${pid}" data-i="${i}" data-d="-1" aria-label="Menos">−</button><output class="num">${v}</output><button data-act="vit" data-p="${pid}" data-i="${i}" data-d="1" aria-label="Mais">+</button></div><span class="lbl">${CORES[t.cor].n}</span></div>`});
     h+='</div></div>'}
-  const ord=ids.slice().sort((a,b)=>(pv[b]?.m||0)-(pv[a]?.m||0)||nm(a).localeCompare(nm(b)));
-  h+=`<div class="panel"><div class="panel-h"><h3>Avaliação da galera</h3><span class="sub">estrelas</span></div><div class="sub" style="margin-bottom:6px">${statusVotacao(p,pid,ids)} Cada um avalia todo mundo que jogou, menos a si mesmo.</div><div class="list">`;
-  for(const id of ord){const s=st[id]||{},v=pv[id];
-    const step=(f,lbl,disp)=>`<div class="stepbox">${A?`<div class="step"><button data-act="stat" data-p="${pid}" data-j="${id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${disp}</output><button data-act="stat" data-p="${pid}" data-j="${id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div>`:`<output class="num">${disp}</output>`}<span class="lbl">${lbl}</span></div>`;
-    h+=`<div class="item" style="flex-wrap:wrap">${avHTML(id)}<div class="grow" style="min-width:110px"><div class="name">${esc(nm(id))}${pr.mvp===id?' 🏆':''}${pr.per===id?' 🐢':''}</div><div class="sub">${v?`<span class="rnota">★ ${fmtN(v.m)}</span> · ${v.n} voto${v.n>1?'s':''}`:'sem votos ainda'}</div></div>
-      <div class="row" style="gap:6px">${step('g','Gols',s.g||0)}${step('a','Assist.',s.a||0)}</div></div>`}
-  h+='</div></div>';
+  h+=`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Avaliação da galera'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div><div class="sub" style="margin-bottom:6px">${statusVotacao(p,pid,ids)}</div>${tabelaNotas(pid,p,A)}</div>`;
   const opts=(list,v)=>'<option value="">—</option>'+list.map(id=>`<option value="${id}" ${v===id?'selected':''}>${esc(nm(id))}</option>`).join('');
   const sugArt=ids.slice().sort((a,b)=>(st[b]?.g||0)-(st[a]?.g||0))[0],sugGar=ids.slice().sort((a,b)=>(st[b]?.a||0)-(st[a]?.a||0))[0];
   const gks=ids.filter(id=>J(id).pos==='GOL');
-  const auto=k=>!manual[k]&&pr[k]?'<div class="sub">Pelos votos da galera</div>':'';
+  const auto=k=>!manual[k]&&pr[k]?'<div class="sub">Pelos votos da galera</div>':(k==='mvp'||k==='per')&&!p.aval?'<div class="sub">Sai pelos votos quando a avaliação fechar</div>':'';
   h+=`<div class="panel" style="margin-top:12px"><h3 style="margin-bottom:10px">Prêmios</h3><div class="awards">
     <div class="award"><label for="pr-mvp">🏆 Craque</label>${A?`<select id="pr-mvp" data-act="premio" data-p="${pid}" data-f="mvp">${opts(ids,pr.mvp)}</select>${auto('mvp')}`:esc(pr.mvp?nm(pr.mvp):'—')}</div>
     <div class="award"><label for="pr-per">🐢 Pereba</label>${A?`<select id="pr-per" data-act="premio" data-p="${pid}" data-f="per">${opts(ids,pr.per)}</select>${auto('per')}`:esc(pr.per?nm(pr.per):'—')}</div>
@@ -884,7 +923,7 @@ function subPos(pid,p,A){
   if(A){
     const temPremio=['mvp','art','gar','gol'].some(k=>pr[k]);
     h+=`<div class="stack" style="margin-top:12px"><button class="btn warn" data-act="arte" data-p="${pid}" ${temPremio?'':'disabled'}>Gerar artes dos destaques</button><button class="btn" data-act="msg" data-v="resultado">Mandar resultado no WhatsApp</button>`;
-    h+=UI.confirmEnd?`<div class="confirm"><b>Encerrar a pelada de ${dShort(p.data)}?</b><span class="small">A pelada vai para o histórico. A galera ainda pode avaliar até 48h depois do término.</span><div class="row"><button class="btn primary" data-act="encerrar" data-p="${pid}">Encerrar</button><button class="btn" data-act="confirm-end" data-v="0">Voltar</button></div></div>`
+    h+=UI.confirmEnd?`<div class="confirm"><b>Encerrar a pelada de ${dShort(p.data)}?</b><span class="small">A pelada vai para o histórico. A galera ainda pode avaliar até ${janelaH()}h depois do término.</span><div class="row"><button class="btn primary" data-act="encerrar" data-p="${pid}">Encerrar</button><button class="btn" data-act="confirm-end" data-v="0">Voltar</button></div></div>`
       :`<button class="btn primary" data-act="confirm-end" data-v="1">Encerrar pelada</button>`;
     h+='</div>'}
   return h;
@@ -894,12 +933,12 @@ function posJogoMeu(){const j=meuJogador();if(!j)return null;
   return Object.entries(S.pel).filter(([,p])=>jogaram(p).includes(j)&&posAberto(p)).sort((a,b)=>fimDe(b[1])-fimDe(a[1]))[0]||null}
 function painelPosJogo(){const pp=posJogoMeu();if(!pp)return'';const[pid,p]=pp,j=meuJogador(),doc=S.pres[myId]||{};
   const outros=jogaram(p).filter(id=>id!==j&&S.jog[id]).sort((a,b)=>nm(a).localeCompare(nm(b)));
-  const meus=(doc.votos||{})[pid]||{},feitos=outros.filter(id=>meus[id]).length;
+  const meus=meusVotos(pid),feitos=outros.filter(id=>meus[id]).length;
   const L=(doc.lanc||{})[pid],stt=lancStatus(p,myId,L),ap=(p.stats||{})[j]||{};
   const rasc=(UI.lanc&&UI.lanc[pid])||{g:L?L.g:(ap.g||0),a:L?L.a:(ap.a||0)};
   const aberto=UI.votoAberto===pid||feitos<outros.length;
   let h=`<div class="panel stack" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Pós-jogo · ${dShort(p.data)}</h3><span class="sub num">${feitos}/${outros.length} avaliados</span></div>`;
-  h+=`<div class="sub" style="margin-top:-4px">Dê de 1 a 5 estrelas para cada um que jogou. Os votos definem o craque 🏆 e o pereba 🐢 da pelada.</div>`;
+  h+=`<div class="sub" style="margin-top:-4px">Dê de 1 a 5 estrelas para cada um que jogou. 🔒 Seu voto é secreto. Aberta até ${quandoCurto(fimAval(p))}; depois saem as notas, o craque 🏆 e o pereba 🐢.</div>`;
   if(aberto)h+=`<div class="list">${outros.map(id=>`<div class="item">${avHTML(id)}<div class="grow name">${esc(nm(id))}</div>${estrelasInput(meus[id],`data-act="voto" data-p="${pid}" data-j="${id}"`)}</div>`).join('')}</div>`;
   else h+=`<div class="row between"><span>✓ Você avaliou todo mundo.</span><button class="btn sm" data-act="voto-abrir" data-p="${pid}">Rever votos</button></div>`;
   const stp=(f,lbl)=>`<div class="stepbox"><div class="step"><button data-act="lanc-step" data-p="${pid}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${rasc[f]||0}</output><button data-act="lanc-step" data-p="${pid}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`;
@@ -915,7 +954,7 @@ function renderHist(A){
   const show=UI.showHist?enc:enc.slice(0,3);
   let h=`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Últimas peladas</h3></div>`;
   for(const[pid,p] of show){const pr=premiosDe(p,pid);
-    h+=`<div class="hist"><div class="grow"><b class="num">${dShort(p.data)}</b><div class="sub">${jogaram(p).length} jogadores${pr.mvp?' · 🏆 '+esc(nm(pr.mvp)):''}${pr.art?' · ⚽ '+esc(nm(pr.art)):''}</div></div>${A?`<div class="row" style="gap:4px;flex-wrap:nowrap">${Object.values(pr).some(Boolean)?`<button class="btn sm" data-act="arte" data-p="${pid}">Artes</button>`:''}<button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button></div>`:''}</div>`}
+    h+=`<div class="hist"><div class="grow"><b class="num">${dShort(p.data)}</b><div class="sub">${jogaram(p).length} jogadores${pr.mvp?' · 🏆 '+esc(nm(pr.mvp)):''}${pr.art?' · ⚽ '+esc(nm(pr.art)):''}</div></div><div class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button>${A?`${Object.values(pr).some(Boolean)?`<button class="btn sm" data-act="arte" data-p="${pid}">Artes</button>`:''}<button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button>`:''}</div></div>`}
   if(enc.length>3)h+=`<button class="btn sm block" style="margin-top:8px" data-act="hist">${UI.showHist?'Mostrar menos':'Ver todas ('+enc.length+')'}</button>`;
   return h+'</div>';
 }
@@ -996,17 +1035,29 @@ function tAvisos(A){
 }
 
 /* --- Ranking --- */
+function periodo(){const hoje=new Date();if(!UI.ref)UI.ref={y:hoje.getFullYear(),m:hoje.getMonth()+1};const{y,m}=UI.ref,per=UI.per||'mes';
+  if(per==='mes'){const ny=m===12?y+1:y,nm2=m===12?1:m+1;return{ini:`${y}-${pad(m)}-01`,fim:`${ny}-${pad(nm2)}-01`,txt:`${MESES[m-1]} ${y}`}}
+  if(per==='sem'){const s1=m<=6;return{ini:s1?`${y}-01-01`:`${y}-07-01`,fim:s1?`${y}-07-01`:`${y+1}-01-01`,txt:`${s1?'1º':'2º'} semestre ${y}`}}
+  return{ini:`${y}-01-01`,fim:`${y+1}-01-01`,txt:String(y)}}
+function navPeriodo(d){const per=UI.per||'mes';let{y,m}=UI.ref;
+  if(per==='mes'){m+=d;if(m<1){m=12;y--}if(m>12){m=1;y++}}else if(per==='sem'){m=(m<=6?1:7)+d*6;if(m<1){m=7;y--}if(m>12){m=1;y++}}else y+=d;
+  UI.ref={y,m}}
 function tRanking(){
-  const{st,total}=temporada(UI.ano);
-  const anos=[...new Set(Object.values(S.pel).map(p=>Number(p.data.slice(0,4))).concat([new Date().getFullYear()]))].sort((a,b)=>b-a);
-  const key={nota:id=>notaAtual(id),g:id=>st[id].g,a:id=>st[id].a,pr:id=>st[id].mvp*3+st[id].art+st[id].gar+st[id].gol,j:id=>st[id].j}[UI.rk];
-  const ids=Object.keys(S.jog).filter(id=>S.jog[id].ativo!==false&&(UI.rk==='nota'||st[id].j>0)).sort((a,b)=>key(b)-key(a)||st[b].j-st[a].j);
-  const cols={nota:['Nota','J','G','A'],g:['Gols','J','A','Nota'],a:['Assist.','J','G','Nota'],pr:['🏆','⚽','🅰️','🧤'],j:['Jogos','%','G','Nota']}[UI.rk];
-  const vals=id=>{const s=st[id],n=fmtN(notaAtual(id));return{nota:[n,s.j,s.g,s.a],g:[s.g,s.j,s.a,n],a:[s.a,s.j,s.g,n],pr:[s.mvp,s.art,s.gar,s.gol],j:[s.j,total?Math.round(s.j/total*100):0,s.g,n]}[UI.rk]};
-  let h=`<div class="row between" style="margin-bottom:10px"><h2>Ranking</h2><select id="ano" data-act="ano" style="width:auto">${anos.map(a=>`<option ${a==UI.ano?'selected':''}>${a}</option>`).join('')}</select></div>
-    <div class="pick" style="margin-bottom:12px">${[['nota','Nota'],['g','Artilharia'],['a','Garçons'],['pr','Prêmios'],['j','Presença']].map(([k,n])=>`<button data-act="rk" data-v="${k}" aria-pressed="${UI.rk===k}">${n}</button>`).join('')}</div>
-    <div class="panel"><div class="sub" style="margin-bottom:8px">${total} pelada(s) encerrada(s) em ${UI.ano}</div>`;
-  if(!ids.length)return h+'<div class="empty">O ranking aparece depois da primeira pelada encerrada.</div></div>';
+  const P=periodo(),{st,total}=estatPeriodo(P.ini,P.fim),rk=UI.rk||'nota';
+  const md=id=>st[id].media;
+  const filtro={nota:id=>md(id)!=null,g:id=>st[id].g>0,a:id=>st[id].a>0,pr:id=>st[id].mvp+st[id].art+st[id].gar+st[id].gol+st[id].per>0,j:id=>st[id].j>0}[rk];
+  const key={nota:id=>md(id),g:id=>st[id].g,a:id=>st[id].a,pr:id=>st[id].mvp*3+st[id].art+st[id].gar+st[id].gol,j:id=>st[id].j}[rk];
+  const ids=Object.keys(S.jog).filter(id=>S.jog[id].ativo!==false&&filtro(id)).sort((a,b)=>key(b)-key(a)||st[b].j-st[a].j||nm(a).localeCompare(nm(b)));
+  const cols={nota:['Média','J','G','A'],g:['Gols','J','A','Média'],a:['Assist.','J','G','Média'],pr:['🏆','⚽','🅰️','🧤'],j:['Jogos','%','G','A']}[rk];
+  const fm=id=>md(id)==null?'—':fmtN(md(id));
+  const vals=id=>{const s=st[id];return{nota:[fm(id),s.notas.length,s.g,s.a],g:[s.g,s.j,s.a,fm(id)],a:[s.a,s.j,s.g,fm(id)],pr:[s.mvp,s.art,s.gar,s.gol],j:[s.j,total?Math.round(s.j/total*100):0,s.g,s.a]}[rk]};
+  const per=UI.per||'mes';
+  let h=`<div class="row between" style="margin-bottom:10px"><h2>Ranking</h2></div>
+    <div class="seg" style="margin-bottom:10px" role="group">${[['mes','Mês'],['sem','Semestre'],['ano','Ano']].map(([k,n])=>`<button data-act="per" data-v="${k}" aria-pressed="${per===k}">${n}</button>`).join('')}</div>
+    <div class="row between" style="margin-bottom:12px;flex-wrap:nowrap"><button class="btn sm" data-act="per-nav" data-d="-1" aria-label="Período anterior">‹</button><b style="font-family:var(--f-display);font-size:20px;text-transform:uppercase">${P.txt}</b><button class="btn sm" data-act="per-nav" data-d="1" aria-label="Próximo período">›</button></div>
+    <div class="pick" style="margin-bottom:12px">${[['nota','Melhor nota'],['g','Artilharia'],['a','Assistências'],['pr','Prêmios'],['j','Presença']].map(([k,n])=>`<button data-act="rk" data-v="${k}" aria-pressed="${rk===k}">${n}</button>`).join('')}</div>
+    <div class="panel"><div class="sub" style="margin-bottom:8px">${total} pelada(s) no período · ${rk==='nota'?'média das notas dadas pela galera em cada pelada':rk==='g'||rk==='a'?'inclui ajustes do administrador':''}</div>`;
+  if(!ids.length)return h+`<div class="empty">${total?'Ninguém pontuou aqui neste período.':'Nenhuma pelada concluída neste período.'}</div></div>`;
   h+=`<div class="rank"><span></span><span class="h" style="text-align:left">Jogador</span>${cols.map(c=>`<span class="h">${c}</span>`).join('')}`;
   ids.forEach((id,i)=>{const v=vals(id);
     h+=`<div class="line"></div><span class="pos num">${i+1}</span><span style="min-width:0"><span class="name">${esc(nm(id))}</span> <span class="chip p-${S.jog[id].pos}">${S.jog[id].pos}</span></span>${v.map((x,k)=>`<span class="v ${k===0?'hi':''}">${x}</span>`).join('')}`});
@@ -1086,6 +1137,8 @@ function sheetCfg(){
     <div class="panel"><h3 style="margin-bottom:6px">Convite</h3><div class="sub">Link para a galera entrar na pelada</div><div class="num" style="font-weight:700;word-break:break-all;margin:4px 0">${esc(linkConvite())}</div><div class="sub">Código: <b>${esc((GRUPO||{}).codigo||'')}</b></div>
       <div class="row" style="margin-top:8px"><button class="btn sm" data-act="msg" data-v="convite">Mensagem de convite</button><button class="btn sm" data-act="copiar-link">Copiar link</button><button class="btn sm" data-act="qr-pelada">QR Code</button></div></div>
     <div class="panel"><h3 style="margin-bottom:6px">Administradores</h3><div id="adm-list"></div></div>
+    <div class="panel"><h3 style="margin-bottom:4px">Avaliação pós-jogo</h3><div class="sub" style="margin-bottom:8px">Depois do término, a galera vota em segredo. Quando fecha, saem as notas, o craque e o pereba.</div>
+      <label class="field"><span>Fica aberta por</span><select id="c-janela">${[6,12,24,36,48,72].map(h=>`<option value="${h}" ${janelaH()===h?'selected':''}>${h} horas${h===24?' (padrão)':''}</option>`).join('')}</select></label></div>
     <div class="panel"><h3 style="margin-bottom:4px">Goleiros</h3><div class="sub" style="margin-bottom:8px">O time é formado pelos jogadores de linha. Escolha se o goleiro entra no sorteio.</div>
       <div class="pick" id="gol-pick"><button type="button" data-act="gol-sorteio" data-v="0" aria-pressed="${!c.golSorteio}">Goleiro extra</button><button type="button" data-act="gol-sorteio" data-v="1" aria-pressed="${!!c.golSorteio}">Goleiro no sorteio</button></div>
       <div class="sub" id="gol-txt" style="margin-top:6px">${c.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.'}</div></div>
@@ -1127,12 +1180,16 @@ function renderJogForm(){
 }
 function sheetVerJog(id){
   const j=J(id),{st}=temporada(UI.ano),s=st[id]||{},A=ADM();
-  const hist=encerradas().map(([pid,p])=>[pid,p,notaJogo(p,pid,id)]).filter(x=>typeof x[2]==='number').slice(0,8);
+  const hist=historicoNotas(id).slice(0,8).map(x=>[x.pid,S.pel[x.pid],x.n]);
+  const mesK=mesAtual(),aj=(j.ajustes||{})[mesK]||{};
   openSheet(nm(id),`<div class="stack">
     <div class="board"><div class="row between"><div><div class="when" style="font-size:56px">${fmtN(notaAtual(id))}</div><div class="where">${POS[j.pos]}${j.pos2?' · também '+POS[j.pos2].toLowerCase():''} · ${j.tipo==='diarista'?'Diarista':'Mensalista'}</div></div></div>
     <div class="stats"><div class="stat"><b>${s.j||0}</b><span>Jogos ${UI.ano}</span></div><div class="stat"><b>${s.g||0}</b><span>Gols</span></div><div class="stat"><b>${s.a||0}</b><span>Assist.</span></div><div class="stat"><b>${s.mvp||0}</b><span>Craque</span></div></div></div>
     <div class="panel small"><div class="row between"><span>Nota inicial</span><b class="num">${fmtN(notaInicial(j))}</b></div>${j.conv?`<div class="row between" style="margin-top:4px"><span>Convidado por</span><b>${esc(nm(j.conv))}</b></div>`:''}<div class="row between" style="margin-top:4px"><span>Confirma pelo app</span><b>${vinculo(id)?'Sim':'Ainda não'}</b></div>${j.tel?`<div class="row between" style="margin-top:4px"><span>WhatsApp</span><b class="num">${esc(j.tel)}</b></div>`:''}
       ${hist.length?`<div style="margin-top:8px"><span class="muted">Últimas notas</span><div class="row" style="margin-top:4px">${hist.map(([,p,n])=>`<span class="chip solid num">${dShort(p.data).slice(4)} · ${fmtN(n)}</span>`).join('')}</div></div>`:''}</div>
+    ${A?`<div class="panel"><div class="panel-h"><h3>Ajustar total de ${UI.ano}</h3></div><div class="sub" style="margin-bottom:8px">Corrija gols e assistências que não foram lançados nas peladas. O ajuste entra no mês atual.</div>
+      <div class="row" style="gap:16px">${[['g','Gols',s.g||0],['a','Assist.',s.a||0]].map(([f,lbl,v])=>`<div class="stepbox"><div class="step"><button data-act="ajuste" data-j="${id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${v}</output><button data-act="ajuste" data-j="${id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`).join('')}</div>
+      ${(s.ajG||s.ajA)?`<div class="sub" style="margin-top:6px">Inclui ajustes do administrador: ${s.ajG>0?'+':''}${s.ajG||0} gol(s) e ${s.ajA>0?'+':''}${s.ajA||0} assist.</div>`:''}</div>`:''}
     <button class="btn warn block" data-act="carta" data-j="${id}">Ver carta do jogador</button>
     ${A?`<div class="row"><button class="btn primary grow" data-act="edit-jog" data-j="${id}">Editar</button><button class="btn grow" data-act="msg" data-v="convite" data-j="${id}">Convite</button></div>`:''}</div>`);
 }
@@ -1159,6 +1216,8 @@ document.addEventListener('click',e=>{
     case'sub':UI.sub=d.v;UI.sel=null;UI.confirmEnd=false;render();break;
     case'filtro':UI.filtro=d.v;render();break;
     case'rk':UI.rk=d.v;render();break;
+    case'per':UI.per=d.v;render();break;
+    case'per-nav':periodo();navPeriodo(Number(d.d));render();break;
     case'hist':UI.showHist=!UI.showHist;render();break;
     case'mes':{const[y,m]=(UI.mes||mesAtual()).split('-').map(Number);const dt=new Date(y,m-1+Number(d.d),1);UI.mes=dt.getFullYear()+'-'+pad(dt.getMonth()+1);render();break}
     case'close':case'close-bg':closeSheet();break;
@@ -1312,8 +1371,13 @@ document.addEventListener('click',e=>{
     case'add-restr':{const a=document.getElementById('r-a').value,bb=document.getElementById('r-b').value;if(!a||!bb||a===bb){toast('Escolha dois jogadores diferentes.');return}F.restr.push({a,b:bb,tipo:d.v});renderRestr();break}
     case'del-restr':F.restr.splice(Number(d.i),1);renderRestr();break;
     case'voto':{const doc=S.pres[myId];if(!doc||!doc.jogador||d.j===doc.jogador)return;const v=Number(d.v);
-      const vp={...((doc.votos||{})[d.p]||{})};vp[d.j]=vp[d.j]===v?0:v;
-      put('presencas/'+myId,{...doc,votos:trim10({...(doc.votos||{}),[d.p]:vp})});break}
+      const p=S.pel[d.p];if(!p||!posAberto(p)){toast('A avaliação desta pelada já fechou.');return}
+      const mv=(S.votos||{})[myId]||{},vp={...((mv.v||{})[d.p]||{})};vp[d.j]=vp[d.j]===v?0:v;
+      put('votos/'+myId,{jogador:doc.jogador,v:trim10({...(mv.v||{}),[d.p]:vp}),t:Date.now()});break}
+    case'ajuste':{const j=S.jog[d.j];if(!j)return;const k=mesAtual(),cur={...((j.ajustes||{})[k]||{})};
+      const{st}=temporada(UI.ano);if(Number(d.d)<0&&(st[d.j][d.f]||0)<=0)return;
+      cur[d.f]=(cur[d.f]||0)+Number(d.d);put('jogadores/'+d.j,{...j,ajustes:{...(j.ajustes||{}),[k]:cur}});sheetVerJog(d.j);break}
+    case'notas-pel':sheetNotasPelada(d.p);break;
     case'voto-abrir':UI.votoAberto=UI.votoAberto===d.p?null:d.p;render();break;
     case'lanc-step':{const doc=S.pres[myId]||{},L=(doc.lanc||{})[d.p],ap=(S.pel[d.p].stats||{})[doc.jogador]||{};
       UI.lanc=UI.lanc||{};const r=UI.lanc[d.p]||{g:L?L.g:(ap.g||0),a:L?L.a:(ap.a||0)};r[d.f]=Math.max(0,Math.min(30,(r[d.f]||0)+Number(d.d)));UI.lanc[d.p]=r;render();break}
@@ -1327,7 +1391,7 @@ document.addEventListener('click',e=>{
     case'gol-sorteio':{F.golSorteio=d.v==='1';document.querySelectorAll('#gol-pick button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===d.v)));
       document.getElementById('gol-txt').textContent=F.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
-      put('config/geral',{...(S.config||{}),nome:g('c-nome').trim()||DEF_CFG.nome,dia:Number(g('c-dia')),hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),porTime:Math.max(3,Math.min(11,Number(g('c-portime'))||5)),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,golSorteio:F.golSorteio,restr:F.restr});
+      put('config/geral',{...(S.config||{}),nome:g('c-nome').trim()||DEF_CFG.nome,dia:Number(g('c-dia')),hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),porTime:Math.max(3,Math.min(11,Number(g('c-portime'))||5)),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,golSorteio:F.golSorteio,janelaAval:Number(g('c-janela'))||24,restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:Number(g('c-dia')),hora:g('c-hora')||'08:00'});
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':{const cx=S.caixa[d.m]||{mens:{},desp:[]};put('caixa/'+d.m,{...cx,mens:{...(cx.mens||{}),[d.j]:!(cx.mens||{})[d.j]}});break}
@@ -1455,7 +1519,7 @@ function stopDemo(){if(!REAL||!db){if(window.voltarGrupos)window.voltarGrupos();
 /* ---------- conexão com o banco (Firebase via app.js) ---------- */
 window.iniciarPelada=function(ctx){
   window.pararPelada();
-  S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{}};
+  S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{}};
   demo=false;REAL=null;ready=false;loaded=0;db=ctx.db;myId=ctx.uid;isAdmin=!!ctx.isAdmin;dl=ctx.dl||null;GRUPO=ctx.grupo;GID=ctx.gid;
   UI.tab='jogo';UI.sub='presenca';UI.npLoc=undefined;UI.comoJogador=false;PUSH_PRONTO=false;PUSH_VISTOS.clear();
   closeSheet();render();window.scrollTo(0,0);
@@ -1467,7 +1531,14 @@ window.iniciarPelada=function(ctx){
     if(first){first=false;done()}else if(!demo)render()},e=>{onErr(e);if(first){first=false;done()}})};
   one('eventos/feed','feed');one('config/geral','config');one('mural/geral','mural');
   live('jogadores','jog');live('peladas','pel');live('caixa','caixa');live('avisos','avisos');live('presencas','pres');live('locais','locais');live('membros','membros');
+  ouvirVotos();
 };
+// votos: o administrador lê todos (para apurar quando a avaliação fecha); o jogador lê só os dele
+let unsubVotos=null;
+function ouvirVotos(){if(unsubVotos){try{unsubVotos()}catch(e){}unsubVotos=null}if(!db||demo)return;S.votosOk=false;
+  const fim=()=>{S.votosOk=true;render()};
+  if(isAdmin)unsubVotos=db.collection('votos').onSnapshot(snap=>{const m={};snap.docs.forEach(x=>m[x.id]=x.data());S.votos=withPending('votos',m);fim()},e=>console.warn(e));
+  else unsubVotos=db.doc('votos/'+myId).onSnapshot(snap=>{S.votos={...(S.votos||{}),[myId]:snap.exists?snap.data():undefined};if(!snap.exists)delete S.votos[myId];fim()},e=>console.warn(e))}
 window.pararPelada=function(){if(db&&db.unsubs)db.unsubs.splice(0).forEach(u=>{try{u()}catch(e){}});db=null;ready=false;demo=false;REAL=null};
-window.atualizarGrupo=function(g){GRUPO=g;const adm=!!(g&&(g.admins||[]).includes(myId));if(adm!==isAdmin){isAdmin=adm;if(!adm&&['avisos','caixa'].includes(UI.tab))UI.tab='jogo'}render();renderAdmins()};
-window.abrirDemo=function(){window.pararPelada();S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{}};myId=null;isAdmin=true;GRUPO={codigo:'DEMO01',admins:[]};ready=true;startDemo()};
+window.atualizarGrupo=function(g){GRUPO=g;const adm=!!(g&&(g.admins||[]).includes(myId));if(adm!==isAdmin){isAdmin=adm;ouvirVotos();if(!adm&&['avisos','caixa'].includes(UI.tab))UI.tab='jogo'}render();renderAdmins()};
+window.abrirDemo=function(){window.pararPelada();S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{}};myId=null;isAdmin=true;GRUPO={codigo:'DEMO01',admins:[]};ready=true;startDemo()};
