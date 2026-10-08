@@ -210,21 +210,31 @@ function votosDe(pid){const out={};for(const[u,d] of Object.entries(S.votos||{})
    - se já foi fora da curva em 2 das últimas 5 peladas: peso cai pela metade
    Tudo automático e silencioso: ninguém é avisado e os votos continuam secretos. */
 function pesoBase(dev,chapado){let w=dev<=1?1:dev>=2.5?.15:1-(dev-1)/1.5*.85;if(chapado)w=Math.min(w,.5);return w}
-function analiseBase(pid){const vs=votosDe(pid),out={};
+/* Régua de cada avaliador: quem é mais exigente (dá 1-2) e quem é mais bonzinho (dá 4-5) passam para a mesma régua
+   antes de qualquer conta. O app tira a diferença entre a média de cada um e a média geral da galera;
+   assim conta QUEM você acha melhor ou pior, não o tamanho do número. */
+function ajustarRegua(vs){ // vs: {avaliador:{alvo:valor}} → mesma forma, com os valores ajustados
+  const todos=[];for(const[V,m] of Object.entries(vs))for(const[t,v] of Object.entries(m||{}))if(t!==V&&Number(v))todos.push(Number(v));
+  if(!todos.length)return{};const G=sum(todos)/todos.length,out={};
   for(const[V,m] of Object.entries(vs)){const its=Object.entries(m||{}).filter(([t,v])=>t!==V&&Number(v));if(!its.length)continue;
-    const devs=[];for(const[t,v] of its){const os=Object.entries(vs).filter(([o])=>o!==V&&o!==t).map(([,mm])=>Number((mm||{})[t])).filter(Boolean);
-      if(os.length>=2)devs.push(Math.abs(Number(v)-sum(os)/os.length))}
-    const vals=its.map(([,v])=>Number(v)),chapado=vals.length>=4&&vals.every(x=>x===vals[0]);
-    const dev=devs.length>=2?sum(devs)/devs.length:0,lado=devs.length?sum(its.map(([t,v])=>{const os=Object.entries(vs).filter(([o])=>o!==V&&o!==t).map(([,mm])=>Number((mm||{})[t])).filter(Boolean);return os.length>=2?Number(v)-sum(os)/os.length:0}))/its.length:0;
-    out[V]={dev,lado,chapado,qtd:vals.length,media:sum(vals)/vals.length,wb:pesoBase(dev,chapado)}}
+    const mv=sum(its.map(([,v])=>Number(v)))/its.length,off=its.length>=2?mv-G:0;
+    out[V]={};for(const[t,v] of its)out[V][t]=Number(v)-off}
+  return out}
+function analiseBase(pid){const bruto=votosDe(pid),vs=ajustarRegua(bruto),out={};
+  for(const[V,m] of Object.entries(vs)){const its=Object.entries(m);if(!its.length)continue;
+    const difs=[];for(const[t,v] of its){const os=Object.entries(vs).filter(([o])=>o!==V&&o!==t).map(([,mm])=>mm[t]).filter(x=>x!=null);
+      if(os.length>=2)difs.push(v-sum(os)/os.length)}
+    const vals=Object.entries(bruto[V]||{}).filter(([t,v])=>t!==V&&Number(v)).map(([,v])=>Number(v)),chapado=vals.length>=4&&vals.every(x=>x===vals[0]);
+    const dev=difs.length>=2?sum(difs.map(Math.abs))/difs.length:0,lado=difs.length?sum(difs)/difs.length:0;
+    out[V]={dev,lado,chapado,qtd:vals.length,media:vals.length?sum(vals)/vals.length:0,wb:pesoBase(dev,chapado)}}
   return out}
 function analisarVotos(pid){const p=S.pel[pid]||{},base=analiseBase(pid);
   const ant=Object.entries(S.pel).filter(([k,q])=>k!==pid&&q.data<p.data).sort((a,b)=>b[1].data.localeCompare(a[1].data)).slice(0,5).map(([k])=>[k,analiseBase(k)]);
   for(const[V,x] of Object.entries(base)){x.hist=ant.filter(([,b])=>b[V]&&b[V].wb<.6).map(([k])=>k);
     x.w=x.wb*(x.hist.length>=2?.5:1)}
-  const r={},vs=votosDe(pid);
-  for(const[V,m] of Object.entries(vs)){const w=base[V]?base[V].w:1;for(const[t,v] of Object.entries(m||{})){if(t===V||!Number(v))continue;(r[t]=r[t]||{s:0,w:0,n:0});r[t].s+=Number(v)*w;r[t].w+=w;if(w>0)r[t].n++}}
-  const aval={};for(const t in r)if(r[t].w>0)aval[t]={m:Math.round(r[t].s/r[t].w*100)/100,n:r[t].n};
+  const r={},vs=ajustarRegua(votosDe(pid));
+  for(const[V,m] of Object.entries(vs)){const w=base[V]?base[V].w:1;for(const[t,v] of Object.entries(m)){(r[t]=r[t]||{s:0,w:0,n:0});r[t].s+=v*w;r[t].w+=w;if(w>0)r[t].n++}}
+  const aval={};for(const t in r)if(r[t].w>0)aval[t]={m:Math.round(Math.max(1,Math.min(5,r[t].s/r[t].w))*100)/100,n:r[t].n};
   return{aval,eleitores:base}}
 function apurar(pid){return analisarVotos(pid).aval}
 const FECHANDO=new Set();
@@ -1026,21 +1036,19 @@ function avG(id,px){const j=J(id),f=fotoDe(id);return`<div class="av bg-${j.pos}
 
 // apuração: média ponderada por critério; quem foge muito da galera pesa menos
 function apurarRodada(rid){
-  const vs={};for(const[u,d] of Object.entries(S.votos||{})){const v=d&&d.av&&d.av[rid];const jog=(d&&d.jogador)||(S.pres[u]||{}).jogador;if(v&&jog)vs[jog]=v}
-  const peso={};
-  for(const[V,m] of Object.entries(vs)){const devs=[],vals=[];
-    for(const[t,cr] of Object.entries(m||{})){if(t===V||!cr||cr.ns)continue;
-      for(const[c] of critDe(t)){const x=Number(cr[c]);if(!x)continue;vals.push(x);
-        const os=Object.entries(vs).filter(([o])=>o!==V&&o!==t).map(([,mm])=>Number(((mm||{})[t]||{})[c])).filter(Boolean);
-        if(os.length>=2)devs.push(Math.abs(x-sum(os)/os.length))}}
-    const dev=devs.length>=3?sum(devs)/devs.length:0,chapado=vals.length>=8&&vals.every(x=>x===vals[0]);
-    peso[V]=pesoBase(dev,chapado)}
+  const bruto={};for(const[u,d] of Object.entries(S.votos||{})){const v=d&&d.av&&d.av[rid];const jog=(d&&d.jogador)||(S.pres[u]||{}).jogador;if(v&&jog)bruto[jog]=v}
+  // achata em "alvo|critério" para usar a mesma régua do pós-jogo
+  const plano={};for(const[V,m] of Object.entries(bruto)){plano[V]={};for(const[t,cr] of Object.entries(m||{})){if(t===V||!cr||cr.ns||!S.jog[t])continue;
+    for(const[c] of critDe(t)){const x=Number(cr[c]);if(x)plano[V][t+'|'+c]=x}}}
+  const vs=ajustarRegua(plano),peso={};
+  for(const[V,m] of Object.entries(vs)){const difs=[];
+    for(const[k,v] of Object.entries(m)){const os=Object.entries(vs).filter(([o])=>o!==V&&o!==k.split('|')[0]).map(([,mm])=>mm[k]).filter(x=>x!=null);if(os.length>=2)difs.push(Math.abs(v-sum(os)/os.length))}
+    const vals=Object.values(plano[V]||{}),chapado=vals.length>=8&&vals.every(x=>x===vals[0]);
+    peso[V]=pesoBase(difs.length>=3?sum(difs)/difs.length:0,chapado)}
   const res={};
-  for(const[V,m] of Object.entries(vs))for(const[t,cr] of Object.entries(m||{})){if(t===V||!cr||cr.ns||!S.jog[t])continue;const w=peso[V]??1;
-    const r=res[t]=res[t]||{s:{},w:{},n:0};let algum=false;
-    for(const[c] of critDe(t)){const x=Number(cr[c]);if(!x)continue;algum=true;r.s[c]=(r.s[c]||0)+x*w;r.w[c]=(r.w[c]||0)+w}
-    if(algum)r.n++}
-  const out={};for(const[t,r] of Object.entries(res)){const c={};for(const k in r.s)if(r.w[k]>0)c[k]=Math.round(r.s[k]/r.w[k]*100)/100;out[t]={crit:c,n:r.n}}
+  for(const[V,m] of Object.entries(vs)){const w=peso[V]??1,alvos=new Set();
+    for(const[k,v] of Object.entries(m)){const[t,c]=k.split('|');const r=res[t]=res[t]||{s:{},w:{},quem:new Set()};r.s[c]=(r.s[c]||0)+v*w;r.w[c]=(r.w[c]||0)+w;r.quem.add(V)}}
+  const out={};for(const[t,r] of Object.entries(res)){const c={};for(const k in r.s)if(r.w[k]>0)c[k]=Math.round(Math.max(1,Math.min(5,r.s[k]/r.w[k]))*100)/100;out[t]={crit:c,n:r.quem.size}}
   return out}
 const FECHANDO_AV=new Set();
 function fecharRodada(rid){const r=S.avals[rid];if(!r||FECHANDO_AV.has(rid))return;FECHANDO_AV.add(rid);
