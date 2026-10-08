@@ -846,6 +846,10 @@ function tJogo(A){
       <div class="sub" style="margin-bottom:4px">${esc(L.nome)} · pelada de ${dShort(p.data)}</div>${formAvalCampo(pid,(d.avalCampo||{})[pid],'me')}
       <div class="sub" style="margin-top:4px">Sua avaliação ajuda a galera a escolher onde jogar.</div></div>`}}
   h+=cartaoAvCompleta();
+  if(A&&!demo&&!rodadaAberta()){const semAv=ativos().filter(x=>!S.jog[x].critGalera);if(semAv.length>=3)h+=`<div class="panel stack" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Notas pela galera</h3><span class="sub">${semAv.length} sem avaliação</span></div>
+    <div class="sub" style="margin-top:-4px">Todo mundo se conhece? Abra uma avaliação geral antes da pelada: cada um avalia todos nos 5 critérios e as notas deixam de depender só do administrador.</div>
+    <div class="row" style="gap:4px;flex-wrap:nowrap;overflow:hidden">${semAv.slice(0,8).map(id=>avHTML(id)).join('')}${semAv.length>8?`<span class="sub">+${semAv.length-8}</span>`:''}</div>
+    <button class="btn warn block" data-act="av-admin">Abrir avaliação da galera</button></div>`}
   h+=painelPosJogo();
   if(A)h+=painelAprovar();
   if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar: ${esc(AVISOS[v.a.tipo]?.n||'')}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
