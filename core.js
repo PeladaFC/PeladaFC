@@ -93,7 +93,7 @@ function nomeTime(cor){const v=((cfg().nomesTimes||[])[cor]||'').trim();return v
 /* evento único: sem mensalista nem diarista; todo mundo confirma direto e quem passa das vagas vai para a espera */
 const EV=()=>!!cfg().evento;
 const ehDiarista=id=>!EV()&&J(id).tipo==='diarista';
-const pagaPorJogo=id=>EV()||J(id).tipo==='diarista';
+const pagaPorJogo=id=>!EV()&&J(id).tipo==='diarista';
 const tipoTxt=id=>EV()?'Participante':J(id).tipo==='diarista'?'Diarista':'Mensalista';
 function notaInicial(j){const g=j.critGalera||{};const k=critKey(j.pos).map(([c])=>Number(g[c]??j.crit?.[c]??3));return sum(k)/k.length*2}
 function encerradas(){return Object.entries(S.pel).filter(([,p])=>p.status==='encerrada').sort((a,b)=>b[1].data.localeCompare(a[1].data))}
@@ -819,7 +819,7 @@ function renderTop(){
   return h;
 }
 function renderNav(){
-  const tabs=[['jogo','Jogo'],['elenco','Elenco'],['avisos','Avisos'],['ranking','Ranking'],['caixa','Caixa']].filter(([k])=>ADM()||!['avisos','caixa'].includes(k));
+  const tabs=[['jogo','Jogo'],['elenco','Elenco'],['avisos','Avisos'],['ranking','Ranking'],['caixa','Caixa']].filter(([k])=>(ADM()||!['avisos','caixa'].includes(k))&&!(k==='caixa'&&EV()));
   if(!tabs.some(([k])=>k===UI.tab))UI.tab='jogo';
   document.getElementById('nav').innerHTML='<div class="in">'+tabs.map(([k,n])=>`<button data-act="tab" data-v="${k}" ${UI.tab===k?'aria-current="page"':''}>${ICON[k]}${n}</button>`).join('')+'</div>';
 }
@@ -1288,7 +1288,7 @@ function sheetCfg(){
     <div class="grid2"><label class="field"><span>Dia fixo</span><select id="c-dia">${DIAS.map((d,i)=>`<option value="${i}" ${c.dia==i?'selected':''}>${d}</option>`).join('')}</select></label>
     <label class="field"><span>Início</span><input type="time" id="c-hora" value="${esc(c.hora)}"></label></div>
     <label class="field"><span>Término</span><input type="time" id="c-fim" value="${esc(horaFimDe(null))}"></label>
-    <div class="field"><span>Tipo de pelada</span><select id="c-tipo"><option value="fixa" ${c.evento?'':'selected'}>Fixa (toda semana, com mensalistas e diaristas)</option><option value="evento" ${c.evento?'selected':''}>Evento único (sem mensalista nem diarista)</option></select></div>
+    <div class="field"><span>Tipo de pelada</span><select id="c-tipo"><option value="fixa" ${c.evento?'':'selected'}>Fixa (toda semana, com mensalistas e diaristas)</option><option value="evento" ${c.evento?'selected':''}>Evento único (sem cobrança, sem mensalista nem diarista)</option></select></div>
     <label class="field"><span>Data do evento (se for evento único)</span><input type="date" id="c-dataev" value="${esc(c.dataEvento||'')}"></label>
     <label class="field"><span>Local padrão</span>${selLocais('c-localid',c.localId,'Sem local padrão')}</label>
     <button class="btn sm" data-act="locais">Gerenciar locais</button>

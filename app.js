@@ -235,7 +235,6 @@ function render() {
       <div class="grid2"><label class="field"><span>Times</span><select id="n-times"><option>2</option><option>3</option><option>4</option></select></label>
       <label class="field"><span>Jogadores de linha por time</span><input type="number" id="n-por" value="5" min="3" max="11"></label></div>
       <div class="grid2" id="n-fixa-box"><label class="field"><span>Mensalidade (R$)</span><input type="number" id="n-mens" value="80" min="0"></label><label class="field"><span>Diária (R$)</span><input type="number" id="n-dia2" value="20" min="0"></label></div>
-      <label class="field" id="n-valor-box" hidden><span>Valor por pessoa (R$, opcional)</span><input type="number" id="n-valor" min="0" placeholder="0"></label>
       <button class="btn primary block" type="submit">Criar pelada</button></form>`;
   if (t === 'codigo') h = topo('minhas') + `<h2>Entrar numa pelada</h2><p class="lead">Leia o QR Code de quem já está na pelada, ou digite o código de 6 letras.</p>
     <button class="btn primary block" data-sh="ler-qr" style="padding-block:16px;font-size:16px">📷 Ler QR Code do convite</button>
@@ -332,7 +331,7 @@ async function aceitarConvite() {
 async function criarGrupo(f) {
   if (OCUPADO) return; OCUPADO = true;
   const gid = novoId(), codigo = novoCodigo(), p = PERFIL || {}, now = Date.now();
-  const cfg = { nome: f.nome, dia: f.dia, hora: f.hora, horaFim: f.fim, golSorteio: false, local: '', times: f.times, porTime: f.por, mensal: f.evento ? 0 : f.mens, diaria: f.evento ? f.valor : f.diaria, pix: '', restr: [], nivelPublico: false, evento: !!f.evento, dataEvento: f.data || null };
+  const cfg = { nome: f.nome, dia: f.dia, hora: f.hora, horaFim: f.fim, golSorteio: false, local: '', times: f.times, porTime: f.por, mensal: f.evento ? 0 : f.mens, diaria: f.evento ? 0 : f.diaria, pix: '', restr: [], nivelPublico: false, evento: !!f.evento, dataEvento: f.data || null };
   try {
     await B.batch([
       { op: 'set', path: 'grupos/' + gid, data: { nome: f.nome, dia: f.dia, hora: f.hora, evento: !!f.evento, data: f.data || null, dono: EU.uid, admins: [EU.uid], codigo, criadoEm: now } },
@@ -476,8 +475,8 @@ document.addEventListener('click', async e => {
   if (a === 'abrir') abrirGrupo(v);
   if (a === 'tipo-pel') { const ev = v === 'evento'; UIp.tipoPel = v;
     document.querySelectorAll('#n-tipo button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === v)));
-    $('n-data-box').hidden = !ev; $('n-dia-box').hidden = ev; $('n-fixa-box').hidden = ev; $('n-valor-box').hidden = !ev;
-    $('n-tipo-txt').textContent = ev ? 'Uma pelada só, numa data. Sem mensalista nem diarista: quem confirma primeiro entra, e quem passar das vagas vai para a espera.' : 'Tem mensalistas e diaristas, e acontece toda semana no mesmo dia.'; }
+    $('n-data-box').hidden = !ev; $('n-dia-box').hidden = ev; $('n-fixa-box').hidden = ev;
+    $('n-tipo-txt').textContent = ev ? 'Uma pelada só, numa data, sem cobrança. Ninguém entra como mensalista nem diarista: quem confirma primeiro entra, e quem passar das vagas vai para a espera.' : 'Tem mensalistas e diaristas, e acontece toda semana no mesmo dia.'; }
   if (a === 'push-ativar') ativarPush();
   if (a === 'ler-qr') abrirLeitor();
   if (a === 'fechar-leitor') fecharLeitor();
@@ -514,7 +513,7 @@ document.addEventListener('submit', async e => {
   }
   if (f.id === 'f-nova') { if (!val('n-nome')) { aviso('Dê um nome para a pelada.'); return; }
     const ev = UIp.tipoPel === 'evento', dataEv = ev ? ($('n-data').value || proxSabado()) : null;
-    criarGrupo({ evento: ev, data: dataEv, valor: ev ? Number($('n-valor').value) || 0 : 0, nome: val('n-nome'), dia: ev ? new Date(dataEv + 'T12:00').getDay() : Number($('n-dia').value), hora: $('n-hora').value || '08:00', fim: $('n-fim').value || '', times: Number($('n-times').value) || 2, por: Math.max(3, Math.min(11, Number($('n-por').value) || 5)), mens: Number($('n-mens').value) || 0, diaria: Number($('n-dia2').value) || 0 }); }
+    criarGrupo({ evento: ev, data: dataEv, nome: val('n-nome'), dia: ev ? new Date(dataEv + 'T12:00').getDay() : Number($('n-dia').value), hora: $('n-hora').value || '08:00', fim: $('n-fim').value || '', times: Number($('n-times').value) || 2, por: Math.max(3, Math.min(11, Number($('n-por').value) || 5)), mens: Number($('n-mens').value) || 0, diaria: Number($('n-dia2').value) || 0 }); }
   if (f.id === 'f-codigo') buscarCodigo(val('cod'));
 });
 
