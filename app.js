@@ -285,8 +285,7 @@ async function depoisDoLogin() {
   if (!PERFIL || !PERFIL.apelido && !PERFIL.pos) { ir('perfil'); return; }
   const conv = ls.get('pelada.convite');
   if (conv) { ls.set('pelada.convite', null); await buscarCodigo(conv); return; }
-  const ult = ls.get('pelada.ultimo');
-  if (ult && GRUPOS[ult]) { abrirGrupo(ult); return; }
+  // Ao abrir o app (ícone ou site), sempre começa em "Minhas peladas".
   ir('minhas');
 }
 async function buscarCodigo(cod) {
@@ -441,3 +440,6 @@ document.addEventListener('submit', async e => {
     ir('carregando'); await depoisDoLogin();
   });
 })();
+
+// Se o navegador devolver a página da memória (voltar/reabrir), recarrega para começar do início.
+window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
