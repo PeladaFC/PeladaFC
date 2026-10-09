@@ -954,26 +954,36 @@ function subPresenca(pid,p,l,A){
   return h;
 }
 function subTimes(pid,p,l,A){
-  const c=cfg();let h='';
-  if(A)h+=`<div class="panel stack"><div class="row between"><div><b>${l.escalados.length} na linha · ${l.gks.length} goleiro(s)</b><div class="sub">${c.golSorteio?'Goleiros entram no sorteio':'Goleiros ficam fora do sorteio (extra)'} · equilibra por nota e posição${(c.restr||[]).length?' · respeita '+c.restr.length+' regra(s)':''}</div></div>
-    <div class="row"><select id="nt" aria-label="Número de times" style="width:auto">${[2,3,4].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
-    <button class="btn primary" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div></div>`;
-  if(A){const rs=(c.restr||[]).filter(r=>idsRegra(r).filter(x=>S.jog[x]).length>=2),vai=new Set([...l.escalados,...l.gks]);
-    h+=`<div class="panel stack" style="margin-top:12px"><div class="panel-h"><h3>Regras do sorteio</h3><span class="sub">${rs.length?rs.length+' regra'+(rs.length>1?'s':''):''}</span></div>
-      ${rs.length?`<div class="list">${rs.map((r,i)=>`<div class="item"><span style="font-size:20px">${r.tipo==='separar'?'🚫':'🤝'}</span><div class="grow small">${textoRegra(r)}${(()=>{const ids=idsRegra(r),fora=ids.filter(x=>!vai.has(x));return!fora.length?'':ids.length-fora.length<2?'<div class="sub">Não vale hoje: falta gente confirmar</div>':`<div class="sub">Hoje sem: ${nomesLista(fora)}</div>`})()}</div><button class="btn sm" data-act="regra-del" data-i="${(c.restr||[]).indexOf(r)}" aria-label="Apagar regra">✕</button></div>`).join('')}</div>`:'<div class="sub" style="margin-top:-4px">Ex.: dois amigos que querem jogar juntos, ou dois irmãos que não podem cair no mesmo time.</div>'}
+  const c=cfg(),M='margin-top:12px';const sec={};
+  if(!A){if(!timesPub(p))return`<div class="empty">🔒 Os times aparecem aqui quando o administrador divulgar.</div>`;return blocoTimes(pid,p,false)}
+  // 1. jogadores sem nota
+  {const sn=[...l.escalados,...l.gks].filter(semAvaliacao);if(sn.length)sec.semNota=`<div class="banner due" style="display:block"><b>⚠️ ${sn.length} jogador${sn.length>1?'es':''} sem nota confirmado${sn.length>1?'s':''}</b><br><span class="sub" style="color:inherit">${sn.map(x=>esc(nm(x))).join(', ')}. Avalie antes do sorteio para os times saírem equilibrados.</span>
+      <div class="avstrip" style="margin-top:6px">${sn.map(x=>`<button class="avthumb on" data-act="edit-jog" data-j="${x}" aria-label="Avaliar ${esc(nm(x))}">${avHTML(x)}</button>`).join('')}</div>
+      <div class="lado" style="margin-top:6px"><button class="btn sm" data-act="edit-jog" data-j="${sn[0]}" data-agora="1">Eu avalio agora</button><button class="btn sm warn" data-act="av-semnota" data-v="${sn.join(',')}">Pedir para a galera</button></div></div>`}
+  // 2. regras
+  {const rs=(c.restr||[]).filter(r=>idsRegra(r).filter(x=>S.jog[x]).length>=2),vai=new Set([...l.escalados,...l.gks]);
+    sec.regras=`<div class="panel stack"><div class="panel-h"><h3>Regras do sorteio</h3><span class="sub">${rs.length?rs.length+' regra'+(rs.length>1?'s':''):''}</span></div>
+      ${rs.length?`<div class="list">${rs.map(r=>`<div class="item"><span style="font-size:20px">${r.tipo==='separar'?'🚫':'🤝'}</span><div class="grow small">${textoRegra(r)}${(()=>{const ids=idsRegra(r),fora=ids.filter(x=>!vai.has(x));return!fora.length?'':ids.length-fora.length<2?'<div class="sub">Não vale hoje: falta gente confirmar</div>':`<div class="sub">Hoje sem: ${nomesLista(fora)}</div>`})()}</div><button class="btn sm" data-act="regra-del" data-i="${(c.restr||[]).indexOf(r)}" aria-label="Apagar regra">✕</button></div>`).join('')}</div>`:'<div class="sub" style="margin-top:-4px">Ex.: dois amigos que querem jogar juntos, ou dois irmãos que não podem cair no mesmo time.</div>'}
       <div class="lado"><button class="btn sm" data-act="regra-nova" data-v="juntar">🤝 Jogar juntos</button><button class="btn sm" data-act="regra-nova" data-v="separar">🚫 Não jogar juntos</button></div>
       ${rs.length&&p.times?'<div class="sub">Mudou as regras? Toque em <b>Sortear de novo</b>.</div>':''}</div>`}
-  {const sn=[...l.escalados,...l.gks].filter(semAvaliacao);if(A&&sn.length)h=`<div class="banner due" style="margin-bottom:12px;display:block"><b>⚠️ ${sn.length} jogador${sn.length>1?'es':''} sem nota confirmado${sn.length>1?'s':''}</b><br><span class="sub" style="color:inherit">${sn.map(x=>esc(nm(x))).join(', ')}. Avalie antes do sorteio para os times saírem equilibrados.</span>
-      <div class="avstrip" style="margin-top:6px">${sn.map(x=>`<button class="avthumb on" data-act="edit-jog" data-j="${x}" aria-label="Avaliar ${esc(nm(x))}">${avHTML(x)}</button>`).join('')}</div>
-      <div class="lado" style="margin-top:6px"><button class="btn sm" data-act="edit-jog" data-j="${sn[0]}" data-agora="1">Eu avalio agora</button><button class="btn sm warn" data-act="av-semnota" data-v="${sn.join(',')}">Pedir para a galera</button></div></div>`+h}
-  if(!A&&!timesPub(p))return h+`<div class="empty">🔒 Os times aparecem aqui quando o administrador divulgar.</div>`;
-  if(!p.times)return h+`<div class="empty">Os times aparecem aqui depois do sorteio.</div>`;
-  if(A)h+=timesPub(p)?`<div class="banner" style="margin-top:12px"><span>✓ <b>Times publicados.</b> A galera já vê no app.</span><button class="btn sm" data-act="pub-times" data-p="${pid}" data-v="0">Esconder</button></div>`
-    :`<div class="banner due" style="margin-top:12px;display:block"><b>🔒 Rascunho: só os administradores veem estes times.</b><br><span class="sub" style="color:inherit">Sorteie e troque jogadores quantas vezes quiser. A galera só vê depois que você publicar.</span>
-      <button class="btn primary block" style="margin-top:8px" data-act="pub-times" data-p="${pid}" data-v="1">Publicar times no app</button></div>`;
-  const med=p.times.map(teamMedia),mx=Math.max(...med),mn=Math.min(...med);
-  if(A)h+=`<div class="panel" style="margin-block:12px"><div class="row between"><b>Equilíbrio</b><span class="num small muted">diferença de ${ovr(mx-mn)} ponto${ovr(mx-mn)===1?'':'s'} na média</span></div><div class="meter" style="margin-top:8px"><i style="width:${Math.max(5,100-(mx-mn)*60)}%"></i></div>${A?'<div class="sub" style="margin-top:6px">Toque em um jogador e depois em outro de outro time para trocar os dois.</div>':''}</div>`;
-  h+='<div class="teams">';
+  // 3. sortear
+  sec.sortear=`<div class="panel stack"><div class="row between"><div><b>${l.escalados.length} na linha · ${l.gks.length} goleiro(s)</b><div class="sub">${c.golSorteio?'Goleiros entram no sorteio':'Goleiros ficam fora do sorteio (extra)'} · equilibra por nota e posição${(c.restr||[]).length?' · respeita '+c.restr.length+' regra(s)':''}</div></div>
+    <div class="row"><select id="nt" aria-label="Número de times" style="width:auto">${[2,3,4].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
+    <button class="btn primary" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div></div>`;
+  if(p.times){
+    // 4. equilíbrio
+    const med=p.times.map(teamMedia),mx=Math.max(...med),mn=Math.min(...med);
+    sec.equil=`<div class="panel"><div class="row between"><b>Equilíbrio</b><span class="num small muted">diferença de ${ovr(mx-mn)} ponto${ovr(mx-mn)===1?'':'s'} na média</span></div><div class="meter" style="margin-top:8px"><i style="width:${Math.max(5,100-(mx-mn)*60)}%"></i></div><div class="sub" style="margin-top:6px">Toque em um jogador e depois em outro de outro time para trocar os dois.</div></div>`;
+    // 5. times
+    sec.times=blocoTimes(pid,p,true);
+    // 6. publicar
+    sec.pub=timesPub(p)?`<div class="banner" style="display:block"><b>✓ Times publicados.</b> A galera já vê no app.<div class="lado" style="margin-top:8px"><button class="btn sm" data-act="msg" data-v="times">Mandar no WhatsApp</button><button class="btn sm" data-act="pub-times" data-p="${pid}" data-v="0">Esconder da galera</button></div></div>`
+      :`<div class="banner due" style="display:block"><b>🔒 Rascunho: só os administradores veem estes times.</b><br><span class="sub" style="color:inherit">Sorteie e troque jogadores quantas vezes quiser. A galera só vê depois que você publicar.</span>
+        <button class="btn primary block" style="margin-top:8px" data-act="pub-times" data-p="${pid}" data-v="1">Publicar times no app</button>
+        <button class="btn block" style="margin-top:8px" data-act="msg" data-v="times">Mandar times no WhatsApp</button></div>`}
+  return['semNota','regras','sortear','equil','times','pub'].filter(k=>sec[k]).map((k,i)=>i?`<div style="${M}">${sec[k]}</div>`:sec[k]).join('')+(p.times?'':`<div class="empty">Os times aparecem aqui depois do sorteio.</div>`);
+}
+function blocoTimes(pid,p,A){let h='<div class="teams">';
   p.times.forEach((t,ti)=>{const co=CORES[t.cor];
     h+=`<div class="team"><div class="team-h"><div class="row"><span class="sw" style="background:${co.c}"></span>${A?`<button class="tnome" data-act="time-nome" data-c="${t.cor}" aria-label="Mudar o nome do time">${esc(nomeTime(t.cor))} ✎</button>`:`<b>${esc(nomeTime(t.cor))}</b>`}</div><span class="nota num" style="font-size:20px">${A||[t.gk,...t.ids].filter(Boolean).every(podeVerAval)?ovr(teamMedia(t)):'—'}</span></div><ul>`;
     const ids=(t.gk?[['GOL',t.gk]]:[]).concat(t.ids.map(id=>[posLinha(id),id]));
@@ -982,10 +992,8 @@ function subTimes(pid,p,l,A){
       h+=`<li class="${isSel?'sel':''}">${A?`<button data-act="swap" data-p="${pid}" data-t="${ti}" data-j="${id}">${inner}</button>`:inner}</li>`}
     h+='</ul></div>'});
   h+='</div>';
-  {const gx=(p.goleiros||[]).filter(id=>S.jog[id]);if(gx.length)h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>🧤 Goleiros</h3><span class="sub">extra · fora do sorteio</span></div><div class="list">${gx.map(id=>`<div class="item">${avHTML(id)}<div class="grow name">${esc(nm(id))}</div><span class="num muted small">${ovrTxt(id)}</span></div>`).join('')}</div></div>`}
-  if(A)h+=`<button class="btn block primary" style="margin-top:12px" data-act="msg" data-v="times">Mandar times no WhatsApp</button>`;
-  return h;
-}
+  const gx=(p.goleiros||[]).filter(id=>S.jog[id]);if(gx.length)h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>🧤 Goleiros</h3><span class="sub">extra · fora do sorteio</span></div><div class="list">${gx.map(id=>`<div class="item">${avHTML(id)}<div class="grow name">${esc(nm(id))}</div><span class="num muted small">${ovrTxt(id)}</span></div>`).join('')}</div></div>`;
+  return h}
 function quandoCurto(t){const d=new Date(t);return`${DIAS3[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`}
 function statusVotacao(p,pid,ids){const f=fimDe(p).getTime(),n=Date.now(),fa=fimAval(p);
   const cont=ADM()&&!p.aval?` ${Object.keys(votosDe(pid)).filter(j=>ids.includes(j)).length} de ${ids.length} já votaram.`:'';
