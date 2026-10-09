@@ -1,5 +1,6 @@
 /* ---------- constantes ---------- */
-const POS={GOL:'Goleiro',ZAG:'Zagueiro',MEI:'Meio-campo',ATA:'Atacante'};
+const POS={GOL:'Goleiro',ZAG:'Zagueiro',LAT:'Lateral',VOL:'Volante',MEI:'Meio-campo',ATA:'Atacante'};
+const LINHA=['ZAG','LAT','VOL','MEI','ATA'],SETOR={ZAG:'def',LAT:'def',VOL:'meio',MEI:'meio',ATA:'atq'};
 const CRIT={
   linha:[['tec','Técnica'],['fis','Físico'],['pas','Passe'],['fin','Finalização'],['mar','Marcação']],
   GOL:[['ref','Reflexo'],['posi','Posicionamento'],['sai','Saída do gol'],['rep','Reposição'],['com','Comunicação']]
@@ -168,7 +169,7 @@ function sortear(p,T){
   const teamsGk=Array.from({length:T},(_,i)=>gk[i]||null);
   const line=escalados.concat(gk.slice(T));
   const L=Array.from({length:T},()=>[]);
-  for(const pos of['ZAG','MEI','ATA']){
+  for(const pos of LINHA){
     const ps=line.filter(id=>posLinha(id)===pos).map(id=>({id,k:N(id)+(Math.random()-.5)*1.2})).sort((a,b)=>b.k-a.k);
     for(const x of ps){let best=0,bs=Infinity;
       L.forEach((arr,i)=>{const sc=arr.filter(id=>posLinha(id)===pos).length*1e4+arr.length*100+sum(arr.map(N));if(sc<bs){bs=sc;best=i}});
@@ -180,7 +181,8 @@ function sortear(p,T){
     const means=L.map((arr,i)=>(arr.length?sum(arr.map(N))/arr.length:0)+(teamsGk[i]?(N(teamsGk[i])-gkAvg)*.3:0));
     const m=sum(means)/T;let c=sum(means.map(x=>(x-m)**2))*10;
     const sz=L.map(a=>a.length);c+=Math.max(0,Math.max(...sz)-Math.min(...sz)-1)*50;
-    for(const pos of['ZAG','MEI','ATA']){const n=L.map(a=>a.filter(id=>posLinha(id)===pos).length);c+=Math.max(0,Math.max(...n)-Math.min(...n)-1)*3}
+    for(const pos of LINHA){const n=L.map(a=>a.filter(id=>posLinha(id)===pos).length);c+=Math.max(0,Math.max(...n)-Math.min(...n)-1)*2}
+    for(const se of['def','meio','atq']){const n=L.map(a=>a.filter(id=>SETOR[posLinha(id)]===se).length);c+=Math.max(0,Math.max(...n)-Math.min(...n)-1)*3}
     for(const r of restr){const ts=idsRegra(r).map(id=>L.findIndex(a=>a.includes(id))).filter(t=>t>=0);if(ts.length<2)continue;
       const cnt=Array(T).fill(0);ts.forEach(t=>cnt[t]++);
       if(r.tipo==='juntar')c+=(ts.length-Math.max(...cnt))*200;
@@ -203,7 +205,7 @@ function sortear(p,T){
     [L[i][a],L[j][b]]=[L[j][b],L[i][a]];
     const c2=cost();if(c2<=c)c=c2;else[L[i][a],L[j][b]]=[L[j][b],L[i][a]];
   }
-  const ord={ZAG:0,MEI:1,ATA:2};
+  const ord={ZAG:0,LAT:1,VOL:2,MEI:3,ATA:4};
   return L.map((arr,i)=>({cor:i,gk:teamsGk[i],ids:arr.sort((a,b)=>ord[posLinha(a)]-ord[posLinha(b)])}));
 }
 const timesPub=p=>!!(p&&p.times)&&p.publicado!==false;
@@ -620,7 +622,7 @@ function sheetNotif(){
 
 /* ---------- artes para redes sociais ---------- */
 const ART={bg1:'#0B3F20',bg2:'#17602F',chalk:'rgba(255,255,255,.13)',y:'#F2C12E',w:'#FFFFFF',w2:'rgba(255,255,255,.72)'};
-const POSCOR={GOL:'#C99A10',ZAG:'#3F7BC6',MEI:'#8E5FC0',ATA:'#D2533B'};
+const POSCOR={GOL:'#C99A10',ZAG:'#3F7BC6',LAT:'#1A9393',VOL:'#5E8C1F',MEI:'#8E5FC0',ATA:'#D2533B'};
 const PREMIO={mvp:{t:'Craque da pelada',s:'CRAQUE'},art:{t:'Artilheiro',s:'ARTILHEIRO'},gar:{t:'Garçom',s:'GARÇOM'},gol:{t:'Melhor goleiro',s:'GOLEIRO'}};
 async function fontsReady(){try{await Promise.all(['800 120px "Saira Condensed"','700 60px "Saira Condensed"','600 36px Figtree','500 30px Figtree'].map(f=>document.fonts.load(f)))}catch(e){}}
 function fit(ctx,text,maxW,size,weight,fam){let s=size;do{ctx.font=`${weight} ${s}px ${fam}`;s-=4}while(ctx.measureText(text).width>maxW&&s>20);return s+4}
@@ -1227,13 +1229,13 @@ function tElenco(A){
   const{st}=temporada(UI.ano);
   let ids=Object.keys(S.jog).filter(id=>{const j=S.jog[id];
     if(UI.filtro==='inativos')return j.ativo===false;if(j.ativo===false)return false;
-    if(['GOL','ZAG','MEI','ATA'].includes(UI.filtro)&&j.pos!==UI.filtro)return false;
+    if(Object.keys(POS).includes(UI.filtro)&&j.pos!==UI.filtro)return false;
     if(UI.filtro==='diarista'&&j.tipo!=='diarista')return false;if(UI.filtro==='mensalista'&&j.tipo==='diarista')return false;
     return!q||(j.nome+' '+(j.apelido||'')).toLowerCase().includes(q)});
   ids.sort((a,b)=>notaAtual(b)-notaAtual(a));
   let h=`<div class="row between" style="margin-bottom:10px"><h2>Elenco <span class="muted num">${ativos().length}</span></h2>${A?'<button class="btn primary" data-act="add-jog">+ Jogador</button>':''}</div>
     <input type="text" id="busca" placeholder="Buscar jogador" value="${esc(UI.busca)}" data-in="busca" style="margin-bottom:10px">
-    <div class="pick" style="margin-bottom:12px">${[['todos','Todos'],['GOL','GOL'],['ZAG','ZAG'],['MEI','MEI'],['ATA','ATA'],...(EV()?[]:[['mensalista','Mensalistas'],['diarista','Diaristas']]),['inativos','Inativos']].map(([k,n])=>`<button data-act="filtro" data-v="${k}" aria-pressed="${UI.filtro===k}">${n}</button>`).join('')}</div>`;
+    <div class="pick" style="margin-bottom:12px">${[['todos','Todos'],...Object.keys(POS).map(k=>[k,k]),...(EV()?[]:[['mensalista','Mensalistas'],['diarista','Diaristas']]),['inativos','Inativos']].map(([k,n])=>`<button data-act="filtro" data-v="${k}" aria-pressed="${UI.filtro===k}">${n}</button>`).join('')}</div>`;
   if(A){const ra=rodadaAberta();h+=`<button class="btn block ${ra?'':'warn'}" data-act="${ra?'av-admin':'av-novo'}" style="margin-bottom:12px">${ra?`⭐ Avaliação completa aberta · até ${quandoFim(ra[1].fim)}`:'⭐ Abrir avaliação da galera'}</button>`}
   h+=cartaoAvCompleta();
   if(membrosSemCadastro().length&&!demo)h+=A?painelMembros():painelPendentes();

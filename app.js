@@ -84,7 +84,7 @@ const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<':
 const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { } } };
 const novoId = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
 const novoCodigo = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('');
-const POSN = { GOL: 'Goleiro', ZAG: 'Zagueiro', MEI: 'Meio-campo', ATA: 'Atacante' };
+const POSN = { GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral', VOL: 'Volante', MEI: 'Meio-campo', ATA: 'Atacante' };
 const DIASN = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 // texto de quando é a pelada: fixa (toda semana) ou evento livre (datas a definir)
 function dataBR(iso) { const [y, m, d] = String(iso).split('-').map(Number); const dt = new Date(y, m - 1, d); return `${DIASN[dt.getDay()].toLowerCase()}, ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`; }
