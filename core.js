@@ -868,6 +868,12 @@ function guardarNp(t){UI[t.dataset.np]=t.value;
   if(t.dataset.np==='npFim')UI.npFimManual=true;
   if(t.dataset.np==='npHora'&&!UI.npFimManual&&t.value){const f=document.getElementById('np-fim');UI.npFim=maisHora(t.value,60);if(f)f.value=UI.npFim}}
 function bannerPendente(){return`<div class="banner due" style="margin-top:12px"><span><b>⏳ Sua entrada está esperando a autorização do administrador.</b><br>Assim que ele autorizar, seu nome entra no elenco e você já pode confirmar presença.</span></div>`}
+function sheetRegra(tipo){const pe=atual(),l=pe?lista(pe[1],pe[0]):{escalados:[],gks:[]},vai=[...l.escalados,...l.gks],outros=ativos().filter(x=>!vai.includes(x)).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  const opts=`<option value="">Escolha</option>${vai.length?`<optgroup label="Confirmados">${vai.map(x=>`<option value="${x}">${esc(nm(x))}</option>`).join('')}</optgroup>`:''}${outros.length?`<optgroup label="Outros do elenco">${outros.map(x=>`<option value="${x}">${esc(nm(x))}</option>`).join('')}</optgroup>`:''}`;
+  openSheet(tipo==='juntar'?'Jogar juntos':'Não jogar juntos',`<div class="stack"><p class="sub" style="margin:0">${tipo==='juntar'?'O sorteio coloca os dois sempre no mesmo time.':'O sorteio nunca coloca os dois no mesmo time.'} A regra fica salva para as próximas peladas.</p>
+    <label class="field"><span>Jogador</span><select id="rg-a">${opts}</select></label>
+    <label class="field"><span>${tipo==='juntar'?'Joga junto com':'Não joga com'}</span><select id="rg-b">${opts}</select></label>
+    <button class="btn primary block" data-act="regra-salvar" data-v="${tipo}">Salvar regra</button></div>`)}
 /* --- Jogo --- */
 function tJogo(A){
   const c=cfg();let h='';
@@ -937,6 +943,11 @@ function subTimes(pid,p,l,A){
   if(A)h+=`<div class="panel stack"><div class="row between"><div><b>${l.escalados.length} na linha · ${l.gks.length} goleiro(s)</b><div class="sub">${c.golSorteio?'Goleiros entram no sorteio':'Goleiros ficam fora do sorteio (extra)'} · equilibra por nota e posição${(c.restr||[]).length?' · respeita '+c.restr.length+' regra(s)':''}</div></div>
     <div class="row"><select id="nt" aria-label="Número de times" style="width:auto">${[2,3,4].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
     <button class="btn primary" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div></div>`;
+  if(A){const rs=(c.restr||[]).filter(r=>S.jog[r.a]&&S.jog[r.b]),vai=new Set([...l.escalados,...l.gks]);
+    h+=`<div class="panel stack" style="margin-top:12px"><div class="panel-h"><h3>Regras do sorteio</h3><span class="sub">${rs.length?rs.length+' regra'+(rs.length>1?'s':''):''}</span></div>
+      ${rs.length?`<div class="list">${rs.map((r,i)=>`<div class="item"><span style="font-size:20px">${r.tipo==='separar'?'🚫':'🤝'}</span><div class="grow small"><b>${esc(nm(r.a))}</b> ${r.tipo==='separar'?'não joga com':'sempre com'} <b>${esc(nm(r.b))}</b>${vai.has(r.a)&&vai.has(r.b)?'':'<div class="sub">Não vale hoje: um dos dois não confirmou</div>'}</div><button class="btn sm" data-act="regra-del" data-i="${(c.restr||[]).indexOf(r)}" aria-label="Apagar regra">✕</button></div>`).join('')}</div>`:'<div class="sub" style="margin-top:-4px">Ex.: dois amigos que querem jogar juntos, ou dois irmãos que não podem cair no mesmo time.</div>'}
+      <div class="lado"><button class="btn sm" data-act="regra-nova" data-v="juntar">🤝 Jogar juntos</button><button class="btn sm" data-act="regra-nova" data-v="separar">🚫 Não jogar juntos</button></div>
+      ${rs.length&&p.times?'<div class="sub">Mudou as regras? Toque em <b>Sortear de novo</b>.</div>':''}</div>`}
   {const sn=[...l.escalados,...l.gks].filter(semAvaliacao);if(A&&sn.length)h=`<div class="banner due" style="margin-bottom:12px;display:block"><b>⚠️ ${sn.length} jogador${sn.length>1?'es':''} sem nota confirmado${sn.length>1?'s':''}</b><br><span class="sub" style="color:inherit">${sn.map(x=>esc(nm(x))).join(', ')}. Avalie antes do sorteio para os times saírem equilibrados.</span>
       <div class="avstrip" style="margin-top:6px">${sn.map(x=>`<button class="avthumb on" data-act="edit-jog" data-j="${x}" aria-label="Avaliar ${esc(nm(x))}">${avHTML(x)}</button>`).join('')}</div>
       <div class="lado" style="margin-top:6px"><button class="btn sm" data-act="edit-jog" data-j="${sn[0]}" data-agora="1">Eu avalio agora</button><button class="btn sm warn" data-act="av-semnota" data-v="${sn.join(',')}">Pedir para a galera</button></div></div>`+h}
@@ -1598,6 +1609,10 @@ document.addEventListener('click',e=>{
       [['convocacao',w(-4),'09:00'],['cobrar',w(-2),'19:00'],['lista',w(-1),'20:00'],['times',dia,'07:00'],['resultado',dia,'12:00'],['pagamento',1,'10:00']]
         .forEach(([tipo,d2,hora])=>put('avisos/'+uid('a'),{tipo,dia:d2,hora,ativo:true}));toast('Agenda sugerida criada. Ajuste à vontade.');break}
     case'premio':break;
+    case'regra-nova':sheetRegra(d.v);break;
+    case'regra-salvar':{const a=document.getElementById('rg-a').value,bb=document.getElementById('rg-b').value;if(!a||!bb||a===bb){toast('Escolha dois jogadores diferentes.');return}
+      const rs=(cfg().restr||[]).filter(r=>!((r.a===a&&r.b===bb)||(r.a===bb&&r.b===a)));rs.push({a,b:bb,tipo:d.v});put('config/geral',{...(S.config||{}),restr:rs});closeSheet();toast('Regra salva.');break}
+    case'regra-del':{const rs=(cfg().restr||[]).slice();rs.splice(Number(d.i),1);put('config/geral',{...(S.config||{}),restr:rs});toast('Regra apagada.');break}
     case'add-restr':{const a=document.getElementById('r-a').value,bb=document.getElementById('r-b').value;if(!a||!bb||a===bb){toast('Escolha dois jogadores diferentes.');return}F.restr.push({a,b:bb,tipo:d.v});renderRestr();break}
     case'del-restr':F.restr.splice(Number(d.i),1);renderRestr();break;
     case'voto':{const doc=S.pres[myId];if(!doc||!doc.jogador||d.j===doc.jogador)return;const v=Number(d.v);
