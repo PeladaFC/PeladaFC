@@ -206,6 +206,7 @@ function sortear(p,T){
   const ord={ZAG:0,MEI:1,ATA:2};
   return L.map((arr,i)=>({cor:i,gk:teamsGk[i],ids:arr.sort((a,b)=>ord[posLinha(a)]-ord[posLinha(b)])}));
 }
+const timesPub=p=>!!(p&&p.times)&&p.publicado!==false;
 function teamMedia(t){const ids=(t.gk?[t.gk]:[]).concat(t.ids);return ids.length?sum(ids.map(notaAtual))/ids.length:0}
 function jogaram(p){if(p.jogaram)return p.jogaram;if(p.times)return p.times.flatMap(t=>(t.gk?[t.gk]:[]).concat(t.ids)).concat((p.goleiros||[]).filter(id=>S.jog[id]));return p.resp||1?lista(p).escalados.concat(lista(p).gks):[]}
 /* horário de início e término */
@@ -554,8 +555,8 @@ function itensJogador(){
       const{last}=ocorrencias(a);if(last.getTime()<t0||last>new Date())continue;
       if(!r||!r.s||r.t<last.getTime())out.push({id:'lem'+pid+aid+iso(last),tipo:'convoca',titulo:'Lembrete',texto:`Você ainda não confirmou a pelada de ${q}. ${l.vagas>l.escalados.length?'Restam '+(l.vagas-l.escalados.length)+' vaga(s).':'Lista cheia, ainda dá para entrar na espera.'}`,t:last.getTime(),act:'tab-jogo'})}
     const ap=(p.aprov||{})[j];if(ap&&r&&r.s==='sim'&&l.escalados.concat(l.gks).includes(j))out.push({id:'lib'+pid+ap,tipo:'convoca',titulo:'Vaga liberada ✅',texto:`O administrador liberou sua vaga na pelada de ${q}.`,t:ap});
-    if(p.times&&p.sorteadoEm){const ti=p.times.findIndex(tm=>tm.gk===j||tm.ids.includes(j));
-      if(ti>=0)out.push({id:'times'+pid+p.sorteadoEm,tipo:'convoca',titulo:'Times sorteados',texto:`Você está no time ${nomeTime(p.times[ti].cor)} ${CORES[p.times[ti].cor].e} na pelada de ${q}.`,t:p.sorteadoEm})}}
+    if(timesPub(p)&&p.sorteadoEm){const ti=p.times.findIndex(tm=>tm.gk===j||tm.ids.includes(j));
+      if(ti>=0)out.push({id:'times'+pid+(p.publicadoEm||p.sorteadoEm),tipo:'convoca',titulo:'Times sorteados',texto:`Você está no time ${nomeTime(p.times[ti].cor)} ${CORES[p.times[ti].cor].e} na pelada de ${q}.`,t:p.sorteadoEm})}}
   const pa=avalPendenteJogador();if(pa){const[pid,p]=pa;if(p.encerradaEm)out.push({id:'aval'+pid,tipo:'convoca',titulo:'Avalie o campo',texto:`Como estava o ${S.locais[p.localId].nome} na pelada de ${dShort(p.data)}? Avalie gramado, atendimento, ambiente, banheiros e tamanho.`,t:p.encerradaEm+2})}
   return out.filter(x=>x.t).sort((a,b)=>b.t-a.t);
 }
@@ -965,7 +966,11 @@ function subTimes(pid,p,l,A){
   {const sn=[...l.escalados,...l.gks].filter(semAvaliacao);if(A&&sn.length)h=`<div class="banner due" style="margin-bottom:12px;display:block"><b>⚠️ ${sn.length} jogador${sn.length>1?'es':''} sem nota confirmado${sn.length>1?'s':''}</b><br><span class="sub" style="color:inherit">${sn.map(x=>esc(nm(x))).join(', ')}. Avalie antes do sorteio para os times saírem equilibrados.</span>
       <div class="avstrip" style="margin-top:6px">${sn.map(x=>`<button class="avthumb on" data-act="edit-jog" data-j="${x}" aria-label="Avaliar ${esc(nm(x))}">${avHTML(x)}</button>`).join('')}</div>
       <div class="lado" style="margin-top:6px"><button class="btn sm" data-act="edit-jog" data-j="${sn[0]}" data-agora="1">Eu avalio agora</button><button class="btn sm warn" data-act="av-semnota" data-v="${sn.join(',')}">Pedir para a galera</button></div></div>`+h}
+  if(!A&&!timesPub(p))return h+`<div class="empty">🔒 Os times aparecem aqui quando o administrador divulgar.</div>`;
   if(!p.times)return h+`<div class="empty">Os times aparecem aqui depois do sorteio.</div>`;
+  if(A)h+=timesPub(p)?`<div class="banner" style="margin-top:12px"><span>✓ <b>Times publicados.</b> A galera já vê no app.</span><button class="btn sm" data-act="pub-times" data-p="${pid}" data-v="0">Esconder</button></div>`
+    :`<div class="banner due" style="margin-top:12px;display:block"><b>🔒 Rascunho: só os administradores veem estes times.</b><br><span class="sub" style="color:inherit">Sorteie e troque jogadores quantas vezes quiser. A galera só vê depois que você publicar.</span>
+      <button class="btn primary block" style="margin-top:8px" data-act="pub-times" data-p="${pid}" data-v="1">Publicar times no app</button></div>`;
   const med=p.times.map(teamMedia),mx=Math.max(...med),mn=Math.min(...med);
   if(A)h+=`<div class="panel" style="margin-block:12px"><div class="row between"><b>Equilíbrio</b><span class="num small muted">diferença de ${ovr(mx-mn)} ponto${ovr(mx-mn)===1?'':'s'} na média</span></div><div class="meter" style="margin-top:8px"><i style="width:${Math.max(5,100-(mx-mn)*60)}%"></i></div>${A?'<div class="sub" style="margin-top:6px">Toque em um jogador e depois em outro de outro time para trocar os dois.</div>':''}</div>`;
   h+='<div class="teams">';
@@ -1597,7 +1602,8 @@ document.addEventListener('click',e=>{
       dl.save({filename:a.nome,data:a.blob}).then(r=>{if(r&&r.status==='saved')toast('Imagem pronta.')},e=>{if(e&&e.name!=='AbortError')toast('Não deu para salvar. Toque e segure a imagem.')});break}
     case'sortear':{const T=Number(document.getElementById('nt').value)||cfg().times;const times=sortear(S.pel[d.p],T);UI.sel=null;
       const goleiros=cfg().golSorteio?[]:lista(S.pel[d.p],d.p).gks;
-      patch('peladas/'+d.p,{times,goleiros,nTimes:T,vit:times.map(()=>0),sorteadoEm:Date.now()});toast('Times sorteados.');break}
+      patch('peladas/'+d.p,{times,goleiros,nTimes:T,vit:times.map(()=>0),sorteadoEm:Date.now(),publicado:false});toast('Times sorteados. Só os administradores estão vendo.');break}
+    case'pub-times':{const on=d.v==='1';patch('peladas/'+d.p,{publicado:on,publicadoEm:on?Date.now():null});toast(on?'Times publicados! A galera já pode ver.':'Times escondidos da galera.');break}
     case'swap':{const p=S.pel[d.p],ti=Number(d.t);
       if(!UI.sel){UI.sel={t:ti,id:d.j};render();break}
       if(UI.sel.id===d.j||UI.sel.t===ti){UI.sel=UI.sel.id===d.j?null:{t:ti,id:d.j};render();break}
