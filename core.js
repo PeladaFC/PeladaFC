@@ -143,8 +143,9 @@ function respDe(p,pid){
   return resp;
 }
 function vinculo(jid){return Object.entries(S.pres||{}).find(([,d])=>d.jogador===jid)?.[0]||null}
+const vagasCfg=()=>{const c=cfg();return Math.max(2,Number(c.vagas)||(Number(c.times)||2)*(Number(c.porTime)||5))};
 function lista(p,pid){
-  const c=cfg(),vagas=c.times*c.porTime,resp=respDe(p,pid);
+  const c=cfg(),vagas=vagasCfg(),resp=respDe(p,pid);
   const aprov=p.aprov||{},sim=ativos().filter(id=>resp[id]?.s==='sim');
   // liberado: o administrador autorizou depois do pedido
   const lib=id=>aprov[id]&&aprov[id]>=(resp[id].t||0)-1000;
@@ -473,7 +474,7 @@ function msg(tipo,ctx={}){
   const quando=p?`📅 *${dLong(p.data)}* das *${horaIniDe(p)}* às *${horaFimDe(p)}*`:EV()?'📅 Data a definir':`📅 *${DIAS[c.dia]}* das *${c.hora}* às *${horaFimDe(null)}*`;
   const LL=localDe(p),onde=LL?LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):'';
   const head=`⚽ *${c.nome.toUpperCase()}*`;
-  if(tipo==='convocacao')return[head,quando,onde?'📍 '+onde:'','',`São ${c.times*c.porTime} vagas na linha + goleiros.${EV()?' Quem confirmar primeiro garante a vaga.':' Mensalista tem prioridade.'}`,'Responda aqui: ✅ vou  |  ❌ não vou'].filter((x,i)=>x!==''||i===3).join('\n');
+  if(tipo==='convocacao')return[head,quando,onde?'📍 '+onde:'','',`São ${vagasCfg()} vagas na linha + goleiros.${EV()?' Quem confirmar primeiro garante a vaga.':' Mensalista tem prioridade.'}`,'Responda aqui: ✅ vou  |  ❌ não vou'].filter((x,i)=>x!==''||i===3).join('\n');
   if(!p&&tipo!=='pagamento'&&tipo!=='convite')return head+'\n\nAinda não tem pelada marcada. Marque a próxima no app.';
   if(tipo==='cobrar'){const l=lista(p);if(!l.pend.length)return head+'\n'+quando+'\n\nTodo mundo já respondeu. Valeu! 🙌';
     return[head,quando,'',`⏰ Ainda faltam ${l.pend.length} responder:`,...l.pend.map(id=>'• '+nm(id)),'','Confirma aí pra gente fechar a lista! ✅ ou ❌'].join('\n')}
@@ -889,7 +890,7 @@ function guardarNp(t){UI[t.dataset.np]=t.value;
   if(t.dataset.np==='npFim')UI.npFimManual=true;
   if(t.dataset.np==='npHora'&&!UI.npFimManual&&t.value){const f=document.getElementById('np-fim');UI.npFim=maisHora(t.value,60);if(f)f.value=UI.npFim}}
 function bannerPendente(){return`<div class="banner due" style="margin-top:12px"><span><b>⏳ Sua entrada está esperando a autorização do administrador.</b><br>Assim que ele autorizar, seu nome entra no elenco e você já pode confirmar presença.</span></div>`}
-function sheetRegra(tipo){if(tipo)UI.rg={tipo,sel:new Set()};const rg=UI.rg;if(!rg)return;const max=Math.max(2,Number(cfg().porTime)||5);
+function sheetRegra(tipo){if(tipo)UI.rg={tipo,sel:new Set()};const rg=UI.rg;if(!rg)return;const max=Math.max(2,Math.ceil(vagasCfg()/(Number(cfg().times)||2)));
   const pe=atual(),l=pe?lista(pe[1],pe[0]):{escalados:[],gks:[]},vai=[...l.escalados,...l.gks],outros=ativos().filter(x=>!vai.includes(x)).sort((a,b)=>nm(a).localeCompare(nm(b)));
   const card=id=>`<button class="avcard ${rg.sel.has(id)?'on':''}" data-act="rg-tog" data-j="${id}" aria-pressed="${rg.sel.has(id)}">${avG(id,48)}<b>${esc(nm(id))}</b>${rg.sel.has(id)?'<span class="ok">✓</span>':''}</button>`;
   const n=rg.sel.size,juntar=rg.tipo==='juntar';
@@ -1405,8 +1406,9 @@ function sheetCfg(){
     <div class="field"><span>Tipo de pelada</span><select id="c-tipo"><option value="fixa" ${c.evento?'':'selected'}>Fixa (toda semana, com mensalistas e diaristas)</option><option value="evento" ${c.evento?'selected':''}>Evento livre (sem cobrança, datas livres)</option></select></div>
     <label class="field"><span>Local padrão</span>${selLocais('c-localid',c.localId,'Sem local padrão')}</label>
     <button class="btn sm" data-act="locais">Gerenciar locais</button>
-    <div class="grid2"><label class="field"><span>Times por pelada</span><select id="c-times">${[2,3,4].map(n=>`<option ${c.times==n?'selected':''}>${n}</option>`).join('')}</select></label>
-    <label class="field"><span>Jogadores de linha por time</span><input type="number" id="c-portime" min="3" max="11" value="${c.porTime}"></label></div>
+    <label class="field"><span>Vagas na pelada (jogadores de linha)</span><input type="number" id="c-vagas" min="2" max="60" inputmode="numeric" value="${vagasCfg()}"></label>
+    <div class="sub" style="margin-top:-6px">Os primeiros a confirmar ficam com as vagas, mensalista ou não. Quem confirmar depois vai para a lista de espera. Goleiros ficam fora dessa conta.</div>
+    <label class="field"><span>Times no sorteio (padrão)</span><select id="c-times">${[2,3,4].map(n=>`<option ${c.times==n?'selected':''}>${n}</option>`).join('')}</select></label>
     <div class="grid2"><label class="field"><span>Mensalidade (R$)</span><input type="number" id="c-mensal" min="0" step="0.01" value="${c.mensal}"></label>
     <label class="field"><span>Diária (R$)</span><input type="number" id="c-diaria" min="0" step="0.01" value="${c.diaria}"></label></div>
     <label class="field"><span>Chave Pix</span><input type="text" id="c-pix" value="${esc(c.pix)}" placeholder="Telefone, e-mail ou chave aleatória"></label>
@@ -1665,7 +1667,7 @@ document.addEventListener('click',e=>{
       const pr=S.pres[myId]||{pel:{}};put('presencas/'+myId,{...pr,pos:d.v===S.jog[id].pos?null:d.v,posTroca:{de,para:d.v,t:Date.now()}});closeSheet();toast(`Pronto! Agora você joga de ${POS[d.v].toLowerCase()} neste grupo.`);break}
     case'apagar-sorteio':if(b.dataset.sure){patch('peladas/'+d.p,{times:null,goleiros:null,vit:null,publicado:false,sorteadoEm:null,publicadoEm:null});UI.sel=null;toast('Sorteio apagado. A troca de posição está aberta de novo.')}else{b.dataset.sure='1';b.textContent='Toque de novo para apagar'}break;
     case'regra-nova':sheetRegra(d.v);break;
-    case'rg-tog':{const rg=UI.rg;if(!rg)return;const max=Math.max(2,Number(cfg().porTime)||5);if(rg.sel.has(d.j))rg.sel.delete(d.j);else{if(rg.sel.size>=max){toast(`No máximo ${max} jogadores (o tamanho de um time).`);return}rg.sel.add(d.j)}
+    case'rg-tog':{const rg=UI.rg;if(!rg)return;const max=Math.max(2,Math.ceil(vagasCfg()/(Number(cfg().times)||2)));if(rg.sel.has(d.j))rg.sel.delete(d.j);else{if(rg.sel.size>=max){toast(`No máximo ${max} jogadores (o tamanho de um time).`);return}rg.sel.add(d.j)}
       const sc=document.querySelector('.sheet').scrollTop;sheetRegra();document.querySelector('.sheet').scrollTop=sc;break}
     case'regra-salvar':{const rg=UI.rg;if(!rg||rg.sel.size<2)return;const ids=[...rg.sel];
       const rs=(cfg().restr||[]).slice();rs.push({tipo:rg.tipo,ids,a:ids[0],b:ids[1]});put('config/geral',{...(S.config||{}),restr:rs});UI.rg=null;closeSheet();toast('Regra salva.');break}
@@ -1725,7 +1727,7 @@ document.addEventListener('click',e=>{
       document.getElementById('gol-txt').textContent=F.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
       const ev=g('c-tipo')==='evento',dataEv=null,diaEv=Number(g('c-dia'));
-      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),porTime:Math.max(3,Math.min(11,Number(g('c-portime'))||5)),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:Number(g('c-janela'))||24,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
+      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:Number(g('c-janela'))||24,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',evento:ev,data:dataEv});
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':{const cx=S.caixa[d.m]||{mens:{},desp:[]};put('caixa/'+d.m,{...cx,mens:{...(cx.mens||{}),[d.j]:!(cx.mens||{})[d.j]}});break}
