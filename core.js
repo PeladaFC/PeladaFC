@@ -2,7 +2,7 @@
 const POS={GOL:'Goleiro',ZAG:'Zagueiro',LAT:'Lateral',VOL:'Volante',MEI:'Meio-campo',ATA:'Atacante'};
 const LINHA=['ZAG','LAT','VOL','MEI','ATA'],SETOR={ZAG:'def',LAT:'def',VOL:'meio',MEI:'meio',ATA:'atq'};
 const CRIT={
-  linha:[['tec','Técnica','Domínio e drible'],['fis','Físico','Velocidade, fôlego e força'],['pas','Passe','Certeiro e criativo'],['fin','Finalização','Chuta bem e faz gol'],['mar','Defesa','Marca, desarma e volta']],
+  linha:[['tec','Técnica','Domínio e drible'],['fis','Físico','Veloz, forte e aguenta'],['pas','Passe','Certeiro e criativo'],['fin','Finalização','Chuta bem e faz gol'],['mar','Defesa','Marca, desarma e volta']],
   GOL:[['ref','Reflexo','Defesas difíceis'],['posi','Posicionamento','Sabe onde ficar'],['sai','Saída do gol','Cruzamentos e 1 contra 1'],['rep','Reposição','Põe a bola em jogo bem'],['com','Comunicação','Orienta a defesa']]
 };
 const DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
