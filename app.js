@@ -91,6 +91,15 @@ function dataBR(iso) { const [y, m, d] = String(iso).split('-').map(Number); con
 function quandoG(G, curto) { if (G.evento && !G.data) return (curto ? '' : '📅 ') + 'Datas livres';
   if (G.evento && G.data) return (curto ? '' : '📅 ') + dataBR(G.data) + (G.hora ? (curto ? ' ' : ' às ') + G.hora : '');
   if (G.dia == null) return G.hora || ''; return curto ? DIASN[G.dia] + ' ' + (G.hora || '') : `📅 ${[0, 6].includes(Number(G.dia)) ? 'Todo' : 'Toda'} ${DIASN[G.dia].toLowerCase()}${G.hora ? ' às ' + G.hora : ''}`; }
+// próximo jogo de um grupo (pelo dia fixo ou pela data do evento)
+function proxJogo(G) { if (!G) return null; const [hh, mm] = String(G.hora || '08:00').split(':').map(Number), agora = Date.now();
+  if (G.evento) { if (!G.data) return null; const d = new Date(G.data + 'T00:00'); d.setHours(hh || 0, mm || 0, 0, 0); return d.getTime() + 2 * 36e5 > agora ? d : null; }
+  if (G.dia == null) return null; const d = new Date(); d.setHours(hh || 0, mm || 0, 0, 0);
+  let k = (Number(G.dia) - d.getDay() + 7) % 7; if (k === 0 && d.getTime() + 2 * 36e5 < agora) k = 7; d.setDate(d.getDate() + k); return d; }
+function falta(d, longo) { const h0 = new Date(); h0.setHours(0, 0, 0, 0); const dd = new Date(d); dd.setHours(0, 0, 0, 0); const n = Math.round((dd - h0) / 864e5), hora = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  if (n <= 0) return longo ? (d.getTime() < Date.now() ? 'Rolando agora' : `Hoje, ${hora}`) : 'hoje';
+  if (n === 1) return longo ? `Amanhã, ${hora}` : 'amanhã';
+  return longo ? `${DIASN[d.getDay()]}, ${hora}` : `em ${n} dias`; }
 function proxSabado() { const d = new Date(); d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7)); return d.toISOString().slice(0, 10); }
 const ERROS = {
   'invalid-credential': 'E-mail ou senha incorretos.', 'wrong-password': 'E-mail ou senha incorretos.', 'user-not-found': 'Não existe conta com esse e-mail.',
@@ -218,19 +227,26 @@ function render() {
   const avOk = rid => { try { return !!localStorage.getItem('pelada.avok.' + rid); } catch (e) { return false; } };
   const avAb = g => { const a = GRUPOS[g] && GRUPOS[g].avAberta; return a && a.v === 2 && a.fim > Date.now() && !avOk(a.rid) ? a : null; };
   if (t === 'minhas') { const ids = Object.keys(GRUPOS); const adm = ids.filter(g => (GRUPOS[g].admins || []).includes(EU.uid)), jog = ids.filter(g => !adm.includes(g));
-    const card = (g, papel) => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="abrir" data-v="${g}"><div class="av bg-${papel === 'ADMIN' ? 'MEI' : 'ATA'}">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.evento ? '<b style="display:inline;font-size:10px;letter-spacing:.05em;color:var(--card-ink);background:var(--card);border-radius:5px;padding:1px 5px;margin-right:4px">EVENTO LIVRE</b>' : ''}${escH(quandoG(G, true))}</span></span><span class="badge2 ${papel === 'ADMIN' ? '' : 'j'}">${papel}</span></button>`; };
-    h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELADA FC</span><button class="btn sm" data-sh="ir" data-v="perfil">${escH(PERFIL?.apelido || PERFIL?.nome || 'Perfil')}</button></div>
-    <h2>Minhas peladas</h2>
+    const ini = n => escH((n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase());
+    const CRESTS = ['#1B6A36', '#C0392B', '#2F6FD0', '#7E57C2', '#E8742A', '#0E7C7B', '#9A6B00'];
+    const cor = g => { let x = 0; for (const ch of g) x = (x * 31 + ch.charCodeAt(0)) >>> 0; return CRESTS[x % CRESTS.length]; };
+    const prox = ids.map(g => ({ g, d: proxJogo(GRUPOS[g]) })).filter(x => x.d).sort((a, b) => a.d - b.d)[0];
+    const card = (g, adm) => { const G = GRUPOS[g], d = proxJogo(G);
+      return `<button class="clube" data-sh="abrir" data-v="${g}" style="--cor:${cor(g)}"><span class="escudo"><span>${ini(G.nome)}</span></span><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.evento ? '<i class="tag-ev">Evento livre</i>' : ''}${escH(quandoG(G, true))}${d ? ` · <em>${escH(falta(d))}</em>` : ''}</span></span>${adm ? '<span class="papel">Admin</span>' : ''}<span class="seta" aria-hidden="true">›</span></button>`; };
+    const nomeEu = (PERFIL?.apelido || PERFIL?.nome || '').split(/\s+/)[0];
+    const hr = new Date().getHours(), ola = hr < 5 ? 'Boa noite' : hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
+    const eu = PERFIL || {};
+    h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELADA FC</span><button class="eu-av" data-sh="ir" data-v="perfil" aria-label="Meu perfil" style="${eu.foto ? `background-image:url('${eu.foto}')` : ''}">${eu.foto ? '' : ini(eu.apelido || eu.nome)}</button></div>
+    ${prox ? `<button class="home-hero" data-sh="abrir" data-v="${prox.g}"><span class="hh-ola">${ola}${nomeEu ? ', ' + escH(nomeEu) : ''}.</span><span class="hh-q">${escH(falta(prox.d, true))}</span><span class="hh-n">${escH(GRUPOS[prox.g].nome || 'Pelada')}</span><span class="hh-ir">Abrir pelada</span></button>`
+      : `<div class="home-hero"><span class="hh-ola">${ola}${nomeEu ? ', ' + escH(nomeEu) : ''}.</span><span class="hh-q">${ids.length ? 'Sem jogo marcado' : 'Bora jogar?'}</span><span class="hh-n">${ids.length ? 'Quando marcarem a próxima, ela aparece aqui.' : 'Crie sua pelada ou entre com o código de um convite.'}</span></div>`}
     ${ids.filter(avAb).map(g => `<button class="alerta-av" data-sh="avaliar" data-v="${g}"><span class="ic">⭐</span><span><b>Avaliação da galera aberta!</b>${escH(GRUPOS[g].nome || 'Pelada')} · dê sua nota para o elenco</span><span class="ir">Avaliar</span></button>`).join('')}
     ${cartaoPush()}
-    <button class="ob-opt" data-sh="ir" data-v="compartilhar" style="padding:12px 14px"><span class="ic" style="background:var(--card)">📲</span><span class="grow"><b>Convidar para o app</b><span class="sub">Mostre o QR Code ou mande o link do app</span></span></button>
-    ${ids.length ? `<button class="ob-opt" data-sh="ir" data-v="convidar-pelada" style="padding:12px 14px"><span class="ic" style="background:var(--pitch-soft)">⚽</span><span class="grow"><b>Convidar para minha pelada</b><span class="sub">QR Code ou link que já entra na pelada</span></span></button>` : ''}
-    ${!ids.length ? `<p class="lead">Você ainda não está em nenhuma pelada. Crie a sua ou entre com o código de um convite.</p>` : ''}
-    ${adm.length ? `<div class="sub" style="font-weight:700">ADMINISTRO</div>${adm.map(g => card(g, 'ADMIN')).join('')}` : ''}
-    ${jog.length ? `<div class="sub" style="font-weight:700">JOGO</div>${jog.map(g => card(g, 'JOGADOR')).join('')}` : ''}
-    <button class="btn primary block" data-sh="ir" data-v="nova">+ Criar uma pelada</button>
-    <button class="btn block" data-sh="ir" data-v="codigo">📷 Entrar com QR Code ou código</button>
-    <button class="btn block" data-sh="demo">Ver demonstração</button>`; }
+    ${adm.length ? `<h3 class="home-sec">Você administra</h3>${adm.map(g => card(g, true)).join('')}` : ''}
+    ${jog.length ? `<h3 class="home-sec">Você joga</h3>${jog.map(g => card(g, false)).join('')}` : ''}
+    <div class="home-acoes"><button class="btn primary" data-sh="ir" data-v="nova">+ Criar pelada</button><button class="btn" data-sh="ir" data-v="codigo">📷 Entrar com código</button></div>
+    <h3 class="home-sec">Chame a galera</h3>
+    <div class="home-conv"><button class="tile" data-sh="ir" data-v="compartilhar"><span class="ic">📲</span><b>Convidar para o app</b><span class="sub">QR Code ou link</span></button>${ids.length ? `<button class="tile" data-sh="ir" data-v="convidar-pelada"><span class="ic">⚽</span><b>Convidar para a pelada</b><span class="sub">Já entra no grupo</span></button>` : ''}</div>
+    <button class="ob-link" style="align-self:center;margin-top:4px" data-sh="demo">Ver demonstração do app</button>`; }
   if (t === 'nova') h = topo('minhas') + `<h2>Criar sua pelada</h2><p class="lead">Depois você ajusta tudo nos Ajustes.</p>
     <form id="f-nova" class="stack" novalidate>
       <label class="field"><span>Nome da pelada</span><input type="text" id="n-nome" placeholder="Pelada do Sábado" required></label>

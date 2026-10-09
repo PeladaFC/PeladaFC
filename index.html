@@ -376,6 +376,37 @@ nav.tabs button[aria-current="page"] svg{filter:drop-shadow(2px 2px 0 var(--card
 @media (prefers-reduced-motion: no-preference){.sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(30px);opacity:.6}}}
 
 /* casca (login, minhas peladas) */
+.eu-av{all:unset;cursor:pointer;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--pitch) center/cover;color:var(--pitch-ink);font-family:var(--f-display);font-weight:800;font-size:17px;box-shadow:0 0 0 3px var(--card)}
+.eu-av:focus-visible{outline:3px solid var(--pitch);outline-offset:3px}
+.home-hero{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:20px 20px 18px;color:#fff;border-radius:6px;position:relative;overflow:hidden;
+  clip-path:polygon(0 0,calc(100% - 26px) 0,100% 26px,100% 100%,26px 100%,0 calc(100% - 26px));
+  background:radial-gradient(circle at 100% 100%,transparent 70px,rgba(255,255,255,.18) 71px,rgba(255,255,255,.18) 73px,transparent 74px),linear-gradient(90deg,transparent calc(100% - 2px),rgba(255,255,255,.18) 0),repeating-linear-gradient(-55deg,rgba(255,255,255,.06) 0 3px,transparent 3px 22px),radial-gradient(circle at 85% 0%,rgba(242,193,46,.35),transparent 50%),linear-gradient(135deg,var(--pitch),var(--pitch2))}
+div.home-hero{cursor:default}
+.home-hero:focus-visible{outline:3px solid var(--card);outline-offset:-3px}
+.hh-ola{font-size:15px;opacity:.9}
+.hh-q{font-family:var(--f-display);font-weight:800;font-size:44px;line-height:.95;text-transform:uppercase;transform:skewX(-8deg);transform-origin:left;margin-top:6px;text-shadow:3px 3px 0 rgba(0,0,0,.18)}
+.hh-n{font-size:16px;font-weight:600;margin-top:6px;max-width:30ch}
+.hh-ir{align-self:flex-start;margin-top:14px;background:var(--card);color:var(--card-ink);font-weight:800;font-size:14px;padding:8px 14px;border-radius:8px;transform:skewX(-8deg)}
+.home-sec{align-self:flex-start;font-size:19px;margin:10px 0 -2px}
+.clube{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;padding:12px 12px 12px 14px;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--cor);border-radius:12px;text-align:left}
+.clube:focus-visible{outline:3px solid var(--pitch);outline-offset:2px}
+.clube:active{transform:scale(.99)}
+.clube .escudo{width:46px;height:52px;flex:none;display:grid;place-items:center;background:var(--cor);color:#fff;clip-path:polygon(50% 0,100% 12%,100% 58%,50% 100%,0 58%,0 12%);font-family:var(--f-display);font-weight:800;font-size:18px;letter-spacing:.02em}
+.clube .escudo span{margin-top:-6px}
+.clube b{display:block;font-family:var(--f-display);font-weight:700;font-size:20px;line-height:1.1}
+.clube .sub{display:block;margin-top:2px}
+.clube em{font-style:normal;font-weight:700;color:var(--pitch)}
+.clube .tag-ev{font-style:normal;font-size:11px;font-weight:700;background:var(--card);color:var(--card-ink);border-radius:5px;padding:1px 6px;margin-right:6px}
+.clube .papel{font-size:12px;font-weight:700;color:var(--pitch);background:var(--pitch-soft);border-radius:6px;padding:3px 8px}
+.clube .seta{font-size:26px;line-height:1;color:var(--muted);margin-left:2px}
+.home-acoes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+.home-acoes .btn{padding-inline:8px}
+.home-conv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.home-conv .tile{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:14px;border-radius:12px;background:var(--surface);border:1px dashed var(--line)}
+.home-conv .tile:focus-visible{outline:3px solid var(--pitch);outline-offset:2px}
+.home-conv .tile .ic{font-size:26px;margin-bottom:4px}
+.home-conv .tile b{font-size:15px;line-height:1.2}
+.home-conv .tile:only-child{grid-column:1/-1}
 #shell .ob-in{padding-top:calc(18px + env(safe-area-inset-top,0px))}
 #toast{z-index:95}
 .leitor{position:fixed;inset:0;z-index:92;background:#0B1410;color:#fff;display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
