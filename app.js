@@ -216,7 +216,7 @@ function render() {
       <button class="btn primary block" type="submit">Salvar</button></form>
     ${p.apelido ? `<button class="btn block" data-sh="sair">Sair da conta</button><p class="sub" style="text-align:center">${escH(EU.email || '')}</p>` : ''}`; }
   const avOk = rid => { try { return !!localStorage.getItem('pelada.avok.' + rid); } catch (e) { return false; } };
-  const avAb = g => { const a = GRUPOS[g] && GRUPOS[g].avAberta; return a && a.fim > Date.now() && !avOk(a.rid) ? a : null; };
+  const avAb = g => { const a = GRUPOS[g] && GRUPOS[g].avAberta; return a && a.v === 2 && a.fim > Date.now() && !avOk(a.rid) ? a : null; };
   if (t === 'minhas') { const ids = Object.keys(GRUPOS); const adm = ids.filter(g => (GRUPOS[g].admins || []).includes(EU.uid)), jog = ids.filter(g => !adm.includes(g));
     const card = (g, papel) => { const G = GRUPOS[g]; return `<button class="ob-pel" data-sh="abrir" data-v="${g}"><div class="av bg-${papel === 'ADMIN' ? 'MEI' : 'ATA'}">${escH((G.nome || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase())}</div><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.evento ? '<b style="display:inline;font-size:10px;letter-spacing:.05em;color:var(--card-ink);background:var(--card);border-radius:5px;padding:1px 5px;margin-right:4px">EVENTO LIVRE</b>' : ''}${escH(quandoG(G, true))}</span></span><span class="badge2 ${papel === 'ADMIN' ? '' : 'j'}">${papel}</span></button>`; };
     h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELADA FC</span><button class="btn sm" data-sh="ir" data-v="perfil">${escH(PERFIL?.apelido || PERFIL?.nome || 'Perfil')}</button></div>

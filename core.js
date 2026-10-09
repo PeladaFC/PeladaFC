@@ -818,7 +818,7 @@ function render(){
 }
 /* avaliação aberta: avisa no grupo (lista "Minhas peladas") e mostra um alerta grande ao entrar */
 function sincAvisoAval(){if(!ADM()||!GRUPO||!window.sincronizarGrupo)return;const ra=rodadaAberta();
-  const quer=ra?{rid:ra[0],fim:ra[1].fim||0}:null,tem=GRUPO.avAberta||null;
+  const quer=ra?{rid:ra[0],fim:ra[1].fim||0,v:2}:null,tem=GRUPO.avAberta||null;
   if(JSON.stringify(quer)!==JSON.stringify(tem)){GRUPO.avAberta=quer;window.sincronizarGrupo({avAberta:quer})}}
 const AV_POP=new Set();
 function avPendente(){const ra=rodadaAberta();if(!ra||!meuJogador())return null;const p=progressoAv(ra[0],ra[1]);return p.total&&p.feitos<p.total?{rid:ra[0],r:ra[1],...p}:null}
@@ -1060,7 +1060,7 @@ function painelJogador(pid,p,l){
    Essa média vira a "estrela" do jogador e substitui a nota inicial do cadastro no cálculo da nota. */
 const MIN_AV=2;
 function critDe(jid){return critKey(J(jid).pos)}
-function rodadaAberta(){return Object.entries(S.avals||{}).filter(([,r])=>r&&r.status==='aberta').sort((a,b)=>(b[1].criadoEm||0)-(a[1].criadoEm||0))[0]||null}
+function rodadaAberta(){return Object.entries(S.avals||{}).filter(([,r])=>r&&r.status==='aberta'&&r.v===2).sort((a,b)=>(b[1].criadoEm||0)-(a[1].criadoEm||0))[0]||null}
 function alvosDe(r){return(r.alvos||[]).filter(id=>S.jog[id])}
 function meusAv(rid){const d=(S.votos||{})[myId];return((d&&d.av)||{})[rid]||{}}
 function feitoAv(jid,v){if(!v)return false;if(v.ns)return true;return critDe(jid).every(([c])=>Number(v[c])>0)}
@@ -1092,7 +1092,8 @@ function fecharRodada(rid){const r=S.avals[rid];if(!r||FECHANDO_AV.has(rid))retu
   for(const[jid,x] of Object.entries(res)){const j=S.jog[jid];if(!j||x.n<MIN_AV)continue;
     put('jogadores/'+jid,{...j,critGalera:x.crit,critN:x.n,critEm:now})}
 }
-function consolidarRodadas(){if(demo||!ADM()||!S.votosOk)return;const ra=rodadaAberta();if(ra&&Date.now()>=(ra[1].fim||0))fecharRodada(ra[0])}
+function consolidarRodadas(){if(demo||!ADM())return;for(const[rid,r] of Object.entries(S.avals||{}))if(r&&r.status==='aberta'&&r.v!==2&&!FECHANDO_AV.has(rid)){FECHANDO_AV.add(rid);put('avaliacoes/'+rid,{...r,status:'cancelada',canceladaEm:Date.now()})}
+  if(!S.votosOk)return;const ra=rodadaAberta();if(ra&&Date.now()>=(ra[1].fim||0))fecharRodada(ra[0])}
 
 /* painel do administrador: abrir / acompanhar / encerrar a avaliação da galera */
 function statsRodada(rid,r){const ids=alvosDe(r),vs=Object.entries(S.votos||{}).filter(([,d])=>d&&d.av&&d.av[rid]);
@@ -1150,12 +1151,18 @@ function sheetAvAdmin(){const ra=rodadaAberta();
       <button class="btn primary block" data-act="av-encerrar" data-r="${rid}">Encerrar agora e calcular</button>
       <button class="btn danger block" data-act="av-cancelar" data-r="${rid}">Cancelar avaliação</button>
       <p class="sub" style="margin:0">Ao encerrar, cada jogador avaliado por pelo menos ${MIN_AV} pessoas ganha a estrela da galera, que passa a valer no lugar da nota inicial do cadastro.</p></div>`);return}
-  if(!UI.avSel)UI.avSel=new Set();const sel=UI.avSel;
+  if(!UI.avSel)UI.avSel=new Set();const sel=UI.avSel;if(!UI.avPrazo)UI.avPrazo=24;
+  const prazo=`<div class="field"><span>Por quanto tempo a votação fica aberta?</span><div class="pick">${[[12,'12 horas'],[24,'24 horas'],[48,'2 dias'],[72,'3 dias'],[168,'7 dias']].map(([h,n])=>`<button data-act="av-prazo" data-v="${h}" aria-pressed="${UI.avPrazo===h}">${n}</button>`).join('')}</div><div class="sub" style="margin-top:6px">Fecha ${quandoFim(Date.now()+UI.avPrazo*36e5)}. Você pode encerrar antes, se todo mundo já tiver votado.</div></div>`;
+  if(UI.avModo==='todos'){const ids=ativos();
+    openSheet('Abrir avaliação para todos',`<div class="stack"><p style="margin:0">Cada pessoa do grupo vai dar nota para <b>todos os outros ${ids.length>1?ids.length-1:''} jogadores</b> nos 5 critérios. É secreto.</p>
+      <p class="sub" style="margin:0">Assim que você abrir, aparece um <b>alerta amarelo</b> para todo mundo quando entrar no app.</p>
+      ${prazo}
+      <button class="btn primary block btn-grande" data-act="av-criar">Abrir avaliação agora</button><button class="btn block" data-act="fechar-sheet">Cancelar</button></div>`);return}
   const ids=ativos().sort((a,b)=>(!!S.jog[a].critGalera)-(!!S.jog[b].critGalera)||nm(a).localeCompare(nm(b)));
   openSheet('Nova avaliação completa',`<div class="stack"><p class="sub" style="margin:0">Escolha quem a galera vai avaliar nos 5 critérios. Os marcados com <b>NOVO</b> ainda não têm avaliação da galera.</p>
     <div class="row" style="gap:6px"><button class="btn sm" data-act="av-sel" data-v="todos">Todos</button><button class="btn sm" data-act="av-sel" data-v="novos">Só os novos</button><button class="btn sm" data-act="av-sel" data-v="nenhum">Limpar</button></div>
     <div class="avgrid">${ids.map(id=>`<button class="avcard ${sel.has(id)?'on':''}" data-act="av-tog" data-j="${id}" aria-pressed="${sel.has(id)}">${avG(id,56)}<b>${esc(nm(id))}</b><span class="chip p-${J(id).pos}">${J(id).pos}</span>${S.jog[id].critGalera?'':'<span class="novo">NOVO</span>'}${sel.has(id)?'<span class="ok">✓</span>':''}</button>`).join('')}</div>
-    <label class="field"><span>Prazo para avaliar</span><select id="av-prazo">${[1,2,3,5,7].map(d=>`<option value="${d}" ${d===3?'selected':''}>${d} dia${d>1?'s':''}</option>`).join('')}</select></label>
+    ${prazo}
     <button class="btn primary block btn-grande" data-act="av-criar" ${sel.size?'':'disabled'}>Abrir avaliação · ${sel.size} jogador${sel.size===1?'':'es'}</button></div>`)}
 
 /* estrela (radar) dos 5 critérios, com comparação */
@@ -1605,13 +1612,14 @@ document.addEventListener('click',e=>{
       const id=uid('j'),pos=m.pos||'MEI',crit={};critKey(pos).forEach(([k])=>crit[k]=3);
       put('jogadores/'+id,{nome:m.nome||m.apelido||'Sem nome',apelido:m.apelido||'',tel:m.tel||'',pos,pos2:'',tipo:m.prefere==='diarista'?'diarista':'mensalista',foto:m.foto||null,conv:'',crit,semNota:true,ativo:true,criadoEm:Date.now()});
       put('presencas/'+d.u,{...(S.pres[d.u]||{pel:{}}),jogador:id});toast(`${m.apelido||m.nome||'Jogador'} entrou sem nota. Avalie antes do sorteio.`);break}
-    case'av-semnota':{UI.avSel=new Set(d.v.split(','));sheetAvAdmin();break}
-    case'av-admin':UI.avSel=null;sheetAvAdmin();break;
-    case'av-todos':UI.avSel=new Set(ativos());sheetAvAdmin();break;
+    case'av-prazo':{UI.avPrazo=Number(d.v);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
+    case'av-semnota':{UI.avModo=null;UI.avSel=new Set(d.v.split(','));sheetAvAdmin();break}
+    case'av-admin':UI.avModo=null;UI.avSel=null;sheetAvAdmin();break;
+    case'av-todos':UI.avModo='todos';UI.avPrazo=null;UI.avSel=new Set(ativos());sheetAvAdmin();break;
     case'av-tog':{UI.avSel.has(d.j)?UI.avSel.delete(d.j):UI.avSel.add(d.j);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
     case'av-sel':{const ids=ativos();UI.avSel=new Set(d.v==='todos'?ids:d.v==='novos'?ids.filter(x=>!S.jog[x].critGalera):[]);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
-    case'av-criar':{if(!UI.avSel||!UI.avSel.size)return;const dias=Number(document.getElementById('av-prazo').value)||3,rid=uid('r');
-      put('avaliacoes/'+rid,{criadoEm:Date.now(),fim:Date.now()+dias*864e5,alvos:[...UI.avSel],status:'aberta'});AV_POP.add(rid);UI.avSel=null;closeSheet();toast('Avaliação aberta! A galera já pode avaliar.');break}
+    case'av-criar':{if(!UI.avSel||!UI.avSel.size)return;const horas=UI.avPrazo||24,rid=uid('r');
+      put('avaliacoes/'+rid,{criadoEm:Date.now(),fim:Date.now()+horas*36e5,alvos:[...UI.avSel],status:'aberta',v:2,por:myId});AV_POP.add(rid);UI.avSel=null;UI.avModo=null;UI.avPrazo=null;closeSheet();toast('Avaliação aberta! A galera já pode avaliar.');break}
     case'av-encerrar-p':if(b.dataset.sure){fecharRodada(d.r);toast('Avaliação encerrada. Notas atualizadas.')}else{b.dataset.sure='1';b.textContent='Toque de novo para encerrar'}break;
     case'av-encerrar':fecharRodada(d.r);closeSheet();toast('Avaliação encerrada. Estrelas e notas atualizadas.');break;
     case'av-cancelar':if(b.dataset.sure){const r=S.avals[d.r];put('avaliacoes/'+d.r,{...r,status:'cancelada'});closeSheet();toast('Avaliação cancelada.')}else{b.dataset.sure='1';b.textContent='Toque de novo para cancelar'}break;
