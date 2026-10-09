@@ -157,6 +157,9 @@ function lista(p,pid){
     nao:ativos().filter(id=>resp[id]?.s==='nao'),
     pend:ativos().filter(id=>!resp[id]||!resp[id].s)};
 }
+const idsRegra=r=>(r.ids||[r.a,r.b]).filter(Boolean);
+const nomesLista=ids=>{const n=ids.map(x=>esc(nm(x)));return n.length>1?n.slice(0,-1).join(', ')+' e '+n[n.length-1]:n.join('')};
+function textoRegra(r){const ids=idsRegra(r);return r.tipo==='separar'?(ids.length>2?`<b>${nomesLista(ids)}</b> em times diferentes`:`<b>${esc(nm(ids[0]))}</b> não joga com <b>${esc(nm(ids[1]))}</b>`):(ids.length>2?`<b>${nomesLista(ids)}</b> sempre juntos`:`<b>${esc(nm(ids[0]))}</b> sempre com <b>${esc(nm(ids[1]))}</b>`)}
 function posLinha(id){const j=J(id);if(j.pos!=='GOL')return j.pos;return j.pos2&&j.pos2!=='GOL'?j.pos2:'MEI'}
 function sortear(p,T){
   const{escalados,gks}=lista(p),N=notaAtual,noSorteio=!!cfg().golSorteio;
@@ -178,11 +181,19 @@ function sortear(p,T){
     const m=sum(means)/T;let c=sum(means.map(x=>(x-m)**2))*10;
     const sz=L.map(a=>a.length);c+=Math.max(0,Math.max(...sz)-Math.min(...sz)-1)*50;
     for(const pos of['ZAG','MEI','ATA']){const n=L.map(a=>a.filter(id=>posLinha(id)===pos).length);c+=Math.max(0,Math.max(...n)-Math.min(...n)-1)*3}
-    for(const r of restr){const ta=L.findIndex(a=>a.includes(r.a)),tb=L.findIndex(a=>a.includes(r.b));
-      if(ta<0||tb<0)continue;if(r.tipo==='separar'&&ta===tb)c+=20;if(r.tipo==='juntar'&&ta!==tb)c+=20}
+    for(const r of restr){const ts=idsRegra(r).map(id=>L.findIndex(a=>a.includes(id))).filter(t=>t>=0);if(ts.length<2)continue;
+      const cnt=Array(T).fill(0);ts.forEach(t=>cnt[t]++);
+      if(r.tipo==='juntar')c+=(ts.length-Math.max(...cnt))*200;
+      else{const lim=Math.ceil(ts.length/T);c+=sum(cnt.map(n=>Math.max(0,n-lim)))*200}}
     return c};
+  // grupos "sempre juntos": antes de equilibrar, junta todo mundo no time onde a maioria já está
+  for(const r of restr){if(r.tipo!=='juntar'||T<2)continue;const g=idsRegra(r).filter(id=>L.some(a=>a.includes(id)));if(g.length<2)continue;
+    const cnt=L.map(a=>a.filter(id=>g.includes(id)).length),alvo=cnt.indexOf(Math.max(...cnt));
+    for(const id of g){const t=L.findIndex(a=>a.includes(id));if(t===alvo)continue;
+      const livres=L[alvo].map((x,k)=>k).filter(k=>!g.includes(L[alvo][k]));if(!livres.length)break;
+      const k=livres.find(k=>posLinha(L[alvo][k])===posLinha(id))??livres[0],a=L[t].indexOf(id);[L[t][a],L[alvo][k]]=[L[alvo][k],L[t][a]]}}
   let c=cost();
-  for(let it=0;it<4000&&T>1;it++){
+  for(let it=0;it<6000&&T>1;it++){
     const i=Math.floor(Math.random()*T);let j=Math.floor(Math.random()*T);if(i===j)continue;
     if(!L[i].length||!L[j].length)continue;
     const a=Math.floor(Math.random()*L[i].length);
@@ -868,12 +879,15 @@ function guardarNp(t){UI[t.dataset.np]=t.value;
   if(t.dataset.np==='npFim')UI.npFimManual=true;
   if(t.dataset.np==='npHora'&&!UI.npFimManual&&t.value){const f=document.getElementById('np-fim');UI.npFim=maisHora(t.value,60);if(f)f.value=UI.npFim}}
 function bannerPendente(){return`<div class="banner due" style="margin-top:12px"><span><b>⏳ Sua entrada está esperando a autorização do administrador.</b><br>Assim que ele autorizar, seu nome entra no elenco e você já pode confirmar presença.</span></div>`}
-function sheetRegra(tipo){const pe=atual(),l=pe?lista(pe[1],pe[0]):{escalados:[],gks:[]},vai=[...l.escalados,...l.gks],outros=ativos().filter(x=>!vai.includes(x)).sort((a,b)=>nm(a).localeCompare(nm(b)));
-  const opts=`<option value="">Escolha</option>${vai.length?`<optgroup label="Confirmados">${vai.map(x=>`<option value="${x}">${esc(nm(x))}</option>`).join('')}</optgroup>`:''}${outros.length?`<optgroup label="Outros do elenco">${outros.map(x=>`<option value="${x}">${esc(nm(x))}</option>`).join('')}</optgroup>`:''}`;
-  openSheet(tipo==='juntar'?'Jogar juntos':'Não jogar juntos',`<div class="stack"><p class="sub" style="margin:0">${tipo==='juntar'?'O sorteio coloca os dois sempre no mesmo time.':'O sorteio nunca coloca os dois no mesmo time.'} A regra fica salva para as próximas peladas.</p>
-    <label class="field"><span>Jogador</span><select id="rg-a">${opts}</select></label>
-    <label class="field"><span>${tipo==='juntar'?'Joga junto com':'Não joga com'}</span><select id="rg-b">${opts}</select></label>
-    <button class="btn primary block" data-act="regra-salvar" data-v="${tipo}">Salvar regra</button></div>`)}
+function sheetRegra(tipo){if(tipo)UI.rg={tipo,sel:new Set()};const rg=UI.rg;if(!rg)return;const max=Math.max(2,Number(cfg().porTime)||5);
+  const pe=atual(),l=pe?lista(pe[1],pe[0]):{escalados:[],gks:[]},vai=[...l.escalados,...l.gks],outros=ativos().filter(x=>!vai.includes(x)).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  const card=id=>`<button class="avcard ${rg.sel.has(id)?'on':''}" data-act="rg-tog" data-j="${id}" aria-pressed="${rg.sel.has(id)}">${avG(id,48)}<b>${esc(nm(id))}</b>${rg.sel.has(id)?'<span class="ok">✓</span>':''}</button>`;
+  const n=rg.sel.size,juntar=rg.tipo==='juntar';
+  openSheet(juntar?'Jogar juntos':'Não jogar juntos',`<div class="stack"><p class="sub" style="margin:0">${juntar?'O sorteio coloca todos os escolhidos no mesmo time.':'O sorteio espalha os escolhidos em times diferentes.'} Escolha de 2 até ${max} jogadores (o tamanho de um time). A regra fica salva para as próximas peladas.</p>
+    ${vai.length?`<div class="sub" style="font-weight:700">CONFIRMADOS</div><div class="avgrid">${vai.map(card).join('')}</div>`:''}
+    ${outros.length?`<div class="sub" style="font-weight:700">OUTROS DO ELENCO</div><div class="avgrid">${outros.map(card).join('')}</div>`:''}
+    ${!juntar&&n>(Number((atual()||[0,{}])[1].nTimes)||Number(cfg().times)||2)?`<div class="sub">Com mais escolhidos do que times, alguns vão cair juntos, mas o sorteio divide o mais igual possível.</div>`:''}
+    <button class="btn primary block" data-act="regra-salvar" ${n>=2?'':'disabled'}>${n>=2?`Salvar regra · ${n} jogadores`:'Escolha pelo menos 2'}</button></div>`)}
 /* --- Jogo --- */
 function tJogo(A){
   const c=cfg();let h='';
@@ -943,9 +957,9 @@ function subTimes(pid,p,l,A){
   if(A)h+=`<div class="panel stack"><div class="row between"><div><b>${l.escalados.length} na linha · ${l.gks.length} goleiro(s)</b><div class="sub">${c.golSorteio?'Goleiros entram no sorteio':'Goleiros ficam fora do sorteio (extra)'} · equilibra por nota e posição${(c.restr||[]).length?' · respeita '+c.restr.length+' regra(s)':''}</div></div>
     <div class="row"><select id="nt" aria-label="Número de times" style="width:auto">${[2,3,4].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
     <button class="btn primary" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div></div>`;
-  if(A){const rs=(c.restr||[]).filter(r=>S.jog[r.a]&&S.jog[r.b]),vai=new Set([...l.escalados,...l.gks]);
+  if(A){const rs=(c.restr||[]).filter(r=>idsRegra(r).filter(x=>S.jog[x]).length>=2),vai=new Set([...l.escalados,...l.gks]);
     h+=`<div class="panel stack" style="margin-top:12px"><div class="panel-h"><h3>Regras do sorteio</h3><span class="sub">${rs.length?rs.length+' regra'+(rs.length>1?'s':''):''}</span></div>
-      ${rs.length?`<div class="list">${rs.map((r,i)=>`<div class="item"><span style="font-size:20px">${r.tipo==='separar'?'🚫':'🤝'}</span><div class="grow small"><b>${esc(nm(r.a))}</b> ${r.tipo==='separar'?'não joga com':'sempre com'} <b>${esc(nm(r.b))}</b>${vai.has(r.a)&&vai.has(r.b)?'':'<div class="sub">Não vale hoje: um dos dois não confirmou</div>'}</div><button class="btn sm" data-act="regra-del" data-i="${(c.restr||[]).indexOf(r)}" aria-label="Apagar regra">✕</button></div>`).join('')}</div>`:'<div class="sub" style="margin-top:-4px">Ex.: dois amigos que querem jogar juntos, ou dois irmãos que não podem cair no mesmo time.</div>'}
+      ${rs.length?`<div class="list">${rs.map((r,i)=>`<div class="item"><span style="font-size:20px">${r.tipo==='separar'?'🚫':'🤝'}</span><div class="grow small">${textoRegra(r)}${(()=>{const ids=idsRegra(r),fora=ids.filter(x=>!vai.has(x));return!fora.length?'':ids.length-fora.length<2?'<div class="sub">Não vale hoje: falta gente confirmar</div>':`<div class="sub">Hoje sem: ${nomesLista(fora)}</div>`})()}</div><button class="btn sm" data-act="regra-del" data-i="${(c.restr||[]).indexOf(r)}" aria-label="Apagar regra">✕</button></div>`).join('')}</div>`:'<div class="sub" style="margin-top:-4px">Ex.: dois amigos que querem jogar juntos, ou dois irmãos que não podem cair no mesmo time.</div>'}
       <div class="lado"><button class="btn sm" data-act="regra-nova" data-v="juntar">🤝 Jogar juntos</button><button class="btn sm" data-act="regra-nova" data-v="separar">🚫 Não jogar juntos</button></div>
       ${rs.length&&p.times?'<div class="sub">Mudou as regras? Toque em <b>Sortear de novo</b>.</div>':''}</div>`}
   {const sn=[...l.escalados,...l.gks].filter(semAvaliacao);if(A&&sn.length)h=`<div class="banner due" style="margin-bottom:12px;display:block"><b>⚠️ ${sn.length} jogador${sn.length>1?'es':''} sem nota confirmado${sn.length>1?'s':''}</b><br><span class="sub" style="color:inherit">${sn.map(x=>esc(nm(x))).join(', ')}. Avalie antes do sorteio para os times saírem equilibrados.</span>
@@ -1380,7 +1394,7 @@ function sheetCfg(){
   renderRestr();renderAdmins();
 }
 function renderRestr(){const el=document.getElementById('restr');if(!el)return;
-  el.innerHTML=F.restr.length?F.restr.map((r,i)=>`<div class="item"><div class="grow small"><b>${esc(nm(r.a))}</b> ${r.tipo==='separar'?'separado de':'junto com'} <b>${esc(nm(r.b))}</b></div><button class="btn sm" data-act="del-restr" data-i="${i}" aria-label="Remover regra">✕</button></div>`).join(''):'<div class="sub">Nenhuma regra.</div>'}
+  el.innerHTML=F.restr.length?F.restr.map((r,i)=>`<div class="item"><div class="grow small">${textoRegra(r)}</div><button class="btn sm" data-act="del-restr" data-i="${i}" aria-label="Remover regra">✕</button></div>`).join(''):'<div class="sub">Nenhuma regra.</div>'}
 
 function sheetJog(id){
   const j=id?S.jog[id]:null;
@@ -1610,8 +1624,10 @@ document.addEventListener('click',e=>{
         .forEach(([tipo,d2,hora])=>put('avisos/'+uid('a'),{tipo,dia:d2,hora,ativo:true}));toast('Agenda sugerida criada. Ajuste à vontade.');break}
     case'premio':break;
     case'regra-nova':sheetRegra(d.v);break;
-    case'regra-salvar':{const a=document.getElementById('rg-a').value,bb=document.getElementById('rg-b').value;if(!a||!bb||a===bb){toast('Escolha dois jogadores diferentes.');return}
-      const rs=(cfg().restr||[]).filter(r=>!((r.a===a&&r.b===bb)||(r.a===bb&&r.b===a)));rs.push({a,b:bb,tipo:d.v});put('config/geral',{...(S.config||{}),restr:rs});closeSheet();toast('Regra salva.');break}
+    case'rg-tog':{const rg=UI.rg;if(!rg)return;const max=Math.max(2,Number(cfg().porTime)||5);if(rg.sel.has(d.j))rg.sel.delete(d.j);else{if(rg.sel.size>=max){toast(`No máximo ${max} jogadores (o tamanho de um time).`);return}rg.sel.add(d.j)}
+      const sc=document.querySelector('.sheet').scrollTop;sheetRegra();document.querySelector('.sheet').scrollTop=sc;break}
+    case'regra-salvar':{const rg=UI.rg;if(!rg||rg.sel.size<2)return;const ids=[...rg.sel];
+      const rs=(cfg().restr||[]).slice();rs.push({tipo:rg.tipo,ids,a:ids[0],b:ids[1]});put('config/geral',{...(S.config||{}),restr:rs});UI.rg=null;closeSheet();toast('Regra salva.');break}
     case'regra-del':{const rs=(cfg().restr||[]).slice();rs.splice(Number(d.i),1);put('config/geral',{...(S.config||{}),restr:rs});toast('Regra apagada.');break}
     case'add-restr':{const a=document.getElementById('r-a').value,bb=document.getElementById('r-b').value;if(!a||!bb||a===bb){toast('Escolha dois jogadores diferentes.');return}F.restr.push({a,b:bb,tipo:d.v});renderRestr();break}
     case'del-restr':F.restr.splice(Number(d.i),1);renderRestr();break;
