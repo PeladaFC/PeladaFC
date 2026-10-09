@@ -25,6 +25,7 @@ const NOTIF={
   espera:{n:'Foi para a espera',d:'Confirmou com a lista já cheia',def:true},
   subiu:{n:'Abriu vaga',d:'Alguém saiu da espera e entrou na lista',def:true},
   cheia:{n:'Lista completa',d:'Todas as vagas da linha preenchidas',def:true},
+  posicao:{n:'Troca de posição',d:'Jogador mudou a própria posição no grupo',def:true},
   aviso:{n:'Hora de mandar mensagem',d:'Os avisos programados na aba Avisos',def:true}
 };
 const DEF_CFG={nivelPublico:false,nome:'Pelada de Sábado',dia:6,hora:'08:00',local:'',times:2,porTime:5,mensal:80,diaria:20,pix:'',link:'',restr:[]};
@@ -62,7 +63,9 @@ const parseD=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
 const dLong=s=>{const d=parseD(s);return DIAS[d.getDay()]+', '+pad(d.getDate())+'/'+pad(d.getMonth()+1)};
 const dShort=s=>{const d=parseD(s);return DIAS3[d.getDay()]+' '+pad(d.getDate())+'/'+pad(d.getMonth()+1)};
 const cfg=()=>Object.assign({},DEF_CFG,S.config||{});
-const J=id=>S.jog[id]||{nome:'(removido)',pos:'MEI'};
+let POS_IDX=null;
+function posIdx(){if(!POS_IDX){POS_IDX={};for(const d of Object.values(S.pres||{}))if(d&&d.jogador&&d.pos)POS_IDX[d.jogador]=d.pos}return POS_IDX}
+const J=id=>{const j=S.jog[id];if(!j)return{nome:'(removido)',pos:'MEI'};const o=posIdx()[id];return o&&o!==j.pos?{...j,pos:o,pos2:j.pos2===o?'':j.pos2}:j};
 const nm=id=>{const j=J(id);return j.apelido||j.nome};
 const initials=s=>String(s||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 const sum=a=>a.reduce((x,y)=>x+y,0);
@@ -75,14 +78,14 @@ function slotGet(path){const[c,id]=path.split('/');return c==='config'?S.config:
 function slotSet(path,v){const[c,id]=path.split('/');if(c==='config')S.config=v;else if(c==='eventos')S.feed=v;else if(v==null)delete S[COL[c]][id];else S[COL[c]][id]=v}
 function chain(path,fn){queues[path]=(queues[path]||Promise.resolve()).then(fn).catch(writeErr);return queues[path]}
 function writeErr(e){console.warn(e);toast(e&&(e.code==='invalid_argument'||e.code==='permission-denied')?(ADM()?'Não foi possível salvar. Verifique a conexão.':'Só o administrador pode alterar isso.'):e&&e.code==='quota_exceeded'?'O banco da pelada encheu. Apague registros antigos.':'Não foi possível salvar. Tente de novo.')}
-function put(path,data){slotSet(path,data);render();if(demo||!db)return;delete pending[path];return chain(path,()=>db.doc(path).set(data))}
-function del(path){slotSet(path,null);render();if(demo||!db)return;return chain(path,()=>db.doc(path).delete())}
+function put(path,data){slotSet(path,data);render();if(demo||!db)return;delete pending[path];const d0=db;return chain(path,()=>d0.doc(path).set(data))}
+function del(path){slotSet(path,null);render();if(demo||!db)return;const d0=db;return chain(path,()=>d0.doc(path).delete())}
 function patch(path,part){
   slotSet(path,merge(slotGet(path),part));render();
   if(demo||!db)return;
   pending[path]=merge(pending[path],part);
   clearTimeout(timers[path]);
-  timers[path]=setTimeout(()=>{const p=pending[path];delete pending[path];if(p)chain(path,()=>db.doc(path).update(p))},450);
+  const d0=db;timers[path]=setTimeout(()=>{const p=pending[path];delete pending[path];if(p)chain(path,()=>d0.doc(path).update(p))},450);
 }
 function withPending(colName,map){for(const p in pending){const[c,id]=p.split('/');if(c===colName&&map[id])map[id]=merge(map[id],pending[p])}return map}
 
@@ -536,6 +539,7 @@ function feedItems(){
       else if(r.a==='sim'){tipo='desistiu';texto=`${nm(j)} desistiu pelo app`}
       else{tipo='naoVai';texto=`${nm(j)} respondeu pelo app que não vai`}
       out.push({id:u+pid,tipo,texto:texto+q,t:r.t})}}
+  for(const doc of Object.values(S.pres||{})){const x=doc&&doc.posTroca,j=doc&&doc.jogador;if(x&&j&&S.jog[j])out.push({id:'pos'+j+x.t,tipo:'posicao',texto:`${nm(j)} mudou de posição: ${POS[x.de]||x.de} → ${POS[x.para]||x.para}`,t:x.t})}
   return out.sort((a,b)=>b.t-a.t);
 }
 /* notificações de cada jogador (calculadas a partir dos dados da pelada) */
@@ -825,7 +829,7 @@ function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GR
 
 /* ---------- render ---------- */
 function render(){
-  NOTA_CACHE=null;consolidarAvaliacoes();consolidarRodadas();
+  NOTA_CACHE=null;POS_IDX=null;consolidarAvaliacoes();consolidarRodadas();
   const app=document.getElementById('app');
   const ae=document.activeElement,aid=ae&&ae.id,sel=aid&&ae.selectionStart!=null?[ae.selectionStart,ae.selectionEnd]:null;
   renderNav();setTimeout(checarPush,0);
@@ -894,6 +898,11 @@ function sheetRegra(tipo){if(tipo)UI.rg={tipo,sel:new Set()};const rg=UI.rg;if(!
     ${outros.length?`<div class="sub" style="font-weight:700">OUTROS DO ELENCO</div><div class="avgrid">${outros.map(card).join('')}</div>`:''}
     ${!juntar&&n>(Number((atual()||[0,{}])[1].nTimes)||Number(cfg().times)||2)?`<div class="sub">Com mais escolhidos do que times, alguns vão cair juntos, mas o sorteio divide o mais igual possível.</div>`:''}
     <button class="btn primary block" data-act="regra-salvar" ${n>=2?'':'disabled'}>${n>=2?`Salvar regra · ${n} jogadores`:'Escolha pelo menos 2'}</button></div>`)}
+function trocaPosAberta(){const pe=atual();return!(pe&&pe[1].times)}
+function sheetMinhaPos(){const id=meuJogador();if(!id)return;const j=J(id);
+  if(!trocaPosAberta()){openSheet('Mudar minha posição',`<div class="stack"><p style="margin:0">🔒 A troca de posição está fechada para esta pelada.</p><p class="sub" style="margin:0">Ela abre de novo depois da pelada. Se precisar mudar agora, fale com o administrador.</p><button class="btn block" data-act="fechar-sheet">Entendi</button></div>`);return}
+  openSheet('Mudar minha posição',`<div class="stack"><p class="sub" style="margin:0">A posição vale para este grupo: ela muda o peso de cada critério na sua nota e ajuda o sorteio a montar os times. Só dá para trocar antes do sorteio. Os administradores recebem um aviso.</p>
+    <div class="pick">${Object.entries(POS).map(([k,n])=>`<button data-act="minha-pos" data-v="${k}" aria-pressed="${j.pos===k}">${n}</button>`).join('')}</div></div>`)}
 /* --- Jogo --- */
 function tJogo(A){
   const c=cfg();let h='';
@@ -974,7 +983,8 @@ function subTimes(pid,p,l,A){
   // 3. sortear
   sec.sortear=`<div class="panel stack"><div class="row between"><div><b>${l.escalados.length} na linha · ${l.gks.length} goleiro(s)</b><div class="sub">${c.golSorteio?'Goleiros entram no sorteio':'Goleiros ficam fora do sorteio (extra)'} · equilibra por nota e posição${(c.restr||[]).length?' · respeita '+c.restr.length+' regra(s)':''}</div></div>
     <div class="row"><select id="nt" aria-label="Número de times" style="width:auto">${[2,3,4].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
-    <button class="btn primary" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div></div>`;
+    <button class="btn primary" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div>
+    ${p.times?`<button class="btn sm danger" style="align-self:flex-start" data-act="apagar-sorteio" data-p="${pid}">Apagar sorteio</button><div class="sub" style="margin-top:-4px">Com o sorteio feito, os jogadores não podem trocar de posição. Apagando, a troca abre de novo.</div>`:'<div class="sub" style="margin-top:-4px">Até o sorteio, cada jogador pode trocar a própria posição.</div>'}</div>`;
   if(p.times){
     // 4. equilíbrio
     const med=p.times.map(teamMedia),mx=Math.max(...med),mn=Math.min(...med);
@@ -1254,7 +1264,7 @@ function tElenco(A){
   }
   const linha=(id,tag='')=>{const s=st[id]||{};
     return`<button class="item" data-act="ver-jog" data-j="${id}" style="all:unset;display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);cursor:pointer">
-      ${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${S.jog[id].pos}">${S.jog[id].pos}</span>${tag}<span>${tipoTxt(id)}${A&&semAvaliacao(id)?' · <b style="color:var(--red,#c0392b)">SEM NOTA</b>':''} · ${s.j||0} jogos · ${s.g||0} gols</span></div></div>${podeVerAval(id)?`<span class="nota num">${ovr(notaAtual(id))}</span>`:`<span class="sub" style="font-size:11px;text-align:right;line-height:1.2">Em<br>avaliação</span>`}</button>`};
+      ${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${J(id).pos}">${J(id).pos}</span>${tag}<span>${tipoTxt(id)}${A&&semAvaliacao(id)?' · <b style="color:var(--red,#c0392b)">SEM NOTA</b>':''} · ${s.j||0} jogos · ${s.g||0} gols</span></div></div>${podeVerAval(id)?`<span class="nota num">${ovr(notaAtual(id))}</span>`:`<span class="sub" style="font-size:11px;text-align:right;line-height:1.2">Em<br>avaliação</span>`}</button>`};
   if(UI.filtro==='inativos'){h+='<div class="panel"><div class="list">'+(ids.length?ids.map(id=>linha(id)).join(''):'<div class="empty">Nenhum jogador aqui.</div>')+'</div></div>';return h}
   const set=new Set(ids),cur=atual();
   const exc=cur?lista(cur[1],cur[0]).espera.filter(id=>set.has(id)):[];
@@ -1314,7 +1324,7 @@ function tRanking(){
   if(!ids.length)return h+`<div class="empty">${total?'Ninguém pontuou aqui neste período.':'Nenhuma pelada concluída neste período.'}</div></div>`;
   h+=`<div class="rank"><span></span><span class="h" style="text-align:left">Jogador</span>${cols.map(c=>`<span class="h">${c}</span>`).join('')}`;
   ids.forEach((id,i)=>{const v=vals(id);
-    h+=`<div class="line"></div><span class="pos num">${i+1}</span><span style="min-width:0"><span class="name">${esc(nm(id))}</span> <span class="chip p-${S.jog[id].pos}">${S.jog[id].pos}</span></span>${v.map((x,k)=>`<span class="v ${k===0?'hi':''}">${x}</span>`).join('')}`});
+    h+=`<div class="line"></div><span class="pos num">${i+1}</span><span style="min-width:0"><span class="name">${esc(nm(id))}</span> <span class="chip p-${J(id).pos}">${S.jog[id].pos}</span></span>${v.map((x,k)=>`<span class="v ${k===0?'hi':''}">${x}</span>`).join('')}`});
   return h+'</div></div>';
 }
 
@@ -1415,7 +1425,7 @@ function renderRestr(){const el=document.getElementById('restr');if(!el)return;
   el.innerHTML=F.restr.length?F.restr.map((r,i)=>`<div class="item"><div class="grow small">${textoRegra(r)}</div><button class="btn sm" data-act="del-restr" data-i="${i}" aria-label="Remover regra">✕</button></div>`).join(''):'<div class="sub">Nenhuma regra.</div>'}
 
 function sheetJog(id){
-  const j=id?S.jog[id]:null;
+  const j=id?(S.jog[id]?J(id):null):null;
   F=j?JSON.parse(JSON.stringify({...j,_id:id})):{nome:'',apelido:'',tel:'',pos:'MEI',pos2:'',tipo:'mensalista',conv:'',crit:{},_id:null};
   F._depois=!!(j&&j.semNota&&!j.critGalera);
   openSheet(id?'Editar jogador':'Novo jogador','<div id="jf"></div>');renderJogForm();
@@ -1448,6 +1458,7 @@ function sheetVerJog(id){
   const mesK=mesAtual(),aj=(j.ajustes||{})[mesK]||{};
   openSheet(nm(id),`<div class="stack">
     <div class="board"><div class="row between"><div><div class="when" style="font-size:${podeVerAval(id)?56:30}px">${podeVerAval(id)?ovr(notaAtual(id)):'Em avaliação'}</div><div class="where">${POS[j.pos]}${j.pos2?' · também '+POS[j.pos2].toLowerCase():''} · ${tipoTxt(id)}</div></div></div>
+    ${!demo&&id===meuJogador()?`<button class="btn sm" style="margin-top:12px;background:rgba(255,255,255,.15);color:inherit;border-color:rgba(255,255,255,.35)" data-act="minha-pos-abrir">${trocaPosAberta()?'Mudar minha posição':'🔒 Mudar minha posição'}</button>`:''}
     <div class="stats"><div class="stat"><b>${s.j||0}</b><span>Jogos ${UI.ano}</span></div><div class="stat"><b>${s.g||0}</b><span>Gols</span></div><div class="stat"><b>${s.a||0}</b><span>Assist.</span></div><div class="stat"><b>${s.mvp||0}</b><span>Craque</span></div></div></div>
     <div class="panel small">${A?`<div class="row between"><span>${j.critGalera?'Base da avaliação da galera':'Nota inicial'}${semAvaliacao(id)?' <b style="color:var(--red,#c0392b)">· sem nota</b>':''}</span><b class="num">${ovr(notaInicial(j))}</b></div>`:''}${j.conv?`<div class="row between" style="margin-top:4px"><span>Convidado por</span><b>${esc(nm(j.conv))}</b></div>`:''}<div class="row between" style="margin-top:4px"><span>Confirma pelo app</span><b>${vinculo(id)?'Sim':'Ainda não'}</b></div>${j.tel?`<div class="row between" style="margin-top:4px"><span>WhatsApp</span><b class="num">${esc(j.tel)}</b></div>`:''}
       ${hist.length?`<div style="margin-top:8px"><span class="muted">Últimas notas</span><div class="row" style="margin-top:4px">${hist.map(([,p,n])=>`<span class="chip solid num">${dShort(p.data).slice(4)} · ${fmtN(n)}</span>`).join('')}</div></div>`:''}</div>
@@ -1503,6 +1514,7 @@ document.addEventListener('click',e=>{
       if(!_id){data.ativo=true;data.criadoEm=Date.now()}
       data.semNota=!!_depois&&!data.critGalera; // avaliar depois: nota neutra até alguém avaliar
       const uidM=data._uid;delete data._uid;
+      for(const[u,pr] of Object.entries(S.pres||{}))if(pr&&pr.jogador===id&&pr.pos)put('presencas/'+u,{...pr,pos:null});
       put('jogadores/'+id,data);if(uidM)put('presencas/'+uidM,{...(S.pres[uidM]||{pel:{}}),jogador:id});closeSheet();toast(_id?'Jogador atualizado.':'Jogador adicionado.');break}
     case'toggle-ativo':{const j=S.jog[d.j];put('jogadores/'+d.j,{...j,ativo:j.ativo===false});closeSheet();toast(j.ativo===false?'Jogador reativado.':'Jogador inativado.');break}
     case'nova-pel':{const data=document.getElementById('np-data').value;if(!data){toast('Escolha a data.');return}
@@ -1642,6 +1654,10 @@ document.addEventListener('click',e=>{
       [['convocacao',w(-4),'09:00'],['cobrar',w(-2),'19:00'],['lista',w(-1),'20:00'],['times',dia,'07:00'],['resultado',dia,'12:00'],['pagamento',1,'10:00']]
         .forEach(([tipo,d2,hora])=>put('avisos/'+uid('a'),{tipo,dia:d2,hora,ativo:true}));toast('Agenda sugerida criada. Ajuste à vontade.');break}
     case'premio':break;
+    case'minha-pos-abrir':sheetMinhaPos();break;
+    case'minha-pos':{const id=meuJogador();if(!id||!trocaPosAberta()){sheetMinhaPos();return}const de=J(id).pos;if(d.v===de){closeSheet();return}
+      const pr=S.pres[myId]||{pel:{}};put('presencas/'+myId,{...pr,pos:d.v===S.jog[id].pos?null:d.v,posTroca:{de,para:d.v,t:Date.now()}});closeSheet();toast(`Pronto! Agora você joga de ${POS[d.v].toLowerCase()} neste grupo.`);break}
+    case'apagar-sorteio':if(b.dataset.sure){patch('peladas/'+d.p,{times:null,goleiros:null,vit:null,publicado:false,sorteadoEm:null,publicadoEm:null});UI.sel=null;toast('Sorteio apagado. A troca de posição está aberta de novo.')}else{b.dataset.sure='1';b.textContent='Toque de novo para apagar'}break;
     case'regra-nova':sheetRegra(d.v);break;
     case'rg-tog':{const rg=UI.rg;if(!rg)return;const max=Math.max(2,Number(cfg().porTime)||5);if(rg.sel.has(d.j))rg.sel.delete(d.j);else{if(rg.sel.size>=max){toast(`No máximo ${max} jogadores (o tamanho de um time).`);return}rg.sel.add(d.j)}
       const sc=document.querySelector('.sheet').scrollTop;sheetRegra();document.querySelector('.sheet').scrollTop=sc;break}
