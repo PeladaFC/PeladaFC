@@ -104,7 +104,7 @@ const ehDiarista=id=>!EV()&&J(id).tipo==='diarista';
 const pagaPorJogo=id=>!EV()&&J(id).tipo==='diarista';
 const tipoTxt=id=>EV()?'Participante':J(id).tipo==='diarista'?'Diarista':'Mensalista';
 // peso de cada critério na nota, conforme a posição (como no FIFA)
-const PESOS={ZAG:{tec:.15,fis:.20,pas:.15,fin:.05,mar:.45},LAT:{tec:.20,fis:.20,pas:.25,fin:.05,mar:.30},VOL:{tec:.10,fis:.20,pas:.30,fin:.05,mar:.35},MEI:{tec:.30,fis:.20,pas:.35,fin:.10,mar:.05},ATA:{tec:.25,fis:.20,pas:.10,fin:.40,mar:.05}};
+const PESOS={ZAG:{tec:.15,fis:.20,pas:.15,fin:.10,mar:.40},LAT:{tec:.20,fis:.20,pas:.20,fin:.10,mar:.30},VOL:{tec:.10,fis:.20,pas:.30,fin:.10,mar:.30},MEI:{tec:.25,fis:.20,pas:.30,fin:.15,mar:.10},ATA:{tec:.25,fis:.20,pas:.10,fin:.35,mar:.10}};
 const pesoDe=(pos,c,n)=>(PESOS[pos]||{})[c]??1/n;
 function notaInicial(j){const g=j.critGalera||{},cr=critKey(j.pos);return sum(cr.map(([c])=>Number(g[c]??j.crit?.[c]??3)*pesoDe(j.pos,c,cr.length)))*2}
 function encerradas(){return Object.entries(S.pel).filter(([,p])=>p.status==='encerrada').sort((a,b)=>b[1].data.localeCompare(a[1].data))}
