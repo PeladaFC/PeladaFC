@@ -1102,9 +1102,8 @@ function statsRodada(rid,r){const ids=alvosDe(r),vs=Object.entries(S.votos||{}).
 function painelAvAdmin(){if(!ativos().length)return'';const ra=rodadaAberta();
   if(!ra){const semAv=ativos().filter(x=>!S.jog[x].critGalera);
     return`<div class="panel stack avadm" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Avaliação da galera</h3><span class="pill-off">FECHADA</span></div>
-    <div class="sub" style="margin-top:-4px">Quando você abrir, todo mundo do grupo recebe um <b>alerta amarelo</b> para dar nota aos outros nos 5 critérios (cada um avalia todos, menos a si mesmo). Antes disso, nada aparece para eles.${semAv.length?` <b>${semAv.length}</b> jogador${semAv.length>1?'es ainda não têm':' ainda não tem'} nota da galera.`:''}</div>
-    <button class="btn primary block btn-grande" data-act="av-todos">Abrir avaliação para todos</button>
-    <button class="btn block" data-act="av-admin">Abrir só para alguns jogadores</button></div>`}
+    <div class="sub" style="margin-top:-4px">Quando você abrir, a galera recebe um <b>alerta amarelo</b> para dar as notas nos 5 critérios. Antes disso, nada aparece para eles.${semAv.length?` <b>${semAv.length}</b> jogador${semAv.length>1?'es ainda não têm':' ainda não tem'} nota da galera.`:''}</div>
+    <button class="btn primary block btn-grande" data-act="av-novo">Abrir avaliação</button></div>`}
   const[rid,r]=ra,{ids,concluiram}=statsRodada(rid,r),parcial=ids.length<ativos().length;
   return`<div class="panel stack avadm on" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Avaliação da galera</h3><span class="pill-on">ABERTA</span></div>
     <div class="sub" style="margin-top:-4px">Até <b>${quandoFim(r.fim)}</b> · ${parcial?`<b>${ids.length} de ${ativos().length}</b> jogadores em avaliação`:'todo o elenco em avaliação'} · <b>${concluiram}</b> pessoa${concluiram===1?'':'s'} já terminaram.</div>
@@ -1159,8 +1158,8 @@ function sheetAvAdmin(){const ra=rodadaAberta();
       ${prazo}
       <button class="btn primary block btn-grande" data-act="av-criar">Abrir avaliação agora</button><button class="btn block" data-act="fechar-sheet">Cancelar</button></div>`);return}
   const ids=ativos().sort((a,b)=>(!!S.jog[a].critGalera)-(!!S.jog[b].critGalera)||nm(a).localeCompare(nm(b)));
-  openSheet('Nova avaliação completa',`<div class="stack"><p class="sub" style="margin:0">Escolha quem a galera vai avaliar nos 5 critérios. Os marcados com <b>NOVO</b> ainda não têm avaliação da galera.</p>
-    <div class="row" style="gap:6px"><button class="btn sm" data-act="av-sel" data-v="todos">Todos</button><button class="btn sm" data-act="av-sel" data-v="novos">Só os novos</button><button class="btn sm" data-act="av-sel" data-v="nenhum">Limpar</button></div>
+  openSheet('Abrir avaliação',`<div class="stack"><p style="margin:0"><b>Quem vai ser avaliado?</b> Cada pessoa do grupo dá nota para os escolhidos, menos para si mesma.</p><p class="sub" style="margin:0">Os marcados com <b>NOVO</b> ainda não têm avaliação da galera.</p>
+    <div class="row" style="gap:6px"><button class="btn sm ${sel.size===ativos().length?'primary':''}" data-act="av-sel" data-v="todos">Avaliar todos</button><button class="btn sm" data-act="av-sel" data-v="novos">Só os novos</button><button class="btn sm" data-act="av-sel" data-v="nenhum">Limpar</button></div>
     <div class="avgrid">${ids.map(id=>`<button class="avcard ${sel.has(id)?'on':''}" data-act="av-tog" data-j="${id}" aria-pressed="${sel.has(id)}">${avG(id,56)}<b>${esc(nm(id))}</b><span class="chip p-${J(id).pos}">${J(id).pos}</span>${S.jog[id].critGalera?'':'<span class="novo">NOVO</span>'}${sel.has(id)?'<span class="ok">✓</span>':''}</button>`).join('')}</div>
     ${prazo}
     <button class="btn primary block btn-grande" data-act="av-criar" ${sel.size?'':'disabled'}>Abrir avaliação · ${sel.size} jogador${sel.size===1?'':'es'}</button></div>`)}
@@ -1197,7 +1196,7 @@ function tElenco(A){
   let h=`<div class="row between" style="margin-bottom:10px"><h2>Elenco <span class="muted num">${ativos().length}</span></h2>${A?'<button class="btn primary" data-act="add-jog">+ Jogador</button>':''}</div>
     <input type="text" id="busca" placeholder="Buscar jogador" value="${esc(UI.busca)}" data-in="busca" style="margin-bottom:10px">
     <div class="pick" style="margin-bottom:12px">${[['todos','Todos'],['GOL','GOL'],['ZAG','ZAG'],['MEI','MEI'],['ATA','ATA'],...(EV()?[]:[['mensalista','Mensalistas'],['diarista','Diaristas']]),['inativos','Inativos']].map(([k,n])=>`<button data-act="filtro" data-v="${k}" aria-pressed="${UI.filtro===k}">${n}</button>`).join('')}</div>`;
-  if(A){const ra=rodadaAberta();h+=`<button class="btn block ${ra?'':'warn'}" data-act="av-admin" style="margin-bottom:12px">${ra?`⭐ Avaliação completa aberta · até ${quandoFim(ra[1].fim)}`:'⭐ Nova avaliação completa (5 critérios)'}</button>`}
+  if(A){const ra=rodadaAberta();h+=`<button class="btn block ${ra?'':'warn'}" data-act="${ra?'av-admin':'av-novo'}" style="margin-bottom:12px">${ra?`⭐ Avaliação completa aberta · até ${quandoFim(ra[1].fim)}`:'⭐ Abrir avaliação da galera'}</button>`}
   h+=cartaoAvCompleta();
   if(membrosSemCadastro().length&&!demo)h+=A?painelMembros():painelPendentes();
   if(!A&&euPendente())h=bannerPendente().replace('margin-top:12px','margin:0 0 12px')+h;
@@ -1615,6 +1614,7 @@ document.addEventListener('click',e=>{
     case'av-prazo':{UI.avPrazo=Number(d.v);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
     case'av-semnota':{UI.avModo=null;UI.avSel=new Set(d.v.split(','));sheetAvAdmin();break}
     case'av-admin':UI.avModo=null;UI.avSel=null;sheetAvAdmin();break;
+    case'av-novo':UI.avModo=null;UI.avPrazo=null;UI.avSel=new Set(ativos());sheetAvAdmin();break;
     case'av-todos':UI.avModo='todos';UI.avPrazo=null;UI.avSel=new Set(ativos());sheetAvAdmin();break;
     case'av-tog':{UI.avSel.has(d.j)?UI.avSel.delete(d.j):UI.avSel.add(d.j);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
     case'av-sel':{const ids=ativos();UI.avSel=new Set(d.v==='todos'?ids:d.v==='novos'?ids.filter(x=>!S.jog[x].critGalera):[]);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
