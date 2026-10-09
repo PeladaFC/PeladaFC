@@ -76,8 +76,8 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.hid
 /* ---------- gravação ---------- */
 function slotGet(path){const[c,id]=path.split('/');return c==='config'?S.config:c==='eventos'?S.feed:S[COL[c]][id]}
 function slotSet(path,v){const[c,id]=path.split('/');if(c==='config')S.config=v;else if(c==='eventos')S.feed=v;else if(v==null)delete S[COL[c]][id];else S[COL[c]][id]=v}
-function chain(path,fn){queues[path]=(queues[path]||Promise.resolve()).then(fn).catch(writeErr);return queues[path]}
-function writeErr(e){console.warn(e);toast(e&&(e.code==='invalid_argument'||e.code==='permission-denied')?(ADM()?'Não foi possível salvar. Verifique a conexão.':'Só o administrador pode alterar isso.'):e&&e.code==='quota_exceeded'?'O banco da pelada encheu. Apague registros antigos.':'Não foi possível salvar. Tente de novo.')}
+function chain(path,fn){queues[path]=(queues[path]||Promise.resolve()).then(fn).catch(e=>writeErr(e,path));return queues[path]}
+function writeErr(e,path){console.warn(e);if(e&&e.code==='permission-denied'&&String(path||'').startsWith('votos/')){toast(ADM()?'Seu voto não foi salvo: as regras do Firebase precisam ser atualizadas.':'Seu voto não foi salvo. Avise o administrador para liberar a votação no app.');return}toast(e&&(e.code==='invalid_argument'||e.code==='permission-denied')?(ADM()?'Não foi possível salvar. Verifique a conexão.':'Só o administrador pode alterar isso.'):e&&e.code==='quota_exceeded'?'O banco da pelada encheu. Apague registros antigos.':'Não foi possível salvar. Tente de novo.')}
 function put(path,data){slotSet(path,data);render();if(demo||!db)return;delete pending[path];const d0=db;return chain(path,()=>d0.doc(path).set(data))}
 function del(path){slotSet(path,null);render();if(demo||!db)return;const d0=db;return chain(path,()=>d0.doc(path).delete())}
 function patch(path,part){
