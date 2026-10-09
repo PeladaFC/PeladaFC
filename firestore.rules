@@ -57,7 +57,9 @@ service cloud.firestore {
       // Presença, vínculo com o elenco e avaliação do campo: cada um mexe no seu.
       match /presencas/{uid} {
         allow read: if membro(gid) || admin(gid);
-        allow write: if admin(gid) || (logado() && eu() == uid && membro(gid));
+        // O jogador mexe na própria presença, mas não escolhe quem ele é: o vínculo com o elenco é do administrador.
+        allow write: if admin(gid) || (logado() && eu() == uid && membro(gid)
+          && resource != null && request.resource.data.jogador == resource.data.jogador);
       }
 
       // Avaliação pós-jogo (secreta): cada um lê e grava só o próprio voto.

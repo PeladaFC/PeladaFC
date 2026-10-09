@@ -1091,16 +1091,13 @@ function painelJogador(pid,p,l){
 
   const doc=S.pres[myId];
   if(!doc||!S.jog[doc.jogador]){
-    const tomados=new Set(Object.values(S.pres).map(x=>x.jogador));
-    const ops=ativos().filter(id=>!tomados.has(id)).sort((a,b)=>nm(a).localeCompare(nm(b)));
-    return`<div class="panel stack" style="margin-bottom:12px"><h3>Quem é você?</h3><div class="sub">Escolha seu nome uma vez. Depois é só tocar em "Vou" ou "Não vou". ${EV()?'Quem confirma primeiro garante a vaga; depois das vagas, vai para a espera.':'Mensalista com vaga entra na hora; diarista e lista de espera dependem da liberação do administrador.'}</div>
-      <div class="row" style="flex-wrap:nowrap"><select id="eu-sou" class="grow"><option value="">Seu nome no elenco</option>${ops.map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('')}</select><button class="btn primary" data-act="eu-sou">Sou eu</button></div>
-      <div class="sub">Não achou seu nome? Peça ao administrador para te cadastrar.</div></div>`}
+    if(euPendente())return'';
+    return`<div class="panel stack" style="margin-bottom:12px"><h3>Confirmar presença</h3><div class="sub">Sua conta ainda não está ligada a um nome do elenco. Peça ao administrador para te autorizar: assim que ele fizer isso, você confirma presença por aqui.</div></div>`}
   const j=doc.jogador,s=respDe(p,pid)[j]?.s;
   let status='Você ainda não respondeu.';
   if(s==='sim'){const i=l.escalados.indexOf(j);status=l.aguardando.includes(j)?'Pedido enviado. Aguardando o administrador liberar sua vaga.':J(j).pos==='GOL'?'Confirmado no gol. ✓':i>=0?`Você está na lista: ${i+1}º de ${l.vagas}.`:`Você é o ${l.espera.indexOf(j)+1}º da espera.`}
   if(s==='nao')status='Você avisou que não vai.';
-  return`<div class="panel stack" style="margin-bottom:12px;border-color:var(--pitch)"><div class="row between"><h3>Você vai, ${esc(nm(j))}?</h3><button class="btn sm" data-act="eu-trocar">Não sou eu</button></div>
+  return`<div class="panel stack" style="margin-bottom:12px;border-color:var(--pitch)"><div class="row between"><h3>Você vai, ${esc(nm(j))}?</h3></div>
     <div class="row" style="flex-wrap:nowrap"><button class="btn grow ${s==='sim'?'primary':''}" data-act="eu-vou" data-p="${pid}" data-v="sim">✓ Vou</button><button class="btn grow ${s==='nao'?'danger':''}" data-act="eu-vou" data-p="${pid}" data-v="nao">✕ Não vou</button></div>
     <div class="sub">${status}</div></div>`;
 }
@@ -1537,15 +1534,11 @@ document.addEventListener('click',e=>{
       if(UI.npLoc&&S.locais[UI.npLoc])put('locais/'+UI.npLoc,{...S.locais[UI.npLoc],usadoEm:Date.now()});
       UI.npLoc=undefined;UI.npData=UI.npHora=UI.npFim=null;UI.npFimManual=false;UI.sub='presenca';toast('Pelada marcada. Agora é só convocar.');break}
     case'cancel-pel':if(b.dataset.sure){del('peladas/'+d.p);toast('Pelada cancelada.')}else{b.dataset.sure='1';b.textContent='Toque de novo para cancelar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Cancelar esta pelada'}},3500)}break;
-    case'rsvp':{const p=S.pel[d.p],cur=respDe(p,d.p)[d.j]?.s;const v=cur===d.v?null:d.v;const before=lista(p,d.p);
+    case'rsvp':{if(!ADM())return;const p=S.pel[d.p],cur=respDe(p,d.p)[d.j]?.s;const v=cur===d.v?null:d.v;const before=lista(p,d.p);
       const now=Date.now(),cheia=before.escalados.length>=before.vagas&&J(d.j).pos!=='GOL'&&!before.escalados.includes(d.j);
       patch('peladas/'+d.p,{resp:{[d.j]:{s:v,t:now,esp:v==='sim'&&cheia}},aprov:{[d.j]:v==='sim'&&!cheia?now:null}});
       if(v==='sim'&&cheia)toast(`Lista cheia: ${nm(d.j)} foi para a espera.`);
       eventosPresenca(S.pel[d.p],before,lista(S.pel[d.p],d.p),d.j,cur,v);break}
-    case'eu-sou':{const jid=document.getElementById('eu-sou').value;if(!jid){toast('Escolha seu nome na lista.');return}
-      if(!myId){toast('Entre na sua conta para confirmar.');return}
-      put('presencas/'+myId,{jogador:jid,pel:{}});toast('Pronto! Agora é só confirmar.');break}
-    case'eu-trocar':if(myId){del('presencas/'+myId)}break;
     case'eu-vou':{const doc=S.pres[myId];if(!doc)return;const p=S.pel[d.p],prev=respDe(p,d.p)[doc.jogador]?.s||null;
       if(prev===d.v)return;
       const l0=lista(p,d.p),jj=doc.jogador,cheia=d.v==='sim'&&J(jj).pos!=='GOL'&&!l0.escalados.includes(jj)&&l0.escalados.length>=l0.vagas;
