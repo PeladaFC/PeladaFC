@@ -103,7 +103,10 @@ const EV=()=>!!cfg().evento;
 const ehDiarista=id=>!EV()&&J(id).tipo==='diarista';
 const pagaPorJogo=id=>!EV()&&J(id).tipo==='diarista';
 const tipoTxt=id=>EV()?'Participante':J(id).tipo==='diarista'?'Diarista':'Mensalista';
-function notaInicial(j){const g=j.critGalera||{};const k=critKey(j.pos).map(([c])=>Number(g[c]??j.crit?.[c]??3));return sum(k)/k.length*2}
+// peso de cada critério na nota, conforme a posição (como no FIFA)
+const PESOS={ZAG:{tec:.10,fis:.25,pas:.15,fin:.05,mar:.45},LAT:{tec:.15,fis:.30,pas:.20,fin:.05,mar:.30},VOL:{tec:.10,fis:.20,pas:.30,fin:.05,mar:.35},MEI:{tec:.30,fis:.15,pas:.35,fin:.15,mar:.05},ATA:{tec:.25,fis:.20,pas:.10,fin:.40,mar:.05}};
+const pesoDe=(pos,c,n)=>(PESOS[pos]||{})[c]??1/n;
+function notaInicial(j){const g=j.critGalera||{},cr=critKey(j.pos);return sum(cr.map(([c])=>Number(g[c]??j.crit?.[c]??3)*pesoDe(j.pos,c,cr.length)))*2}
 function encerradas(){return Object.entries(S.pel).filter(([,p])=>p.status==='encerrada').sort((a,b)=>b[1].data.localeCompare(a[1].data))}
 let NOTA_CACHE=null;
 /* Nota do jogador (0 a 10)
@@ -1434,8 +1437,8 @@ function renderJogForm(){
     <label class="field"><span>Convidado por</span><select id="f-conv" data-f="conv"><option value="">—</option>${Object.keys(S.jog).filter(x=>x!==F._id).map(x=>`<option value="${x}" ${F.conv===x?'selected':''}>${esc(nm(x))}</option>`).join('')}</select></label>
     ${F.critGalera?'':`<div class="field"><span>Avaliação</span><div class="pick"><button data-act="f-depois" data-v="0" aria-pressed="${!F._depois}">Eu avalio agora</button><button data-act="f-depois" data-v="1" aria-pressed="${!!F._depois}">Avaliar depois</button></div></div>`}
     ${F._depois&&!F.critGalera?`<div class="panel"><h3 style="margin-bottom:4px">Avaliação depois</h3><div class="sub">O jogador entra com nota neutra e a etiqueta SEM NOTA. Antes do sorteio, aparece um aviso para você avaliar ou pedir para a galera avaliar.</div></div>`:`<div class="panel"><div class="row between"><h3>Avaliação inicial</h3><span class="nota num">${ovr(ini)}</span></div>
-      <div class="sub" style="margin:4px 0 6px">${F._id&&encerradas().length?'Base da nota. Depois de cada pelada, a nota se ajusta com as avaliações do jogo.':'Quem convidou dá de 1 a 5 em cada item. Depois de cada pelada, a nota se ajusta com as avaliações do jogo.'}</div>
-      ${cr.map(([k,n,d])=>`<div class="crit"><span>${n}<small class="crit-d">${d}</small></span><div class="dots">${[1,2,3,4,5].map(v=>`<button data-act="f-crit" data-k="${k}" data-v="${v}" class="${Number(F.crit[k]||3)>=v?'on':''}" aria-label="${n} ${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>`}
+      <div class="sub" style="margin:4px 0 6px">${F._id&&encerradas().length?'Base da nota. Depois de cada pelada, a nota se ajusta com as avaliações do jogo.':'Quem convidou dá de 1 a 5 em cada item. O peso de cada item muda conforme a posição. Depois de cada pelada, a nota se ajusta com as avaliações do jogo.'}</div>
+      ${cr.map(([k,n,d])=>`<div class="crit"><span>${n}${PESOS[F.pos]?` <small class="crit-p">${Math.round(pesoDe(F.pos,k,cr.length)*100)}%</small>`:''}<small class="crit-d">${d}</small></span><div class="dots">${[1,2,3,4,5].map(v=>`<button data-act="f-crit" data-k="${k}" data-v="${v}" class="${Number(F.crit[k]||3)>=v?'on':''}" aria-label="${n} ${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>`}
     <button class="btn primary block" data-act="save-jog">${F._id?'Salvar':'Adicionar ao elenco'}</button>
     ${F._id?`<div class="row"><button class="btn grow" data-act="msg" data-v="convite" data-j="${F._id}">Mandar convite</button><button class="btn ${S.jog[F._id]?.ativo===false?'':'danger'} grow" data-act="toggle-ativo" data-j="${F._id}">${S.jog[F._id]?.ativo===false?'Reativar':'Inativar'}</button></div>`:''}</div>`;
 }
