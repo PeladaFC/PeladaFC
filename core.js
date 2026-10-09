@@ -2,8 +2,8 @@
 const POS={GOL:'Goleiro',ZAG:'Zagueiro',LAT:'Lateral',VOL:'Volante',MEI:'Meio-campo',ATA:'Atacante'};
 const LINHA=['ZAG','LAT','VOL','MEI','ATA'],SETOR={ZAG:'def',LAT:'def',VOL:'meio',MEI:'meio',ATA:'atq'};
 const CRIT={
-  linha:[['tec','Técnica'],['fis','Físico'],['pas','Passe'],['fin','Finalização'],['mar','Marcação']],
-  GOL:[['ref','Reflexo'],['posi','Posicionamento'],['sai','Saída do gol'],['rep','Reposição'],['com','Comunicação']]
+  linha:[['tec','Técnica','Domínio e drible'],['fis','Físico','Velocidade e fôlego'],['pas','Passe','Certeiro e criativo'],['fin','Finalização','Chuta bem e faz gol'],['mar','Defesa','Marca, desarma e volta']],
+  GOL:[['ref','Reflexo','Defesas difíceis'],['posi','Posicionamento','Sabe onde ficar'],['sai','Saída do gol','Cruzamentos e 1 contra 1'],['rep','Reposição','Põe a bola em jogo bem'],['com','Comunicação','Orienta a defesa']]
 };
 const DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 const DIAS3=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
@@ -1170,7 +1170,7 @@ function sheetAvaliar(){const ra=rodadaAberta();if(!ra){closeSheet();toast('A av
     <div style="display:flex;flex-direction:column;align-items:center;gap:6px">${avG(id,112)}<div style="font-family:var(--f-display);font-weight:800;font-size:24px;text-transform:uppercase">${esc(nm(id))}</div>
       <div class="sub">${esc(j.nome||'')}${j.nome&&j.apelido?' · ':''}<span class="chip p-${j.pos}">${j.pos}</span> ${esc(POS[j.pos]||'')}</div></div>
     ${v.ns?`<div class="banner"><span>Você marcou que não sabe avaliar ${esc(nm(id))}.</span></div>`
-      :`<div class="panel">${critDe(id).map(([c,n])=>`<div class="rate"><span>${n}</span>${estrelasInput(v[c],`data-act="av-voto" data-j="${id}" data-c="${c}"`)}</div>`).join('')}</div>`}
+      :`<div class="panel">${critDe(id).map(([c,n,d])=>`<div class="rate"><span>${n}<small class="crit-d">${d}</small></span>${estrelasInput(v[c],`data-act="av-voto" data-j="${id}" data-c="${c}"`)}</div>`).join('')}</div>`}
     <button class="btn sm block" data-act="av-ns" data-j="${id}">${v.ns?'Quero avaliar':'Não sei avaliar este jogador'}</button>
     <div class="lado"><button class="btn" data-act="av-ir" data-v="${UI.avi-1}" ${UI.avi===0?'disabled':''}>‹ Anterior</button><button class="btn ${feitoAv(id,v)?'primary':''}" data-act="av-ir" data-v="${UI.avi+1}" ${UI.avi>=ids.length-1?'disabled':''}>Próximo ›</button></div>
     <div class="sub" style="text-align:center;font-style:italic;opacity:.85">⚖️ Avacalhou na votação? O app foi programado para perceber. Além de atrapalhar a pelada, seu voto passa a valer menos.</div></div>`)}
@@ -1435,7 +1435,7 @@ function renderJogForm(){
     ${F.critGalera?'':`<div class="field"><span>Avaliação</span><div class="pick"><button data-act="f-depois" data-v="0" aria-pressed="${!F._depois}">Eu avalio agora</button><button data-act="f-depois" data-v="1" aria-pressed="${!!F._depois}">Avaliar depois</button></div></div>`}
     ${F._depois&&!F.critGalera?`<div class="panel"><h3 style="margin-bottom:4px">Avaliação depois</h3><div class="sub">O jogador entra com nota neutra e a etiqueta SEM NOTA. Antes do sorteio, aparece um aviso para você avaliar ou pedir para a galera avaliar.</div></div>`:`<div class="panel"><div class="row between"><h3>Avaliação inicial</h3><span class="nota num">${ovr(ini)}</span></div>
       <div class="sub" style="margin:4px 0 6px">${F._id&&encerradas().length?'Base da nota. Depois de cada pelada, a nota se ajusta com as avaliações do jogo.':'Quem convidou dá de 1 a 5 em cada item. Depois de cada pelada, a nota se ajusta com as avaliações do jogo.'}</div>
-      ${cr.map(([k,n])=>`<div class="crit"><span>${n}</span><div class="dots">${[1,2,3,4,5].map(v=>`<button data-act="f-crit" data-k="${k}" data-v="${v}" class="${Number(F.crit[k]||3)>=v?'on':''}" aria-label="${n} ${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>`}
+      ${cr.map(([k,n,d])=>`<div class="crit"><span>${n}<small class="crit-d">${d}</small></span><div class="dots">${[1,2,3,4,5].map(v=>`<button data-act="f-crit" data-k="${k}" data-v="${v}" class="${Number(F.crit[k]||3)>=v?'on':''}" aria-label="${n} ${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>`}
     <button class="btn primary block" data-act="save-jog">${F._id?'Salvar':'Adicionar ao elenco'}</button>
     ${F._id?`<div class="row"><button class="btn grow" data-act="msg" data-v="convite" data-j="${F._id}">Mandar convite</button><button class="btn ${S.jog[F._id]?.ativo===false?'':'danger'} grow" data-act="toggle-ativo" data-j="${F._id}">${S.jog[F._id]?.ativo===false?'Reativar':'Inativar'}</button></div>`:''}</div>`;
 }
