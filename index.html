@@ -213,12 +213,14 @@ nav.tabs button[aria-current="page"]{color:var(--pitch)}
 input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;max-width:100%;min-height:44px;text-align:left}
 input::-webkit-date-and-time-value{text-align:left}
 .btn-grande{padding-block:17px;font-size:17px}
-.votantes{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface)}
+.votantes{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface);font-size:14px}
+.vt-lista{margin-top:6px;display:flex;flex-direction:column}
+.vt-l{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;border-top:1px solid var(--line)}
+.vt-l:first-child{border-top:0}.vt-nota{margin-top:4px;font-size:12px}
 .votantes summary{cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;list-style:none}
 .votantes summary::-webkit-details-marker{display:none}
 .votantes summary::after{content:'▾';color:var(--muted);margin-left:4px}.votantes[open] summary::after{content:'▴'}
-.votantes .list{margin-top:8px}
-.vt{font-size:12px;font-weight:700;border-radius:6px;padding:3px 8px;white-space:nowrap}
+.vt{font-size:11px;font-weight:700;border-radius:5px;padding:2px 6px;white-space:nowrap}
 .vt.ok{background:var(--pitch-soft);color:var(--pitch)}.vt.meio{background:var(--card);color:var(--card-ink)}.vt.nao{background:var(--surface2);color:var(--muted)}
 .crit-p{font-size:11px;font-weight:700;color:var(--pitch);background:var(--pitch-soft);border-radius:5px;padding:0 5px;vertical-align:2px}
 .crit-d{display:block;font-size:12px;font-weight:400;color:var(--muted);line-height:1.2;margin-top:1px}

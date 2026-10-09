@@ -1162,8 +1162,8 @@ function votantesRodada(rid,r){const ids=alvosDe(r),out=[];
 function listaVotantes(rid,r){const vs=votantesRodada(rid,r);if(!vs.length)return'';const ok=vs.filter(v=>v.st===2).length;
   const tag=v=>v.st===2?'<span class="vt ok">✓ Concluiu</span>':v.st===1?`<span class="vt meio">${v.feitos} de ${v.total}</span>`:'<span class="vt nao">Não começou</span>';
   return`<details class="votantes" ${UI.vtAberto?'open':''}><summary><b>Quem já votou</b><span class="sub">${ok} de ${vs.length} concluíram</span></summary>
-    <div class="list">${vs.map(v=>`<div class="item">${avHTML(v.jog)}<div class="grow name">${esc(nm(v.jog))}</div>${tag(v)}</div>`).join('')}</div>
-    <div class="sub" style="margin-top:6px">Só os administradores veem esta lista. As notas de cada um continuam secretas. Quem não tem o app ligado ao elenco não aparece.</div></details>`}
+    <div class="vt-lista">${vs.map(v=>`<div class="vt-l"><span>${esc(nm(v.jog))}</span>${tag(v)}</div>`).join('')}</div>
+    <div class="sub vt-nota">Só os admins veem. As notas continuam secretas.</div></details>`}
 function painelAvAdmin(){if(!ativos().length)return'';const ra=rodadaAberta();
   if(!ra){const semAv=ativos().filter(x=>!S.jog[x].critGalera);
     return`<div class="panel stack avadm" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Avaliação da galera</h3><span class="pill-off">FECHADA</span></div>
