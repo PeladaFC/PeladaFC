@@ -1152,6 +1152,18 @@ function consolidarRodadas(){if(demo||!ADM())return;for(const[rid,r] of Object.e
 function statsRodada(rid,r){const ids=alvosDe(r),vs=Object.entries(S.votos||{}).filter(([,d])=>d&&d.av&&d.av[rid]);
   const concluiram=vs.filter(([u,d])=>{const jog=d.jogador||(S.pres[u]||{}).jogador;const alvo=ids.filter(x=>x!==jog);return alvo.length&&alvo.every(x=>feitoAv(x,d.av[rid][x]))}).length;
   return{ids,comecaram:vs.length,concluiram}}
+/* quem já votou na avaliação da galera (só o admin vê) */
+document.addEventListener('toggle',e=>{const t=e.target;if(t&&t.classList&&t.classList.contains('votantes'))UI.vtAberto=t.open},true);
+function votantesRodada(rid,r){const ids=alvosDe(r),out=[];
+  for(const[u,pr] of Object.entries(S.pres||{})){const jog=pr&&pr.jogador;if(!jog||!S.jog[jog]||S.jog[jog].ativo===false)continue;
+    const alvo=ids.filter(x=>x!==jog);if(!alvo.length)continue;const v=(((S.votos||{})[u]||{}).av||{})[rid]||{};
+    const feitos=alvo.filter(x=>feitoAv(x,v[x])).length;out.push({jog,feitos,total:alvo.length,st:feitos>=alvo.length?2:feitos?1:0})}
+  return out.sort((a,b)=>b.st-a.st||b.feitos-a.feitos||nm(a.jog).localeCompare(nm(b.jog)))}
+function listaVotantes(rid,r){const vs=votantesRodada(rid,r);if(!vs.length)return'';const ok=vs.filter(v=>v.st===2).length;
+  const tag=v=>v.st===2?'<span class="vt ok">✓ Concluiu</span>':v.st===1?`<span class="vt meio">${v.feitos} de ${v.total}</span>`:'<span class="vt nao">Não começou</span>';
+  return`<details class="votantes" ${UI.vtAberto?'open':''}><summary><b>Quem já votou</b><span class="sub">${ok} de ${vs.length} concluíram</span></summary>
+    <div class="list">${vs.map(v=>`<div class="item">${avHTML(v.jog)}<div class="grow name">${esc(nm(v.jog))}</div>${tag(v)}</div>`).join('')}</div>
+    <div class="sub" style="margin-top:6px">Só os administradores veem esta lista. As notas de cada um continuam secretas. Quem não tem o app ligado ao elenco não aparece.</div></details>`}
 function painelAvAdmin(){if(!ativos().length)return'';const ra=rodadaAberta();
   if(!ra){const semAv=ativos().filter(x=>!S.jog[x].critGalera);
     return`<div class="panel stack avadm" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Avaliação da galera</h3><span class="pill-off">FECHADA</span></div>
@@ -1162,6 +1174,7 @@ function painelAvAdmin(){if(!ativos().length)return'';const ra=rodadaAberta();
     <div class="sub" style="margin-top:-4px">Até <b>${quandoFim(r.fim)}</b> · ${parcial?`<b>${ids.length} de ${ativos().length}</b> jogadores em avaliação`:'todo o elenco em avaliação'} · <b>${concluiram}</b> pessoa${concluiram===1?'':'s'} já terminaram.</div>
     ${parcial?`<button class="btn warn block" data-act="av-incluir">Incluir todo o elenco (${ativos().length})</button>`:''}
     <button class="btn primary block" data-act="av-encerrar-p" data-r="${rid}">Encerrar agora e calcular as notas</button>
+    ${listaVotantes(rid,r)}
     <div class="lado"><button class="btn sm" data-act="av-admin">Ver detalhes</button><button class="btn sm danger" data-act="av-cancelar" data-r="${rid}">Cancelar avaliação</button></div></div>`}
 
 /* cartão para quem precisa avaliar */
