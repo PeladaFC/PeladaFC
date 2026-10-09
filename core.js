@@ -1198,7 +1198,7 @@ function sheetAvaliar(){const ra=rodadaAberta();if(!ra){closeSheet();toast('A av
     ${v.ns?`<div class="banner"><span>Você marcou que não sabe avaliar ${esc(nm(id))}.</span></div>`
       :`<div class="panel">${critDe(id).map(([c,n,d])=>`<div class="rate"><span>${n}<small class="crit-d">${d}</small></span>${estrelasInput(v[c],`data-act="av-voto" data-j="${id}" data-c="${c}"`)}</div>`).join('')}</div>`}
     <button class="btn sm block" data-act="av-ns" data-j="${id}">${v.ns?'Quero avaliar':'Não sei avaliar este jogador'}</button>
-    <div class="lado"><button class="btn" data-act="av-ir" data-v="${UI.avi-1}" ${UI.avi===0?'disabled':''}>‹ Anterior</button><button class="btn ${feitoAv(id,v)?'primary':''}" data-act="av-ir" data-v="${UI.avi+1}" ${UI.avi>=ids.length-1?'disabled':''}>Próximo ›</button></div>
+    <div class="lado"><button class="btn" data-act="av-ir" data-v="${UI.avi-1}" ${UI.avi===0?'disabled':''}>‹ Anterior</button><button class="btn primary" data-act="av-salvar" data-j="${id}">${UI.avi>=ids.length-1?'Salvar e concluir':'Salvar e próximo ›'}</button></div>
     <div class="sub" style="text-align:center;font-style:italic;opacity:.85">⚖️ Avacalhou na votação? O app foi programado para perceber. Além de atrapalhar a pelada, seu voto passa a valer menos.</div></div>`)}
 function votarAv(jid,patchV){const ra=rodadaAberta();if(!ra){toast('A avaliação já fechou.');return}const rid=ra[0],eu=meuJogador();if(!eu||jid===eu)return;
   const mv=(S.votos||{})[myId]||{},av={...(mv.av||{})},cur={...((av[rid]||{})[jid]||{})};
@@ -1705,6 +1705,11 @@ document.addEventListener('click',e=>{
     case'av-abrir':abrirAvaliar();break;
     case'fechar-sheet':closeSheet();break;
     case'av-incluir':{const ra=rodadaAberta();if(!ra)return;put('avaliacoes/'+ra[0],{...ra[1],alvos:[...new Set([...(ra[1].alvos||[]),...ativos()])]});toast('Agora a avaliação vale para todo o elenco.');setTimeout(sheetAvAdmin,50);break}
+    case'av-salvar':{const ra=rodadaAberta();if(!ra){closeSheet();toast('A avaliação já fechou.');return}
+      const v=meusAv(ra[0])[d.j]||{};if(!feitoAv(d.j,v)){const falta=critDe(d.j).filter(([c])=>!(Number(v[c])>0)).map(([,n])=>n);toast(`Falta marcar ${falta.length>1?falta.slice(0,-1).join(', ')+' e '+falta[falta.length-1]:falta[0]}.`);return}
+      const ids=paraMimAvaliar(ra[1]),mv=meusAv(ra[0]),pend=ids.findIndex((x,i)=>i>UI.avi&&!feitoAv(x,mv[x])),pend0=ids.findIndex(x=>!feitoAv(x,mv[x]));
+      if(pend0<0){closeSheet();toast('✓ Salvo! Pronto, você avaliou todo mundo. Dá para rever até o prazo.');break}
+      UI.avi=pend>=0?pend:(UI.avi<ids.length-1?UI.avi+1:pend0);toast('✓ Salvo');sheetAvaliar();document.querySelector('.sheet').scrollTop=0;break}
     case'av-ir':UI.avi=Number(d.v);sheetAvaliar();document.querySelector('.sheet').scrollTop=0;break;
     case'av-voto':{const v=Number(d.v);votarAv(d.j,cur=>{const n={...cur};delete n.ns;n[d.c]=n[d.c]===v?0:v;return n});sheetAvaliar();break}
     case'av-ns':votarAv(d.j,cur=>cur.ns?{}:{ns:true});sheetAvaliar();break;
