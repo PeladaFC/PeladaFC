@@ -978,7 +978,7 @@ function renderTop(){
   const nvTxt=nv!=null&&nivelVisivel()?` · <span class="nivel">${starsHTML(nv)} ${String(nv).replace('.',',')}${ADM()&&!c.nivelPublico?' (só você vê)':''}</span>`:'';
   let h=`<div class="top"><button class="iconbtn" data-act="voltar-grupos" aria-label="Minhas peladas" style="flex:none">‹</button><div class="brand grow">${esc(c.nome)}<small>${ADM()?'Administrador':'Jogador'}${nvTxt}</small></div>`;
   {const n=ready?naoLidas():0;
-    h+=`<div class="row" style="flex-wrap:nowrap">${!demo&&GRUPO&&GRUPO.codigo?`<button class="iconbtn" data-act="qr-pelada" aria-label="Convidar para a pelada">${ICON.convidar}</button>`:''}<button class="iconbtn bell" data-act="notif" aria-label="Notificações${n?', '+n+' novas':''}">${ICON.bell}${n?`<span class="badge num">${n>9?'9+':n}</span>`:''}</button>${ADM()?`<button class="iconbtn" data-act="cfg" aria-label="Ajustes da pelada">${ICON.cfg}</button>`:''}</div>`}
+    h+=`<div class="row" style="flex-wrap:nowrap">${!demo&&GRUPO&&GRUPO.codigo?`<button class="iconbtn" data-act="qr-pelada" aria-label="Convidar para a pelada">${ICON.convidar}</button>`:''}<button class="iconbtn bell" data-act="notif" aria-label="Notificações${n?', '+n+' novas':''}">${ICON.bell}${n?`<span class="badge num">${n>9?'9+':n}</span>`:''}</button>${ADM()?`<button class="iconbtn" data-act="cfg" aria-label="Ajustes da pelada">${ICON.cfg}</button>`:!demo&&GRUPO?`<button class="iconbtn" data-act="menu-jog" aria-label="Opções do grupo">${ICON.cfg}</button>`:''}</div>`}
   h+='</div>';
   if(demo)h+=`<div class="banner demo"><span><b>Demonstração.</b> ${UI.comoJogador?'Você está vendo o app como um jogador vê.':'Dados de exemplo. Nada aqui é salvo.'}</span><div class="row" style="gap:6px"><button class="btn sm" data-act="como-jogador">${UI.comoJogador?'Ver como administrador':'Ver como jogador'}</button></div></div>`;
   return h;
@@ -1758,8 +1758,9 @@ document.addEventListener('click',e=>{
     case'apagar-grupo':openSheet('Apagar grupo?',`<div class="stack"><p style="margin:0">Você vai apagar <b>${esc((GRUPO||{}).nome||cfg().nome)}</b> para todo mundo. Elenco, peladas, caixa, avisos, notas e o link de convite deixam de existir.</p><p class="sub" style="margin:0">Não dá para desfazer.</p>
       <button class="btn danger block" data-act="apagar-grupo-ok">Sim, apagar para sempre</button><button class="btn block" data-act="cfg">Cancelar</button></div>`);break;
     case'apagar-grupo-ok':closeSheet();toast('Apagando o grupo…');window.apagarGrupo&&window.apagarGrupo();break;
+    case'menu-jog':openSheet(esc((GRUPO||{}).nome||cfg().nome),`<div class="stack"><div class="panel"><h3 style="margin-bottom:4px">Sair do grupo</h3><div class="sub" style="margin-bottom:8px">O grupo some da sua lista. Para voltar, você vai precisar do convite e da autorização de um administrador.</div><button class="btn danger block" data-act="sair-grupo">Sair do grupo</button></div></div>`);break;
     case'sair-grupo':openSheet('Sair do grupo?',`<div class="stack"><p style="margin:0">Você vai sair de <b>${esc((GRUPO||{}).nome||cfg().nome)}</b>. Para voltar, vai precisar do convite e da autorização de um administrador.</p>
-      <button class="btn danger block" data-act="sair-grupo-ok">Sim, sair</button><button class="btn block" data-act="cfg">Cancelar</button></div>`);break;
+      <button class="btn danger block" data-act="sair-grupo-ok">Sim, sair</button><button class="btn block" data-act="${ADM()?'cfg':'close'}">Cancelar</button></div>`);break;
     case'sair-grupo-ok':closeSheet();window.sairGrupo&&window.sairGrupo();break;
     case'adm-rem':window.mudarAdmins&&window.mudarAdmins((GRUPO.admins||[]).filter(x=>x!==d.u));break;
     case'aval-campo':{const v=Number(d.v);
