@@ -712,7 +712,7 @@ function artePoster(p,k){
   ctx.fillStyle='rgba(255,255,255,.035)';for(let x=0;x<W;x+=9)ctx.fillRect(x,0,3,H);
   const gl=ctx.createRadialGradient(720,620,40,720,620,620);gl.addColorStop(0,'rgba(242,193,46,.16)');gl.addColorStop(1,'rgba(242,193,46,0)');ctx.fillStyle=gl;ctx.fillRect(0,0,W,H);
   // anéis concêntricos atrás da foto
-  const cx=700,cy=640,R=330;ctx.lineCap='butt';
+  const cx=770,cy=660,R=300;ctx.lineCap='butt';
   [[R+40,4,'#F2C12E',[-.5,1.1]],[R+80,14,'rgba(242,193,46,.55)',[2.3,3.6]],[R+80,14,'rgba(240,102,42,.7)',[4.1,5.0]],[R+125,4,'rgba(255,255,255,.25)',[-1.3,.4]],[R+125,4,'rgba(255,255,255,.25)',[1.6,2.9]],[R+165,22,'rgba(240,102,42,.55)',[-.15,.5]],[R+165,22,'rgba(242,193,46,.35)',[3.3,4.0]]]
     .forEach(([r,lw,col,[a,b]])=>{ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.beginPath();ctx.arc(cx,cy,r,a,b);ctx.stroke()});
   // foto
@@ -723,7 +723,7 @@ function artePoster(p,k){
   // título gigante empilhado
   const [t1,t2]=POSTER_TIT[k]||[PREMIO[k].s,''];ctx.textAlign='left';
   ctx.save();ctx.shadowColor='rgba(0,0,0,.45)';ctx.shadowBlur=18;ctx.shadowOffsetX=6;ctx.shadowOffsetY=6;ctx.fillStyle='#FFFFFF';
-  const sz=fit(ctx,t1.length>=t2.length?t1:t2,520,260,800,FAM);ctx.font=`800 ${sz}px ${FAM}`;
+  const sz=fit(ctx,t1.length>=t2.length?t1:t2,470,250,800,FAM);ctx.font=`800 ${sz}px ${FAM}`;
   ctx.fillText(t1,80,180+sz*.82);ctx.fillText(t2,80,180+sz*.82+sz*.86);ctx.restore();
   const yb=180+sz*.82+sz*.86;
   ctx.fillStyle='#F2C12E';ctx.font=`800 92px ${FAM}`;ctx.fillText(k==='gol'?'DA PELADA':'DA PELADA',84,yb+100);
