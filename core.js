@@ -227,7 +227,22 @@ function fimDe(p){const d=parseD(p.data),i=horaIniDe(p),f=horaFimDe(p),[h,m]=f.s
 function janelaH(){const h=Number(cfg().janelaAval);return h>0?h:12}
 function lerJanela(){const h=Math.max(0,Math.min(168,Math.floor(Number(document.getElementById('c-jan-h').value)||0))),m=Math.max(0,Math.min(59,Math.floor(Number(document.getElementById('c-jan-m').value)||0)));const t=h+m/60;return t>=0.25?Math.min(168,t):12}
 function janelaTxt(h=janelaH()){const H=Math.floor(h),M=Math.round((h-H)*60);return M?`${H}h${String(M).padStart(2,'0')}`:`${H}h`}
-function fimAval(p){return fimDe(p).getTime()+janelaH()*36e5}
+function fimAval(p){const t=fimDe(p).getTime()+janelaH()*36e5;return p&&p.avalAte?Math.min(t,p.avalAte):t}
+/* quem já votou no pós-jogo (só o admin vê; nunca mostra em quem votou nem as notas) */
+function votantesPos(pid,p){const ids=jogaram(p).filter(id=>S.jog[id]),out=[],comApp=new Set();
+  for(const[u,pr] of Object.entries(S.pres||{})){const jog=pr&&pr.jogador;if(!jog||!ids.includes(jog))continue;comApp.add(jog);
+    const alvo=ids.filter(x=>x!==jog),v=((((S.votos||{})[u]||{}).v)||{})[pid]||{},feitos=alvo.filter(x=>Number(v[x])>0).length;
+    out.push({jog,feitos,total:alvo.length,st:feitos>=alvo.length?2:feitos?1:0})}
+  return{lista:out.sort((a,b)=>b.st-a.st||nm(a.jog).localeCompare(nm(b.jog))),semApp:ids.filter(x=>!comApp.has(x)).sort((a,b)=>nm(a).localeCompare(nm(b)))}}
+function painelVotacaoPos(pid,p){const n=Date.now(),f=fimDe(p).getTime(),fa=fimAval(p);if(p.aval||n<f)return'';
+  const{lista,semApp}=votantesPos(pid,p),ok=lista.filter(x=>x.st===2).length,falta=lista.length-ok;
+  const tag=v=>v.st===2?'<span class="vt ok">✓ Votou</span>':v.st===1?`<span class="vt meio">${v.feitos} de ${v.total}</span>`:'<span class="vt nao">Não votou</span>';
+  return`<div class="panel stack" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Votação do pós-jogo</h3><span class="pill-on">${n<fa?'ABERTA':'FECHANDO'}</span></div>
+    <div class="sub" style="margin-top:-4px">${n<fa?`Até <b>${quandoCurto(fa)}</b> · `:''}<b>${ok} de ${lista.length}</b> já votaram em todos. Só os admins veem esta lista, e os votos continuam secretos.</div>
+    <div class="votantes" style="padding:6px 10px"><div class="vt-lista" style="margin-top:0">${lista.map(v=>`<div class="vt-l"><span>${esc(nm(v.jog))}</span>${tag(v)}</div>`).join('')||'<div class="sub">Ninguém com o app jogou nesta pelada.</div>'}</div>
+      ${semApp.length?`<div class="sub vt-nota">Sem o app (não votam): ${semApp.map(x=>esc(nm(x))).join(', ')}</div>`:''}</div>
+    <div class="lado">${falta?`<button class="btn sm warn" data-act="msg" data-v="cobrarvoto" data-p="${pid}">Cobrar quem falta (${falta})</button>`:''}<button class="btn sm" data-act="msg" data-v="javotaram" data-p="${pid}">Avisar quem já votou</button></div>
+    ${n<fa?`<button class="btn block" data-act="fechar-votos" data-p="${pid}">Encerrar a votação agora</button>`:''}</div>`}
 function posAberto(p){const f=fimDe(p).getTime(),n=Date.now();return n>=f&&n<fimAval(p)}
 /* avaliação secreta em estrelas.
    Cada voto fica em votos/{uid} (só a própria pessoa e os administradores conseguem ler).
@@ -472,7 +487,7 @@ function sheetDono(){const ls=Object.entries(S.locais).sort((a,b)=>a[1].nome.loc
 
 /* ---------- mensagens para o WhatsApp ---------- */
 // mensagens que podem ir para o Instagram saem sem * (negrito do WhatsApp)
-const MSG_INSTA=new Set(['convocacao','lista','times','resultado']);
+const MSG_INSTA=new Set(['convocacao','lista','times','resultado','cobrarvoto','javotaram']);
 function msg(tipo,ctx={}){const t=msg0(tipo,ctx);return MSG_INSTA.has(tipo)?t.replace(/\*/g,''):t}
 function msg0(tipo,ctx={}){
   const c=cfg(),pe=atual(),p=ctx.pel||(pe&&pe[1]);
@@ -497,6 +512,10 @@ function msg0(tipo,ctx={}){
       if(t.gk)out.push('🧤 '+nm(t.gk));t.ids.forEach(id=>out.push(`${posLinha(id)} ${nm(id)}`))});
     {const gx=(p.goleiros||[]).filter(id=>S.jog[id]);if(gx.length)out.push('','🧤 *GOLEIROS*',...gx.map(id=>nm(id)))}
     out.push('','Bom jogo! ⚽');return out.join('\n')}
+  if(tipo==='cobrarvoto'||tipo==='javotaram'){const pid0=pidOf(p),{lista}=votantesPos(pid0,p),fa=fimAval(p);
+    const ja=lista.filter(x=>x.st===2).map(x=>nm(x.jog)),nao=lista.filter(x=>x.st<2).map(x=>nm(x.jog));
+    if(tipo==='cobrarvoto')return[`⭐ VOTAÇÃO DA PELADA · ${dShort(p.data)}`,'',`Ainda falta votar (${nao.length}):`,...nao.map(x=>'• '+x),'',`Entra no app e dá suas estrelas pra galera${Date.now()<fa?' até '+quandoCurto(fa):''}. É rapidinho e o voto é secreto! 🔒`].join('\n');
+    return[`⭐ VOTAÇÃO DA PELADA · ${dShort(p.data)}`,'',...(ja.length?[`Já votaram (${ja.length} de ${lista.length}):`,...ja.map(x=>'✅ '+x)]:['Ninguém votou ainda.']),'',nao.length?`Falta${nao.length>1?'m':''} ${nao.length}. Bora completar${Date.now()<fa?' até '+quandoCurto(fa):''}! 💪`:'Todo mundo votou. Valeu, galera! 🙌'].join('\n')}
   if(tipo==='resultado'){const pr=premiosDe(p),st=p.stats||{},out=[`🏁 *RESULTADO · ${dShort(p.data)}*`,''];
     if(p.times&&p.vit&&p.vit.some(v=>v>0)){p.times.forEach((t,i)=>out.push(`${CORES[t.cor].e} ${nomeTime(t.cor)}: ${p.vit[i]||0} vitória(s)`));out.push('')}
     if(pr.mvp)out.push('🏆 Craque da pelada: *'+nm(pr.mvp)+'*');
@@ -1101,7 +1120,7 @@ function blocoTimes(pid,p,A){let h='<div class="teams">';
   return h}
 function quandoCurto(t){const d=new Date(t);return`${DIAS3[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`}
 function statusVotacao(p,pid,ids){const f=fimDe(p).getTime(),n=Date.now(),fa=fimAval(p);
-  const cont=ADM()&&!p.aval?` ${Object.keys(votosDe(pid)).filter(j=>ids.includes(j)).length} de ${ids.length} já votaram.`:'';
+  const cont='';
   if(p.aval)return'Avaliação encerrada. As notas abaixo são a média secreta da galera.';
   if(n<f)return`A avaliação abre no término da pelada (${quandoCurto(f)}) e fica aberta por ${janelaTxt()}.`;
   if(n<fa)return`Avaliação aberta até ${quandoCurto(fa)}. Os votos são secretos e as notas só aparecem quando ela fechar.${cont}`;
@@ -1120,7 +1139,7 @@ function sheetNotasPelada(pid){const p=S.pel[pid];if(!p)return;const A=ADM(),ids
 function subPos(pid,p,A){
   const ids=jogaram(p),st=p.stats||{},pr=premiosDe(p,pid),manual=p.premios||{};
   if(!ids.length)return`<div class="empty">Confirme a presença e sorteie os times antes do pós-jogo.</div>`;
-  let h='';
+  let h=A?painelVotacaoPos(pid,p):'';
   if(p.times&&A){h+=`<div class="panel" style="margin-bottom:12px"><h3 style="margin-bottom:8px">Vitórias por time</h3><div class="row" style="gap:16px">`;
     p.times.forEach((t,i)=>{const v=(p.vit||[])[i]||0;h+=`<div class="stepbox"><div class="step"><button data-act="vit" data-p="${pid}" data-i="${i}" data-d="-1" aria-label="Menos">−</button><output class="num">${v}</output><button data-act="vit" data-p="${pid}" data-i="${i}" data-d="1" aria-label="Mais">+</button></div><span class="lbl">${esc(nomeTime(t.cor))}</span></div>`});
     h+='</div></div>'}
@@ -1473,7 +1492,7 @@ let F=null;
 
 function sheetMsg(tipo,ctx={}){
   const text=msg(tipo,ctx);
-  const titulo=tipo==='convite'?'Convite':AVISOS[tipo]?.n||'Mensagem';
+  const titulo=tipo==='convite'?'Convite':tipo==='cobrarvoto'?'Cobrar votação':tipo==='javotaram'?'Quem já votou':AVISOS[tipo]?.n||'Mensagem';
   const tel=ctx.jid&&J(ctx.jid).tel?String(J(ctx.jid).tel).replace(/\D/g,''):'';
   const fone=tel?(tel.length<=11?'55'+tel:tel):'';
   MSG_ORIG=text;
@@ -1777,6 +1796,7 @@ document.addEventListener('click',e=>{
     case'jan':{const el=document.getElementById(d.f==='h'?'c-jan-h':'c-jan-m');let v=(Number(el.value)||0)+Number(d.d);
       if(d.f==='m'){const h=document.getElementById('c-jan-h');if(v>=60){v=0;h.value=Math.min(168,(Number(h.value)||0)+1)}else if(v<0){if((Number(h.value)||0)>0){v=45;h.value=Number(h.value)-1}else v=0}}
       el.value=Math.max(0,Math.min(d.f==='h'?168:59,v));break}
+    case'fechar-votos':if(b.dataset.sure){patch('peladas/'+d.p,{avalAte:Date.now()});toast('Votação encerrada. As notas saem em instantes.')}else{b.dataset.sure='1';b.textContent='Toque de novo para encerrar a votação'}break;
     case'regra-nova':sheetRegra(d.v);break;
     case'rg-tog':{const rg=UI.rg;if(!rg)return;const max=Math.max(2,Math.ceil(vagasCfg()/(Number(cfg().times)||2)));if(rg.sel.has(d.j))rg.sel.delete(d.j);else{if(rg.sel.size>=max){toast(`No máximo ${max} jogadores (o tamanho de um time).`);return}rg.sel.add(d.j)}
       const sc=document.querySelector('.sheet').scrollTop;sheetRegra();document.querySelector('.sheet').scrollTop=sc;break}
