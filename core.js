@@ -224,8 +224,8 @@ function horaIniDe(p){return(p&&p.hora)||cfg().hora}
 function horaFimDe(p){return(p&&p.horaFim)||cfg().horaFim||maisHora(horaIniDe(p),60)}
 function horarioTxt(p){return horaIniDe(p)+' às '+horaFimDe(p)}
 function fimDe(p){const d=parseD(p.data),i=horaIniDe(p),f=horaFimDe(p),[h,m]=f.split(':').map(Number);d.setHours(h,m,0,0);if(f<=i)d.setDate(d.getDate()+1);return d}
-function janelaH(){const h=Number(cfg().janelaAval);return h>0?h:24}
-function lerJanela(){const h=Math.max(0,Math.min(168,Math.floor(Number(document.getElementById('c-jan-h').value)||0))),m=Math.max(0,Math.min(59,Math.floor(Number(document.getElementById('c-jan-m').value)||0)));const t=h+m/60;return t>=0.25?Math.min(168,t):24}
+function janelaH(){const h=Number(cfg().janelaAval);return h>0?h:12}
+function lerJanela(){const h=Math.max(0,Math.min(168,Math.floor(Number(document.getElementById('c-jan-h').value)||0))),m=Math.max(0,Math.min(59,Math.floor(Number(document.getElementById('c-jan-m').value)||0)));const t=h+m/60;return t>=0.25?Math.min(168,t):12}
 function janelaTxt(h=janelaH()){const H=Math.floor(h),M=Math.round((h-H)*60);return M?`${H}h${String(M).padStart(2,'0')}`:`${H}h`}
 function fimAval(p){return fimDe(p).getTime()+janelaH()*36e5}
 function posAberto(p){const f=fimDe(p).getTime(),n=Date.now();return n>=f&&n<fimAval(p)}
