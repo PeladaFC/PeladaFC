@@ -1144,16 +1144,17 @@ function statusVotacao(p,pid,ids){const f=fimDe(p).getTime(),n=Date.now(),fa=fim
   if(n<fa)return`Avaliação aberta até ${quandoCurto(fa)}. Os votos são secretos e as notas só aparecem quando ela fechar.${cont}`;
   return'Avaliação encerrada. As notas aparecem assim que um administrador abrir o app.'+cont}
 // relação das notas de uma pelada, da maior para a menor
-function tabelaNotas(pid,p,A){const st=p.stats||{},pr=premiosDe(p,pid),r=rankingNotas(p,pid);let pos=0;
+function tabelaNotas(pid,p,A,draft){const st=draft||p.stats||{},pr=premiosDe(p,pid),r=rankingNotas(p,pid);let pos=0;
   return`<div class="list">${r.map(x=>{const s=st[x.id]||{};if(x.n!=null)pos++;
-    const step=(f,lbl,v)=>A?`<div class="stepbox"><div class="step"><button data-act="stat" data-p="${pid}" data-j="${x.id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${v}</output><button data-act="stat" data-p="${pid}" data-j="${x.id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`:'';
+    const sa=draft?'stat-rasc':'stat',step=(f,lbl,v)=>A?`<div class="stepbox"><div class="step"><button data-act="${sa}" data-p="${pid}" data-j="${x.id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${v}</output><button data-act="${sa}" data-p="${pid}" data-j="${x.id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`:'';
     return`<div class="item" style="flex-wrap:wrap"><span class="pos num" style="width:22px;text-align:center;font-weight:800">${x.n!=null?pos+'º':'–'}</span>${avHTML(x.id)}<div class="grow" style="min-width:110px"><div class="name">${esc(nm(x.id))}${pr.mvp===x.id?' 🏆':''}${pr.per===x.id?' 🐢':''}</div>
       <div class="sub">${[x.n!=null?(x.a?x.a.n+' voto'+(x.a.n>1?'s':''):''):(x.a?`só ${x.a.n} voto, não conta`:'sem votos'),A?'':`⚽ ${s.g||0} · 🅰️ ${s.a||0}`].filter(Boolean).join(' · ')}</div></div>
       ${A?`<div class="row" style="gap:6px">${step('g','Gols',s.g||0)}${step('a','Assist.',s.a||0)}</div>`:''}<span class="nota num" style="min-width:44px;text-align:right">${x.n!=null?fmtN(x.n):'—'}</span></div>`}).join('')}</div>`}
-function sheetNotasPelada(pid,edit){const p=S.pel[pid];if(!p)return;const A0=ADM(),A=A0&&!!edit,ids=jogaram(p);UI.notasEdit=A?pid:null;
+function sheetNotasPelada(pid,edit){const p=S.pel[pid];if(!p)return;const A0=ADM(),A=A0&&!!edit,ids=jogaram(p);
+  if(A&&(!UI.rasc||UI.rasc.pid!==pid))UI.rasc={pid,st:JSON.parse(JSON.stringify(p.stats||{}))};if(!A)UI.rasc=null;
   openSheet('Pelada de '+dShort(p.data),`<div class="stack"><div class="sub">${statusVotacao(p,pid,ids)}</div>
-    ${p.aval||A0?`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Gols e assistências'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div>${tabelaNotas(pid,p,A)}</div>`:''}
-    ${A?`<button class="btn primary block" data-act="notas-pel" data-p="${pid}">Pronto</button>`:A0?`<button class="btn block" data-act="notas-editar" data-p="${pid}">✏️ Corrigir gols e assistências</button>`:''}</div>`)}
+    ${p.aval||A0?`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Gols e assistências'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div>${tabelaNotas(pid,p,A,A?UI.rasc.st:null)}</div>`:''}
+    ${A?`<div class="lado notas-acoes"><button class="btn" data-act="notas-pel" data-p="${pid}">Cancelar</button><button class="btn primary" data-act="notas-salvar" data-p="${pid}">Salvar</button></div><p class="sub" style="margin:0">Nada muda até você tocar em Salvar.</p>`:A0?`<button class="btn block" data-act="notas-editar" data-p="${pid}">✏️ Editar gols e assistências</button>`:''}</div>`)}
 function subPos(pid,p,A){
   const ids=jogaram(p),st=p.stats||{},pr=premiosDe(p,pid),manual=p.premios||{};
   if(!ids.length)return`<div class="empty">Confirme a presença e sorteie os times antes do pós-jogo.</div>`;
@@ -1210,7 +1211,8 @@ function renderHist(A){
   const show=UI.showHist?enc:enc.slice(0,3);
   let h=`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Últimas peladas</h3></div>`;
   for(const[pid,p] of show){const pr=premiosDe(p,pid);
-    h+=`<div class="hist"><div class="grow"><b class="num">${dShort(p.data)}</b><div class="sub">${jogaram(p).length} jogadores${pr.mvp?' · 🏆 '+esc(nm(pr.mvp)):''}${pr.art?' · ⚽ '+esc(nm(pr.art)):''}</div></div><div class="row hist-bt" style="gap:6px"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button>${A?`${!p.aval&&Date.now()<fimAval(p)?`<button class="btn sm warn" data-act="votacao-pel" data-p="${pid}">Votação</button>`:''}<button class="btn sm" data-act="premios-pel" data-p="${pid}">Prêmios</button>${['mvp','art','gar','gol'].some(k=>pr[k])?`<button class="btn sm" data-act="arte" data-p="${pid}">Artes</button>`:''}<button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button>`:''}</div></div>`}
+    const vAb=A&&!p.aval&&Date.now()<fimAval(p);
+    h+=`<div class="hist"><div class="grow"><div class="row" style="gap:8px;align-items:center"><b class="num">${dShort(p.data)}</b>${vAb?`<button class="btn sm warn vt-chip" data-act="votacao-pel" data-p="${pid}">Votação aberta</button>`:''}</div><div class="sub">${jogaram(p).length} jogadores${pr.mvp?' · 🏆 '+esc(nm(pr.mvp)):''}${pr.art?' · ⚽ '+esc(nm(pr.art)):''}</div></div><div class="row hist-bt" style="gap:6px"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button>${A?`<button class="btn sm" data-act="premios-pel" data-p="${pid}">Prêmios</button>${['mvp','art','gar','gol'].some(k=>pr[k])?`<button class="btn sm" data-act="arte" data-p="${pid}">Artes</button>`:''}<button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button>`:''}</div></div>`}
   if(enc.length>3)h+=`<button class="btn sm block" style="margin-top:8px" data-act="hist">${UI.showHist?'Mostrar menos':'Ver todas ('+enc.length+')'}</button>`;
   return h+'</div>';
 }
@@ -1544,7 +1546,7 @@ function gravarPag(kind,key,id,val){if(kind==='m'){const cx=S.caixa[key]||{mens:
 function openSheet(title,body,foot=''){
   document.getElementById('sheet').innerHTML=`<div class="scrim" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-h"><h2>${esc(title)}</h2><button class="iconbtn" data-act="close" aria-label="Fechar">✕</button></div><div id="sheet-body">${body}</div>${foot}</div></div>`;
 }
-function closeSheet(){document.getElementById('sheet').innerHTML='';F=null;UI.notasEdit=null}
+function closeSheet(){document.getElementById('sheet').innerHTML='';F=null;UI.rasc=null}
 let F=null;
 
 function sheetMsg(tipo,ctx={}){
@@ -1830,8 +1832,7 @@ document.addEventListener('click',e=>{
       patch('peladas/'+d.p,{times});break}
     case'stat':{const p=S.pel[d.p],s=p.stats?.[d.j]||{},dl=Number(d.d);let v;
       if(d.f==='n')v=s.n==null?6:Math.min(10,Math.max(0,s.n+dl*.5));else v=Math.max(0,(s[d.f]||0)+dl);
-      patch('peladas/'+d.p,{stats:{[d.j]:{[d.f]:v}}});
-      if(UI.notasEdit===d.p&&document.querySelector('.sheet')){const sc=document.querySelector('.sheet').scrollTop;sheetNotasPelada(d.p,true);document.querySelector('.sheet').scrollTop=sc}break}
+      patch('peladas/'+d.p,{stats:{[d.j]:{[d.f]:v}}});break}
     case'vit':{const p=S.pel[d.p],vit=(p.vit||p.times.map(()=>0)).slice();vit[d.i]=Math.max(0,(vit[d.i]||0)+Number(d.d));patch('peladas/'+d.p,{vit});break}
     case'confirm-end':UI.confirmEnd=d.v==='1';render();break;
     case'encerrar':{const p=S.pel[d.p],app=document.getElementById('app'),calmo=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1907,7 +1908,12 @@ document.addEventListener('click',e=>{
     case'time-nome-ok':{const cor=Number(d.c),v=document.getElementById('tn-in').value.trim(),arr=CORES.map((_,i)=>(cfg().nomesTimes||[])[i]||'');arr[cor]=v;
       put('config/geral',{...(S.config||{}),nomesTimes:arr});closeSheet();toast('Nome do time salvo.');break}
     case'notas-pel':sheetNotasPelada(d.p);break;
-    case'notas-editar':sheetNotasPelada(d.p,true);break;
+    case'notas-editar':UI.rasc=null;sheetNotasPelada(d.p,true);break;
+    case'stat-rasc':{if(!UI.rasc||UI.rasc.pid!==d.p)return;const s=UI.rasc.st[d.j]={...(UI.rasc.st[d.j]||{})};s[d.f]=Math.max(0,(s[d.f]||0)+Number(d.d));
+      const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetNotasPelada(d.p,true);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc;break}
+    case'notas-salvar':{const R=UI.rasc;if(!R||R.pid!==d.p)return;const p=S.pel[d.p],o=p.stats||{},up={};
+      for(const[id,x] of Object.entries(R.st)){const a=o[id]||{};if((x.g||0)!==(a.g||0)||(x.a||0)!==(a.a||0))up[id]={g:x.g||0,a:x.a||0}}
+      if(Object.keys(up).length)patch('peladas/'+d.p,{stats:up});UI.rasc=null;sheetNotasPelada(d.p);toast(Object.keys(up).length?'Gols e assistências salvos.':'Nada foi alterado.');break}
     case'premios-pel':sheetPremios(d.p);break;
     case'votacao-pel':openSheet('Votação · '+dShort(S.pel[d.p].data),painelVotacaoPos(d.p,S.pel[d.p])||'<div class="empty">A votação já fechou.</div>');break;
     case'voto-salvar':{const pp=posJogoMeu();if(!pp)return;const[pid,p]=pp,j=meuJogador(),outros=jogaram(p).filter(id=>id!==j&&S.jog[id]),meus=meusVotos(pid),falta=outros.filter(id=>!meus[id]);
