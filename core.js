@@ -225,6 +225,8 @@ function horaFimDe(p){return(p&&p.horaFim)||cfg().horaFim||maisHora(horaIniDe(p)
 function horarioTxt(p){return horaIniDe(p)+' às '+horaFimDe(p)}
 function fimDe(p){const d=parseD(p.data),i=horaIniDe(p),f=horaFimDe(p),[h,m]=f.split(':').map(Number);d.setHours(h,m,0,0);if(f<=i)d.setDate(d.getDate()+1);return d}
 function janelaH(){const h=Number(cfg().janelaAval);return h>0?h:24}
+function lerJanela(){const h=Math.max(0,Math.min(168,Math.floor(Number(document.getElementById('c-jan-h').value)||0))),m=Math.max(0,Math.min(59,Math.floor(Number(document.getElementById('c-jan-m').value)||0)));const t=h+m/60;return t>=0.25?Math.min(168,t):24}
+function janelaTxt(h=janelaH()){const H=Math.floor(h),M=Math.round((h-H)*60);return M?`${H}h${String(M).padStart(2,'0')}`:`${H}h`}
 function fimAval(p){return fimDe(p).getTime()+janelaH()*36e5}
 function posAberto(p){const f=fimDe(p).getTime(),n=Date.now();return n>=f&&n<fimAval(p)}
 /* avaliação secreta em estrelas.
@@ -1014,7 +1016,7 @@ function quandoCurto(t){const d=new Date(t);return`${DIAS3[d.getDay()]} ${pad(d.
 function statusVotacao(p,pid,ids){const f=fimDe(p).getTime(),n=Date.now(),fa=fimAval(p);
   const cont=ADM()&&!p.aval?` ${Object.keys(votosDe(pid)).filter(j=>ids.includes(j)).length} de ${ids.length} já votaram.`:'';
   if(p.aval)return'Avaliação encerrada. As notas abaixo são a média secreta da galera.';
-  if(n<f)return`A avaliação abre no término da pelada (${quandoCurto(f)}) e fica aberta por ${janelaH()}h.`;
+  if(n<f)return`A avaliação abre no término da pelada (${quandoCurto(f)}) e fica aberta por ${janelaTxt()}.`;
   if(n<fa)return`Avaliação aberta até ${quandoCurto(fa)}. Os votos são secretos e as notas só aparecem quando ela fechar.${cont}`;
   return'Avaliação encerrada. As notas aparecem assim que um administrador abrir o app.'+cont}
 // relação das notas de uma pelada, da maior para a menor
@@ -1052,7 +1054,7 @@ function subPos(pid,p,A){
   if(A){
     const temPremio=['mvp','art','gar','gol'].some(k=>pr[k]);
     h+=`<div class="stack" style="margin-top:12px"><button class="btn warn" data-act="arte" data-p="${pid}" ${temPremio?'':'disabled'}>Gerar artes dos destaques</button><button class="btn" data-act="msg" data-v="resultado">Mandar resultado no WhatsApp</button>`;
-    h+=UI.confirmEnd?`<div class="confirm"><b>Encerrar a pelada de ${dShort(p.data)}?</b><span class="small">A pelada vai para o histórico. A galera ainda pode avaliar até ${janelaH()}h depois do término.</span><div class="row"><button class="btn primary" data-act="encerrar" data-p="${pid}">Encerrar</button><button class="btn" data-act="confirm-end" data-v="0">Voltar</button></div></div>`
+    h+=UI.confirmEnd?`<div class="confirm"><b>Encerrar a pelada de ${dShort(p.data)}?</b><span class="small">A pelada vai para o histórico. A galera ainda pode avaliar até ${janelaTxt()} depois do término.</span><div class="row"><button class="btn primary" data-act="encerrar" data-p="${pid}">Encerrar</button><button class="btn" data-act="confirm-end" data-v="0">Voltar</button></div></div>`
       :`<button class="btn primary" data-act="confirm-end" data-v="1">Encerrar pelada</button>`;
     h+='</div>'}
   return h;
@@ -1420,7 +1422,10 @@ function sheetCfg(){
     <div class="panel"><h3 style="margin-bottom:4px">Nomes dos times</h3><div class="sub" style="margin-bottom:8px">Deixe em branco para usar o nome da cor.</div>
       <div class="stack" style="gap:8px">${CORES.map((co,i)=>`<label class="row" style="gap:8px;flex-wrap:nowrap"><span class="sw" style="background:${co.c};width:18px;height:18px;border-radius:5px;flex:none;border:1px solid var(--line)"></span><input type="text" id="c-tn${i}" maxlength="24" placeholder="${co.n}" value="${esc((c.nomesTimes||[])[i]||'')}"></label>`).join('')}</div></div>
     <div class="panel"><h3 style="margin-bottom:4px">Avaliação pós-jogo</h3><div class="sub" style="margin-bottom:8px">Depois do término, a galera vota em segredo. Quando fecha, saem as notas, o craque e o pereba.</div>
-      <label class="field"><span>Fica aberta por</span><select id="c-janela">${[6,12,24,36,48,72].map(h=>`<option value="${h}" ${janelaH()===h?'selected':''}>${h} horas${h===24?' (padrão)':''}</option>`).join('')}</select></label></div>
+      <div class="field"><span>Fica aberta por</span><div class="relogio">
+        <div class="stepbox"><div class="step"><button type="button" data-act="jan" data-f="h" data-d="-1" aria-label="Menos uma hora">−</button><input type="number" id="c-jan-h" min="0" max="168" inputmode="numeric" value="${Math.floor(janelaH())}" aria-label="Horas"><button type="button" data-act="jan" data-f="h" data-d="1" aria-label="Mais uma hora">+</button></div><span class="lbl">horas</span></div>
+        <div class="stepbox"><div class="step"><button type="button" data-act="jan" data-f="m" data-d="-15" aria-label="Menos 15 minutos">−</button><input type="number" id="c-jan-m" min="0" max="59" step="15" inputmode="numeric" value="${Math.round((janelaH()%1)*60)}" aria-label="Minutos"><button type="button" data-act="jan" data-f="m" data-d="15" aria-label="Mais 15 minutos">+</button></div><span class="lbl">minutos</span></div></div>
+        <div class="sub" style="margin-top:6px">Conta a partir do término da pelada. Até 7 dias (168 horas).</div></div></div>
     <div class="panel"><h3 style="margin-bottom:4px">Goleiros</h3><div class="sub" style="margin-bottom:8px">O time é formado pelos jogadores de linha. Escolha se o goleiro entra no sorteio.</div>
       <div class="pick" id="gol-pick"><button type="button" data-act="gol-sorteio" data-v="0" aria-pressed="${!c.golSorteio}">Goleiro extra</button><button type="button" data-act="gol-sorteio" data-v="1" aria-pressed="${!!c.golSorteio}">Goleiro no sorteio</button></div>
       <div class="sub" id="gol-txt" style="margin-top:6px">${c.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.'}</div></div>
@@ -1666,6 +1671,9 @@ document.addEventListener('click',e=>{
     case'minha-pos':{const id=meuJogador();if(!id||!trocaPosAberta()){sheetMinhaPos();return}const de=J(id).pos;if(d.v===de){closeSheet();return}
       const pr=S.pres[myId]||{pel:{}};put('presencas/'+myId,{...pr,pos:d.v===S.jog[id].pos?null:d.v,posTroca:{de,para:d.v,t:Date.now()}});closeSheet();toast(`Pronto! Agora você joga de ${POS[d.v].toLowerCase()} neste grupo.`);break}
     case'apagar-sorteio':if(b.dataset.sure){patch('peladas/'+d.p,{times:null,goleiros:null,vit:null,publicado:false,sorteadoEm:null,publicadoEm:null});UI.sel=null;toast('Sorteio apagado. A troca de posição está aberta de novo.')}else{b.dataset.sure='1';b.textContent='Toque de novo para apagar'}break;
+    case'jan':{const el=document.getElementById(d.f==='h'?'c-jan-h':'c-jan-m');let v=(Number(el.value)||0)+Number(d.d);
+      if(d.f==='m'){const h=document.getElementById('c-jan-h');if(v>=60){v=0;h.value=Math.min(168,(Number(h.value)||0)+1)}else if(v<0){if((Number(h.value)||0)>0){v=45;h.value=Number(h.value)-1}else v=0}}
+      el.value=Math.max(0,Math.min(d.f==='h'?168:59,v));break}
     case'regra-nova':sheetRegra(d.v);break;
     case'rg-tog':{const rg=UI.rg;if(!rg)return;const max=Math.max(2,Math.ceil(vagasCfg()/(Number(cfg().times)||2)));if(rg.sel.has(d.j))rg.sel.delete(d.j);else{if(rg.sel.size>=max){toast(`No máximo ${max} jogadores (o tamanho de um time).`);return}rg.sel.add(d.j)}
       const sc=document.querySelector('.sheet').scrollTop;sheetRegra();document.querySelector('.sheet').scrollTop=sc;break}
@@ -1727,7 +1735,7 @@ document.addEventListener('click',e=>{
       document.getElementById('gol-txt').textContent=F.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
       const ev=g('c-tipo')==='evento',dataEv=null,diaEv=Number(g('c-dia'));
-      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:Number(g('c-janela'))||24,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
+      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',evento:ev,data:dataEv});
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':{const cx=S.caixa[d.m]||{mens:{},desp:[]};put('caixa/'+d.m,{...cx,mens:{...(cx.mens||{}),[d.j]:!(cx.mens||{})[d.j]}});break}
