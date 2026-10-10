@@ -1212,7 +1212,7 @@ function renderHist(A){
   let h=`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Últimas peladas</h3></div>`;
   for(const[pid,p] of show){const pr=premiosDe(p,pid);
     const vAb=A&&!p.aval&&Date.now()<fimAval(p);
-    h+=`<div class="hist"><div class="grow"><div class="row" style="gap:8px;align-items:center"><b class="num">${dShort(p.data)}</b>${vAb?`<button class="btn sm warn vt-chip" data-act="votacao-pel" data-p="${pid}">Votação aberta</button>`:''}</div><div class="sub">${jogaram(p).length} jogadores${pr.mvp?' · 🏆 '+esc(nm(pr.mvp)):''}${pr.art?' · ⚽ '+esc(nm(pr.art)):''}</div></div><div class="row hist-bt" style="gap:6px"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button>${A?`<button class="btn sm" data-act="premios-pel" data-p="${pid}">Prêmios</button>${['mvp','art','gar','gol'].some(k=>pr[k])?`<button class="btn sm" data-act="arte" data-p="${pid}">Artes</button>`:''}<button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button>`:''}</div></div>`}
+    h+=`<div class="hist"><div class="grow"><div class="row" style="gap:8px;align-items:center"><b class="num">${dShort(p.data)}</b>${vAb?`<button class="btn sm warn vt-chip" data-act="votacao-pel" data-p="${pid}">Votação aberta</button>`:''}</div><div class="sub">${jogaram(p).length} jogadores${pr.mvp?' · 🏆 '+esc(nm(pr.mvp)):''}${pr.art?' · ⚽ '+esc(nm(pr.art)):''}</div></div><div class="row hist-bt" style="gap:6px"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button>${A?`<button class="btn sm" data-act="premios-pel" data-p="${pid}">Prêmios</button><button class="btn sm" data-act="${['mvp','art','gar','gol'].some(k=>pr[k])?'arte':'arte-sem'}" data-p="${pid}">Artes</button><button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button>`:''}</div></div>`}
   if(enc.length>3)h+=`<button class="btn sm block" style="margin-top:8px" data-act="hist">${UI.showHist?'Mostrar menos':'Ver todas ('+enc.length+')'}</button>`;
   return h+'</div>';
 }
@@ -1816,6 +1816,7 @@ document.addEventListener('click',e=>{
     case'pref':{const pr=prefs();pr[d.v]=!pr[d.v];put('config/geral',{...cfg(),...(S.config||{}),notif:pr});
       b.setAttribute('aria-checked',String(pr[d.v]));break}
     case'arte':sheetArtes(d.p);break;
+    case'arte-sem':sheetPremios(d.p);toast('Escolha os prêmios para gerar as artes.');break;
     case'carta':sheetCarta(d.j);break;
     case'salvar-arte':{const a=ARTS[Number(d.i)];if(!a||!dl)return;
       dl.save({filename:a.nome,data:a.blob}).then(r=>{if(r&&r.status==='saved')toast('Imagem pronta.')},e=>{if(e&&e.name!=='AbortError')toast('Não deu para salvar. Toque e segure a imagem.')});break}
