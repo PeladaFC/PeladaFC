@@ -1475,7 +1475,7 @@ function sheetCfg(){
     <div class="panel"><h3 style="margin-bottom:6px">Escudo da pelada</h3><div class="row" style="gap:12px;flex-wrap:nowrap">
       <div style="width:64px;height:72px;flex:none;display:grid;place-items:center">${c.escudo?`<img src="${c.escudo}" alt="Escudo" style="max-width:64px;max-height:72px">`:`<div style="width:56px;height:64px;background:${corEscudo()};clip-path:polygon(50% 0,100% 12%,100% 58%,50% 100%,0 58%,0 12%);display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:800;font-size:20px">${esc(((c.nome||'P').split(/\s+/).filter(t=>t.length>2).slice(0,2).map(t=>t[0]).join('')||'P').toUpperCase())}</div>`}</div>
       <div class="grow"><div class="sub" style="margin-bottom:6px">Aparece nas artes dos destaques. ${c.escudo?'':'Sem imagem, o app usa um escudo com as iniciais.'} De preferência PNG com fundo transparente.</div>
-      <div class="row" style="gap:6px"><label class="btn sm">${c.escudo?'Trocar escudo':'Enviar escudo'}<input type="file" accept="image/*" id="c-escudo" class="vh"></label>${c.escudo?'<button class="btn sm" data-act="escudo-rem">Remover</button>':''}</div></div></div></div>
+      <div class="row" style="gap:6px"><button class="btn sm" data-act="escudo-info">${c.escudo?'Trocar escudo':'Enviar escudo'}</button>${c.escudo?'<button class="btn sm" data-act="escudo-rem">Remover</button>':''}</div></div></div></div>
     <div class="panel"><h3 style="margin-bottom:6px">Convite</h3><div class="sub">Link para a galera entrar na pelada</div><div class="num" style="font-weight:700;word-break:break-all;margin:4px 0">${esc(linkConvite())}</div><div class="sub">Código: <b>${esc((GRUPO||{}).codigo||'')}</b></div>
       <div class="row" style="margin-top:8px"><button class="btn sm" data-act="msg" data-v="convite">Mensagem de convite</button><button class="btn sm" data-act="copiar-link">Copiar link</button><button class="btn sm" data-act="qr-pelada">QR Code</button></div></div>
     <div class="panel"><h3 style="margin-bottom:6px">Administradores</h3><div id="adm-list"></div></div>
@@ -1582,6 +1582,14 @@ document.addEventListener('click',e=>{
     case'edit-jog':sheetJog(d.j);if(d.agora&&F){F._depois=false;renderJogForm()}break;
     case'f-pos':F.pos=d.v;if(F.pos2===d.v)F.pos2='';renderJogForm();break;
     case'f-tipo':F.tipo=d.v;renderJogForm();break;
+    case'escudo-info':openSheet('Enviar escudo',`<div class="stack"><div class="dica-foto"><b>🛡️ Para o escudo ficar bonito nas artes</b><ul>
+      <li><b>PNG com fundo transparente</b> (sem fundo branco ou colorido em volta)</li>
+      <li>Só o escudo, sem textos ou bordas sobrando</li>
+      <li>Imagem nítida, de pelo menos 500 pixels</li>
+      <li>Formato original: o app não corta nem arredonda</li></ul></div>
+      <p class="sub" style="margin:0">Se a imagem tiver fundo, ele aparece como um retângulo nas artes. Dá para tirar o fundo grátis em sites como remove.bg.</p>
+      <label class="btn primary block">Escolher imagem<input type="file" accept="image/png,image/webp,image/*" id="c-escudo" class="vh"></label>
+      <button class="btn block" data-act="cfg">Voltar</button></div>`);break;
     case'escudo-rem':put('config/geral',{...(S.config||{}),escudo:null});if(window.sincronizarGrupo)window.sincronizarGrupo({escudo:null});toast('Escudo removido.');sheetCfg();break;
     case'f-foto-rem':F.foto=null;renderJogForm();break;
     case'f-crit':F.crit[d.k]=Number(d.v);renderJogForm();break;
