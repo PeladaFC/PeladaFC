@@ -471,7 +471,10 @@ function sheetDono(){const ls=Object.entries(S.locais).sort((a,b)=>a[1].nome.loc
 
 
 /* ---------- mensagens para o WhatsApp ---------- */
-function msg(tipo,ctx={}){
+// mensagens que podem ir para o Instagram saem sem * (negrito do WhatsApp)
+const MSG_INSTA=new Set(['convocacao','lista','times','resultado']);
+function msg(tipo,ctx={}){const t=msg0(tipo,ctx);return MSG_INSTA.has(tipo)?t.replace(/\*/g,''):t}
+function msg0(tipo,ctx={}){
   const c=cfg(),pe=atual(),p=ctx.pel||(pe&&pe[1]);
   const quando=p?`📅 *${dLong(p.data)}* das *${horaIniDe(p)}* às *${horaFimDe(p)}*`:EV()?'📅 Data a definir':`📅 *${DIAS[c.dia]}* das *${c.hora}* às *${horaFimDe(null)}*`;
   const LL=localDe(p),onde=LL?LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):'';
@@ -481,9 +484,9 @@ function msg(tipo,ctx={}){
   if(tipo==='cobrar'){const l=lista(p);if(!l.pend.length)return head+'\n'+quando+'\n\nTodo mundo já respondeu. Valeu! 🙌';
     return[head,quando,'',`⏰ Ainda faltam ${l.pend.length} responder:`,...l.pend.map(id=>'• '+nm(id)),'','Confirma aí pra gente fechar a lista! ✅ ou ❌'].join('\n')}
   if(tipo==='lista'){const l=lista(p),out=[head,quando,onde?'📍 '+onde:'',''];
-    out.push(`✅ *Confirmados* (${l.escalados.length}/${l.vagas})`);l.escalados.forEach((id,i)=>out.push(`${i+1}. ${nm(id)}${ehDiarista(id)?' (D)':''}`));
-    if(l.gks.length){out.push('','🧤 *Goleiros*');l.gks.forEach(id=>out.push('• '+nm(id)))}
-    if(l.espera.length){out.push('','⏳ *Lista de espera*');l.espera.forEach((id,i)=>out.push(`${i+1}. ${nm(id)}${l.aguardando.includes(id)?' (aguardando liberação)':''}`))}
+    out.push(`✅ CONFIRMADOS (${l.escalados.length}/${l.vagas})`);l.escalados.forEach((id,i)=>out.push(`${i+1}. ${nm(id)}${ehDiarista(id)?' (D)':''}`));
+    if(l.gks.length){out.push('','🧤 GOLEIROS');l.gks.forEach(id=>out.push('• '+nm(id)))}
+    if(l.espera.length){out.push('','⏳ LISTA DE ESPERA');l.espera.forEach((id,i)=>out.push(`${i+1}. ${nm(id)}${l.aguardando.includes(id)?' (aguardando liberação)':''}`))}
     if(l.nao.length)out.push('','❌ Não vão: '+l.nao.map(nm).join(', '));
     if(l.pend.length)out.push('','❓ Sem resposta: '+l.pend.map(nm).join(', '));
     if(l.vagas>l.escalados.length)out.push('',`Ainda tem ${l.vagas-l.escalados.length} vaga(s)!`);
