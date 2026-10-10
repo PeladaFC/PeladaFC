@@ -878,7 +878,7 @@ async function sheetEscudoFundo(orig){openSheet('Tirar o fundo?','<div class="em
   const body=document.getElementById('sheet-body');if(!body)return;
   body.innerHTML=`<div class="stack"><p class="sub" style="margin:0">O app tirou a cor do fundo. Veja como fica no fundo xadrez (transparente) e no verde das artes, e escolha.</p>
     <div class="esc-cmp">${prev(r.url,'Sem fundo','esc-sem',true)}${prev(orig,'Original','esc-orig',false)}</div>
-    <p class="sub" style="margin:0">Se o escudo ficou com buracos ou o fundo não saiu direito, mantenha o original ou use o remove.bg.</p></div>`}
+    <p class="sub" style="margin:0">Se o escudo ficou com buracos ou o fundo não saiu direito, mantenha o original.</p></div>`}
 function salvarEscudo(d,msg){put('config/geral',{...(S.config||{}),escudo:d});if(window.sincronizarGrupo)window.sincronizarGrupo({escudo:d});UI.escOrig=UI.escSem=null;toast(msg||'Escudo salvo.');sheetCfg()}
 window.redimFoto=function(file,lado=384){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),im=new Image();
   im.onload=()=>{const w=im.naturalWidth,h=im.naturalHeight,q0=Math.min(w,h),sx=(w-q0)/2,sy=(h-q0)/2,c=document.createElement('canvas');c.width=c.height=lado;const x=c.getContext('2d');
@@ -1614,7 +1614,7 @@ document.addEventListener('click',e=>{
       <li>Só o escudo, sem textos ou bordas sobrando</li>
       <li>Imagem nítida, de pelo menos 500 pixels</li>
       <li>Formato original: o app não corta nem arredonda</li></ul></div>
-      <p class="sub" style="margin:0">Se a imagem tiver fundo, ele aparece como um retângulo nas artes. Dá para tirar o fundo grátis em sites como remove.bg.</p>
+      <p class="sub" style="margin:0">Se a imagem tiver fundo, o app oferece tirar o fundo antes de salvar.</p>
       <label class="btn primary block">Escolher imagem<input type="file" accept="image/png,image/webp,image/*" id="c-escudo" class="vh"></label>
       <button class="btn block" data-act="cfg">Voltar</button></div>`);break;
     case'esc-sem':if(UI.escSem)salvarEscudo(UI.escSem,'Escudo salvo sem fundo.');break;
