@@ -408,6 +408,9 @@ nav.tabs button:active svg{transform:scale(.9)}
 .ob-pel .badge2{font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--pitch);color:var(--pitch-ink)}
 .ob-pel .badge2.j{background:var(--surface2);color:var(--muted)}
 @media (prefers-reduced-motion: no-preference){.sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(30px);opacity:.6}}}
+@media (prefers-reduced-motion: no-preference){#app{transition:opacity .26s ease,transform .26s ease}#app.saindo{opacity:0;transform:translateY(10px)}#app.entrando{animation:entra .5s ease-out}@keyframes entra{from{opacity:0;transform:translateY(-8px)}}.enc-ok{animation:entra .6s ease-out .1s both}}
+.enc-ok{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--pitch);border-left:5px solid var(--pitch);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.enc-ic{width:30px;height:30px;border-radius:50%;background:var(--pitch);color:var(--pitch-ink);display:grid;place-items:center;font-weight:800;flex-shrink:0}
 
 /* casca (login, minhas peladas) */
 .eu-av{all:unset;cursor:pointer;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--pitch) center/cover;color:var(--pitch-ink);font-family:var(--f-display);font-weight:800;font-size:17px;box-shadow:0 0 0 3px var(--card)}

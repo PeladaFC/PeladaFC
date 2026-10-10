@@ -999,7 +999,10 @@ function renderTab(){
       ${membrosSemCadastro().length?painelMembros():''}</div>`
     :`<div class="board"><div class="when">Bem-vindo!</div><div class="where">Você entrou na ${esc(cfg().nome)}.</div></div>${euPendente()?bannerPendente():''}`;
   }
-  return({jogo:tJogo,elenco:tElenco,avisos:tAvisos,ranking:tRanking,caixa:tCaixa}[UI.tab]||tJogo)(A);
+  const pe=UI.tab==='jogo'&&UI.recemEnc&&S.pel[UI.recemEnc];
+  const ban=pe?`<div class="enc-ok"><div class="enc-ic">✓</div><div class="grow"><b>Pelada de ${dShort(pe.data)} encerrada</b><div class="sub">Ela foi para "Últimas peladas", com notas, prêmios e artes. Agora é só marcar a próxima.</div>
+    <div class="row" style="gap:6px;margin-top:8px"><button class="btn sm" data-act="notas-pel" data-p="${UI.recemEnc}">Ver notas</button><button class="btn sm" data-act="fechar-enc">Ok</button></div></div></div>`:'';
+  return ban+({jogo:tJogo,elenco:tElenco,avisos:tAvisos,ranking:tRanking,caixa:tCaixa}[UI.tab]||tJogo)(A);
 }
 
 // guarda data e horários da próxima pelada; o término acompanha o início até ser mudado à mão
@@ -1830,7 +1833,12 @@ document.addEventListener('click',e=>{
       patch('peladas/'+d.p,{stats:{[d.j]:{[d.f]:v}}});break}
     case'vit':{const p=S.pel[d.p],vit=(p.vit||p.times.map(()=>0)).slice();vit[d.i]=Math.max(0,(vit[d.i]||0)+Number(d.d));patch('peladas/'+d.p,{vit});break}
     case'confirm-end':UI.confirmEnd=d.v==='1';render();break;
-    case'encerrar':{const p=S.pel[d.p];UI.confirmEnd=false;UI.sub='presenca';patch('peladas/'+d.p,{status:'encerrada',jogaram:jogaram(p),encerradaEm:Date.now()});toast('Pelada encerrada. Notas atualizadas.');break}
+    case'encerrar':{const p=S.pel[d.p],app=document.getElementById('app'),calmo=matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const fim=()=>{UI.confirmEnd=false;UI.sub='presenca';UI.recemEnc=d.p;patch('peladas/'+d.p,{status:'encerrada',jogaram:jogaram(p),encerradaEm:Date.now()});
+        app.classList.remove('saindo');window.scrollTo({top:0,behavior:calmo?'auto':'smooth'});
+        if(!calmo){app.classList.add('entrando');setTimeout(()=>app.classList.remove('entrando'),600)}};
+      if(calmo)fim();else{app.classList.add('saindo');setTimeout(fim,260)}break}
+    case'fechar-enc':UI.recemEnc=null;render();break;
     case'msg':{const ctx={};if(d.p)ctx.pel=S.pel[d.p];if(d.j)ctx.jid=d.j;if(d.m)ctx.mes=d.m;if(d.aviso){ctx.aviso=d.aviso;ctx.key=d.key}sheetMsg(d.v,ctx);break}
     case'copy':{const t=document.getElementById('msg-text');navigator.clipboard?.writeText(t.value).then(()=>toast('Mensagem copiada.'),()=>{t.select();toast('Selecione e copie o texto.')})||(t.select(),toast('Selecione e copie o texto.'));break}
     case'aviso-feito':{const a=S.avisos[d.a];const feitos=Object.fromEntries(Object.entries({...(a.feitos||{}),[d.key]:true}).sort().slice(-12));put('avisos/'+d.a,{...a,feitos});closeSheet();toast('Alerta resolvido.');break}
