@@ -701,6 +701,15 @@ function arteIndividual(p,k){
     ctx.fillStyle='#1E1700';ctx.fillText(stat,W/2,1168)}
   ctx.textAlign='left';return cv;
 }
+/* escudo da pelada: imagem enviada pelo admin ou escudo com as iniciais */
+const ESC_CORES=['#1B6A36','#C0392B','#2F6FD0','#7E57C2','#E8742A','#0E7C7B','#9A6B00'];
+function corEscudo(){const g=GID||'x';let x=0;for(const ch of g)x=(x*31+ch.charCodeAt(0))>>>0;return ESC_CORES[x%ESC_CORES.length]}
+function desenharEscudo(ctx,x,y,w,h){const im=cfg().escudo?FOTO_CACHE[cfg().escudo]:null;
+  if(im){const k=Math.min(w/im.naturalWidth,h/im.naturalHeight),iw=im.naturalWidth*k,ih=im.naturalHeight*k;ctx.save();ctx.shadowColor='rgba(0,0,0,.4)';ctx.shadowBlur=16;ctx.drawImage(im,x+(w-iw)/2,y+(h-ih)/2,iw,ih);ctx.restore();return}
+  const p=(a,b)=>[x+w*a,y+h*b];ctx.save();ctx.beginPath();[[.5,0],[1,.12],[1,.58],[.5,1],[0,.58],[0,.12]].forEach(([a,b],i)=>{const[px,py]=p(a,b);i?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.closePath();
+  ctx.shadowColor='rgba(0,0,0,.4)';ctx.shadowBlur=16;ctx.fillStyle=corEscudo();ctx.fill();ctx.shadowColor='transparent';ctx.lineWidth=Math.max(4,w*.04);ctx.strokeStyle='#F2C12E';ctx.stroke();
+  const ini=(cfg().nome||'P').split(/\s+/).filter(t=>t.length>2||/^[A-ZÀ-Ú]/.test(t)).slice(0,2).map(t=>t[0]).join('').toUpperCase()||'P';
+  ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font=`800 ${Math.round(h*.38)}px "Saira Condensed", Impact, sans-serif`;ctx.fillText(ini,x+w/2,y+h*.56);ctx.restore()}
 /* arte estilo pôster: título gigante empilhado, foto grande em círculo com anéis */
 const POSTER_TIT={mvp:['CRA','QUE'],art:['ARTI','LHEIRO'],gar:['GAR','ÇOM'],gol:['GOLEI','RO']};
 function espacado(ctx,txt,x,y,sp){ctx.save();ctx.textAlign='left';let w=0;for(const ch of txt)w+=ctx.measureText(ch).width+sp;w-=sp;let cx=x-w/2;for(const ch of txt){ctx.fillText(ch,cx,y);cx+=ctx.measureText(ch).width+sp}ctx.restore()}
@@ -730,6 +739,7 @@ function artePoster(p,k){
   ctx.fillStyle='rgba(255,255,255,.85)';ctx.font=`700 52px ${FAM}`;const dt=p.data.split('-').reverse().join('/');ctx.fillText(dt,88,yb+165);
   // número do prêmio
   const stat=premioStat(p,k);if(stat){ctx.font=`800 60px ${FAM}`;const sw=ctx.measureText(stat).width+56;ctx.fillStyle='#F2C12E';ctx.beginPath();ctx.roundRect(80,yb+200,sw,86,10);ctx.fill();ctx.fillStyle='#1E1700';ctx.fillText(stat,108,yb+264)}
+  desenharEscudo(ctx,80,yb+(stat?320:210),150,175);
   // nome do jogador, inclinado, abaixo da foto
   const nome=nm(id).toUpperCase();ctx.save();ctx.translate(cx+10,cy+R+60);ctx.rotate(-.06);ctx.fillStyle='#FFFFFF';ctx.textAlign='center';
   const ns=fit(ctx,nome,620,130,800,FAM);ctx.font=`italic 800 ${ns}px ${FAM}`;ctx.shadowColor='rgba(0,0,0,.5)';ctx.shadowBlur=14;ctx.fillText(nome,0,0);ctx.restore();
@@ -742,7 +752,7 @@ async function sheetArtes(pid){
   const p=S.pel[pid],PR=premiosDe(p,pid),ks=['mvp','art','gar','gol'].filter(k=>PR[k]);
   if(!ks.length){toast('Escolha os prêmios antes de gerar as artes.');return}
   openSheet('Artes da pelada','<div class="empty">Desenhando as artes…</div>');
-  await fontsReady();await Promise.all(ks.map(k=>carregarImg(fotoDe(PR[k]))));
+  await fontsReady();await Promise.all(ks.map(k=>carregarImg(fotoDe(PR[k]))).concat(cfg().escudo?[carregarImg(cfg().escudo)]:[]));
   ARTS.forEach(a=>URL.revokeObjectURL(a.url));ARTS=[];
   const mk=async(cv,nome,label)=>{const blob=await new Promise(r=>cv.toBlob(r,'image/png'));ARTS.push({blob,url:URL.createObjectURL(blob),nome,label})};
   await mk(arteGeral(p),`destaques-${p.data}.png`,'Destaques');
@@ -835,6 +845,11 @@ const FOTO_CACHE={};
 function fotoDe(id){const j=S.jog[id];if(j&&j.foto)return j.foto;const u=Object.keys(S.pres||{}).find(k=>S.pres[k].jogador===id);const m=u&&S.membros&&S.membros[u];return(m&&m.foto)||null}
 function fotoStyle(f){return f?`background-image:url('${f}');background-size:cover;background-position:center;`:''}
 function avHTML(id){const j=J(id),f=fotoDe(id);return`<div class="av bg-${j.pos}" style="${fotoStyle(f)}" ${f?`role="img" aria-label="${esc(nm(id))}"`:''}>${f?'':esc(initials(nm(id)))}</div>`}
+window.redimEscudo=function(file,lado=320){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),im=new Image();
+  im.onload=()=>{const w=im.naturalWidth,h=im.naturalHeight,k=Math.min(1,lado/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(url);let d=c.toDataURL('image/png');
+    if(d.length>150000){d=c.toDataURL('image/webp',.85);if(!d.startsWith('data:image/webp')||d.length>150000)d=c.toDataURL('image/jpeg',.8)}res(d)};
+  im.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('escudo'))};im.src=url})};
 window.redimFoto=function(file,lado=384){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),im=new Image();
   im.onload=()=>{const w=im.naturalWidth,h=im.naturalHeight,q0=Math.min(w,h),sx=(w-q0)/2,sy=(h-q0)/2,c=document.createElement('canvas');c.width=c.height=lado;const x=c.getContext('2d');
     x.fillStyle='#fff';x.fillRect(0,0,lado,lado);x.drawImage(im,sx,sy,q0,q0,0,0,lado,lado);URL.revokeObjectURL(url);
@@ -1454,6 +1469,10 @@ function sheetCfg(){
     <label class="field"><span>Chave Pix</span><input type="text" id="c-pix" value="${esc(c.pix)}" placeholder="Telefone, e-mail ou chave aleatória"></label>
     <label class="row"><input type="checkbox" id="c-nivelpub" ${c.nivelPublico?'checked':''}> Mostrar o nível da pelada (estrelas) para os jogadores</label>
     <label class="row"><input type="checkbox" id="c-mostraval" ${c.mostrarAval===false?'':'checked'}> Mostrar as avaliações dos jogadores (0 a 100) para todos. Mesmo ligado, só aparece depois da avaliação da galera.</label>
+    <div class="panel"><h3 style="margin-bottom:6px">Escudo da pelada</h3><div class="row" style="gap:12px;flex-wrap:nowrap">
+      <div style="width:64px;height:72px;flex:none;display:grid;place-items:center">${c.escudo?`<img src="${c.escudo}" alt="Escudo" style="max-width:64px;max-height:72px">`:`<div style="width:56px;height:64px;background:${corEscudo()};clip-path:polygon(50% 0,100% 12%,100% 58%,50% 100%,0 58%,0 12%);display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:800;font-size:20px">${esc(((c.nome||'P').split(/\s+/).filter(t=>t.length>2).slice(0,2).map(t=>t[0]).join('')||'P').toUpperCase())}</div>`}</div>
+      <div class="grow"><div class="sub" style="margin-bottom:6px">Aparece nas artes dos destaques. ${c.escudo?'':'Sem imagem, o app usa um escudo com as iniciais.'} De preferência PNG com fundo transparente.</div>
+      <div class="row" style="gap:6px"><label class="btn sm">${c.escudo?'Trocar escudo':'Enviar escudo'}<input type="file" accept="image/*" id="c-escudo" class="vh"></label>${c.escudo?'<button class="btn sm" data-act="escudo-rem">Remover</button>':''}</div></div></div></div>
     <div class="panel"><h3 style="margin-bottom:6px">Convite</h3><div class="sub">Link para a galera entrar na pelada</div><div class="num" style="font-weight:700;word-break:break-all;margin:4px 0">${esc(linkConvite())}</div><div class="sub">Código: <b>${esc((GRUPO||{}).codigo||'')}</b></div>
       <div class="row" style="margin-top:8px"><button class="btn sm" data-act="msg" data-v="convite">Mensagem de convite</button><button class="btn sm" data-act="copiar-link">Copiar link</button><button class="btn sm" data-act="qr-pelada">QR Code</button></div></div>
     <div class="panel"><h3 style="margin-bottom:6px">Administradores</h3><div id="adm-list"></div></div>
@@ -1560,6 +1579,7 @@ document.addEventListener('click',e=>{
     case'edit-jog':sheetJog(d.j);if(d.agora&&F){F._depois=false;renderJogForm()}break;
     case'f-pos':F.pos=d.v;if(F.pos2===d.v)F.pos2='';renderJogForm();break;
     case'f-tipo':F.tipo=d.v;renderJogForm();break;
+    case'escudo-rem':put('config/geral',{...(S.config||{}),escudo:null});toast('Escudo removido.');sheetCfg();break;
     case'f-foto-rem':F.foto=null;renderJogForm();break;
     case'f-crit':F.crit[d.k]=Number(d.v);renderJogForm();break;
     case'f-depois':F._depois=d.v==='1';renderJogForm();break;
@@ -1793,6 +1813,7 @@ document.addEventListener('change',e=>{
   if(t.dataset.act==='cmp'){UI.cmp=t.value||null;const sc=document.querySelector('.sheet').scrollTop;sheetVerJog(t.dataset.j);document.querySelector('.sheet').scrollTop=sc}
   if(t.dataset.act==='premio'){patch('peladas/'+t.dataset.p,{premios:{[t.dataset.f]:t.value||null}})}
   if(t.dataset.act==='ano'){UI.ano=Number(t.value);render()}
+  if(t.id==='c-escudo'&&t.files&&t.files[0]){toast('Preparando o escudo…');window.redimEscudo(t.files[0]).then(d=>{put('config/geral',{...(S.config||{}),escudo:d});toast('Escudo salvo.');sheetCfg()},()=>toast('Não consegui abrir essa imagem. Tente outra.'));return}
   if(t.id==='f-foto'&&t.files&&t.files[0]&&F){toast('Preparando a foto…');window.redimFoto(t.files[0]).then(d=>{F.foto=d;renderJogForm()},()=>toast('Não consegui abrir essa foto. Tente outra.'))}
   if(t.dataset.f&&F){F[t.dataset.f]=t.value}
 });

@@ -227,7 +227,7 @@ function render() {
   const avOk = rid => { try { return !!localStorage.getItem('pelada.avok.' + rid); } catch (e) { return false; } };
   const avAb = g => { const a = GRUPOS[g] && GRUPOS[g].avAberta; return a && a.v === 2 && a.fim > Date.now() && !avOk(a.rid) ? a : null; };
   if (t === 'minhas') { const ids = Object.keys(GRUPOS); const adm = ids.filter(g => (GRUPOS[g].admins || []).includes(EU.uid)), jog = ids.filter(g => !adm.includes(g));
-    const ini = n => escH((n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase());
+    const ini = n => { const ws = (n || '?').split(/\s+/).filter(Boolean), g = ws.filter(w => w.length > 2); return escH(((g.length ? g : ws).slice(0, 2).map(w => w[0]).join('')).toUpperCase()); };
     const CRESTS = ['#1B6A36', '#C0392B', '#2F6FD0', '#7E57C2', '#E8742A', '#0E7C7B', '#9A6B00'];
     const cor = g => { let x = 0; for (const ch of g) x = (x * 31 + ch.charCodeAt(0)) >>> 0; return CRESTS[x % CRESTS.length]; };
     const prox = ids.map(g => ({ g, d: proxJogo(GRUPOS[g]) })).filter(x => x.d).sort((a, b) => a.d - b.d)[0];
