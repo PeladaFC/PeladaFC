@@ -848,11 +848,38 @@ const FOTO_CACHE={};
 function fotoDe(id){const j=S.jog[id];if(j&&j.foto)return j.foto;const u=Object.keys(S.pres||{}).find(k=>S.pres[k].jogador===id);const m=u&&S.membros&&S.membros[u];return(m&&m.foto)||null}
 function fotoStyle(f){return f?`background-image:url('${f}');background-size:cover;background-position:center;`:''}
 function avHTML(id){const j=J(id),f=fotoDe(id);return`<div class="av bg-${j.pos}" style="${fotoStyle(f)}" ${f?`role="img" aria-label="${esc(nm(id))}"`:''}>${f?'':esc(initials(nm(id)))}</div>`}
-window.redimEscudo=function(file,lado=320){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),im=new Image();
-  im.onload=()=>{const w=im.naturalWidth,h=im.naturalHeight,k=Math.min(1,lado/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);
-    c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(url);let d=c.toDataURL('image/png');
-    if(d.length>150000){d=c.toDataURL('image/webp',.85);if(!d.startsWith('data:image/webp')||d.length>150000)d=c.toDataURL('image/jpeg',.8)}res(d)};
+window.redimEscudo=function(file,lado=360){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),im=new Image();
+  im.onload=()=>{URL.revokeObjectURL(url);let L=lado,d;do{const k=Math.min(1,L/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.naturalWidth*k));c.height=Math.max(1,Math.round(im.naturalHeight*k));
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);d=c.toDataURL('image/png');L=Math.round(L*.82)}while(d.length>180000&&L>120);res(d)};
   im.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('escudo'))};im.src=url})};
+/* tira o fundo liso: parte das bordas e apaga a cor do fundo, com borda suave */
+function semFundo(dataUrl){return new Promise(res=>{const im=new Image();im.onload=()=>{
+  const W=im.naturalWidth,H=im.naturalHeight,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.drawImage(im,0,0);
+  const D=x.getImageData(0,0,W,H),a=D.data,idx=(i,j)=>(j*W+i)*4;
+  // cor do fundo = mais comum nas bordas (agrupada)
+  const cnt={};let tot=0,transp=0;const add=(i,j)=>{const k=idx(i,j);tot++;if(a[k+3]<30){transp++;return}const key=(a[k]>>4)+','+(a[k+1]>>4)+','+(a[k+2]>>4);cnt[key]=(cnt[key]||[0,0,0,0]);const e=cnt[key];e[0]++;e[1]+=a[k];e[2]+=a[k+1];e[3]+=a[k+2]};
+  for(let i=0;i<W;i++){add(i,0);add(i,H-1)}for(let j=0;j<H;j++){add(0,j);add(W-1,j)}
+  if(transp/tot>.6){res({ja:true});return}
+  const top=Object.values(cnt).sort((p,q)=>q[0]-p[0])[0];if(!top){res({ja:true});return}
+  const br=top[1]/top[0],bg=top[2]/top[0],bb=top[3]/top[0],cobre=top[0]/(tot-transp);
+  const dist=k=>Math.sqrt((a[k]-br)**2+(a[k+1]-bg)**2+(a[k+2]-bb)**2),T=52,T2=95;
+  const vis=new Uint8Array(W*H),st=[];const push=(i,j)=>{if(i<0||j<0||i>=W||j>=H)return;const p=j*W+i;if(vis[p])return;const k=p*4;if(a[k+3]<30||dist(k)<T){vis[p]=1;st.push(p)}};
+  for(let i=0;i<W;i++){push(i,0);push(i,H-1)}for(let j=0;j<H;j++){push(0,j);push(W-1,j)}
+  while(st.length){const p=st.pop(),i=p%W,j=(p/W)|0;push(i+1,j);push(i-1,j);push(i,j+1);push(i,j-1)}
+  let tirados=0;for(let p=0;p<W*H;p++)if(vis[p]){a[p*4+3]=0;tirados++}
+  // borda suave: vizinhos do fundo ficam semitransparentes conforme a semelhança
+  for(let j=1;j<H-1;j++)for(let i=1;i<W-1;i++){const p=j*W+i;if(vis[p])continue;if(!(vis[p-1]||vis[p+1]||vis[p-W]||vis[p+W]))continue;const k=p*4,d=dist(k);if(d<T2)a[k+3]=Math.min(a[k+3],Math.round(255*(d-T)/(T2-T)))}
+  x.putImageData(D,0,0);res({url:c.toDataURL('image/png'),parte:tirados/(W*H),cobre})};im.onerror=()=>res({erro:true});im.src=dataUrl})}
+const XADREZ='background:conic-gradient(#ddd 25%,#fff 0 50%,#ddd 0 75%,#fff 0) 0 0/16px 16px';
+async function sheetEscudoFundo(orig){openSheet('Tirar o fundo?','<div class="empty">Preparando…</div>');const r=await semFundo(orig);
+  if(r.ja||r.erro||!r.url||r.parte<.03){salvarEscudo(orig,r.ja?'Escudo salvo. Ele já estava sem fundo.':'Escudo salvo.');return}
+  UI.escOrig=orig;UI.escSem=r.url;
+  const prev=(src,lbl,act,pri)=>`<button class="esc-op" data-act="${act}"><span class="esc-bx" style="${XADREZ}"><img src="${src}" alt=""></span><span class="esc-bx verde"><img src="${src}" alt=""></span><b>${lbl}</b><span class="btn ${pri?'primary':''} block">${pri?'Usar este':'Manter original'}</span></button>`;
+  const body=document.getElementById('sheet-body');if(!body)return;
+  body.innerHTML=`<div class="stack"><p class="sub" style="margin:0">O app tirou a cor do fundo. Veja como fica no fundo xadrez (transparente) e no verde das artes, e escolha.</p>
+    <div class="esc-cmp">${prev(r.url,'Sem fundo','esc-sem',true)}${prev(orig,'Original','esc-orig',false)}</div>
+    <p class="sub" style="margin:0">Se o escudo ficou com buracos ou o fundo não saiu direito, mantenha o original ou use o remove.bg.</p></div>`}
+function salvarEscudo(d,msg){put('config/geral',{...(S.config||{}),escudo:d});if(window.sincronizarGrupo)window.sincronizarGrupo({escudo:d});UI.escOrig=UI.escSem=null;toast(msg||'Escudo salvo.');sheetCfg()}
 window.redimFoto=function(file,lado=384){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),im=new Image();
   im.onload=()=>{const w=im.naturalWidth,h=im.naturalHeight,q0=Math.min(w,h),sx=(w-q0)/2,sy=(h-q0)/2,c=document.createElement('canvas');c.width=c.height=lado;const x=c.getContext('2d');
     x.fillStyle='#fff';x.fillRect(0,0,lado,lado);x.drawImage(im,sx,sy,q0,q0,0,0,lado,lado);URL.revokeObjectURL(url);
@@ -1590,6 +1617,8 @@ document.addEventListener('click',e=>{
       <p class="sub" style="margin:0">Se a imagem tiver fundo, ele aparece como um retângulo nas artes. Dá para tirar o fundo grátis em sites como remove.bg.</p>
       <label class="btn primary block">Escolher imagem<input type="file" accept="image/png,image/webp,image/*" id="c-escudo" class="vh"></label>
       <button class="btn block" data-act="cfg">Voltar</button></div>`);break;
+    case'esc-sem':if(UI.escSem)salvarEscudo(UI.escSem,'Escudo salvo sem fundo.');break;
+    case'esc-orig':if(UI.escOrig)salvarEscudo(UI.escOrig,'Escudo salvo.');break;
     case'escudo-rem':put('config/geral',{...(S.config||{}),escudo:null});if(window.sincronizarGrupo)window.sincronizarGrupo({escudo:null});toast('Escudo removido.');sheetCfg();break;
     case'f-foto-rem':F.foto=null;renderJogForm();break;
     case'f-crit':F.crit[d.k]=Number(d.v);renderJogForm();break;
@@ -1824,7 +1853,7 @@ document.addEventListener('change',e=>{
   if(t.dataset.act==='cmp'){UI.cmp=t.value||null;const sc=document.querySelector('.sheet').scrollTop;sheetVerJog(t.dataset.j);document.querySelector('.sheet').scrollTop=sc}
   if(t.dataset.act==='premio'){patch('peladas/'+t.dataset.p,{premios:{[t.dataset.f]:t.value||null}})}
   if(t.dataset.act==='ano'){UI.ano=Number(t.value);render()}
-  if(t.id==='c-escudo'&&t.files&&t.files[0]){toast('Preparando o escudo…');window.redimEscudo(t.files[0]).then(d=>{put('config/geral',{...(S.config||{}),escudo:d});if(window.sincronizarGrupo)window.sincronizarGrupo({escudo:d});toast('Escudo salvo.');sheetCfg()},()=>toast('Não consegui abrir essa imagem. Tente outra.'));return}
+  if(t.id==='c-escudo'&&t.files&&t.files[0]){window.redimEscudo(t.files[0]).then(d=>sheetEscudoFundo(d),()=>toast('Não consegui abrir essa imagem. Tente outra.'));return}
   if(t.id==='f-foto'&&t.files&&t.files[0]&&F){toast('Preparando a foto…');window.redimFoto(t.files[0]).then(d=>{F.foto=d;renderJogForm()},()=>toast('Não consegui abrir essa foto. Tente outra.'))}
   if(t.dataset.f&&F){F[t.dataset.f]=t.value}
 });

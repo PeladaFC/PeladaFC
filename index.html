@@ -226,6 +226,11 @@ input::-webkit-date-and-time-value{text-align:left}
 .relogio{display:flex;gap:16px;flex-wrap:wrap}
 .relogio .step input{width:56px;text-align:center;border:0;background:transparent;font-family:var(--f-display);font-weight:700;font-size:20px;padding:0;-moz-appearance:textfield}
 .relogio .step input::-webkit-outer-spin-button,.relogio .step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.esc-cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.esc-op{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:stretch;text-align:center;border:1px solid var(--line);border-radius:12px;padding:8px;background:var(--surface)}
+.esc-op:focus-visible{outline:3px solid var(--pitch);outline-offset:2px}
+.esc-bx{display:grid;place-items:center;height:110px;border-radius:8px}.esc-bx.verde{background:linear-gradient(#0B3F20,#06291A)}
+.esc-bx img{max-width:85%;max-height:92px;object-fit:contain}.esc-op .btn{pointer-events:none}
 .crit-p{font-size:11px;font-weight:700;color:var(--pitch);background:var(--pitch-soft);border-radius:5px;padding:0 5px;vertical-align:2px}
 .crit-d{display:block;font-size:12px;font-weight:400;color:var(--muted);line-height:1.2;margin-top:1px}
 .avadm{border-color:var(--card)}.avadm.on{border-width:2px}
