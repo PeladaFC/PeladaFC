@@ -298,7 +298,9 @@ function rankingNotas(p,pid){return jogaram(p).filter(id=>S.jog[id]).map(id=>({i
   .sort((x,y)=>(y.n??-1)-(x.n??-1)||((y.a||{}).n||0)-((x.a||{}).n||0)||nm(x.id).localeCompare(nm(y.id)))}
 function craquePereba(p,pid){if(!p.aval)return{};const r=rankingNotas(p,pid).filter(x=>x.n!=null);if(r.length<2)return{};return{mvp:r[0].id,per:r[r.length-1].id}}
 function premiosDe(p,pid){pid=pid||pidOf(p);const pr={...(p.premios||{})},cp=craquePereba(p,pid);
-  if(!pr.mvp&&cp.mvp)pr.mvp=cp.mvp;if(!pr.per&&cp.per)pr.per=cp.per;return pr}
+  if(!pr.mvp&&cp.mvp)pr.mvp=cp.mvp;if(!pr.per&&cp.per)pr.per=cp.per;
+  const st=p.stats||{},ids=jogaram(p).filter(id=>S.jog[id]),top=f=>{const r=ids.filter(id=>(st[id]?.[f]||0)>0).sort((a,b)=>(st[b][f]-st[a][f])||(notaJogo(p,pid,b)??0)-(notaJogo(p,pid,a)??0));return r[0]||null};
+  if(!pr.art)pr.art=top('g');if(!pr.gar)pr.gar=top('a');return pr}
 /* gols e assistências lançados pelo próprio jogador: ficam pendentes até um administrador aprovar */
 function lancStatus(p,u,L){if(!L)return null;if((p.lancOk||{})[u]>=L.t)return'ok';if((p.lancRec||{})[u]>=L.t)return'rec';return'pend'}
 function lancPendentes(){const out=[];for(const[u,d] of Object.entries(S.pres||{})){if(!d||!d.jogador||!S.jog[d.jogador])continue;
@@ -1119,6 +1121,12 @@ function blocoTimes(pid,p,A){let h='<div class="teams">';
   const gx=(p.goleiros||[]).filter(id=>S.jog[id]);if(gx.length)h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>🧤 Goleiros</h3><span class="sub">extra · fora do sorteio</span></div><div class="list">${gx.map(id=>`<div class="item">${avHTML(id)}<div class="grow name">${esc(nm(id))}</div><span class="num muted small">${ovrTxt(id)}</span></div>`).join('')}</div></div>`;
   return h}
 function quandoCurto(t){const d=new Date(t);return`${DIAS3[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`}
+function sheetPremios(pid){const p=S.pel[pid];if(!p)return;const ids=jogaram(p).filter(id=>S.jog[id]),pr=premiosDe(p,pid),st=p.stats||{},gks=ids.filter(id=>J(id).pos==='GOL');
+  const opts=(list,v)=>'<option value="">—</option>'+list.map(id=>`<option value="${id}" ${v===id?'selected':''}>${esc(nm(id))}</option>`).join('');
+  const sel=(k,lbl,list)=>`<div class="award"><label for="hp-${k}">${lbl}</label><select id="hp-${k}" data-act="premio" data-p="${pid}" data-f="${k}">${opts(list,pr[k])}</select></div>`;
+  openSheet('Prêmios · '+dShort(p.data),`<div class="stack"><p class="sub" style="margin:0">Craque e pereba saem dos votos; artilheiro e garçom, dos gols e assistências. Você pode trocar qualquer um.</p>
+    <div class="awards">${sel('mvp','🏆 Craque',ids)}${sel('per','🐢 Pereba',ids)}${sel('art','⚽ Artilheiro',ids)}${sel('gar','🅰️ Garçom',ids)}${sel('gol','🧤 Goleiro',gks.length?gks:ids)}</div>
+    <button class="btn warn block" data-act="arte" data-p="${pid}">Gerar artes dos destaques</button></div>`)}
 function statusVotacao(p,pid,ids){const f=fimDe(p).getTime(),n=Date.now(),fa=fimAval(p);
   const cont='';
   if(p.aval)return'Avaliação encerrada. As notas abaixo são a média secreta da galera.';
@@ -1159,9 +1167,9 @@ function subPos(pid,p,A){
     ${notaCampoHTML(p.localId)?`<div class="sub" style="margin-top:6px">Nota geral do campo: ${notaCampoHTML(p.localId)}</div>`:''}</div>`}
   if(A){
     const temPremio=['mvp','art','gar','gol'].some(k=>pr[k]);
-    h+=`<div class="stack" style="margin-top:12px"><button class="btn warn" data-act="arte" data-p="${pid}" ${temPremio?'':'disabled'}>Gerar artes dos destaques</button><button class="btn" data-act="msg" data-v="resultado">Mandar resultado no WhatsApp</button>`;
+    h+=`<div class="stack" style="margin-top:12px"><button class="btn warn" data-act="arte" data-p="${pid}" ${temPremio?'':'disabled'}>Gerar artes dos destaques</button>${temPremio?'':`<div class="sub" style="margin-top:-6px">${!p.aval&&Date.now()<fimAval(p)?`O craque sai quando a votação fechar (${quandoCurto(fimAval(p))}). Antes disso, escolha os prêmios no quadro acima ou lance os gols.`:'Escolha os prêmios no quadro acima ou lance os gols e assistências.'}</div>`}<button class="btn" data-act="msg" data-v="resultado">Mandar resultado no WhatsApp</button>`;
     h+=UI.confirmEnd?`<div class="confirm"><b>Encerrar a pelada de ${dShort(p.data)}?</b><span class="small">A pelada vai para o histórico. A galera ainda pode avaliar até ${janelaTxt()} depois do término.</span><div class="row"><button class="btn primary" data-act="encerrar" data-p="${pid}">Encerrar</button><button class="btn" data-act="confirm-end" data-v="0">Voltar</button></div></div>`
-      :`<button class="btn primary" data-act="confirm-end" data-v="1">Encerrar pelada</button>`;
+      :`<button class="btn primary" data-act="confirm-end" data-v="1">Encerrar pelada</button><div class="sub" style="margin-top:-6px">Arquiva esta pelada em "Últimas peladas" e libera para marcar a próxima. ${!p.aval&&Date.now()<fimAval(p)?`A votação continua aberta até ${quandoCurto(fimAval(p))}.`:''} Prêmios e artes continuam disponíveis depois.</div>`;
     h+='</div>'}
   return h;
 }
@@ -1192,7 +1200,7 @@ function renderHist(A){
   const show=UI.showHist?enc:enc.slice(0,3);
   let h=`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Últimas peladas</h3></div>`;
   for(const[pid,p] of show){const pr=premiosDe(p,pid);
-    h+=`<div class="hist"><div class="grow"><b class="num">${dShort(p.data)}</b><div class="sub">${jogaram(p).length} jogadores${pr.mvp?' · 🏆 '+esc(nm(pr.mvp)):''}${pr.art?' · ⚽ '+esc(nm(pr.art)):''}</div></div><div class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button>${A?`${Object.values(pr).some(Boolean)?`<button class="btn sm" data-act="arte" data-p="${pid}">Artes</button>`:''}<button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button>`:''}</div></div>`}
+    h+=`<div class="hist"><div class="grow"><b class="num">${dShort(p.data)}</b><div class="sub">${jogaram(p).length} jogadores${pr.mvp?' · 🏆 '+esc(nm(pr.mvp)):''}${pr.art?' · ⚽ '+esc(nm(pr.art)):''}</div></div><div class="row hist-bt" style="gap:6px"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button>${A?`${!p.aval&&Date.now()<fimAval(p)?`<button class="btn sm warn" data-act="votacao-pel" data-p="${pid}">Votação</button>`:''}<button class="btn sm" data-act="premios-pel" data-p="${pid}">Prêmios</button>${['mvp','art','gar','gol'].some(k=>pr[k])?`<button class="btn sm" data-act="arte" data-p="${pid}">Artes</button>`:''}<button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button>`:''}</div></div>`}
   if(enc.length>3)h+=`<button class="btn sm block" style="margin-top:8px" data-act="hist">${UI.showHist?'Mostrar menos':'Ver todas ('+enc.length+')'}</button>`;
   return h+'</div>';
 }
@@ -1844,6 +1852,8 @@ document.addEventListener('click',e=>{
     case'time-nome-ok':{const cor=Number(d.c),v=document.getElementById('tn-in').value.trim(),arr=CORES.map((_,i)=>(cfg().nomesTimes||[])[i]||'');arr[cor]=v;
       put('config/geral',{...(S.config||{}),nomesTimes:arr});closeSheet();toast('Nome do time salvo.');break}
     case'notas-pel':sheetNotasPelada(d.p);break;
+    case'premios-pel':sheetPremios(d.p);break;
+    case'votacao-pel':openSheet('Votação · '+dShort(S.pel[d.p].data),painelVotacaoPos(d.p,S.pel[d.p])||'<div class="empty">A votação já fechou.</div>');break;
     case'voto-salvar':{const pp=posJogoMeu();if(!pp)return;const[pid,p]=pp,j=meuJogador(),outros=jogaram(p).filter(id=>id!==j&&S.jog[id]),meus=meusVotos(pid),falta=outros.filter(id=>!meus[id]);
       if(falta.length){toast(`Falta avaliar ${falta.length===1?nm(falta[0]):falta.length+' jogadores'}.`);return}
       UI.votoAberto=null;render();toast('✓ Votos salvos! Dá para mudar até '+quandoCurto(fimAval(p))+'.');window.scrollTo({top:0,behavior:'smooth'});break}
