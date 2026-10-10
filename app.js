@@ -232,7 +232,7 @@ function render() {
     const cor = g => { let x = 0; for (const ch of g) x = (x * 31 + ch.charCodeAt(0)) >>> 0; return CRESTS[x % CRESTS.length]; };
     const prox = ids.map(g => ({ g, d: proxJogo(GRUPOS[g]) })).filter(x => x.d).sort((a, b) => a.d - b.d)[0];
     const card = (g, adm) => { const G = GRUPOS[g], d = proxJogo(G);
-      return `<button class="clube" data-sh="abrir" data-v="${g}" style="--cor:${cor(g)}"><span class="escudo"><span>${ini(G.nome)}</span></span><span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.evento ? '<i class="tag-ev">Evento livre</i>' : ''}${escH(quandoG(G, true))}${d ? ` · <em>${escH(falta(d))}</em>` : ''}</span></span>${adm ? '<span class="papel">Admin</span>' : ''}<span class="seta" aria-hidden="true">›</span></button>`; };
+      return `<button class="clube" data-sh="abrir" data-v="${g}" style="--cor:${cor(g)}">${G.escudo ? `<span class="escudo img"><img src="${G.escudo}" alt=""></span>` : `<span class="escudo"><span>${ini(G.nome)}</span></span>`}<span class="grow"><b>${escH(G.nome || 'Pelada')}</b><span class="sub">${G.evento ? '<i class="tag-ev">Evento livre</i>' : ''}${escH(quandoG(G, true))}${d ? ` · <em>${escH(falta(d))}</em>` : ''}</span></span>${adm ? '<span class="papel">Admin</span>' : ''}<span class="seta" aria-hidden="true">›</span></button>`; };
     const nomeEu = (PERFIL?.apelido || PERFIL?.nome || '').split(/\s+/)[0];
     const hr = new Date().getHours(), ola = hr < 5 ? 'Boa noite' : hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
     const eu = PERFIL || {};

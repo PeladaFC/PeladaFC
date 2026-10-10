@@ -713,40 +713,40 @@ function desenharEscudo(ctx,x,y,w,h){const im=cfg().escudo?FOTO_CACHE[cfg().escu
 /* arte estilo pôster: título gigante empilhado, foto grande em círculo com anéis */
 const POSTER_TIT={mvp:['CRA','QUE'],art:['ARTI','LHEIRO'],gar:['GAR','ÇOM'],gol:['GOLEI','RO']};
 function espacado(ctx,txt,x,y,sp){ctx.save();ctx.textAlign='left';let w=0;for(const ch of txt)w+=ctx.measureText(ch).width+sp;w-=sp;let cx=x-w/2;for(const ch of txt){ctx.fillText(ch,cx,y);cx+=ctx.measureText(ch).width+sp}ctx.restore()}
-function artePoster(p,k){
-  const W=1080,H=1350,cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
+function artePoster(p,k,story){
+  const W=1080,H=story?1920:1350,Y=story?{top:230,tit:300,cx:660,cy:1170,R:350,rod:190,tw:560,ts:300}:{top:110,tit:180,cx:770,cy:660,R:300,rod:120,tw:470,ts:250},cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
   const id=premiosDe(p)[k],j=J(id),FAM='"Saira Condensed", Impact, sans-serif',c=cfg(),L=S.locais[p.localId]||{};
   // fundo: verde profundo com listras finas verticais
   const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#06291A');g.addColorStop(.55,'#0B3F20');g.addColorStop(1,'#04170E');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
   ctx.fillStyle='rgba(255,255,255,.035)';for(let x=0;x<W;x+=9)ctx.fillRect(x,0,3,H);
-  const gl=ctx.createRadialGradient(720,620,40,720,620,620);gl.addColorStop(0,'rgba(242,193,46,.16)');gl.addColorStop(1,'rgba(242,193,46,0)');ctx.fillStyle=gl;ctx.fillRect(0,0,W,H);
+  const gl=ctx.createRadialGradient(Y.cx-50,Y.cy-40,40,Y.cx-50,Y.cy-40,620);gl.addColorStop(0,'rgba(242,193,46,.16)');gl.addColorStop(1,'rgba(242,193,46,0)');ctx.fillStyle=gl;ctx.fillRect(0,0,W,H);
   // anéis concêntricos atrás da foto
-  const cx=770,cy=660,R=300;ctx.lineCap='butt';
+  const cx=Y.cx,cy=Y.cy,R=Y.R;ctx.lineCap='butt';
   [[R+40,4,'#F2C12E',[-.5,1.1]],[R+80,14,'rgba(242,193,46,.55)',[2.3,3.6]],[R+80,14,'rgba(240,102,42,.7)',[4.1,5.0]],[R+125,4,'rgba(255,255,255,.25)',[-1.3,.4]],[R+125,4,'rgba(255,255,255,.25)',[1.6,2.9]],[R+165,22,'rgba(240,102,42,.55)',[-.15,.5]],[R+165,22,'rgba(242,193,46,.35)',[3.3,4.0]]]
     .forEach(([r,lw,col,[a,b]])=>{ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.beginPath();ctx.arc(cx,cy,r,a,b);ctx.stroke()});
   // foto
   const im=imgDe(id);ctx.fillStyle=POSCOR[j.pos]||'#555';ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fill();
   if(im)circFoto(ctx,im,cx,cy,R);else{ctx.fillStyle='rgba(255,255,255,.95)';ctx.textAlign='center';ctx.font=`800 300px ${FAM}`;ctx.fillText(initials(nm(id)),cx,cy+105)}
   // nome da pelada no topo, espaçado
-  ctx.fillStyle='#FFFFFF';ctx.font='700 40px "Saira Condensed", Impact, sans-serif';espacado(ctx,(c.nome||'PELADA').toUpperCase(),W/2,110,14);
+  ctx.fillStyle='#FFFFFF';ctx.font='700 40px "Saira Condensed", Impact, sans-serif';espacado(ctx,(c.nome||'PELADA').toUpperCase(),W/2,Y.top,14);
   // título gigante empilhado
   const [t1,t2]=POSTER_TIT[k]||[PREMIO[k].s,''];ctx.textAlign='left';
   ctx.save();ctx.shadowColor='rgba(0,0,0,.45)';ctx.shadowBlur=18;ctx.shadowOffsetX=6;ctx.shadowOffsetY=6;ctx.fillStyle='#FFFFFF';
-  const sz=fit(ctx,t1.length>=t2.length?t1:t2,470,250,800,FAM);ctx.font=`800 ${sz}px ${FAM}`;
-  ctx.fillText(t1,80,180+sz*.82);ctx.fillText(t2,80,180+sz*.82+sz*.86);ctx.restore();
-  const yb=180+sz*.82+sz*.86;
+  const sz=fit(ctx,t1.length>=t2.length?t1:t2,Y.tw,Y.ts,800,FAM);ctx.font=`800 ${sz}px ${FAM}`;
+  ctx.fillText(t1,80,Y.tit+sz*.82);ctx.fillText(t2,80,Y.tit+sz*.82+sz*.86);ctx.restore();
+  const yb=Y.tit+sz*.82+sz*.86;
   ctx.fillStyle='#F2C12E';ctx.font=`800 92px ${FAM}`;ctx.fillText(k==='gol'?'DA PELADA':'DA PELADA',84,yb+100);
   ctx.fillStyle='rgba(255,255,255,.85)';ctx.font=`700 52px ${FAM}`;const dt=p.data.split('-').reverse().join('/');ctx.fillText(dt,88,yb+165);
   // número do prêmio
   const stat=premioStat(p,k);if(stat){ctx.font=`800 60px ${FAM}`;const sw=ctx.measureText(stat).width+56;ctx.fillStyle='#F2C12E';ctx.beginPath();ctx.roundRect(80,yb+200,sw,86,10);ctx.fill();ctx.fillStyle='#1E1700';ctx.fillText(stat,108,yb+264)}
-  desenharEscudo(ctx,80,yb+(stat?320:210),150,175);
+  desenharEscudo(ctx,74,yb+(stat?315:205),210,245);
   // nome do jogador, inclinado, abaixo da foto
   const nome=nm(id).toUpperCase();ctx.save();ctx.translate(cx+10,cy+R+60);ctx.rotate(-.06);ctx.fillStyle='#FFFFFF';ctx.textAlign='center';
   const ns=fit(ctx,nome,620,130,800,FAM);ctx.font=`italic 800 ${ns}px ${FAM}`;ctx.shadowColor='rgba(0,0,0,.5)';ctx.shadowBlur=14;ctx.fillText(nome,0,0);ctx.restore();
   // local no rodapé
   ctx.textAlign='center';ctx.fillStyle='#FFFFFF';
-  if(L.nome){ctx.font=`700 40px ${FAM}`;espacado(ctx,L.nome.toUpperCase(),W/2,H-120,8)}
-  if(L.end){ctx.fillStyle='rgba(255,255,255,.8)';ctx.font=`600 32px ${FAM}`;const e='📍 '+L.end.toUpperCase();espacado(ctx,e.length>58?e.slice(0,56)+'…':e,W/2,H-68,4)}
+  if(L.nome){ctx.font=`700 40px ${FAM}`;espacado(ctx,L.nome.toUpperCase(),W/2,H-Y.rod,8)}
+  if(L.end){ctx.fillStyle='rgba(255,255,255,.8)';ctx.font=`600 32px ${FAM}`;const e='📍 '+L.end.toUpperCase();espacado(ctx,e.length>58?e.slice(0,56)+'…':e,W/2,H-Y.rod+52,4)}
   ctx.textAlign='left';return cv}
 async function sheetArtes(pid){
   const p=S.pel[pid],PR=premiosDe(p,pid),ks=['mvp','art','gar','gol'].filter(k=>PR[k]);
@@ -756,12 +756,15 @@ async function sheetArtes(pid){
   ARTS.forEach(a=>URL.revokeObjectURL(a.url));ARTS=[];
   const mk=async(cv,nome,label)=>{const blob=await new Promise(r=>cv.toBlob(r,'image/png'));ARTS.push({blob,url:URL.createObjectURL(blob),nome,label})};
   await mk(arteGeral(p),`destaques-${p.data}.png`,'Destaques');
+  const STO=[];for(const k of ks){const cv=artePoster(p,k,true);const blob=await new Promise(r=>cv.toBlob(r,'image/png'));STO.push({blob,url:URL.createObjectURL(blob),nome:`story-${k==='mvp'?'craque':k==='art'?'artilheiro':k==='gar'?'garcom':'goleiro'}-${p.data}.png`,label:'Story · '+PREMIO[k].t+' · '+nm(PR[k])})}
   for(const k of ks)await mk(artePoster(p,k),`${k==='mvp'?'craque':k==='art'?'artilheiro':k==='gar'?'garcom':'goleiro'}-${p.data}.png`,PREMIO[k].t+' · '+nm(PR[k]));
+  const nInd=ARTS.length;ARTS.push(...STO);
   const body=document.getElementById('sheet-body');if(!body)return;
   const btn=i=>dl?`<button class="btn sm ${i===0?'primary':''}" data-act="salvar-arte" data-i="${i}">Salvar imagem</button>`:'';
   body.innerHTML=`<div class="stack"><div class="art-main"><img src="${ARTS[0].url}" alt="Arte com os destaques da pelada">${btn(0)}</div>
-    <h3>Individuais</h3><div class="arts">${ARTS.slice(1).map((a,i)=>`<figure><img src="${a.url}" alt="${esc(a.label)}"><figcaption>${esc(a.label)}</figcaption>${btn(i+1)}</figure>`).join('')}</div>
-    <p class="sub" style="margin:0">${dl?'No celular, "Salvar imagem" abre o compartilhamento: dá para mandar direto para o Instagram ou WhatsApp.':'Toque e segure a imagem para salvar.'} Formato 1080×1350, o tamanho do feed do Instagram.</p></div>`;
+    <h3>Individuais (feed)</h3><div class="arts">${ARTS.slice(1,nInd).map((a,i)=>`<figure><img src="${a.url}" alt="${esc(a.label)}"><figcaption>${esc(a.label)}</figcaption>${btn(i+1)}</figure>`).join('')}</div>
+    <h3>Stories</h3><div class="arts">${ARTS.slice(nInd).map((a,i)=>`<figure><img src="${a.url}" alt="${esc(a.label)}"><figcaption>${esc(a.label)}</figcaption>${btn(nInd+i)}</figure>`).join('')}</div>
+    <p class="sub" style="margin:0">${dl?'No celular, "Salvar imagem" abre o compartilhamento: dá para mandar direto para o Instagram ou WhatsApp.':'Toque e segure a imagem para salvar.'} Feed em 1080×1350 e stories em 1080×1920, nos tamanhos do Instagram.</p></div>`;
 }
 
 /* ---------- carta do jogador ---------- */
@@ -1579,7 +1582,7 @@ document.addEventListener('click',e=>{
     case'edit-jog':sheetJog(d.j);if(d.agora&&F){F._depois=false;renderJogForm()}break;
     case'f-pos':F.pos=d.v;if(F.pos2===d.v)F.pos2='';renderJogForm();break;
     case'f-tipo':F.tipo=d.v;renderJogForm();break;
-    case'escudo-rem':put('config/geral',{...(S.config||{}),escudo:null});toast('Escudo removido.');sheetCfg();break;
+    case'escudo-rem':put('config/geral',{...(S.config||{}),escudo:null});if(window.sincronizarGrupo)window.sincronizarGrupo({escudo:null});toast('Escudo removido.');sheetCfg();break;
     case'f-foto-rem':F.foto=null;renderJogForm();break;
     case'f-crit':F.crit[d.k]=Number(d.v);renderJogForm();break;
     case'f-depois':F._depois=d.v==='1';renderJogForm();break;
@@ -1813,7 +1816,7 @@ document.addEventListener('change',e=>{
   if(t.dataset.act==='cmp'){UI.cmp=t.value||null;const sc=document.querySelector('.sheet').scrollTop;sheetVerJog(t.dataset.j);document.querySelector('.sheet').scrollTop=sc}
   if(t.dataset.act==='premio'){patch('peladas/'+t.dataset.p,{premios:{[t.dataset.f]:t.value||null}})}
   if(t.dataset.act==='ano'){UI.ano=Number(t.value);render()}
-  if(t.id==='c-escudo'&&t.files&&t.files[0]){toast('Preparando o escudo…');window.redimEscudo(t.files[0]).then(d=>{put('config/geral',{...(S.config||{}),escudo:d});toast('Escudo salvo.');sheetCfg()},()=>toast('Não consegui abrir essa imagem. Tente outra.'));return}
+  if(t.id==='c-escudo'&&t.files&&t.files[0]){toast('Preparando o escudo…');window.redimEscudo(t.files[0]).then(d=>{put('config/geral',{...(S.config||{}),escudo:d});if(window.sincronizarGrupo)window.sincronizarGrupo({escudo:d});toast('Escudo salvo.');sheetCfg()},()=>toast('Não consegui abrir essa imagem. Tente outra.'));return}
   if(t.id==='f-foto'&&t.files&&t.files[0]&&F){toast('Preparando a foto…');window.redimFoto(t.files[0]).then(d=>{F.foto=d;renderJogForm()},()=>toast('Não consegui abrir essa foto. Tente outra.'))}
   if(t.dataset.f&&F){F[t.dataset.f]=t.value}
 });
