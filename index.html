@@ -347,7 +347,13 @@ h3::before{content:"";position:absolute;inset:0;background:var(--pitch-soft);bor
 nav.tabs{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--pitch) 0 40%,var(--card) 40% 70%,var(--hot) 70%) 1}
 nav.tabs button{position:relative}
 nav.tabs button[aria-current="page"]::before{content:"";position:absolute;top:0;left:22%;right:22%;height:4px;background:var(--pitch);transform:skewX(-25deg)}
-nav.tabs button[aria-current="page"] svg{filter:drop-shadow(2px 2px 0 var(--card))}
+nav.tabs button{transition:color .15s}
+nav.tabs button svg{transition:transform .18s ease}
+nav.tabs button[aria-current="page"]{font-weight:800;font-size:12px}
+nav.tabs button[aria-current="page"]::after{content:"";position:absolute;z-index:-1;top:5px;bottom:4px;left:12%;right:12%;background:var(--pitch-soft);border-radius:12px;transform:skewX(-8deg)}
+nav.tabs button[aria-current="page"] svg{transform:scale(1.22) translateY(-1px);filter:drop-shadow(2px 2px 0 var(--card))}
+nav.tabs button:active svg{transform:scale(.9)}
+@media (prefers-reduced-motion:reduce){nav.tabs button svg{transition:none}}
 .rsvp button,.dots button,.step button,.pick button{border-radius:5px}
 .pick button[aria-pressed="true"]{background:var(--pitch);border-color:var(--pitch);color:var(--pitch-ink);box-shadow:2px 2px 0 var(--card)}
 .sheet{border-radius:16px 16px 0 0;border-top:4px solid var(--pitch);background:
