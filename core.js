@@ -1070,7 +1070,8 @@ function painelPosJogo(){const pp=posJogoMeu();if(!pp)return'';const[pid,p]=pp,j
   const aberto=UI.votoAberto===pid||feitos<outros.length;
   let h=`<div class="panel stack" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Pós-jogo · ${dShort(p.data)}</h3><span class="sub num">${feitos}/${outros.length} avaliados</span></div>`;
   h+=`<div class="sub" style="margin-top:-4px">Dê de 1 a 5 estrelas para cada um que jogou. 🔒 Seu voto é secreto. Aberta até ${quandoCurto(fimAval(p))}; depois saem as notas, o craque 🏆 e o pereba 🐢.</div><div class="sub" style="font-style:italic;opacity:.85">⚖️ Avacalhou na votação? O app foi programado para perceber. Além de atrapalhar a pelada, seu voto passa a valer menos.</div>`;
-  if(aberto)h+=`<div class="list">${outros.map(id=>`<div class="item">${avHTML(id)}<div class="grow name">${esc(nm(id))}</div>${estrelasInput(meus[id],`data-act="voto" data-p="${pid}" data-j="${id}"`)}</div>`).join('')}</div>`;
+  if(aberto)h+=`<div class="list">${outros.map(id=>`<div class="item">${avHTML(id)}<div class="grow name">${esc(nm(id))}</div>${estrelasInput(meus[id],`data-act="voto" data-p="${pid}" data-j="${id}"`)}</div>`).join('')}</div>`
+    +`<button class="btn primary block btn-grande" data-act="voto-salvar" data-p="${pid}">Salvar votos${feitos<outros.length?` (${feitos} de ${outros.length})`:''}</button>`;
   else h+=`<div class="row between"><span>✓ Você avaliou todo mundo.</span><button class="btn sm" data-act="voto-abrir" data-p="${pid}">Rever votos</button></div>`;
   const stp=(f,lbl)=>`<div class="stepbox"><div class="step"><button data-act="lanc-step" data-p="${pid}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${rasc[f]||0}</output><button data-act="lanc-step" data-p="${pid}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`;
   const stTxt=stt==='ok'?'✅ Aprovado pelo administrador.':stt==='rec'?'❌ O administrador não aprovou. Confira e envie de novo.':stt==='pend'?'⏳ Enviado. Aguardando a aprovação de um administrador.':'Seus números só contam depois que um administrador aprovar.';
@@ -1682,7 +1683,7 @@ document.addEventListener('click',e=>{
     case'regra-del':{const rs=(cfg().restr||[]).slice();rs.splice(Number(d.i),1);put('config/geral',{...(S.config||{}),restr:rs});toast('Regra apagada.');break}
     case'add-restr':{const a=document.getElementById('r-a').value,bb=document.getElementById('r-b').value;if(!a||!bb||a===bb){toast('Escolha dois jogadores diferentes.');return}F.restr.push({a,b:bb,tipo:d.v});renderRestr();break}
     case'del-restr':F.restr.splice(Number(d.i),1);renderRestr();break;
-    case'voto':{const doc=S.pres[myId];if(!doc||!doc.jogador||d.j===doc.jogador)return;const v=Number(d.v);
+    case'voto':{const doc=S.pres[myId];if(!doc||!doc.jogador||d.j===doc.jogador)return;const v=Number(d.v);UI.votoAberto=d.p;
       const p=S.pel[d.p];if(!p||!posAberto(p)){toast('A avaliação desta pelada já fechou.');return}
       const mv=(S.votos||{})[myId]||{},vp={...((mv.v||{})[d.p]||{})};vp[d.j]=vp[d.j]===v?0:v;
       put('votos/'+myId,{jogador:doc.jogador,v:trim10({...(mv.v||{}),[d.p]:vp}),t:Date.now()});break}
@@ -1721,6 +1722,9 @@ document.addEventListener('click',e=>{
     case'time-nome-ok':{const cor=Number(d.c),v=document.getElementById('tn-in').value.trim(),arr=CORES.map((_,i)=>(cfg().nomesTimes||[])[i]||'');arr[cor]=v;
       put('config/geral',{...(S.config||{}),nomesTimes:arr});closeSheet();toast('Nome do time salvo.');break}
     case'notas-pel':sheetNotasPelada(d.p);break;
+    case'voto-salvar':{const pp=posJogoMeu();if(!pp)return;const[pid,p]=pp,j=meuJogador(),outros=jogaram(p).filter(id=>id!==j&&S.jog[id]),meus=meusVotos(pid),falta=outros.filter(id=>!meus[id]);
+      if(falta.length){toast(`Falta avaliar ${falta.length===1?nm(falta[0]):falta.length+' jogadores'}.`);return}
+      UI.votoAberto=null;render();toast('✓ Votos salvos! Dá para mudar até '+quandoCurto(fimAval(p))+'.');window.scrollTo({top:0,behavior:'smooth'});break}
     case'voto-abrir':UI.votoAberto=UI.votoAberto===d.p?null:d.p;render();break;
     case'lanc-step':{const doc=S.pres[myId]||{},L=(doc.lanc||{})[d.p],ap=(S.pel[d.p].stats||{})[doc.jogador]||{};
       UI.lanc=UI.lanc||{};const r=UI.lanc[d.p]||{g:L?L.g:(ap.g||0),a:L?L.a:(ap.a||0)};r[d.f]=Math.max(0,Math.min(30,(r[d.f]||0)+Number(d.d)));UI.lanc[d.p]=r;render();break}
