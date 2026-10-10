@@ -1646,7 +1646,7 @@ function sheetVerJog(id){
       ${hist.length?`<div style="margin-top:8px"><span class="muted">Últimas notas</span><div class="row" style="margin-top:4px">${hist.map(([,p,n])=>`<span class="chip solid num">${dShort(p.data).slice(4)} · ${fmtN(n)}</span>`).join('')}</div></div>`:''}</div>
     ${A?`<div class="panel"><div class="panel-h"><h3>Ajustar total de ${UI.ano}</h3></div><div class="sub" style="margin-bottom:8px">Corrija gols e assistências que não foram lançados nas peladas. O ajuste entra no mês atual.</div>
       <div class="row" style="gap:16px">${[['g','Gols',s.g||0],['a','Assist.',s.a||0]].map(([f,lbl,v])=>`<div class="stepbox"><div class="step"><button data-act="ajuste" data-j="${id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${v}</output><button data-act="ajuste" data-j="${id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`).join('')}</div>
-      ${(s.ajG||s.ajA)?`<div class="sub" style="margin-top:6px">Inclui ajustes do administrador: ${s.ajG>0?'+':''}${s.ajG||0} gol(s) e ${s.ajA>0?'+':''}${s.ajA||0} assist.</div>`:''}</div>`:''}
+      ${(s.ajG||s.ajA)?`<div class="sub" style="margin-top:6px">Lançado nas peladas: <b>${(s.g||0)-(s.ajG||0)}</b> gol(s) e <b>${(s.a||0)-(s.ajA||0)}</b> assist.<br>Ajuste manual: <b>${s.ajG>0?'+':''}${s.ajG||0}</b> gol(s) e <b>${s.ajA>0?'+':''}${s.ajA||0}</b> assist.</div>`:''}</div>`:''}
     ${podeVerAval(id)?painelEstrela(id):`<div class="panel"><div class="panel-h"><h3>⭐ Estrela</h3></div><div class="sub">A avaliação aparece depois que ${esc(nm(id))} passar por uma avaliação completa da galera.</div></div>`}
     <button class="btn warn block" data-act="carta" data-j="${id}">Ver carta do jogador</button>
     ${A?`<div class="row"><button class="btn primary grow" data-act="edit-jog" data-j="${id}">Editar</button><button class="btn grow" data-act="msg" data-v="convite" data-j="${id}">Convite</button></div>`:''}</div>`);
@@ -1865,7 +1865,7 @@ document.addEventListener('click',e=>{
       put('votos/'+myId,{jogador:doc.jogador,v:trim10({...(mv.v||{}),[d.p]:vp}),t:Date.now()});break}
     case'ajuste':{const j=S.jog[d.j];if(!j)return;const k=mesAtual(),cur={...((j.ajustes||{})[k]||{})};
       const{st}=temporada(UI.ano);if(Number(d.d)<0&&(st[d.j][d.f]||0)<=0)return;
-      cur[d.f]=(cur[d.f]||0)+Number(d.d);put('jogadores/'+d.j,{...j,ajustes:{...(j.ajustes||{}),[k]:cur}});sheetVerJog(d.j);break}
+      cur[d.f]=(cur[d.f]||0)+Number(d.d);const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;put('jogadores/'+d.j,{...j,ajustes:{...(j.ajustes||{}),[k]:cur}});sheetVerJog(d.j);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc;break}
     case'membro-semnota':{const m=S.membros[d.u]||{};if(S.pres[d.u]&&S.jog[S.pres[d.u].jogador])return;
       const id=uid('j'),pos=m.pos||'MEI',crit={};critKey(pos).forEach(([k])=>crit[k]=3);
       put('jogadores/'+id,{nome:m.nome||m.apelido||'Sem nome',apelido:m.apelido||'',tel:m.tel||'',pos,pos2:'',tipo:m.prefere==='diarista'?'diarista':'mensalista',foto:m.foto||null,conv:'',crit,semNota:true,ativo:true,criadoEm:Date.now()});
