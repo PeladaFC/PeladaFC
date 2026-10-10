@@ -501,7 +501,9 @@ function msg(tipo,ctx={}){
     if(pr.gar)out.push(`🅰️ Garçom: *${nm(pr.gar)}* (${st[pr.gar]?.a||0} assist.)`);
     if(pr.gol)out.push('🧤 Melhor goleiro: *'+nm(pr.gol)+'*');
     if(pr.per)out.push('🐢 Pereba da pelada: *'+nm(pr.per)+'*');
-    {const pid0=pidOf(p),rn=p.aval?rankingNotas(p,pid0).filter(x=>x.n!=null):[];if(rn.length){out.push('','*Notas da galera*');rn.forEach((x,i)=>out.push(`${i+1}º ${nm(x.id)} · ${fmtN(x.n)}`))}}
+    {const pid0=pidOf(p),rn=rankingNotas(p,pid0).filter(x=>x.n!=null).sort((a,b)=>(b.n-a.n)||((b.id===pr.mvp)-(a.id===pr.mvp)));
+      if(rn.length){const md=['🥇','🥈','🥉'];out.push('',`*TOP ${Math.min(10,rn.length)} DA PELADA* (nota da galera)`);rn.slice(0,10).forEach((x,i)=>out.push(`${md[i]||(i+1)+'º'} ${nm(x.id)} · *${fmtN(x.n)}*`))}
+      else if(Date.now()<fimAval(p))out.push('',`⭐ As notas da galera saem quando a avaliação fechar (${quandoCurto(fimAval(p))}).`)}
     const gols=Object.entries(st).filter(([,s])=>s.g>0).sort((a,b)=>b[1].g-a[1].g);
     if(gols.length){out.push('','*Gols*');gols.forEach(([id,s])=>out.push(`• ${nm(id)} ${s.g}`))}
     out.push('','Valeu, rapaziada! Até a próxima 💪');return out.join('\n')}
