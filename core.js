@@ -111,8 +111,15 @@ const pagaPorJogo=id=>!EV()&&J(id).tipo==='diarista';
 /* quem paga numa pelada: na fixa, só diarista; no evento livre, todo mundo que joga, se a pelada tiver valor */
 /* "por atleta": evento livre ou evento extra numa pelada fixa (aí mensalista também paga) */
 function PA(p){return EV()||!!(p&&p.extra)}
-function pagaEm(p,id){return PA(p)?precoDP(p)>0:pagaPorJogo(id)}
-function valorTxt(p){const v=precoDP(p);return v>0?(PA(p)?BRL(v)+' por atleta':'Diária '+BRL(v)+' para diaristas'):''}
+function pagaBase(p,id){return PA(p)?true:pagaPorJogo(id)}
+function pagaEm(p,id){return pagaBase(p,id)&&precoDP(p)>0}
+/* descontos por atleta: {pct:.25|.5} desconto, {v:10} valor combinado, {isento:true} */
+function descDe(p,id){return((p&&p.descontos)||{})[id]||null}
+function aberto(p){return!!(p&&p.dividir&&p.precoDiaria==null)}
+function baseDivisao(p){let tot=Number(p.dividir)||0,w=0;for(const id of jogaram(p).filter(id=>pagaBase(p,id))){const d=descDe(p,id);if(d&&d.isento)continue;if(d&&d.v!=null){tot-=Number(d.v);continue}w+=1-(Number(d&&d.pct)||0)}return w>0?Math.max(0,Math.ceil(tot/w*100)/100):0}
+function valorDe(p,id){const d=descDe(p,id);if(d&&d.isento)return 0;if(d&&d.v!=null)return Number(d.v);return Math.round(precoDP(p)*(1-(Number(d&&d.pct)||0))*100)/100}
+function descTxt(d){return!d?'':d.isento?'Isento':d.v!=null?'Valor combinado '+BRL(d.v):d.pct?Math.round(d.pct*100)+'% de desconto':''}
+function valorTxt(p){const v=precoDP(p);if(aberto(p))return BRL(p.dividir)+' dividido'+(v>0?' · hoje dá ~'+BRL(v)+' por atleta':'');return v>0?(PA(p)?BRL(v)+' por atleta':'Diária '+BRL(v)+' para diaristas'):''}
 const tipoTxt=id=>EV()?'Participante':J(id).tipo==='diarista'?'Diarista':'Mensalista';
 // peso de cada critério na nota, conforme a posição (como no FIFA)
 const PESOS={ZAG:{tec:.15,fis:.20,pas:.15,fin:.10,mar:.40},LAT:{tec:.20,fis:.20,pas:.20,fin:.10,mar:.30},VOL:{tec:.10,fis:.20,pas:.30,fin:.10,mar:.30},MEI:{tec:.25,fis:.20,pas:.30,fin:.15,mar:.10},ATA:{tec:.25,fis:.20,pas:.10,fin:.35,mar:.10}};
@@ -555,7 +562,7 @@ function msg0(tipo,ctx={}){
     const out=[`💰 *PENDÊNCIAS · ${MESES[mm-1].toUpperCase()}/${y}*`,''];
     if(!d.mens.length&&!d.dia.length&&!d.ext.length)return out.concat(['Tudo pago! Obrigado, galera 🙌']).join('\n');
     if(d.mens.length){out.push(`*Mensalidade* (${BRL(precoM(m))})`);d.mens.forEach(id=>out.push('• '+nm(id)))}
-    if(d.dia.length){out.push('',EV()?'*Eventos*':`*Diárias*`);d.dia.forEach(x=>out.push(`• ${nm(x.id)} · ${dShort(x.data)} · ${BRL(x.pid&&S.pel[x.pid]?precoDP(S.pel[x.pid]):precoD(m))}`))}
+    if(d.dia.length){out.push('',EV()?'*Eventos*':`*Diárias*`);d.dia.forEach(x=>out.push(`• ${nm(x.id)} · ${dShort(x.data)} · ${BRL(x.pid&&S.pel[x.pid]?valorDe(S.pel[x.pid],x.id):precoD(m))}`))}
     d.ext.forEach(x=>{out.push('',`*${x.nome}* (${BRL(x.v)})`);x.ids.forEach(id=>out.push('• '+nm(id)))});
     if(c.pix)out.push('','Pix: '+c.pix);return out.join('\n')}
   if(tipo==='convite'){const j=ctx.jid?J(ctx.jid):null;
@@ -568,7 +575,7 @@ function mesAtual(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth
 function devedores(m){
   const cx=S.caixa[m]||{},mens=EV()||!(precoM(m)>0)?[]:ativos().filter(id=>J(id).tipo==='mensalista'&&!stPag((cx.mens||{})[id]));
   const dia=[];for(const[pid,p] of Object.entries(S.pel)){if(!p.data.startsWith(m)||(p.status!=='encerrada'&&!PA(p))||!(precoDP(p)>0))continue;
-    for(const id of jogaram(p))if(pagaEm(p,id)&&!stPag((p.diarias||{})[id]))dia.push({id,data:p.data,pid})}
+    if(!aberto(p))for(const id of jogaram(p))if(pagaEm(p,id)&&valorDe(p,id)>0&&!stPag((p.diarias||{})[id]))dia.push({id,data:p.data,pid})}
   const ext=extrasDe(m).filter(([,x])=>x.v>0).map(([xid,x])=>({xid,nome:x.nome,v:Number(x.v),ids:(x.quem||[]).filter(id=>S.jog[id]&&!stPag((x.pag||{})[id]))})).filter(x=>x.ids.length);
   return{mens,dia,ext};
 }
@@ -1156,7 +1163,10 @@ function tJogo(A){
           <div class="sub" style="margin:6px 0 10px">${ext?'<b>Evento extra:</b> fora da mensalidade. Se tiver valor, <b>todo mundo que confirmar paga</b>, mensalista também.':'<b>Pelada do mês:</b> mensalista já pagou na mensalidade e <b>não paga nada</b>. Só diarista paga a diária.'}</div>`;
         return`<div class="field"><span><i class="stepn">4</i>${EV()?'Vai ter cobrança?':'Que pelada é essa?'}</span>${tipo}
         <div class="seg"><button type="button" data-act="np-cobra" data-v="nao" aria-pressed="${cobra==='nao'}">Sem cobrança</button><button type="button" data-act="np-cobra" data-v="sim" aria-pressed="${cobra==='sim'}">${pa?'Cobrar por atleta':'Cobrar diária'}</button></div>
-        ${cobra==='sim'?`<label class="field" style="margin-top:8px"><span>${pa?'Valor por atleta (R$)':'Diária do diarista nesta pelada (R$)'}</span><input type="number" id="np-valor" data-np="npValor" inputmode="decimal" min="0" step="0.01" value="${esc(UI.npValor??padrao)}" placeholder="Ex.: 25"></label><div class="sub">${pa?'Quem confirmar vê o valor e pode pagar pelo app. Aparece no Caixa.':'Mensalistas não pagam. O diarista vê o valor antes de confirmar.'}</div>`:`<div class="sub" style="margin-top:6px">${pa?'Ninguém paga nada por esta pelada.':'Nesta pelada o diarista também não paga.'}</div>`}</div>`})()}
+        ${cobra==='sim'?`<label class="field" style="margin-top:8px"><span>${pa?'Valor por atleta (R$)':'Diária do diarista nesta pelada (R$)'}</span><input type="number" id="np-valor" data-np="npValor" inputmode="decimal" min="0" step="0.01" value="${esc(UI.npValor??padrao)}" placeholder="Ex.: 25"></label>
+          <div class="sub" style="margin:6px 0">${pa?'Quem paga, quem tem desconto e quem não paga:':'Mensalistas não pagam. Diaristas:'}</div>
+          <div id="np-qp">${htmlQuemPaga(ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>nm(a).localeCompare(nm(b))),UI.npDesc||{},Number(String(UI.npValor??padrao).replace(',','.'))||0,'npd')}</div>`
+          :`<div class="sub" style="margin-top:6px">${pa?'Ninguém paga nada por esta pelada.':'Nesta pelada o diarista também não paga.'}</div>`}</div>`})()}
       <button class="btn primary block btn-grande" data-act="nova-pel">Abrir lista de presença</button>`
       :`<p class="sub" style="margin:0">Depois de escolher o local, você define a data e o horário.</p>`}</div>`}
     return h+renderHist(A);
@@ -1164,7 +1174,7 @@ function tJogo(A){
   const[pid,p]=cur,l=lista(p);
   h+=`<div class="board"><div class="when">${dShort(p.data)}<br>${esc(horaIniDe(p))}<small class="ate"> às ${esc(horaFimDe(p))}</small></div><div class="where row" style="gap:8px">${(()=>{const LL=localDe(p);return LL?`<span>📍 ${esc(LL.nome)}${LL.end?' · '+esc(LL.end):''}</span>${LL.end||LL.tel?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="como-chegar" data-p="${pid}">${LL.end?'🗺️ Como chegar':'📞 Contato'}</button>`:''}`:'Local a definir'})()}${A?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="trocar-local" data-p="${pid}">${localDe(p)?'Trocar local':'Definir local'}</button>`:''}</div>
     <div class="stats${A?' com-arte':''}"><div class="stat"><b class="num">${l.escalados.length}/${l.vagas}</b><span>Linha</span></div><div class="stat"><b class="num">${l.gks.length}</b><span>Goleiros</span></div><div class="stat"><b class="num">${l.espera.length}</b><span>Espera</span></div><div class="stat"><b class="num">${l.pend.length}</b><span>Sem resposta</span></div>${A?`<button class="btn sm warn stat-arte" data-act="convoc-arte" data-p="${pid}">🎨 Arte de convocação</button>`:''}</div></div>`;
-  if(CX()&&valorTxt(p)&&(PA(p)||A||ehDiarista(meuJogador()||'')))h+=`<div class="row between" style="margin-top:8px;gap:8px"><span class="sub">💰 <b class="num">${valorTxt(p)}</b>${p.extra?' · evento extra: mensalista também paga':PA(p)?'':' · mensalista já paga na mensalidade'}</span>${A?`<button class="btn sm" data-act="preco-pel" data-p="${pid}">Mudar valor</button>`:''}</div>`;
+  if(CX()&&valorTxt(p)&&(PA(p)||A||ehDiarista(meuJogador()||'')))h+=`<div class="row between" style="margin-top:8px;gap:8px"><span class="sub">💰 <b class="num">${valorTxt(p)}</b>${p.extra?' · evento extra: mensalista também paga':PA(p)?'':' · mensalista já paga na mensalidade'}</span>${A?`<div class="row" style="gap:4px">${aberto(p)?`<button class="btn sm" data-act="fechar-div" data-p="${pid}">Fechar divisão</button>`:''}<button class="btn sm" data-act="pel-desc" data-p="${pid}">👥 Quem paga</button><button class="btn sm" data-act="preco-pel" data-p="${pid}">Valor</button></div>`:''}</div>`;
   else if(A&&CX()&&EV())h+=`<div class="row between" style="margin-top:8px;gap:8px"><span class="sub">Sem cobrança nesta pelada</span><button class="btn sm" data-act="preco-pel" data-p="${pid}">Cobrar por atleta</button></div>`;
   h+=`<div class="seg" style="margin-block:12px" role="group">${[['presenca','Presença'],['times','Times'],['pos','Pós-jogo']].map(([k,n])=>`<button data-act="sub" data-v="${k}" aria-pressed="${UI.sub===k}">${n}</button>`).join('')}</div>`;
   if(!A)h+=painelJogador(pid,p,l);
@@ -1714,14 +1724,14 @@ function extrasDe(m){return Object.entries((S.caixa[m]||{}).extras||{}).filter((
 function gravarExtra(m,xid,x){const cx=S.caixa[m]||{mens:{},desp:[]};const ex={...(cx.extras||{})};if(x==null)delete ex[xid];else ex[xid]=x;put('caixa/'+m,{...cx,extras:ex})}
 function precoM(m){const v=(S.caixa[m]||{}).precoMensal;return v!=null?Number(v):Number(cfg().mensal)||0}
 function precoD(m){const v=(S.caixa[m]||{}).precoDiaria;return v!=null?Number(v):Number(cfg().diaria)||0}
-function precoDP(p){if(p&&p.precoDiaria!=null)return Number(p.precoDiaria);return PA(p)?0:precoD(p?p.data.slice(0,7):mesAtual())}
+function precoDP(p){if(p&&p.precoDiaria!=null)return Number(p.precoDiaria);if(p&&p.dividir)return baseDivisao(p);return PA(p)?0:precoD(p?p.data.slice(0,7):mesAtual())}
 function notaValor(st,cheio){if(!st||st.s!=='pago'||st.v==null||Number(st.v)===cheio)return'';const v=Number(st.v);return BRL(v)+(cheio&&v<cheio?` · ${Math.round(100-v/cheio*100)}% de desconto`:'')}
 function dataLanc(m){const hoje=iso(new Date());if(UI.cxData&&UI.cxData.startsWith(m))return UI.cxData;return hoje.startsWith(m)?hoje:m+'-05'}
 function caixaMes(m){const c=cfg(),cx=S.caixa[m]||{},mov=[];
   const mensal=EV()?[]:ativos().filter(id=>J(id).tipo==='mensalista');
   for(const id of mensal){const x=stPag((cx.mens||{})[id]);if(x)mov.push({tipo:x.s==='isento'?'isento':'ent',cat:'Mensalidade',quem:id,d:x.d||'',v:x.s==='isento'?0:Number(x.v??precoM(m)),obs:x.obs||''})}
   const pels=Object.entries(S.pel).filter(([,p])=>p.data.startsWith(m)&&(p.status==='encerrada'||PA(p))).sort((a,b)=>a[1].data.localeCompare(b[1].data));
-  for(const[,p] of pels)for(const id of jogaram(p))if(pagaEm(p,id)){const x=stPag((p.diarias||{})[id]);if(x)mov.push({tipo:x.s==='isento'?'isento':'ent',cat:PA(p)?(p.extra?'Evento extra ':'Evento ')+dBR(p.data):'Diária '+dBR(p.data),quem:id,d:x.d||p.data,v:x.s==='isento'?0:Number(x.v??precoDP(p)),obs:x.obs||''})}
+  for(const[,p] of pels)for(const id of jogaram(p))if(pagaEm(p,id)){const x=stPag((p.diarias||{})[id]);if(x)mov.push({tipo:x.s==='isento'?'isento':'ent',cat:PA(p)?(p.extra?'Evento extra ':'Evento ')+dBR(p.data):'Diária '+dBR(p.data),quem:id,d:x.d||p.data,v:x.s==='isento'?0:Number(x.v??valorDe(p,id)),obs:x.obs||''})}
   for(const[,x] of extrasDe(m))for(const id of x.quem||[]){const st=stPag((x.pag||{})[id]);if(st&&S.jog[id])mov.push({tipo:st.s==='isento'?'isento':'ent',cat:x.nome,quem:id,d:st.d||x.d||'',v:st.s==='isento'?0:Number(st.v??x.v),obs:st.obs||''})}
   for(const e of cx.ent||[])mov.push({tipo:'ent',cat:e.d,d:e.dt||'',v:Number(e.v)||0,id:e.id,av:1});
   for(const e of cx.desp||[])mov.push({tipo:'sai',cat:e.d,d:e.dt||'',v:Number(e.v)||0,id:e.id,av:1});
@@ -1752,11 +1762,13 @@ function tCaixa(A){
   {const pelsV=pels.filter(([,p])=>!PA(p)||precoDP(p)>0);
   if(!EV()||pelsV.length){h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>${EV()?'Pagamentos dos eventos':'Diárias e eventos'}</h3><span class="sub">${EV()?'por atleta':precoD(m)>0?BRL(precoD(m))+' por jogo':'sem cobrança'}</span></div>`;
   let any=false;
-  for(const[pid,p] of pelsV){const ds=jogaram(p).filter(id=>pagaEm(p,id));if(!ds.length)continue;any=true;const falta=ds.filter(id=>!stPag((p.diarias||{})[id])).length;
+  for(const[pid,p] of pelsV){const ds=jogaram(p).filter(id=>pagaEm(p,id));if(!ds.length)continue;any=true;const falta=aberto(p)?0:ds.filter(id=>valorDe(p,id)>0&&!stPag((p.diarias||{})[id])).length;
     const pd=precoDP(p),dif=p.precoDiaria!=null&&pd!==precoD(m);
     if(!(pd>0)){h+=`<div class="row between" style="margin-top:10px;gap:6px"><span class="sub"><b style="font-weight:700">Pelada de ${dShort(p.data)}</b> · sem cobrança</span>${A?`<button class="btn sm" data-act="preco-pel" data-p="${pid}" aria-label="Valor da diária nesta pelada">R$ ✎</button>`:''}</div>`;continue}
-    h+=`<div class="row between" style="margin-top:10px;gap:6px"><span class="sub"><b style="font-weight:700">${p.extra?'Evento extra':EV()?'Evento':'Pelada'} de ${dShort(p.data)}</b>${PA(p)?` · <b class="num" style="color:var(--pitch)">${BRL(pd)}</b>`:''}${dif&&!PA(p)?` · <b class="num" style="color:var(--pitch)">${BRL(pd)}</b>`:''}</span><div class="row" style="gap:4px">${A?`<button class="btn sm" data-act="preco-pel" data-p="${pid}" aria-label="Valor da diária nesta pelada">R$ ✎</button>`:''}${A&&falta?`<button class="btn sm" data-act="diarias-todas" data-p="${pid}">Todos pagos</button>`:''}</div></div><div class="list">`;
-    for(const id of ds){const x=(p.diarias||{})[id],st=stPag(x),sb=[notaValor(st,pd),st&&st.obs?esc(st.obs):''].filter(Boolean).join(' · ');h+=`<div class="item"><div class="grow"><div class="name">${esc(nm(id))}</div>${sb?`<div class="sub">${sb}</div>`:''}</div>${botaoPag(x,'pagou-d',`data-p="${pid}" data-j="${id}"`,A)}</div>`}
+    h+=`<div class="row between" style="margin-top:10px;gap:6px"><span class="sub"><b style="font-weight:700">${p.extra?'Evento extra':EV()?'Evento':'Pelada'} de ${dShort(p.data)}</b>${PA(p)?` · <b class="num" style="color:var(--pitch)">${BRL(pd)}</b>`:''}${dif&&!PA(p)?` · <b class="num" style="color:var(--pitch)">${BRL(pd)}</b>`:''}</span><div class="row" style="gap:4px">${A?`<button class="btn sm" data-act="preco-pel" data-p="${pid}" aria-label="Valor e descontos desta pelada">R$ ✎</button>`:''}${A&&falta?`<button class="btn sm" data-act="diarias-todas" data-p="${pid}">Todos pagos</button>`:''}</div></div><div class="list">`;
+    if(aberto(p))h+=`<div class="sub" style="margin:4px 0">Dividindo <b class="num">${BRL(p.dividir)}</b> entre os confirmados. O valor fecha quando a pelada for encerrada${A?` ou quando você tocar em <b>Fechar divisão</b>`:''}.</div>${A?`<button class="btn sm" data-act="fechar-div" data-p="${pid}">Fechar divisão agora · ${BRL(pd)} por atleta</button>`:''}`;
+    for(const id of ds){const x=(p.diarias||{})[id],st=stPag(x),vj=valorDe(p,id),dd=descDe(p,id),sb=[st?notaValor(st,vj):'',!st&&dd&&!dd.isento?descTxt(dd)+(vj>0?' · '+BRL(vj):''):'',st&&st.obs?esc(st.obs):''].filter(Boolean).join(' · ');
+      h+=`<div class="item"><div class="grow"><div class="name">${esc(nm(id))}</div>${sb?`<div class="sub">${sb}</div>`:''}</div>${!st&&!(vj>0)?'<span class="paid isento">ISENTO</span>':aberto(p)&&!st?`<span class="sub num">~${BRL(vj)}</span>`:botaoPag(x,'pagou-d',`data-p="${pid}" data-j="${id}"`,A)}</div>`}
     h+='</div>'}
   if(!any)h+=EV()?'<div class="empty">Ninguém confirmado ainda.</div>':'<div class="empty">Nenhum diarista jogou neste mês.</div>';
   h+='</div>'}}
@@ -1789,10 +1801,10 @@ function minhasPendencias(){return pendenciasDe(meuJogador())}
 function pendenciasDe(jid){if(!jid||!CX())return[];const out=[],m=mesAtual();
   const lim0=iso(new Date(Date.now()-62*864e5)).slice(0,7);
   for(const mx of Object.keys(S.caixa).filter(k=>k>=lim0&&k<=m).sort())for(const[xid,x] of extrasDe(mx))if(x.v>0&&(x.quem||[]).includes(jid)&&!stPag((x.pag||{})[jid]))out.push({tipo:'x',ref:mx+'~'+xid,jid,v:Number(x.v),desc:x.nome});
-  if(EV()){const lim=iso(new Date(Date.now()-62*864e5));for(const[pid,p] of Object.entries(S.pel))if(p.data>=lim&&precoDP(p)>0&&jogaram(p).includes(jid)&&!stPag((p.diarias||{})[jid]))out.push({tipo:'d',ref:pid,jid,v:precoDP(p),desc:'Evento de '+dShort(p.data)});return out}
+  if(EV()){const lim=iso(new Date(Date.now()-62*864e5));for(const[pid,p] of Object.entries(S.pel))if(p.data>=lim&&!aberto(p)&&jogaram(p).includes(jid)&&valorDe(p,jid)>0&&!stPag((p.diarias||{})[jid]))out.push({tipo:'d',ref:pid,jid,v:valorDe(p,jid),desc:'Evento de '+dShort(p.data)});return out}
   if(J(jid).tipo==='mensalista'&&precoM(m)>0&&!stPag(((S.caixa[m]||{}).mens||{})[jid]))out.push({tipo:'m',ref:m,jid,v:precoM(m),desc:'Mensalidade de '+MESES[Number(m.slice(5))-1].toLowerCase()});
   const lim=iso(new Date(Date.now()-62*864e5));
-  for(const[pid,p] of Object.entries(S.pel))if((p.status==='encerrada'||p.extra)&&p.data>=lim&&jogaram(p).includes(jid)&&pagaEm(p,jid)&&precoDP(p)>0&&!stPag((p.diarias||{})[jid]))out.push({tipo:'d',ref:pid,jid,v:precoDP(p),desc:(p.extra?'Evento extra de ':'Diária da pelada de ')+dShort(p.data)});
+  for(const[pid,p] of Object.entries(S.pel))if((p.status==='encerrada'||p.extra)&&p.data>=lim&&jogaram(p).includes(jid)&&pagaEm(p,jid)&&!aberto(p)&&valorDe(p,jid)>0&&!stPag((p.diarias||{})[jid]))out.push({tipo:'d',ref:pid,jid,v:valorDe(p,jid),desc:(p.extra?'Evento extra de ':'Diária da pelada de ')+dShort(p.data)});
   return out}
 const TAXA_MP=.0099;function taxaApp(c){c=c||cfg();return c.mpTaxaApp!=null?Number(c.mpTaxaApp):.01}function taxaTotal(c){return TAXA_MP+taxaApp(c)}
 function pct(x){return(Math.round(x*10000)/100).toLocaleString('pt-BR')+'%'}function taxasTxt(c){return`${pct(taxaTotal(c))} por pagamento`}
@@ -1857,7 +1869,21 @@ function sheetExtra(){const X=UI.xc;if(!X)return;const e=X.xid?(((S.caixa[X.m]||
     <p class="sub" style="margin:0">Cada pessoa da lista vê a cobrança no app${cfg().pixAuto?' e pode pagar com Pix':''}. Entra no saldo do mês quando for paga.</p></div>`);
   UI.xc.conf=conf}
 function xcLer(){const X=UI.xc;if(!X)return;const g=id=>document.getElementById(id);if(g('xc-nome'))X.nome=g('xc-nome').value;if(g('xc-v'))X.v=g('xc-v').value;if(g('xc-d'))X.d=g('xc-d').value}
-function sheetPag(kind,key,id,m){const c=cfg(),xe=kind==='x'?(((S.caixa[key.split('~')[0]]||{}).extras||{})[key.split('~')[1]]||{}):null,src=kind==='m'?((S.caixa[key]||{}).mens||{}):kind==='x'?(xe.pag||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[id])||{},padrao=kind==='m'?precoM(key):kind==='x'?Number(xe.v)||0:precoDP(S.pel[key]);
+/* lista "quem paga" + total (com e sem a taxa do Pix). act: prefixo das ações (npd = formulário, ds = folha) */
+function htmlQuemPaga(ids,map,base,act,conf){conf=conf||new Set();const t=taxaTotal(),vv=id=>{const d=map[id];return d&&d.isento?0:d&&d.v!=null?Number(d.v):Math.round((base||0)*(1-(Number(d&&d.pct)||0))*100)/100};
+  const pag=ids.filter(id=>vv(id)>0),tot=pag.reduce((a,id)=>a+vv(id),0),comTaxa=pag.reduce((a,id)=>a+Math.ceil(vv(id)/(1-t)*100)/100,0);
+  return`<div class="list qp">${ids.map(id=>{const d=map[id]||{},k=d.isento?'isento':d.v!=null?'v':d.pct==.25?'25':d.pct==.5?'50':'cheio',x=vv(id);
+    return`<div class="item" style="flex-wrap:wrap;gap:6px;padding:8px 0"><div class="grow" style="min-width:120px"><div class="name">${esc(nm(id))}${conf.has(id)?' <span class="sub">✓</span>':''}</div></div><b class="num" style="${x>0?'':'color:var(--muted)'}">${x>0?BRL(x):'Não paga'}</b>
+      <div class="seg" style="flex:1 1 100%">${[['cheio','Paga'],['25','−25%'],['50','−50%'],['isento','Não paga']].map(([v,tx])=>`<button type="button" data-act="${act}-set" data-j="${id}" data-v="${v}" aria-pressed="${k===v}">${tx}</button>`).join('')}<input type="number" inputmode="decimal" min="0" step="0.01" placeholder="R$" data-act="${act}-v" data-j="${id}" value="${d.v!=null?d.v:''}" aria-label="Outro valor" style="width:84px;${k==='v'?'outline:2px solid var(--pitch)':''}"></div></div>`}).join('')||'<div class="empty">Ninguém no elenco ainda.</div>'}</div>
+    <div class="panel" style="margin-top:8px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:baseline"><span><b>Total</b>${conf.size?'':' (se todos vierem)'} · ${pag.length} pagando</span><b class="num" style="font-size:20px">${BRL(tot)}</b>
+      <span class="sub">Pelada paga a taxa do Pix (${pct(t)}): você recebe</span><b class="num">${BRL(tot*(1-t))}</b>
+      <span class="sub">Atleta paga a taxa: eles pagam ${BRL(comTaxa)} e você recebe</span><b class="num">${BRL(tot)}</b></div>`}
+/* quem paga quanto numa pelada: descontos, isenções e valor combinado */
+function sheetDescontos(){const D=UI.dsc;if(!D)return;const p=S.pel[D.pid];if(!p)return;const pa=PA(p),conf=new Set(jogaram(p));
+  const ids=ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>(conf.has(b)-conf.has(a))||nm(a).localeCompare(nm(b)));
+  openSheet('Quem paga',`<div class="stack"><p class="sub" style="margin:0">Valor por atleta: <b class="num">${BRL(precoDP(p))}</b>. Toque em quem tem desconto ou não paga. ✓ = confirmado.</p>
+    ${htmlQuemPaga(ids,D.map,precoDP(p),'ds',conf)}<button class="btn primary block" data-act="ds-salvar">Salvar</button></div>`)}
+function sheetPag(kind,key,id,m){const c=cfg(),xe=kind==='x'?(((S.caixa[key.split('~')[0]]||{}).extras||{})[key.split('~')[1]]||{}):null,src=kind==='m'?((S.caixa[key]||{}).mens||{}):kind==='x'?(xe.pag||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[id])||{},padrao=kind==='m'?precoM(key):kind==='x'?Number(xe.v)||0:valorDe(S.pel[key],id);
   const dl=st.d||dataLanc(m||mesAtual());
   openSheet(nm(id),`<div class="stack"><div class="sub" style="margin-top:-6px">${kind==='m'?'Mensalidade de '+MESES[Number(key.slice(5))-1]:kind==='x'?esc(xe.nome||'Cobrança extra'):(EV()?'Pagamento do evento':'Diária da pelada de '+dShort(S.pel[key].data))}</div>
     <div class="grid2"><label class="field"><span>Data</span><input type="date" id="pg-data" value="${dl}"></label><label class="field"><span>Valor (R$)</span><input type="number" id="pg-valor" inputmode="decimal" value="${st.v??padrao}"></label></div>
@@ -2054,14 +2080,19 @@ document.addEventListener('click',e=>{
       for(const[u,pr] of Object.entries(S.pres||{}))if(pr&&pr.jogador===id&&pr.pos)put('presencas/'+u,{...pr,pos:null});
       put('jogadores/'+id,data);if(uidM)put('presencas/'+uidM,{...(S.pres[uidM]||{pel:{}}),jogador:id});closeSheet();toast(_id?'Jogador atualizado.':'Jogador adicionado.');break}
     case'toggle-ativo':{const j=S.jog[d.j];put('jogadores/'+d.j,{...j,ativo:j.ativo===false});closeSheet();toast(j.ativo===false?'Jogador reativado.':'Jogador inativado.');break}
+    case'npd-set':{const m={...(UI.npDesc||{})};if(d.v==='cheio')delete m[d.j];else m[d.j]=d.v==='isento'?{isento:true}:{pct:Number(d.v)/100};UI.npDesc=m;const v=document.getElementById('np-valor');if(v)UI.npValor=v.value;render();break}
+    case'pel-desc':{const p=S.pel[d.p];UI.dsc={pid:d.p,map:{...(p.descontos||{})}};sheetDescontos();break}
+    case'ds-set':{const D=UI.dsc;if(!D)return;if(d.v==='cheio')delete D.map[d.j];else D.map[d.j]=d.v==='isento'?{isento:true}:{pct:Number(d.v)/100};const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetDescontos();const s2=document.querySelector('.sheet');if(s2)s2.scrollTop=sc;break}
+    case'ds-salvar':{const D=UI.dsc;if(!D)return;const m={...D.map};patch('peladas/'+D.pid,{descontos:Object.keys(m).length?m:null});closeSheet();toast('Quem paga: salvo.');break}
+    case'fechar-div':{const p=S.pel[d.p];if(!aberto(p))return;patch('peladas/'+d.p,{precoDiaria:baseDivisao(p)});toast('Divisão fechada: '+BRL(baseDivisao(p))+' por atleta.');break}
     case'np-cobra':UI.npCobra=d.v;render();break;
     case'np-tipo':UI.npTipo=d.v;UI.npCobra=null;UI.npValor=null;render();break;
     case'nova-pel':{const data=document.getElementById('np-data').value;if(!data){toast('Escolha a data.');return}
       const id='p_'+data+'_'+Math.random().toString(36).slice(2,5);
       const hi=document.getElementById('np-hora').value||cfg().hora;
-      put('peladas/'+id,{data,hora:hi,horaFim:document.getElementById('np-fim').value||maisHora(hi,60),localId:UI.npLoc||null,local:(S.locais[UI.npLoc]||{}).nome||'',status:'aberta',resp:{},criadoEm:Date.now(),formato:document.getElementById('np-formato')?.value||cfg().formato||'conv',nTimes:Number(document.getElementById('np-times')?.value)||Number(cfg().times)||3,...(()=>{const ext=!EV()&&UI.npTipo==='extra',pa=EV()||ext,base=ext?{extra:true}:{};const cb=UI.npCobra??(pa?'nao':(precoD(data.slice(0,7))>0?'sim':'nao'));if(cb==='nao')return{...base,precoDiaria:0};const v=Number(String(document.getElementById('np-valor')?.value||'').replace(',','.'));if(!(v>0))return pa?{...base,precoDiaria:0}:base;if(!CX())patch('config/geral',{usarCaixa:true});return v===precoD(data.slice(0,7))&&!pa?base:{...base,precoDiaria:Math.round(v*100)/100}})()});
+      put('peladas/'+id,{data,hora:hi,horaFim:document.getElementById('np-fim').value||maisHora(hi,60),localId:UI.npLoc||null,local:(S.locais[UI.npLoc]||{}).nome||'',status:'aberta',resp:{},criadoEm:Date.now(),formato:document.getElementById('np-formato')?.value||cfg().formato||'conv',nTimes:Number(document.getElementById('np-times')?.value)||Number(cfg().times)||3,...(()=>{const ext=!EV()&&UI.npTipo==='extra',pa=EV()||ext,base=ext?{extra:true}:{};const cb=UI.npCobra??(pa?'nao':(precoD(data.slice(0,7))>0?'sim':'nao'));if(cb==='nao')return{...base,precoDiaria:0};if(Object.keys(UI.npDesc||{}).length)base.descontos={...UI.npDesc};const v=Number(String(document.getElementById('np-valor')?.value||'').replace(',','.'));if(!(v>0))return pa?{...base,precoDiaria:0}:base;if(!CX())patch('config/geral',{usarCaixa:true});return v===precoD(data.slice(0,7))&&!pa?base:{...base,precoDiaria:Math.round(v*100)/100}})()});
       if(UI.npLoc&&S.locais[UI.npLoc])put('locais/'+UI.npLoc,{...S.locais[UI.npLoc],usadoEm:Date.now()});
-      UI.npLoc=undefined;UI.npData=UI.npHora=UI.npFim=UI.npTimes=UI.npFormato=UI.npCobra=UI.npValor=UI.npTipo=null;UI.npFimManual=false;UI.sub='presenca';toast('Pelada marcada. Agora é só convocar.');break}
+      UI.npLoc=undefined;UI.npData=UI.npHora=UI.npFim=UI.npTimes=UI.npFormato=UI.npCobra=UI.npValor=UI.npTipo=UI.npModo=UI.npTotal=UI.npDesc=null;UI.npFimManual=false;UI.sub='presenca';toast('Pelada marcada. Agora é só convocar.');break}
     case'cancel-pel':if(b.dataset.sure){del('peladas/'+d.p);toast('Pelada cancelada.')}else{b.dataset.sure='1';b.textContent='Toque de novo para cancelar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Cancelar esta pelada'}},3500)}break;
     case'rsvp':{if(!ADM())return;const p=S.pel[d.p],cur=respDe(p,d.p)[d.j]?.s;const v=cur===d.v?null:d.v;const before=lista(p,d.p);
       const now=Date.now(),cheia=before.escalados.length>=before.vagas&&J(d.j).pos!=='GOL'&&!before.escalados.includes(d.j);
@@ -2184,7 +2215,7 @@ document.addEventListener('click',e=>{
     case'vit':{const p=S.pel[d.p],vit=(p.vit||p.times.map(()=>0)).slice();vit[d.i]=Math.max(0,(vit[d.i]||0)+Number(d.d));patch('peladas/'+d.p,{vit});break}
     case'confirm-end':UI.confirmEnd=d.v==='1';render();break;
     case'encerrar':{const p=S.pel[d.p],app=document.getElementById('app'),calmo=matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const fim=()=>{UI.confirmEnd=false;UI.sub='presenca';UI.recemEnc=d.p;patch('peladas/'+d.p,{status:'encerrada',jogaram:jogaram(p),encerradaEm:Date.now()});
+      const fim=()=>{UI.confirmEnd=false;UI.sub='presenca';UI.recemEnc=d.p;patch('peladas/'+d.p,{status:'encerrada',jogaram:jogaram(p),encerradaEm:Date.now(),...(aberto(p)?{precoDiaria:baseDivisao(p)}:{})});
         app.classList.remove('saindo');window.scrollTo({top:0,behavior:calmo?'auto':'smooth'});
         if(!calmo){app.classList.add('entrando');setTimeout(()=>app.classList.remove('entrando'),600)}};
       if(calmo)fim();else{app.classList.add('saindo');setTimeout(fim,260)}break}
@@ -2297,7 +2328,7 @@ document.addEventListener('click',e=>{
     case'xc-apagar':{const X=UI.xc;if(!X||!X.xid)return;if(!b.dataset.sure){b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar cobrança'}},3500);return}
       gravarExtra(X.m,X.xid,null);closeSheet();toast('Cobrança apagada.');break}
     case'nahora-lista':sheetNaHora();break;
-    case'nahora':{const x=pendenciasDe(d.j).find(y=>y.tipo===d.t&&y.ref===d.r)||(()=>{/* item fora da janela de 2 meses: monta na mão */const v=d.t==='m'?precoM(d.r):d.t==='d'?precoDP(S.pel[d.r]):Number((((S.caixa[d.r.split('~')[0]]||{}).extras||{})[d.r.split('~')[1]]||{}).v)||0;
+    case'nahora':{const x=pendenciasDe(d.j).find(y=>y.tipo===d.t&&y.ref===d.r)||(()=>{/* item fora da janela de 2 meses: monta na mão */const v=d.t==='m'?precoM(d.r):d.t==='d'?valorDe(S.pel[d.r],d.j):Number((((S.caixa[d.r.split('~')[0]]||{}).extras||{})[d.r.split('~')[1]]||{}).v)||0;
         const desc=d.t==='m'?'Mensalidade de '+MESES[Number(d.r.slice(5))-1].toLowerCase():d.t==='d'?(S.pel[d.r].extra?'Evento extra de ':EV()?'Evento de ':'Diária da pelada de ')+dShort(S.pel[d.r].data):((((S.caixa[d.r.split('~')[0]]||{}).extras||{})[d.r.split('~')[1]]||{}).nome||'Cobrança extra');return{tipo:d.t,ref:d.r,jid:d.j,v,desc}})();
       if(cfg().pixAuto&&cfg().mpConectadoEm)sheetPix(x);else sheetQRManual(x);break}
     case'nahora-pago':{const dt=iso(new Date()),val={s:'pago',d:dt,v:Number(d.v)||0,obs:'Pix (QR na hora)'};gravarPag(d.t,d.r,d.j,val);closeSheet();toast(nm(d.j)+': pago.');break}
@@ -2352,12 +2383,13 @@ document.addEventListener('click',e=>{
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':case'pagou-d':{const kind=d.act==='pagou-m'?'m':'d',key=kind==='m'?d.m:d.p,src=kind==='m'?((S.caixa[key]||{}).mens||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[d.j]);
       if(st){sheetPag(kind,key,d.j,kind==='m'?d.m:S.pel[key].data.slice(0,7));break}
-      const m=kind==='m'?d.m:S.pel[key].data.slice(0,7),c=cfg(),dt=dataLanc(m);gravarPag(kind,key,d.j,{s:'pago',d:dt,v:kind==='m'?precoM(key):precoDP(S.pel[key])});toast(`${nm(d.j)}: pago em ${dBR(dt)}.`);break}
+      const m=kind==='m'?d.m:S.pel[key].data.slice(0,7),c=cfg(),dt=dataLanc(m);gravarPag(kind,key,d.j,{s:'pago',d:dt,v:kind==='m'?precoM(key):valorDe(S.pel[key],d.j)});toast(`${nm(d.j)}: pago em ${dBR(dt)}.`);break}
     case'pg-pct':{document.getElementById('pg-valor').value=d.v;b.parentNode.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));break}
     case'preco-pel':{const p=S.pel[d.p],m=p.data.slice(0,7);openSheet((PA(p)?'Valor do evento de ':'Diária da pelada de ')+dShort(p.data),`<div class="stack"><p class="sub" style="margin:0">${PA(p)?'Quanto cada atleta paga nesta pelada. Coloque 0 para não cobrar.':'Ex.: precisando de diarista, baixa o valor só nesta pelada. Coloque 0 para não cobrar. Quem já pagou não muda.'}</p>
       <label class="field"><span>${PA(p)?'Valor por atleta (R$)':'Valor da diária (R$)'}</span><input type="number" id="pp-v" inputmode="decimal" min="0" step="0.01" value="${precoDP(p)||''}"></label>
       ${PA(p)?'':`<div class="seg">${[[1,'Normal'],[.5,'50% off'],[0,'Sem cobrança']].map(([f,t])=>`<button type="button" data-act="pp-pct" data-v="${Math.round(precoD(m)*f*100)/100}">${t}${f?' · '+BRL(precoD(m)*f):''}</button>`).join('')}</div>`}
-      <button class="btn primary block" data-act="preco-pel-ok" data-p="${d.p}">Salvar</button></div>`);break}
+      <button class="btn primary block" data-act="preco-pel-ok" data-p="${d.p}">Salvar</button>
+      <button class="btn block" data-act="pel-desc" data-p="${d.p}">👥 Quem paga quanto (descontos e isenções)</button></div>`);break}
     case'pp-pct':document.getElementById('pp-v').value=d.v;break;
     case'preco-pel-ok':{const p=S.pel[d.p],v=Number(String(document.getElementById('pp-v').value).replace(',','.'));const n=PA(p)?(isNaN(v)?0:v):(isNaN(v)||v===precoD(p.data.slice(0,7))?null:v);if(PA(p)&&n>0&&!CX())patch('config/geral',{usarCaixa:true});
       const old=precoDP(p),up={};for(const[k,x] of Object.entries(p.diarias||{}))if(x===true)up[k]={s:'pago',v:old};
@@ -2366,16 +2398,22 @@ document.addEventListener('click',e=>{
     case'pagou-d-mais':sheetPag('d',d.p,d.j,S.pel[d.p].data.slice(0,7));break;
     case'pag-set':{const v=d.v==='deve'?false:{s:d.v,d:document.getElementById('pg-data').value||iso(new Date()),v:d.v==='isento'?0:Number(String(document.getElementById('pg-valor').value).replace(',','.'))||0,obs:document.getElementById('pg-obs').value.trim()};
       gravarPag(d.k,d.key,d.j,v);closeSheet();toast(d.v==='deve'?'Voltou para "deve".':d.v==='isento'?nm(d.j)+' isento.':nm(d.j)+' pago.');break}
-    case'diarias-todas':{const p=S.pel[d.p],c=cfg(),dt=dataLanc(p.data.slice(0,7)),up={};for(const id of jogaram(p))if(pagaEm(p,id)&&!stPag((p.diarias||{})[id]))up[id]={s:'pago',d:dt,v:precoDP(p)};patch('peladas/'+d.p,{diarias:up});toast(`${Object.keys(up).length} diária(s) pagas em ${dBR(dt)}.`);break}
+    case'diarias-todas':{const p=S.pel[d.p],c=cfg(),dt=dataLanc(p.data.slice(0,7)),up={};if(!aberto(p))for(const id of jogaram(p))if(pagaEm(p,id)&&valorDe(p,id)>0&&!stPag((p.diarias||{})[id]))up[id]={s:'pago',d:dt,v:valorDe(p,id)};patch('peladas/'+d.p,{diarias:up});toast(`${Object.keys(up).length} diária(s) pagas em ${dBR(dt)}.`);break}
     case'add-lanc':{const ds=document.getElementById('desp-d').value.trim(),v=Number(String(document.getElementById('desp-v').value).replace(',','.'));
       if(!ds||!v){toast('Coloque a descrição e o valor.');return}const cx=S.caixa[d.m]||{mens:{},desp:[]},f=d.t==='ent'?'ent':'desp',dt=dataLanc(d.m);
       put('caixa/'+d.m,{...cx,[f]:[...(cx[f]||[]),{id:uid('d'),d:ds,v,dt}]});toast((d.t==='ent'?'Entrada':'Saída')+' lançada em '+dBR(dt)+'.');break}
     case'del-lanc':{const cx=S.caixa[d.m],f=d.t==='ent'?'ent':'desp';put('caixa/'+d.m,{...cx,[f]:(cx[f]||[]).filter(x=>x.id!==d.id)});break}
   }
 });
+function npQpAtualiza(){const box=document.getElementById('np-qp'),v=document.getElementById('np-valor');if(!box||!v)return;UI.npValor=v.value;const pa=EV()||UI.npTipo==='extra';
+  box.innerHTML=htmlQuemPaga(ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>nm(a).localeCompare(nm(b))),UI.npDesc||{},Number(String(v.value).replace(',','.'))||0,'npd')}
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='np-valor')npQpAtualiza()});
 document.addEventListener('change',e=>{
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
   const t=e.target;
+  if(t.dataset.act==='npd-v'){const m={...(UI.npDesc||{})},v=Number(String(t.value).replace(',','.'));if(t.value===''||isNaN(v))delete m[t.dataset.j];else m[t.dataset.j]={v:Math.max(0,Math.round(v*100)/100)};UI.npDesc=m;npQpAtualiza();return}
+
+  if(t.dataset.act==='ds-v'&&UI.dsc){const v=Number(String(t.value).replace(',','.'));if(t.value===''||isNaN(v))delete UI.dsc.map[t.dataset.j];else UI.dsc.map[t.dataset.j]={v:Math.max(0,Math.round(v*100)/100)};const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetDescontos();const s2=document.querySelector('.sheet');if(s2)s2.scrollTop=sc;return}
   if(t.id==='c-formato'){const iv=document.getElementById('cfg-iv'),nc=document.getElementById('cfg-nc');if(iv)iv.hidden=!['liga','ligamm'].includes(t.value);if(nc)nc.hidden=t.value!=='ligamm'}
   if(t.dataset.act==='cmp'){UI.cmp=t.value||null;const sc=document.querySelector('.sheet').scrollTop;sheetVerJog(t.dataset.j);document.querySelector('.sheet').scrollTop=sc}
   if(t.dataset.act==='mt-n'&&UI.mt){UI.mt.T=Number(t.value);sheetMontar(UI.mt.pid);return}

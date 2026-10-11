@@ -78,7 +78,11 @@ module.exports = db => {
       if (!p) throw Object.assign(new Error('Pelada não encontrada.'), { http: 404 });
       if (stPag((p.diarias || {})[jid])) throw Object.assign(new Error('Essa diária já está paga.'), { http: 409 });
       const cx = (await ler(`grupos/${gid}/caixa/${String(p.data).slice(0, 7)}`)) || {};
-      const v = p.precoDiaria != null ? Number(p.precoDiaria) : cx.precoDiaria != null ? Number(cx.precoDiaria) : Number(cfg.diaria) || 0;
+      if (p.dividir && p.precoDiaria == null) throw Object.assign(new Error('O valor desta pelada ainda está sendo dividido. Espere o administrador fechar.'), { http: 409 });
+      const base = p.precoDiaria != null ? Number(p.precoDiaria) : cx.precoDiaria != null ? Number(cx.precoDiaria) : Number(cfg.diaria) || 0;
+      // desconto, isenção ou valor combinado deste atleta (o administrador define)
+      const dsc = (p.descontos || {})[jid] || null;
+      const v = dsc && dsc.isento ? 0 : dsc && dsc.v != null ? Number(dsc.v) : Math.round(base * (1 - (Number(dsc && dsc.pct) || 0)) * 100) / 100;
       const [, mm, dd] = String(p.data).split('-');
       return { v, cfg, desc: `Diária da pelada de ${dd}/${mm}` };
     }
