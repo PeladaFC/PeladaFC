@@ -1136,6 +1136,10 @@ function tJogo(A){
       <div class="lado"><label class="field"><span>Início</span><input type="time" id="np-hora" data-np="npHora" value="${esc(UI.npHora||c.hora)}"></label>
       <label class="field"><span>Término</span><input type="time" id="np-fim" data-np="npFim" value="${esc(UI.npFim||horaFimDe(null))}"></label></div>
 </div>
+      <div class="field"><span><i class="stepn">3</i>Como vai ser?</span>
+      <div class="stack" style="gap:8px"><label class="field"><span>Times</span><select id="np-times" data-np="npTimes">${[2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}" ${Number(UI.npTimes||c.times||3)===n?'selected':''}>${n} times</option>`).join('')}</select></label>
+      <label class="field"><span>Formato</span><select id="np-formato" data-np="npFormato">${Object.entries(FORMATOS).map(([k,n])=>`<option value="${k}" ${(UI.npFormato||c.formato||'conv')===k?'selected':''}>${n}</option>`).join('')}</select></label></div>
+      <div class="sub">Dá para mudar depois, na aba Times.</div></div>
       <button class="btn primary block btn-grande" data-act="nova-pel">Abrir lista de presença</button>`
       :`<p class="sub" style="margin:0">Depois de escolher o local, você define a data e o horário.</p>`}</div>`}
     return h+renderHist(A);
@@ -1937,9 +1941,9 @@ document.addEventListener('click',e=>{
     case'nova-pel':{const data=document.getElementById('np-data').value;if(!data){toast('Escolha a data.');return}
       const id='p_'+data+'_'+Math.random().toString(36).slice(2,5);
       const hi=document.getElementById('np-hora').value||cfg().hora;
-      put('peladas/'+id,{data,hora:hi,horaFim:document.getElementById('np-fim').value||maisHora(hi,60),localId:UI.npLoc||null,local:(S.locais[UI.npLoc]||{}).nome||'',status:'aberta',resp:{},criadoEm:Date.now()});
+      put('peladas/'+id,{data,hora:hi,horaFim:document.getElementById('np-fim').value||maisHora(hi,60),localId:UI.npLoc||null,local:(S.locais[UI.npLoc]||{}).nome||'',status:'aberta',resp:{},criadoEm:Date.now(),formato:document.getElementById('np-formato')?.value||cfg().formato||'conv',nTimes:Number(document.getElementById('np-times')?.value)||Number(cfg().times)||3});
       if(UI.npLoc&&S.locais[UI.npLoc])put('locais/'+UI.npLoc,{...S.locais[UI.npLoc],usadoEm:Date.now()});
-      UI.npLoc=undefined;UI.npData=UI.npHora=UI.npFim=null;UI.npFimManual=false;UI.sub='presenca';toast('Pelada marcada. Agora é só convocar.');break}
+      UI.npLoc=undefined;UI.npData=UI.npHora=UI.npFim=UI.npTimes=UI.npFormato=null;UI.npFimManual=false;UI.sub='presenca';toast('Pelada marcada. Agora é só convocar.');break}
     case'cancel-pel':if(b.dataset.sure){del('peladas/'+d.p);toast('Pelada cancelada.')}else{b.dataset.sure='1';b.textContent='Toque de novo para cancelar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Cancelar esta pelada'}},3500)}break;
     case'rsvp':{if(!ADM())return;const p=S.pel[d.p],cur=respDe(p,d.p)[d.j]?.s;const v=cur===d.v?null:d.v;const before=lista(p,d.p);
       const now=Date.now(),cheia=before.escalados.length>=before.vagas&&J(d.j).pos!=='GOL'&&!before.escalados.includes(d.j);
