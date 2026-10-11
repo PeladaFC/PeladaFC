@@ -1164,8 +1164,9 @@ function tJogo(A){
         return`<div class="field"><span><i class="stepn">4</i>${EV()?'Vai ter cobrança?':'Que pelada é essa?'}</span>${tipo}
         <div class="seg"><button type="button" data-act="np-cobra" data-v="nao" aria-pressed="${cobra==='nao'}">Sem cobrança</button><button type="button" data-act="np-cobra" data-v="sim" aria-pressed="${cobra==='sim'}">${pa?'Cobrar por atleta':'Cobrar diária'}</button></div>
         ${cobra==='sim'?`<label class="field" style="margin-top:8px"><span>${pa?'Valor por atleta (R$)':'Diária do diarista nesta pelada (R$)'}</span><input type="number" id="np-valor" data-np="npValor" inputmode="decimal" min="0" step="0.01" value="${esc(UI.npValor??padrao)}" placeholder="Ex.: 25"></label>
-          <div class="sub" style="margin:6px 0">${pa?'Quem paga, quem tem desconto e quem não paga:':'Mensalistas não pagam. Diaristas:'}</div>
-          <div id="np-qp">${htmlQuemPaga(ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>nm(a).localeCompare(nm(b))),UI.npDesc||{},Number(String(UI.npValor??padrao).replace(',','.'))||0,'npd')}</div>`
+          ${(()=>{const n=Object.keys(UI.npDesc||{}).length;return`<div class="row between" style="margin-top:8px;gap:8px;flex-wrap:nowrap"><span class="sub">✅ ${pa?'Todos que confirmarem pagam':'Todo diarista que confirmar paga'}${n?` · <b>${n} ajuste${n>1?'s':''}</b>`:''}</span><button type="button" class="btn sm" data-act="np-qp-abrir">${UI.npQpAberta?'Esconder ▴':'Descontos ▾'}</button></div>`})()}
+          ${UI.npQpAberta?`<div id="np-qp">${htmlQuemPaga(ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>nm(a).localeCompare(nm(b))),UI.npDesc||{},Number(String(UI.npValor??padrao).replace(',','.'))||0,'npd')}</div>`:''}
+          <div class="sub" style="margin-top:4px">O total é calculado depois que a galera confirmar.</div>`
           :`<div class="sub" style="margin-top:6px">${pa?'Ninguém paga nada por esta pelada.':'Nesta pelada o diarista também não paga.'}</div>`}</div>`})()}
       <button class="btn primary block btn-grande" data-act="nova-pel">Abrir lista de presença</button>`
       :`<p class="sub" style="margin:0">Depois de escolher o local, você define a data e o horário.</p>`}</div>`}
@@ -1871,13 +1872,12 @@ function sheetExtra(){const X=UI.xc;if(!X)return;const e=X.xid?(((S.caixa[X.m]||
 function xcLer(){const X=UI.xc;if(!X)return;const g=id=>document.getElementById(id);if(g('xc-nome'))X.nome=g('xc-nome').value;if(g('xc-v'))X.v=g('xc-v').value;if(g('xc-d'))X.d=g('xc-d').value}
 /* lista "quem paga" + total (com e sem a taxa do Pix). act: prefixo das ações (npd = formulário, ds = folha) */
 function htmlQuemPaga(ids,map,base,act,conf){conf=conf||new Set();const t=taxaTotal(),vv=id=>{const d=map[id];return d&&d.isento?0:d&&d.v!=null?Number(d.v):Math.round((base||0)*(1-(Number(d&&d.pct)||0))*100)/100};
-  const pag=ids.filter(id=>vv(id)>0&&(!conf.size||conf.has(id))),tot=pag.reduce((a,id)=>a+vv(id),0),comTaxa=pag.reduce((a,id)=>a+Math.ceil(vv(id)/(1-t)*100)/100,0);
-  return`<div class="list qp">${ids.map(id=>{const d=map[id]||{},k=d.isento?'isento':d.v!=null?'v':d.pct==.25?'25':d.pct==.5?'50':'cheio',x=vv(id);
-    return`<div class="item" style="flex-wrap:wrap;gap:6px;padding:8px 0"><div class="grow" style="min-width:120px"><div class="name">${esc(nm(id))}${conf.has(id)?' <span class="sub">✓</span>':''}</div></div><b class="num" style="${x>0?'':'color:var(--muted)'}">${x>0?BRL(x):'Não paga'}</b>
-      <div class="seg" style="flex:1 1 100%">${[['cheio','Paga'],['25','−25%'],['50','−50%'],['isento','Não paga']].map(([v,tx])=>`<button type="button" data-act="${act}-set" data-j="${id}" data-v="${v}" aria-pressed="${k===v}">${tx}</button>`).join('')}<input type="number" inputmode="decimal" min="0" step="0.01" placeholder="R$" data-act="${act}-v" data-j="${id}" value="${d.v!=null?d.v:''}" aria-label="Outro valor" style="width:84px;${k==='v'?'outline:2px solid var(--pitch)':''}"></div></div>`}).join('')||'<div class="empty">Ninguém no elenco ainda.</div>'}</div>
-    <div class="panel" style="margin-top:8px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:baseline"><span><b>Total</b>${conf.size?' dos confirmados':' (se todos vierem)'} · ${pag.length} pagando</span><b class="num" style="font-size:20px">${BRL(tot)}</b>
-      <span class="sub">Pelada paga a taxa do Pix (${pct(t)}): você recebe</span><b class="num">${BRL(tot*(1-t))}</b>
-      <span class="sub">Atleta paga a taxa: eles pagam ${BRL(comTaxa)} e você recebe</span><b class="num">${BRL(tot)}</b></div>`}
+  const pag=ids.filter(id=>vv(id)>0&&conf.has(id)),tot=pag.reduce((a,id)=>a+vv(id),0),comTaxa=pag.reduce((a,id)=>a+Math.ceil(vv(id)/(1-t)*100)/100,0);
+  return`<div class="qp">${ids.map(id=>{const d=map[id]||{},k=d.isento?'isento':d.v!=null?'v':d.pct==.25?'25':d.pct==.5?'50':'cheio',x=vv(id);
+    return`<div class="qp-row"><span class="qp-n">${conf.has(id)?'✓ ':''}${esc(nm(id))}</span><select data-act="${act}-sel" data-j="${id}" aria-label="Quanto ${esc(nm(id))} paga">${[['cheio','Paga'],['25','−25%'],['50','−50%'],['isento','Não paga'],['v','Outro valor']].map(([v,tx])=>`<option value="${v}" ${k===v?'selected':''}>${tx}</option>`).join('')}</select>${k==='v'?`<input type="number" inputmode="decimal" min="0" step="0.01" data-act="${act}-v" data-j="${id}" value="${d.v}" aria-label="Valor de ${esc(nm(id))}">`:`<b class="num${x>0?'':' qp-0'}">${x>0?BRL(x):'—'}</b>`}</div>`}).join('')||'<div class="empty">Ninguém no elenco ainda.</div>'}</div>
+    ${conf.size?`<div class="qp-tot"><span><b>Total dos confirmados</b> · ${pag.length} pagando</span><b class="num">${BRL(tot)}</b>
+      <span class="sub">Pelada paga a taxa (${pct(t)}): você recebe</span><b class="num">${BRL(tot*(1-t))}</b>
+      <span class="sub">Atleta paga a taxa: eles pagam ${BRL(comTaxa)}, você recebe</span><b class="num">${BRL(tot)}</b></div>`:''}`}
 /* quem paga quanto numa pelada: descontos, isenções e valor combinado */
 function sheetDescontos(){const D=UI.dsc;if(!D)return;const p=S.pel[D.pid];if(!p)return;const pa=PA(p),conf=new Set(jogaram(p));
   const ids=ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>(conf.has(b)-conf.has(a))||nm(a).localeCompare(nm(b)));
@@ -2080,6 +2080,7 @@ document.addEventListener('click',e=>{
       for(const[u,pr] of Object.entries(S.pres||{}))if(pr&&pr.jogador===id&&pr.pos)put('presencas/'+u,{...pr,pos:null});
       put('jogadores/'+id,data);if(uidM)put('presencas/'+uidM,{...(S.pres[uidM]||{pel:{}}),jogador:id});closeSheet();toast(_id?'Jogador atualizado.':'Jogador adicionado.');break}
     case'toggle-ativo':{const j=S.jog[d.j];put('jogadores/'+d.j,{...j,ativo:j.ativo===false});closeSheet();toast(j.ativo===false?'Jogador reativado.':'Jogador inativado.');break}
+    case'np-qp-abrir':{const v=document.getElementById('np-valor');if(v)UI.npValor=v.value;UI.npQpAberta=!UI.npQpAberta;render();break}
     case'npd-set':{const m={...(UI.npDesc||{})};if(d.v==='cheio')delete m[d.j];else m[d.j]=d.v==='isento'?{isento:true}:{pct:Number(d.v)/100};UI.npDesc=m;const v=document.getElementById('np-valor');if(v)UI.npValor=v.value;render();break}
     case'pel-desc':{const p=S.pel[d.p];UI.dsc={pid:d.p,map:{...(p.descontos||{})}};sheetDescontos();break}
     case'ds-set':{const D=UI.dsc;if(!D)return;if(d.v==='cheio')delete D.map[d.j];else D.map[d.j]=d.v==='isento'?{isento:true}:{pct:Number(d.v)/100};const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetDescontos();const s2=document.querySelector('.sheet');if(s2)s2.scrollTop=sc;break}
@@ -2092,7 +2093,7 @@ document.addEventListener('click',e=>{
       const hi=document.getElementById('np-hora').value||cfg().hora;
       put('peladas/'+id,{data,hora:hi,horaFim:document.getElementById('np-fim').value||maisHora(hi,60),localId:UI.npLoc||null,local:(S.locais[UI.npLoc]||{}).nome||'',status:'aberta',resp:{},criadoEm:Date.now(),formato:document.getElementById('np-formato')?.value||cfg().formato||'conv',nTimes:Number(document.getElementById('np-times')?.value)||Number(cfg().times)||3,...(()=>{const ext=!EV()&&UI.npTipo==='extra',pa=EV()||ext,base=ext?{extra:true}:{};const cb=UI.npCobra??(pa?'nao':(precoD(data.slice(0,7))>0?'sim':'nao'));if(cb==='nao')return{...base,precoDiaria:0};if(Object.keys(UI.npDesc||{}).length)base.descontos={...UI.npDesc};const v=Number(String(document.getElementById('np-valor')?.value||'').replace(',','.'));if(!(v>0))return pa?{...base,precoDiaria:0}:base;if(!CX())patch('config/geral',{usarCaixa:true});return v===precoD(data.slice(0,7))&&!pa?base:{...base,precoDiaria:Math.round(v*100)/100}})()});
       if(UI.npLoc&&S.locais[UI.npLoc])put('locais/'+UI.npLoc,{...S.locais[UI.npLoc],usadoEm:Date.now()});
-      UI.npLoc=undefined;UI.npData=UI.npHora=UI.npFim=UI.npTimes=UI.npFormato=UI.npCobra=UI.npValor=UI.npTipo=UI.npModo=UI.npTotal=UI.npDesc=null;UI.npFimManual=false;UI.sub='presenca';toast('Pelada marcada. Agora é só convocar.');break}
+      UI.npLoc=undefined;UI.npData=UI.npHora=UI.npFim=UI.npTimes=UI.npFormato=UI.npCobra=UI.npValor=UI.npTipo=UI.npModo=UI.npTotal=UI.npDesc=UI.npQpAberta=null;UI.npFimManual=false;UI.sub='presenca';toast('Pelada marcada. Agora é só convocar.');break}
     case'cancel-pel':if(b.dataset.sure){del('peladas/'+d.p);toast('Pelada cancelada.')}else{b.dataset.sure='1';b.textContent='Toque de novo para cancelar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Cancelar esta pelada'}},3500)}break;
     case'rsvp':{if(!ADM())return;const p=S.pel[d.p],cur=respDe(p,d.p)[d.j]?.s;const v=cur===d.v?null:d.v;const before=lista(p,d.p);
       const now=Date.now(),cheia=before.escalados.length>=before.vagas&&J(d.j).pos!=='GOL'&&!before.escalados.includes(d.j);
@@ -2411,6 +2412,9 @@ document.addEventListener('input',e=>{if(e.target&&e.target.id==='np-valor')npQp
 document.addEventListener('change',e=>{
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
   const t=e.target;
+  if(t.dataset.act==='npd-sel'||t.dataset.act==='ds-sel'){const form=t.dataset.act==='npd-sel',m=form?{...(UI.npDesc||{})}:(UI.dsc?UI.dsc.map:null);if(!m)return;const j=t.dataset.j,v=t.value;
+    if(v==='cheio')delete m[j];else if(v==='isento')m[j]={isento:true};else if(v==='v'){const p=!form&&UI.dsc&&S.pel[UI.dsc.pid];m[j]={v:form?(Number(String(document.getElementById('np-valor')?.value||'').replace(',','.'))||0):precoDP(p)}}else m[j]={pct:Number(v)/100};
+    if(form){UI.npDesc=m;npQpAtualiza()}else{const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetDescontos();const s2=document.querySelector('.sheet');if(s2)s2.scrollTop=sc}return}
   if(t.dataset.act==='npd-v'){const m={...(UI.npDesc||{})},v=Number(String(t.value).replace(',','.'));if(t.value===''||isNaN(v))delete m[t.dataset.j];else m[t.dataset.j]={v:Math.max(0,Math.round(v*100)/100)};UI.npDesc=m;npQpAtualiza();return}
 
   if(t.dataset.act==='ds-v'&&UI.dsc){const v=Number(String(t.value).replace(',','.'));if(t.value===''||isNaN(v))delete UI.dsc.map[t.dataset.j];else UI.dsc.map[t.dataset.j]={v:Math.max(0,Math.round(v*100)/100)};const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetDescontos();const s2=document.querySelector('.sheet');if(s2)s2.scrollTop=sc;return}

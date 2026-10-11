@@ -472,6 +472,14 @@ nav.tabs button:active svg{transform:scale(.9)}
 .gl-g{display:grid;grid-template-columns:1fr 1fr;gap:8px}.gl-p{all:unset;cursor:pointer;display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-weight:600;font-size:14px;min-width:0}
 .gl-p .av{width:32px!important;height:32px!important;font-size:12px!important;flex:none}.gl-p span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gl-p.sem{grid-column:1/-1;justify-content:center;color:var(--muted)}
 .pix-v{display:flex;flex-direction:column;align-items:center;gap:2px}.pix-v b{font-family:var(--f-display);font-size:40px;color:var(--pitch)}
+.qp{display:flex;flex-direction:column;margin-top:6px}
+.qp-row{display:grid;grid-template-columns:1fr auto 76px;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:14px}
+.qp-row:last-child{border-bottom:0}
+.qp-n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qp-row select{width:auto;min-height:0;padding:5px 26px 5px 8px;font-size:13px}
+.qp-row input{min-height:0;padding:5px 6px;font-size:13px;width:76px}
+.qp-row b{text-align:right;font-size:13px}.qp-row .qp-0{color:var(--muted);font-weight:500}
+.qp-tot{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:baseline;margin-top:8px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font-size:14px}
 .pix-qr{width:220px;height:220px;align-self:center;border-radius:12px;background:#fff;padding:8px;border:1px solid var(--line);image-rendering:pixelated}
 .pix-qr-demo{display:grid;place-items:center;text-align:center;font-weight:800;color:var(--muted);background:repeating-linear-gradient(45deg,#fff 0 8px,#eef2ee 8px 16px)}
 #pix-cod{font-size:11px;word-break:break-all}
@@ -545,9 +553,9 @@ label.btn{position:relative;cursor:pointer}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261011v"></script>
-<script src="br.js?v=20261011v"></script>
-<script src="core.js?v=20261011v"></script>
-<script type="module" src="app.js?v=20261011v"></script>
+<script src="qrcode.js?v=20261011w"></script>
+<script src="br.js?v=20261011w"></script>
+<script src="core.js?v=20261011w"></script>
+<script type="module" src="app.js?v=20261011w"></script>
 </body>
 </html>
