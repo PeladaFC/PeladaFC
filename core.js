@@ -1726,7 +1726,8 @@ function tCaixa(A){
   if(A)h+=`<div class="panel cx-data" style="margin-top:12px"><label class="row between" style="gap:10px;flex-wrap:nowrap"><span><b>Data dos lançamentos</b><span class="sub" style="display:block">Tudo que você marcar agora entra com esta data.</span></span><input type="date" id="cx-data" value="${dl}" min="${m}-01" max="${m}-31"></label>
       ${EV()?'':`<div class="cx-precos"><label class="field"><span>Mensalidade de ${MESES[mm-1].toLowerCase()}</span><input type="number" id="cx-pm" data-m="${m}" inputmode="decimal" min="0" step="0.01" value="${precoM(m)}"></label><label class="field"><span>Diária de ${MESES[mm-1].toLowerCase()}</span><input type="number" id="cx-pd" data-m="${m}" inputmode="decimal" min="0" step="0.01" value="${precoD(m)}"></label></div>
       <div class="sub" style="margin-top:4px">Mudou o campo ou o preço? Ajuste aqui. Vale só para este mês. Coloque <b>0</b> para não cobrar neste mês.</div>`}</div>
-    <div class="lado" style="margin-top:10px"><button class="btn warn" data-act="msg" data-v="pagamento" data-m="${m}">Cobrar pendências</button><button class="btn" data-act="msg" data-v="prestacao" data-m="${m}">Prestação de contas</button></div>`;
+    <div class="lado" style="margin-top:10px"><button class="btn warn" data-act="msg" data-v="pagamento" data-m="${m}">Cobrar pendências</button><button class="btn" data-act="msg" data-v="prestacao" data-m="${m}">Prestação de contas</button></div>
+    <button class="btn primary block" style="margin-top:8px" data-act="nahora-lista">📱 Cobrar na hora com QR Code</button>`;
   if(!EV()&&!(precoM(m)>0))h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Mensalidades</h3><span class="sub">sem cobrança</span></div><div class="empty">Sem mensalidade em ${MESES[mm-1].toLowerCase()}. Ninguém aparece devendo.</div></div>`;
   else if(!EV()){h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Mensalidades</h3><span class="sub num">${pagosM.length}/${mensal.length} · ${BRL(precoM(m))}</span></div><div class="list">`;
     if(!mensal.length)h+='<div class="empty">Nenhum mensalista.</div>';
@@ -1769,7 +1770,8 @@ function tCaixa(A){
   return h;
 }
 /* ---------- Pix automático: o que o jogador logado deve ---------- */
-function minhasPendencias(){const jid=meuJogador();if(!jid||!CX())return[];const out=[],m=mesAtual();
+function minhasPendencias(){return pendenciasDe(meuJogador())}
+function pendenciasDe(jid){if(!jid||!CX())return[];const out=[],m=mesAtual();
   const lim0=iso(new Date(Date.now()-62*864e5)).slice(0,7);
   for(const mx of Object.keys(S.caixa).filter(k=>k>=lim0&&k<=m).sort())for(const[xid,x] of extrasDe(mx))if(x.v>0&&(x.quem||[]).includes(jid)&&!stPag((x.pag||{})[jid]))out.push({tipo:'x',ref:mx+'~'+xid,jid,v:Number(x.v),desc:x.nome});
   if(EV())return out;
@@ -1782,21 +1784,42 @@ function pct(x){return(Math.round(x*10000)/100).toLocaleString('pt-BR')+'%'}func
 function painelMeusPag(){const L=minhasPendencias();if(!L.length)return'';const c=cfg();
   return`<div class="panel meus-pag" style="margin-bottom:12px"><div class="panel-h"><h3>💰 Meus pagamentos</h3></div>${L.map(x=>`<div class="item"><div class="grow"><div class="name">${esc(x.desc)}</div><div class="sub num">${BRL(x.v)}</div></div>${c.pixAuto?`<button class="btn sm primary" data-act="pix-pagar" data-t="${x.tipo}" data-r="${x.ref}" data-j="${x.jid}">Pagar com Pix</button>`:c.pix?`<button class="btn sm" data-act="pix-chave">Copiar chave Pix</button>`:''}</div>`).join('')}
     ${c.pixAuto?'<div class="sub" style="margin-top:6px">O pagamento é confirmado sozinho, na hora. Não precisa mandar comprovante.</div>':''}</div>`}
+/* Pix "copia e cola" estático a partir da chave Pix da pelada (quando o Pix automático está desligado) */
+function crc16(t){let c=0xFFFF;for(let i=0;i<t.length;i++){c^=t.charCodeAt(i)<<8;for(let k=0;k<8;k++)c=c&0x8000?((c<<1)^0x1021)&0xFFFF:(c<<1)&0xFFFF}return c.toString(16).toUpperCase().padStart(4,'0')}
+function cpfOk(d){if(!/^\d{11}$/.test(d)||/^(\d)\1{10}$/.test(d))return false;const f=n=>{let s=0;for(let i=0;i<n;i++)s+=+d[i]*(n+1-i);const r=s*10%11%10;return r};return f(9)==d[9]&&f(10)==d[10]}
+function chavePix(k){k=String(k||'').trim();if(!k)return'';if(/@/.test(k))return k.toLowerCase();if(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k))return k.toLowerCase();
+  const d=k.replace(/\D/g,'');if(k.startsWith('+'))return'+'+d;if(d.length===14)return d;if(cpfOk(d))return d;if(d.length>=10&&d.length<=11)return'+55'+d;if(d.length===13&&d.startsWith('55'))return'+'+d;return k}
+function semAcento(t,n){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9 ]/g,'').toUpperCase().trim().slice(0,n)||'PELADA'}
+function pixEstatico(v,txt){const k=chavePix(cfg().pix);if(!k)return'';const f=(id,val)=>id+String(val.length).padStart(2,'0')+val;
+  const base=f('00','br.gov.bcb.pix')+f('01',k),livre=99-base.length-4,conta=base+(txt&&livre>=5?f('02',semAcento(txt,Math.min(40,livre))):'');
+  const p=f('00','01')+f('26',conta)+f('52','0000')+f('53','986')+(v>0?f('54',Number(v).toFixed(2)):'')+f('58','BR')+f('59',semAcento(cfg().nome,25))+f('60','BRASIL')+f('62',f('05','***'))+'6304';
+  return p+crc16(p)}
+function sheetNaHora(){const m=mesAtual(),ids=ativos().sort((a,b)=>nm(a).localeCompare(nm(b))),L=ids.map(id=>[id,pendenciasDe(id)]).filter(([,x])=>x.length);
+  openSheet('Cobrar na hora',`<div class="stack"><p class="sub" style="margin:0">Escolha quem vai pagar. Abre um QR Code só dele${cfg().pixAuto?' e o Caixa marca PAGO sozinho quando o Pix cair':''}.</p>
+    <div class="list">${L.map(([id,x])=>x.map(y=>`<button class="item" style="width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line)" data-act="nahora" data-t="${y.tipo}" data-r="${esc(y.ref)}" data-j="${id}"><div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub">${esc(y.desc)}</div></div><b class="num">${BRL(y.v)}</b></button>`).join('')).join('')||'<div class="empty">Ninguém devendo agora. 🙌</div>'}</div></div>`)}
+function sheetQRManual(x){UI.pixAberto=null;const cod=pixEstatico(x.v,x.desc);
+  if(!cod){openSheet('Cobrar na hora',`<div class="stack"><div class="banner due" style="display:block">Cadastre a chave Pix da pelada em Ajustes para gerar o QR Code.</div><button class="btn block" data-act="cfg">Abrir ajustes</button></div>`);return}
+  openSheet('Cobrar na hora',`<div class="stack pix"><div class="pix-v"><div class="name" style="font-size:20px">${esc(nm(x.jid))}</div><span class="sub">${esc(x.desc)}</span><b class="num">${BRL(x.v)}</b></div>
+    <div class="pix-qr">${window.qrSVG?window.qrSVG(cod):''}</div>
+    <button class="btn block" data-act="pix-copiar">Copiar código Pix (copia e cola)</button><textarea id="pix-cod" class="num" rows="3" readonly>${esc(cod)}</textarea>
+    <button class="btn primary block" data-act="nahora-pago" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}" data-v="${x.v}">Recebi, marcar como pago</button>
+    <p class="sub" style="margin:0">QR da chave Pix da pelada. Como o Pix automático está desligado, confira no seu banco se o dinheiro caiu e toque em <b>Recebi</b>.</p></div>`)}
 function pixPago(x){if(!x)return false;if(x.tipo==='x'){const[mx,xid]=x.ref.split('~'),e=((S.caixa[mx]||{}).extras||{})[xid];return!!(e&&stPag((e.pag||{})[x.jid]))}if(x.tipo==='m')return!!stPag(((S.caixa[x.ref]||{}).mens||{})[x.jid]);const p=S.pel[x.ref];return!!(p&&stPag((p.diarias||{})[x.jid]))}
 async function sheetPix(x){UI.pixAberto=x;openSheet('Pagar com Pix','<div class="empty">Gerando o Pix…</div>');
   let d;try{d=demo?{valor:cfg().pixRepassa?Math.ceil(x.v/(1-taxaTotal())*100)/100:x.v,base:x.v,qr:'00020126580014br.gov.bcb.pix0136demo-pelada-fc5204000053039865802BR5925PELADA FC DEMO6009RECIFE62070503***6304ABCD',qr64:'',link:'',demo:true}:await window.pixCriar({tipo:x.tipo,ref:x.ref,jid:x.jid})}
   catch(e){const b=document.getElementById('sheet-body');if(b)b.innerHTML=`<div class="stack"><div class="banner due" style="display:block">${esc(e.message||'Não deu para gerar o Pix agora.')}</div><button class="btn block" data-act="close">Fechar</button></div>`;return}
   UI.pixDado=d;const b=document.getElementById('sheet-body');if(!b||UI.pixAberto!==x)return;
-  b.innerHTML=`<div class="stack pix"><div class="pix-v"><span class="sub">${esc(x.desc)}</span><b class="num">${BRL(d.valor)}</b>${d.valor!==d.base?`<span class="sub">inclui ${BRL(d.valor-d.base)} da taxa do Pix</span>`:''}</div>
-    ${d.qr64?`<img class="pix-qr" src="data:image/png;base64,${d.qr64}" alt="QR Code do Pix">`:`<div class="pix-qr pix-qr-demo">QR Code${d.demo?'<br><small>(demonstração)</small>':''}</div>`}
+  const outro=x.jid!==meuJogador();
+  b.innerHTML=`<div class="stack pix"><div class="pix-v">${outro?`<div class="name" style="font-size:20px">${esc(nm(x.jid))}</div>`:''}<span class="sub">${esc(x.desc)}</span><b class="num">${BRL(d.valor)}</b>${d.valor!==d.base?`<span class="sub">inclui ${BRL(d.valor-d.base)} da taxa do Pix</span>`:''}</div>
+    ${d.qr64?`<img class="pix-qr" src="data:image/png;base64,${d.qr64}" alt="QR Code do Pix">`:d.qr&&window.qrSVG?`<div class="pix-qr">${window.qrSVG(d.qr)}</div>`:`<div class="pix-qr pix-qr-demo">QR Code${d.demo?'<br><small>(demonstração)</small>':''}</div>`}
     <button class="btn primary block" data-act="pix-copiar">Copiar código Pix (copia e cola)</button>
     <textarea id="pix-cod" class="num" rows="3" readonly>${esc(d.qr)}</textarea>
     ${d.link?`<a class="btn block" href="${esc(d.link)}" target="_blank" rel="noopener">Abrir no Mercado Pago</a>`:''}
     <div class="pix-st"><span class="pix-dot"></span>Aguardando o pagamento. Esta tela muda sozinha quando o Pix cair.</div>
     ${d.demo?`<button class="btn sm block" data-act="pix-demo-pagar">Simular pagamento (demonstração)</button>`:''}
-    <p class="sub" style="margin:0">Abra o app do seu banco, escolha Pix → Pix copia e cola (ou ler QR Code) e confirme. O código vale por 24 horas.</p></div>`}
+    <p class="sub" style="margin:0">${outro?`Mostre esta tela para ${esc(nm(x.jid))}: no app do banco, Pix → <b>ler QR Code</b>. Quando o Pix cair, o Caixa marca PAGO sozinho.`:'Abra o app do seu banco, escolha Pix → Pix copia e cola (ou ler QR Code) e confirme.'} O código vale por 24 horas.</p></div>`}
 function pixConfirmado(){const b=document.getElementById('sheet-body');if(!b)return;const x=UI.pixAberto;UI.pixAberto=null;UI.pixDado=null;
-  b.innerHTML=`<div class="stack pix-ok"><div class="pix-ok-ic">✓</div><h3 style="text-align:center">Pagamento confirmado!</h3><p class="sub" style="text-align:center;margin:0">${esc(x.desc)} está paga. Valeu! 💪</p><button class="btn primary block" data-act="close">Fechar</button></div>`}
+  b.innerHTML=`<div class="stack pix-ok"><div class="pix-ok-ic">✓</div><h3 style="text-align:center">Pagamento confirmado!</h3><p class="sub" style="text-align:center;margin:0">${x.jid!==meuJogador()?esc(nm(x.jid))+' · ':''}${esc(x.desc)} está paga. Valeu! 💪</p><button class="btn primary block" data-act="close">Fechar</button></div>`}
 function sheetComoMP(){const c=cfg();openSheet('Como funciona o Pix automático',`<div class="stack small">
   <ol style="margin:0;padding-left:20px;display:grid;gap:6px">
   <li>Toque em <b>Conectar Mercado Pago</b>. Vai abrir a página do Mercado Pago.</li>
@@ -1825,6 +1848,7 @@ function sheetPag(kind,key,id,m){const c=cfg(),xe=kind==='x'?(((S.caixa[key.spli
     <div class="grid2"><label class="field"><span>Data</span><input type="date" id="pg-data" value="${dl}"></label><label class="field"><span>Valor (R$)</span><input type="number" id="pg-valor" inputmode="decimal" value="${st.v??padrao}"></label></div>
     <div><div class="sub" style="margin-bottom:6px">Valor cheio: <b class="num">${BRL(padrao)}</b></div><div class="seg pg-pct">${[[1,'Cheio'],[.75,'25% off'],[.5,'50% off']].map(([f,t])=>`<button type="button" data-act="pg-pct" data-v="${Math.round(padrao*f*100)/100}" aria-pressed="${Number(st.v??padrao)===Math.round(padrao*f*100)/100}">${t}</button>`).join('')}</div></div>
     <label class="field"><span>Observação <i class="opc">opcional</i></span><input type="text" id="pg-obs" value="${esc(st.obs||'')}" placeholder="Ex.: desconto pra trazer diarista, ajuda, lesão…"></label>
+    ${!st.s&&(Number(st.v??padrao)>0)?`<button class="btn block" data-act="nahora" data-t="${kind}" data-r="${esc(key)}" data-j="${id}">📱 Cobrar agora com QR Code</button>`:''}
     <button class="btn primary block" data-act="pag-set" data-k="${kind}" data-key="${key}" data-j="${id}" data-v="pago">Marcar como pago</button>
     <button class="btn block pag-isento" data-act="pag-set" data-k="${kind}" data-key="${key}" data-j="${id}" data-v="isento">Isentar de pagamento</button>
     ${st.s?`<button class="btn danger block" data-act="pag-set" data-k="${kind}" data-key="${key}" data-j="${id}" data-v="deve">Voltar para "deve"</button>`:''}
@@ -2253,6 +2277,11 @@ document.addEventListener('click',e=>{
       if(X.xid&&mx!==X.m)gravarExtra(X.m,X.xid,null);gravarExtra(mx,xid,novo);if(mx!==UI.mes&&mx!==X.m)UI.mes=mx;closeSheet();toast(X.xid?'Cobrança atualizada.':`Cobrança criada para ${novo.quem.length} pessoa(s).`);break}
     case'xc-apagar':{const X=UI.xc;if(!X||!X.xid)return;if(!b.dataset.sure){b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar cobrança'}},3500);return}
       gravarExtra(X.m,X.xid,null);closeSheet();toast('Cobrança apagada.');break}
+    case'nahora-lista':sheetNaHora();break;
+    case'nahora':{const x=pendenciasDe(d.j).find(y=>y.tipo===d.t&&y.ref===d.r)||(()=>{/* item fora da janela de 2 meses: monta na mão */const v=d.t==='m'?precoM(d.r):d.t==='d'?precoDP(S.pel[d.r]):Number((((S.caixa[d.r.split('~')[0]]||{}).extras||{})[d.r.split('~')[1]]||{}).v)||0;
+        const desc=d.t==='m'?'Mensalidade de '+MESES[Number(d.r.slice(5))-1].toLowerCase():d.t==='d'?'Diária da pelada de '+dShort(S.pel[d.r].data):((((S.caixa[d.r.split('~')[0]]||{}).extras||{})[d.r.split('~')[1]]||{}).nome||'Cobrança extra');return{tipo:d.t,ref:d.r,jid:d.j,v,desc}})();
+      if(cfg().pixAuto&&cfg().mpConectadoEm)sheetPix(x);else sheetQRManual(x);break}
+    case'nahora-pago':{const dt=iso(new Date()),val={s:'pago',d:dt,v:Number(d.v)||0,obs:'Pix (QR na hora)'};gravarPag(d.t,d.r,d.j,val);closeSheet();toast(nm(d.j)+': pago.');break}
     case'jg-gerar':{const p=S.pel[d.p],nj=novosJogos(p);if(nj)patch('peladas/'+d.p,{jogos:nj});break}
     case'jg-prox':{const p=S.pel[d.p],nx=proximaFase(p);if(nx)patch('peladas/'+d.p,{jogos:[...(p.jogos||[]),...nx]});break}
     case'jg-zerar':if(b.dataset.sure){patch('peladas/'+d.p,{jogos:null});toast('Tabela apagada.')}else{b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar tabela de jogos'}},3500)}break;
