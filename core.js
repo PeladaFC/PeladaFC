@@ -1238,6 +1238,10 @@ function destaquesMini(pid,p){const L=destaquesDe(p,pid);if(!L.length)return'';c
   const foto=(id,cls)=>{const f=fotoDe(id),j=J(id);return`<span class="${cls} bg-${j.pos}" style="${fotoStyle(f)}">${f?'':esc(initials(nm(id)))}</span>`};
   if(v==='b'){// figurinhas: cartas verticais deslizando para o lado
     return`<div class="dfig-w" style="margin-top:16px"><div class="row between" style="margin-bottom:8px"><h3 class="dfig-h">Destaques</h3><span class="sub">${dShort(p.data)}</span></div><div class="dfig">${L.map(x=>`<button class="fig${x.k==='mvp'?' ouro':''}" data-act="ver-jog" data-j="${x.id}">${foto(x.id,'fig-f')}<span class="fig-e">${x.e}</span><span class="fig-t">${x.t}</span><b class="fig-n">${esc(nm(x.id))}</b>${x.d?`<span class="fig-d num">${x.d}</span>`:''}</button>`).join('')}</div></div>`}
+  if(v==='d'){// misto: craque grande + figurinhas dos outros
+    const c=L.find(x=>x.k==='mvp')||L[0],o=L.filter(x=>x!==c);
+    return`<div class="board dcq" style="margin-top:16px"><div class="dcq-top">${foto(c.id,'dcq-f')}<div class="grow"><div class="dcq-t">${c.e} ${c.k==='mvp'?'Craque da pelada':c.t} · ${dShort(p.data)}</div><div class="dcq-n">${esc(nm(c.id))}</div>${c.d?`<div class="dcq-d num">${c.d}</div>`:''}</div></div></div>
+      ${o.length?`<div class="dfig" style="margin-top:10px">${o.map(x=>`<button class="fig" data-act="ver-jog" data-j="${x.id}">${foto(x.id,'fig-f')}<span class="fig-e">${x.e}</span><span class="fig-t">${x.t}</span><b class="fig-n">${esc(nm(x.id))}</b>${x.d?`<span class="fig-d num">${x.d}</span>`:''}</button>`).join('')}</div>`:''}`}
   if(v==='c'){// craque em destaque + os outros em fila
     const c=L.find(x=>x.k==='mvp')||L[0],o=L.filter(x=>x!==c);
     return`<div class="board dcq" style="margin-top:16px"><div class="dcq-top">${foto(c.id,'dcq-f')}<div class="grow"><div class="dcq-t">${c.e} ${c.k==='mvp'?'Craque da pelada':c.t} · ${dShort(p.data)}</div><div class="dcq-n">${esc(nm(c.id))}</div>${c.d?`<div class="dcq-d num">${c.d}</div>`:''}</div></div>
