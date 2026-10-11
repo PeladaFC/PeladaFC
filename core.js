@@ -781,6 +781,64 @@ function artePoster(p,k,story){
   if(L.nome){ctx.font=`700 40px ${FAM}`;espacado(ctx,L.nome.toUpperCase(),W/2,H-Y.rod,8)}
   if(L.end){ctx.fillStyle='rgba(255,255,255,.8)';ctx.font=`600 32px ${FAM}`;const e='📍 '+L.end.toUpperCase();espacado(ctx,e.length>58?e.slice(0,56)+'…':e,W/2,H-Y.rod+52,4)}
   ctx.textAlign='left';return cv}
+/* arte de convocação: estádio à noite, escudo no centro, faixa com a data */
+function arteConvocacao(p,story){
+  const W=1080,H=story?1920:1350,cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
+  const FAM='"Saira Condensed", Impact, sans-serif',c=cfg(),L=localDe(p)||{},d=parseD(p.data),cor=corEscudo();
+  const S0=story?1.12:1,oy=story?170:0;
+  // céu noturno
+  let g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#04060B');g.addColorStop(.45,'#0A1626');g.addColorStop(1,'#030604');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // arquibancada: pontinhos da torcida
+  const a0=H*.30,a1=H*.60;let sd=7;const rnd=()=>(sd=(sd*9301+49297)%233280)/233280;
+  for(let i=0;i<5200;i++){const y=a0+rnd()*(a1-a0),x=rnd()*W,t=(y-a0)/(a1-a0);ctx.fillStyle=`rgba(${rnd()<.15?'255,220,170':'200,210,230'},${.10+.35*rnd()*(1-t*.4)})`;ctx.fillRect(x,y,2+t*3,2+t*3)}
+  // gramado em perspectiva
+  const gt=H*.60,top=W*.30;ctx.save();ctx.beginPath();ctx.moveTo(W/2-top,gt);ctx.lineTo(W/2+top,gt);ctx.lineTo(W*1.6,H);ctx.lineTo(-W*.6,H);ctx.closePath();ctx.clip();
+  g=ctx.createLinearGradient(0,gt,0,H);g.addColorStop(0,'#1E5A2A');g.addColorStop(1,'#0E3518');ctx.fillStyle=g;ctx.fillRect(0,gt,W,H-gt);
+  for(let i=0;i<9;i++){const y0=gt+(H-gt)*Math.pow(i/9,1.6),y1=gt+(H-gt)*Math.pow((i+1)/9,1.6);if(i%2){ctx.fillStyle='rgba(255,255,255,.05)';ctx.fillRect(0,y0,W,y1-y0)}}
+  ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(W/2,gt);ctx.lineTo(W/2,H);ctx.stroke();
+  ctx.beginPath();ctx.ellipse(W/2,gt+(H-gt)*.42,170,48,0,0,Math.PI*2);ctx.stroke();ctx.restore();
+  // refletores
+  for(const fx of[W*.12,W*.88]){const fy=H*.12;const gl=ctx.createRadialGradient(fx,fy,4,fx,fy,W*.55);gl.addColorStop(0,'rgba(255,248,220,.55)');gl.addColorStop(.12,'rgba(255,240,200,.18)');gl.addColorStop(1,'rgba(255,240,200,0)');ctx.fillStyle=gl;ctx.fillRect(0,0,W,H);
+    ctx.save();ctx.globalCompositeOperation='lighter';const bm=ctx.createLinearGradient(fx,fy,W/2,H*.75);bm.addColorStop(0,'rgba(255,245,210,.20)');bm.addColorStop(1,'rgba(255,245,210,0)');ctx.fillStyle=bm;ctx.beginPath();ctx.moveTo(fx,fy);ctx.lineTo(W/2-(fx<W/2?260:-260)*-1,H*.78);ctx.lineTo(W/2+(fx<W/2?-60:60)*-1,H*.78);ctx.closePath();ctx.fill();ctx.restore();
+    ctx.fillStyle='rgba(255,252,235,.95)';for(let r=0;r<3;r++)for(let k=0;k<5;k++)ctx.fillRect(fx-50+k*21,fy-22+r*16,15,10)}
+  // escurecer para o texto aparecer
+  ctx.fillStyle='rgba(0,0,0,.26)';ctx.fillRect(0,0,W,H);
+  g=ctx.createRadialGradient(W/2,H/2,W*.35,W/2,H/2,W*.95);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.6)');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // faixas laterais inclinadas
+  const fx=(x,y,w,h,col,dir)=>{ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+w,y+dir*h*.55);ctx.lineTo(x+w,y+dir*h*.55+h);ctx.lineTo(x,y+h);ctx.closePath();ctx.fill()};
+  const sy=H*.42-150;[[cor,0],['#F2C12E',1],[cor,2]].forEach(([col,i])=>{fx(30,sy+i*120,62,100,col,-1);fx(W-92,sy+i*120,62,100,col,1)});
+  // nome da pelada
+  ctx.textAlign='center';ctx.fillStyle='rgba(255,255,255,.9)';ctx.font=`700 ${Math.round(40*S0)}px ${FAM}`;espacado(ctx,(c.nome||'PELADA').toUpperCase(),W/2,oy+92,12);
+  // CONVOCAÇÃO em caixa dourada translúcida
+  ctx.save();ctx.translate(W/2,oy+290*S0);ctx.rotate(-.05);
+  ctx.fillStyle='rgba(242,193,46,.22)';ctx.beginPath();ctx.roundRect(-430,-150,860,250,28);ctx.fill();
+  ctx.fillStyle='#F2C12E';ctx.font=`italic 700 52px ${FAM}`;ctx.fillText('BORA PRO JOGO',0,-88);
+  ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=16;ctx.shadowOffsetX=5;ctx.shadowOffsetY=6;
+  const ts=fit(ctx,'CONVOCAÇÃO',780,170,800,FAM);ctx.font=`italic 800 ${ts}px ${FAM}`;ctx.fillText('CONVOCAÇÃO',0,ts*.42+10);ctx.restore();
+  // escudo
+  const eh=story?470:400,ew=eh*.86,ey=oy+(story?490:430);desenharEscudo(ctx,W/2-ew/2,ey,ew,eh);
+  // faixa vermelha com a data
+  const by=ey+eh+(story?70:40);ctx.save();ctx.translate(W/2,by);ctx.rotate(-.045);
+  ctx.fillStyle='#B8322A';ctx.fillRect(-W*.7,-58,W*1.4,116);ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(-W*.7,40,W*1.4,18);
+  ctx.fillStyle='#FFF4C9';ctx.font=`italic 800 92px ${FAM}`;ctx.fillText(`${DIAS[d.getDay()].toUpperCase()} · ${pad(d.getDate())}/${pad(d.getMonth()+1)}`,0,32);ctx.restore();
+  // horário sublinhado e local
+  let y=by+(story?190:150);ctx.fillStyle='#FFF4C9';ctx.font=`italic 800 70px ${FAM}`;const hr=`${horaIniDe(p)} ÀS ${horaFimDe(p)}`;ctx.fillText(hr,W/2,y);
+  const hw=ctx.measureText(hr).width;ctx.fillStyle='#B8322A';ctx.fillRect(W/2-hw/2-30,y+18,hw+60,6);
+  ctx.fillStyle='#FFFFFF';y+=story?120:95;
+  if(L.nome){ctx.font=`700 48px ${FAM}`;espacado(ctx,L.nome.toUpperCase(),W/2,y,6);y+=story?64:56}
+  ctx.fillStyle='rgba(255,255,255,.85)';ctx.font=`600 36px ${FAM}`;
+  const lin=[L.end?L.end.toUpperCase():'',`${vagasCfg()} VAGAS NA LINHA`,'CONFIRME SUA PRESENÇA NO APP'].filter(Boolean);
+  for(const t of lin){espacado(ctx,t.length>48?t.slice(0,46)+'…':t,W/2,y,4);y+=story?54:48}
+  ctx.textAlign='left';return cv}
+async function sheetConvocArte(pid){const p=S.pel[pid];if(!p)return;
+  openSheet('Arte de convocação','<div class="empty">Desenhando a arte…</div>');
+  await fontsReady();if(cfg().escudo)await carregarImg(cfg().escudo);
+  ARTS.forEach(a=>URL.revokeObjectURL(a.url));ARTS=[];
+  for(const[st,nome,label] of[[false,`convocacao-${p.data}.png`,'Feed'],[true,`convocacao-story-${p.data}.png`,'Story']]){const cv=arteConvocacao(p,st);const blob=await new Promise(r=>cv.toBlob(r,'image/png'));ARTS.push({blob,url:URL.createObjectURL(blob),nome,label})}
+  const body=document.getElementById('sheet-body');if(!body)return;
+  const btn=i=>dl?`<button class="btn sm ${i===0?'primary':''}" data-act="salvar-arte" data-i="${i}">Salvar imagem</button>`:'';
+  body.innerHTML=`<div class="stack"><div class="arts">${ARTS.map((a,i)=>`<figure><img src="${a.url}" alt="Arte de convocação, ${a.label}"><figcaption>${a.label}</figcaption>${btn(i)}</figure>`).join('')}</div>
+    <p class="sub" style="margin:0">${dl?'"Salvar imagem" abre o compartilhamento: dá para mandar direto para o WhatsApp ou o Instagram.':'Toque e segure a imagem para salvar.'} Usa o escudo, a data, o horário e o local desta pelada.</p></div>`}
 async function sheetArtes(pid){
   const p=S.pel[pid],PR=premiosDe(p,pid),ks=['mvp','art','gar','gol'].filter(k=>PR[k]);
   if(!ks.length){toast('Escolha os prêmios antes de gerar as artes.');return}
@@ -1557,6 +1615,7 @@ function sheetMsg(tipo,ctx={}){
   MSG_ORIG=text;
   openSheet(titulo,`<div class="row between" style="margin-bottom:6px"><span class="sub">✎ Toque no texto para editar do seu jeito</span><button class="btn sm" data-act="msg-reset">Restaurar texto</button></div>
     <textarea id="msg-text" rows="14" class="num" aria-label="Texto da mensagem, editável">${esc(text)}</textarea>
+    ${tipo==='convocacao'&&atual()?`<button class="btn warn block" style="margin-top:10px" data-act="convoc-arte" data-p="${atual()[0]}">🎨 Gerar arte de convocação</button>`:''}
     <div class="stack" style="margin-top:12px">
       ${ADM()?`<button class="btn primary block" data-act="enviar-app" data-titulo="${esc(titulo)}">Enviar no app para todos</button>`:''}
       <a class="btn block" id="wa-link" target="_blank" rel="noopener" href="https://wa.me/${fone}?text=${encodeURIComponent(text)}">Abrir no WhatsApp${fone?' (direto para '+esc(nm(ctx.jid))+')':''}</a>
@@ -1817,6 +1876,7 @@ document.addEventListener('click',e=>{
     case'pref':{const pr=prefs();pr[d.v]=!pr[d.v];put('config/geral',{...cfg(),...(S.config||{}),notif:pr});
       b.setAttribute('aria-checked',String(pr[d.v]));break}
     case'arte':sheetArtes(d.p);break;
+    case'convoc-arte':sheetConvocArte(d.p);break;
     case'arte-sem':sheetPremios(d.p);toast('Escolha os prêmios para gerar as artes.');break;
     case'carta':sheetCarta(d.j);break;
     case'salvar-arte':{const a=ARTS[Number(d.i)];if(!a||!dl)return;
