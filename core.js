@@ -1250,12 +1250,26 @@ function sheetEquipes(pid){const p=S.pel[pid];if(!p)return;
   openSheet('Equipes · '+dShort(p.data),`<div class="stack">${camp.length===1?`<div class="sub">Campeão: <b>${CORES[p.times[camp[0]].cor].e} ${esc(nomeTime(p.times[camp[0]].cor))}</b> com ${mx} vitória${mx>1?'s':''}.</div>`:camp.length>1?'<div class="sub">Empate no número de vitórias.</div>':'<div class="sub">As vitórias desta pelada não foram lançadas.</div>'}
     ${ord.map(({t,i})=>{const c=CORES[t.cor]||{},ch=camp.length===1&&camp[0]===i;return`<div class="panel eq${ch?' campeao':''}" style="border-left:6px solid ${c.c}"><div class="panel-h"><h3>${c.e||''} ${esc(nomeTime(t.cor))}</h3><span class="sub num">${ch?'<b class="eq-camp">🏆 CAMPEÃO</b> · ':''}${vit[i]||0} vitória${(vit[i]||0)===1?'':'s'}</span></div>${t.gk&&S.jog[t.gk]?linha(t.gk,true):''}${t.ids.filter(id=>S.jog[id]).map(id=>linha(id)).join('')}</div>`}).join('')}
     ${gx.length?`<div class="panel"><div class="panel-h"><h3>🧤 Goleiros</h3><span class="sub">fora do sorteio</span></div>${gx.map(id=>linha(id,true)).join('')}</div>`:''}</div>`)}
+/* editar uma pelada (mesmo depois de encerrada): gols, assistências, vitórias e prêmios. Nada é gravado até Salvar. */
+function sheetEditarPelada(pid){const p=S.pel[pid];if(!p)return;
+  if(!UI.ed||UI.ed.pid!==pid)UI.ed={pid,st:JSON.parse(JSON.stringify(p.stats||{})),vit:(p.vit||(p.times||[]).map(()=>0)).slice(),pr:{...(p.premios||{})}};
+  const E=UI.ed,ids=jogaram(p).filter(id=>S.jog[id]).sort((a,b)=>nm(a).localeCompare(nm(b))),auto=premiosDe({...p,premios:{}},pid);
+  const step=(act,attrs,v,lbl)=>`<div class="stepbox"><div class="step"><button data-act="${act}" ${attrs} data-d="-1" aria-label="Menos ${lbl}" ${v<=0?'disabled':''}>−</button><output class="num">${v}</output><button data-act="${act}" ${attrs} data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`;
+  const opts=(k,list)=>`<option value="">Automático${auto[k]&&S.jog[auto[k]]?' ('+esc(nm(auto[k]))+')':''}</option>`+list.map(id=>`<option value="${id}" ${E.pr[k]===id?'selected':''}>${esc(nm(id))}</option>`).join('');
+  const zg=ids.filter(id=>POS_XERIFE.includes(J(id).pos)),gks=ids.filter(id=>J(id).pos==='GOL');
+  const PRS=[['mvp','🏆 Craque',ids],['art','⚽ Artilheiro',ids],['gar','🅰️ Garçom',ids],['def','🛡️ Xerife',zg.length?zg:ids],['gol','🧤 Goleiro',gks.length?gks:ids],['per','🐢 Pereba',ids]];
+  openSheet('Editar pelada · '+dShort(p.data),`<div class="stack">
+    ${p.times&&p.times.length?`<div class="panel"><div class="panel-h"><h3>Vitórias</h3></div><div class="ed-lista">${p.times.map((t,i)=>`<div class="ed-l"><span class="grow"><b>${(CORES[t.cor]||{}).e||''} ${esc(nomeTime(t.cor))}</b></span>${step('ed-vit',`data-i="${i}"`,E.vit[i]||0,'Vitórias')}</div>`).join('')}</div></div>`:''}
+    <div class="panel"><div class="panel-h"><h3>Gols e assistências</h3></div><div class="ed-lista">${ids.map(id=>{const x=E.st[id]||{};return`<div class="ed-j"><div class="ed-who">${avHTML(id)}<span class="name">${esc(nm(id))}</span></div><div class="ed-st">${step('ed-st',`data-j="${id}" data-f="g"`,x.g||0,'Gols')}${step('ed-st',`data-j="${id}" data-f="a"`,x.a||0,'Assist.')}</div></div>`}).join('')||'<div class="empty">Ninguém jogou nesta pelada.</div>'}</div></div>
+    <div class="panel"><div class="panel-h"><h3>Prêmios</h3></div><div class="awards">${PRS.map(([k,l,list])=>`<div class="award"><label for="ed-${k}">${l}</label><select id="ed-${k}" data-act="ed-pr" data-f="${k}">${opts(k,list)}</select></div>`).join('')}</div><div class="sub" style="margin-top:6px">"Automático" usa os votos da galera e os gols lançados.</div></div>
+    <div class="lado notas-acoes"><button class="btn" data-act="ed-cancelar">Cancelar</button><button class="btn primary" data-act="ed-salvar" data-p="${pid}">Salvar</button></div>
+    <p class="sub" style="margin:0">Nada muda até você tocar em Salvar.</p></div>`)}
 function sheetNotasPelada(pid,edit){const p=S.pel[pid];if(!p)return;const A0=ADM(),A=A0&&!!edit,ids=jogaram(p);
   if(A&&(!UI.rasc||UI.rasc.pid!==pid))UI.rasc={pid,st:JSON.parse(JSON.stringify(p.stats||{}))};if(!A)UI.rasc=null;
   const stt=p.stats||{};
   openSheet('Pelada de '+dShort(p.data),`<div class="stack"><div class="sub">${statusVotacao(p,pid,ids)}</div>
     ${p.aval||A0||Object.keys(stt).length?`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Gols e assistências'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div>${tabelaNotas(pid,p,A,A?UI.rasc.st:null)}</div>`:''}
-    ${A?`<div class="lado notas-acoes"><button class="btn" data-act="notas-pel" data-p="${pid}">Cancelar</button><button class="btn primary" data-act="notas-salvar" data-p="${pid}">Salvar</button></div><p class="sub" style="margin:0">Nada muda até você tocar em Salvar.</p>`:A0?`<button class="btn block" data-act="notas-editar" data-p="${pid}">✏️ Editar gols e assistências</button>`:''}</div>`)}
+    ${A?`<div class="lado notas-acoes"><button class="btn" data-act="notas-pel" data-p="${pid}">Cancelar</button><button class="btn primary" data-act="notas-salvar" data-p="${pid}">Salvar</button></div><p class="sub" style="margin:0">Nada muda até você tocar em Salvar.</p>`:A0?`<button class="btn block" data-act="editar-pel" data-p="${pid}">✏️ Editar pelada</button>`:''}</div>`)}
 function subPos(pid,p,A){
   const ids=jogaram(p),st=p.stats||{},pr=premiosDe(p,pid),manual=p.premios||{};
   if(!ids.length)return`<div class="empty">Confirme a presença e sorteie os times antes do pós-jogo.</div>`;
@@ -1314,7 +1328,7 @@ function renderHist(A){
   let h=destaquesMini(enc[0][0],enc[0][1])+`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Últimas peladas</h3></div>`;
   for(const[pid,p] of show){const pr=premiosDe(p,pid);
     const vAb=A&&!p.aval&&Date.now()<fimAval(p);
-    h+=`<div class="hist"><div class="grow"><div class="row" style="gap:8px;align-items:center"><b class="num">${dShort(p.data)}</b>${vAb?`<button class="btn sm warn vt-chip" data-act="votacao-pel" data-p="${pid}">Votação aberta</button>`:''}</div><div class="sub">${jogaram(p).length} jogadores</div></div><div class="row hist-bt" style="gap:6px;grid-template-columns:repeat(${A?4:2},1fr)"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button>${A?`<button class="btn sm" data-act="premios-pel" data-p="${pid}">Prêmios</button>`:''}<button class="btn sm" data-act="equipes-pel" data-p="${pid}">Equipes</button>${A?`<button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button>`:''}</div></div>`}
+    h+=`<div class="hist"><div class="grow"><div class="row" style="gap:8px;align-items:center"><b class="num">${dShort(p.data)}</b>${vAb?`<button class="btn sm warn vt-chip" data-act="votacao-pel" data-p="${pid}">Votação aberta</button>`:''}${A?`<button class="btn sm ed-chip" data-act="editar-pel" data-p="${pid}">✏️ Editar</button>`:''}</div><div class="sub">${jogaram(p).length} jogadores</div></div><div class="row hist-bt" style="gap:6px;grid-template-columns:repeat(${A?4:2},1fr)"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button>${A?`<button class="btn sm" data-act="premios-pel" data-p="${pid}">Prêmios</button>`:''}<button class="btn sm" data-act="equipes-pel" data-p="${pid}">Equipes</button>${A?`<button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button>`:''}</div></div>`}
   if(enc.length>3)h+=`<button class="btn sm block" style="margin-top:8px" data-act="hist">${UI.showHist?'Mostrar menos':'Ver todas ('+enc.length+')'}</button>`;
   return h+'</div>';
 }
@@ -1648,7 +1662,7 @@ function gravarPag(kind,key,id,val){if(kind==='m'){const cx=S.caixa[key]||{mens:
 function openSheet(title,body,foot=''){
   document.getElementById('sheet').innerHTML=`<div class="scrim" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-h"><h2>${esc(title)}</h2><button class="iconbtn" data-act="close" aria-label="Fechar">✕</button></div><div id="sheet-body">${body}</div>${foot}</div></div>`;
 }
-function closeSheet(){document.getElementById('sheet').innerHTML='';F=null;UI.rasc=null}
+function closeSheet(){document.getElementById('sheet').innerHTML='';F=null;UI.rasc=null;UI.ed=null}
 let F=null;
 
 function sheetMsg(tipo,ctx={}){
@@ -1752,10 +1766,10 @@ function sheetVerJog(id){
     <div class="stats"><div class="stat"><b>${s.j||0}</b><span>Jogos ${UI.ano}</span></div><div class="stat"><b>${s.g||0}</b><span>Gols</span></div><div class="stat"><b>${s.a||0}</b><span>Assist.</span></div><div class="stat"><b>${s.mvp||0}</b><span>Craque</span></div></div></div>
     <div class="panel small">${A?`<div class="row between"><span>${j.critGalera?'Base da avaliação da galera':'Nota inicial'}${semAvaliacao(id)?' <b style="color:var(--red,#c0392b)">· sem nota</b>':''}</span><b class="num">${ovr(notaInicial(j))}</b></div>`:''}${j.conv?`<div class="row between" style="margin-top:4px"><span>Convidado por</span><b>${esc(nm(j.conv))}</b></div>`:''}<div class="row between" style="margin-top:4px"><span>Confirma pelo app</span><b>${vinculo(id)?'Sim':'Ainda não'}</b></div>${j.tel?`<div class="row between" style="margin-top:4px"><span>WhatsApp</span><b class="num">${esc(j.tel)}</b></div>`:''}
       ${hist.length?`<div style="margin-top:8px"><span class="muted">Últimas notas</span><div class="row" style="margin-top:4px">${hist.map(([,p,n])=>`<span class="chip solid num">${dShort(p.data).slice(4)} · ${fmtN(n)}</span>`).join('')}</div></div>`:''}</div>
-    ${A?`<div class="panel"><div class="panel-h"><h3>Gols fora das peladas</h3></div><div class="sub" style="margin-bottom:8px">Só para gols e assistências que <b>não estão em nenhuma pelada do app</b> (ex.: jogos de antes de usar o app). Para corrigir uma pelada, abra <b>Notas</b> dela e toque em <b>Editar</b>.</div>
+    ${A&&(s.ajG||s.ajA)?`<div class="panel"><div class="panel-h"><h3>Gols fora das peladas</h3></div><div class="sub" style="margin-bottom:8px">Só para gols e assistências que <b>não estão em nenhuma pelada do app</b> (ex.: jogos de antes de usar o app). Para corrigir uma pelada, abra <b>Notas</b> dela e toque em <b>Editar</b>.</div>
       <div class="row" style="gap:16px">${[['g','Gols',s.ajG||0],['a','Assist.',s.ajA||0]].map(([f,lbl,v])=>`<div class="stepbox"><div class="step"><button data-act="ajuste" data-j="${id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}" ${v<=0?'disabled':''}>−</button><output class="num">${v}</output><button data-act="ajuste" data-j="${id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`).join('')}</div>
       <div class="sub" style="margin-top:8px">Total de ${UI.ano}: <b>${s.g||0}</b> gol(s) e <b>${s.a||0}</b> assist. = <b>${(s.g||0)-(s.ajG||0)}</b> e <b>${(s.a||0)-(s.ajA||0)}</b> nas peladas${(s.ajG||s.ajA)?` + <b>${s.ajG||0}</b> e <b>${s.ajA||0}</b> de fora`:''}.</div>
-      ${(s.ajG<0||s.ajA<0)?`<button class="btn sm block" style="margin-top:8px" data-act="ajuste-zerar" data-j="${id}">Zerar ajustes de ${UI.ano}</button>`:''}</div>`:''}
+      <button class="btn sm block" style="margin-top:8px" data-act="ajuste-zerar" data-j="${id}">Zerar e usar só as peladas</button></div>`:''}
     ${podeVerAval(id)?painelEstrela(id):`<div class="panel"><div class="panel-h"><h3>⭐ Estrela</h3></div><div class="sub">A avaliação aparece depois que ${esc(nm(id))} passar por uma avaliação completa da galera.</div></div>`}
     <button class="btn warn block" data-act="carta" data-j="${id}">Ver carta do jogador</button>
     ${A?`<div class="row"><button class="btn primary grow" data-act="edit-jog" data-j="${id}">Editar</button><button class="btn grow" data-act="msg" data-v="convite" data-j="${id}">Convite</button></div>`:''}</div>`);
@@ -2020,6 +2034,15 @@ document.addEventListener('click',e=>{
       put('config/geral',{...(S.config||{}),nomesTimes:arr});closeSheet();toast('Nome do time salvo.');break}
     case'notas-pel':sheetNotasPelada(d.p);break;
     case'equipes-pel':sheetEquipes(d.p);break;
+    case'editar-pel':UI.ed=null;sheetEditarPelada(d.p);break;
+    case'ed-cancelar':UI.ed=null;closeSheet();break;
+    case'ed-vit':case'ed-st':{const E=UI.ed;if(!E)return;if(d.act==='ed-vit')E.vit[d.i]=Math.max(0,(E.vit[d.i]||0)+Number(d.d));else{const x=E.st[d.j]={...(E.st[d.j]||{})};x[d.f]=Math.max(0,(x[d.f]||0)+Number(d.d))}
+      const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetEditarPelada(E.pid);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc;break}
+    case'ed-salvar':{const E=UI.ed;if(!E||E.pid!==d.p)return;const p=S.pel[d.p],o=p.stats||{},st={};
+      for(const[id,x] of Object.entries(E.st)){const a=o[id]||{};if((x.g||0)!==(a.g||0)||(x.a||0)!==(a.a||0))st[id]={g:x.g||0,a:x.a||0}}
+      const pr={};for(const k of['mvp','art','gar','def','gol','per'])if((E.pr[k]||null)!==((p.premios||{})[k]||null))pr[k]=E.pr[k]||null;
+      const up={};if(Object.keys(st).length)up.stats=st;if(Object.keys(pr).length)up.premios=pr;if(p.times&&JSON.stringify(E.vit)!==JSON.stringify(p.vit||[]))up.vit=E.vit;
+      if(Object.keys(up).length)patch('peladas/'+d.p,up);UI.ed=null;closeSheet();toast(Object.keys(up).length?'Pelada atualizada.':'Nada foi alterado.');break}
     case'notas-editar':UI.rasc=null;sheetNotasPelada(d.p,true);break;
     case'stat-rasc':{if(!UI.rasc||UI.rasc.pid!==d.p)return;const s=UI.rasc.st[d.j]={...(UI.rasc.st[d.j]||{})};s[d.f]=Math.max(0,(s[d.f]||0)+Number(d.d));
       const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetNotasPelada(d.p,true);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc;break}
@@ -2075,6 +2098,7 @@ document.addEventListener('change',e=>{
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
   const t=e.target;
   if(t.dataset.act==='cmp'){UI.cmp=t.value||null;const sc=document.querySelector('.sheet').scrollTop;sheetVerJog(t.dataset.j);document.querySelector('.sheet').scrollTop=sc}
+  if(t.dataset.act==='ed-pr'&&UI.ed){UI.ed.pr[t.dataset.f]=t.value||null;return}
   if(t.dataset.act==='convoc-cor-livre'){const cur=coresConvoc();patch('config/geral',{artCores:{...cur,[t.dataset.k]:t.value}});sheetConvocArte(t.dataset.p);return}
   if(t.id==='cx-data'){UI.cxData=t.value||null;render();return}
   if(t.id==='cx-pm'||t.id==='cx-pd'){const m=t.dataset.m,cx=S.caixa[m]||{mens:{},desp:[]},v=t.value===''?null:Number(String(t.value).replace(',','.'));
