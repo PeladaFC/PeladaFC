@@ -319,6 +319,7 @@ async function carregarPerfil() {
 }
 // Histórico pessoal de locais (vale para todas as peladas da pessoa)
 window.meusLocais = () => (PERFIL && PERFIL.locais) || {};
+window.esconderMeuLocal = id => { if (!EU) return; PERFIL = PERFIL || {}; const L = { ...((PERFIL.locais || {})[id] || {}), oculto: true }; PERFIL.locais = { ...(PERFIL.locais || {}), [id]: L }; B.set('users/' + EU.uid, { locais: { [id]: { oculto: true } } }, { merge: true }).catch(e => console.warn(e)); };
 window.salvarMeuLocal = (id, L) => { if (!EU) return; PERFIL = PERFIL || {}; PERFIL.locais = { ...(PERFIL.locais || {}), [id]: L }; B.set('users/' + EU.uid, { locais: { [id]: L } }, { merge: true }).catch(e => console.warn(e)); };
 async function depoisDoLogin() {
   await carregarPerfil();

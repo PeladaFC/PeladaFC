@@ -357,7 +357,7 @@ function relTempo(d){const ms=d-new Date(),h=Math.round(Math.abs(ms)/36e5);
 
 /* ---------- locais ---------- */
 // Cadastro manual. Cada local fica salvo na pelada e também no histórico da pessoa (users/{uid}.locais).
-function selLocais(id,sel,vazio){const ls=Object.entries(S.locais).sort((a,b)=>a[1].nome.localeCompare(b[1].nome));
+function selLocais(id,sel,vazio){const ls=Object.entries(S.locais).filter(([k,L])=>!L.oculto||k===sel).sort((a,b)=>a[1].nome.localeCompare(b[1].nome));
   return`<select id="${id}"><option value="">${ls.length?vazio:'Nenhum local salvo'}</option>${ls.map(([k,L])=>`<option value="${k}" ${sel===k?'selected':''}>${esc(L.nome)}</option>`).join('')}</select>`}
 function mapaURL(nome,end){const q=[nome,end].filter(Boolean).join(', ');return q?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q):''}
 function localDe(p){const lid=(p&&p.localId)||(!p||!p.local?cfg().localId:null),L=lid&&S.locais[lid];
@@ -381,7 +381,7 @@ function atualizarPrevia(inp){clearTimeout(mapaT);mapaT=setTimeout(()=>{const bo
   const nome=(document.getElementById('l-nome')||{}).value||'',end=inp.value.trim();box.innerHTML=end.length>=6?blocoMapa(nome.trim(),end):''},800)}
 // histórico pessoal (fica no perfil da pessoa, vale para todas as peladas dela)
 function historicoLocais(){return demo?{}:((window.meusLocais&&window.meusLocais())||{})}
-function guardarNoHistorico(id,L){if(demo||!window.salvarMeuLocal)return;window.salvarMeuLocal(id,{nome:L.nome||'',end:L.end||'',tel:L.tel||'',t:Date.now()})}
+function guardarNoHistorico(id,L){if(demo||!window.salvarMeuLocal)return;window.salvarMeuLocal(id,{nome:L.nome||'',end:L.end||'',tel:L.tel||'',t:Date.now(),oculto:false})}
 function sheetLocal(id,pre){
   const L=id?S.locais[id]:null;
   openSheet(id?'Editar local':'Novo local',`<div class="stack">${formLocal(L,pre)}
@@ -389,7 +389,7 @@ function sheetLocal(id,pre){
     ${id?`<button class="btn danger block" data-act="del-local" data-l="${id}">Apagar local</button>`:''}</div>`);
 }
 function sheetLocais(){
-  const ls=Object.entries(S.locais).sort((a,b)=>a[1].nome.localeCompare(b[1].nome));
+  const ls=Object.entries(S.locais).filter(([,L])=>!L.oculto).sort((a,b)=>a[1].nome.localeCompare(b[1].nome));
   openSheet('Locais',`<div class="stack"><div class="panel"><div class="list">
     ${ls.length?ls.map(([id,L])=>`<div class="item"><div class="grow"><div class="name">${esc(L.nome)}</div><div class="sub">${esc([L.end,L.tel].filter(Boolean).join(' · ')||'Sem endereço')}</div>${notaCampoHTML(id)}</div>
       <button class="btn sm" data-act="edit-local" data-l="${id}" aria-label="Editar">✎</button></div>`).join(''):'<div class="empty">Nenhum local salvo ainda.</div>'}
@@ -402,8 +402,8 @@ let LP=null;
 function abrirSeletor(alvo){LP={alvo,step:'lista'};openSheet('Onde vai ser a pelada?','<div id="lp"></div>');renderSeletor()}
 function locaisDisponiveis(){
   const out={},hist=historicoLocais();
-  for(const[id,L] of Object.entries(S.locais))out[id]={...L,t:Math.max(L.usadoEm||0,(hist[id]||{}).t||0),daPelada:true};
-  for(const[id,L] of Object.entries(hist))if(!out[id]&&L&&L.nome)out[id]={...L,daPelada:false};
+  for(const[id,L] of Object.entries(S.locais))if(!L.oculto&&!(hist[id]||{}).oculto)out[id]={...L,t:Math.max(L.usadoEm||0,(hist[id]||{}).t||0),daPelada:true};
+  for(const[id,L] of Object.entries(hist))if(!out[id]&&L&&L.nome&&!L.oculto&&!(S.locais[id]||{}).oculto)out[id]={...L,daPelada:false};
   return Object.entries(out).sort((a,b)=>(b[1].t||0)-(a[1].t||0)||a[1].nome.localeCompare(b[1].nome));
 }
 function renderSeletor(){
@@ -412,7 +412,7 @@ function renderSeletor(){
     const ls=locaisDisponiveis();
     h+=`<button class="btn primary block" data-act="lp-novo" style="margin-bottom:12px">+ Cadastrar novo local</button>`;
     h+=ls.length?`<div class="sub" style="margin-bottom:6px;font-weight:700">LOCAIS QUE VOCÊ JÁ USOU</div><div class="panel"><div class="list">`+
-      ls.map(([id,L])=>`<button class="pickrow" data-act="lp-sel" data-v="${id}"><span class="grow"><b>${esc(L.nome)}</b><span class="sub">${esc([L.end,L.tel].filter(Boolean).join(' · ')||'Sem endereço')}</span>${L.daPelada&&notaCampoHTML(id)?`<span class="livre">${notaCampoHTML(id)}</span>`:''}${!L.daPelada?'<span class="sub">De outra pelada sua</span>':''}</span><span class="go">›</span></button>`).join('')+'</div></div>'
+      ls.map(([id,L])=>`<div class="row" style="flex-wrap:nowrap;gap:6px;align-items:center"><button class="pickrow grow" data-act="lp-sel" data-v="${id}"><span class="grow"><b>${esc(L.nome)}</b><span class="sub">${esc([L.end,L.tel].filter(Boolean).join(' · ')||'Sem endereço')}</span>${L.daPelada&&notaCampoHTML(id)?`<span class="livre">${notaCampoHTML(id)}</span>`:''}${!L.daPelada?'<span class="sub">De outra pelada sua</span>':''}</span><span class="go">›</span></button><button class="btn sm" data-act="lp-excluir" data-v="${id}" aria-label="Excluir ${esc(L.nome)} da lista" title="Excluir da lista">✕</button></div>`).join('')+'</div></div>'
       :`<div class="empty">Você ainda não cadastrou nenhum local. Os locais que você usar ficam guardados aqui para as próximas vezes.</div>`;
   }else{
     h+=`<div class="crumbs"><button data-act="lp-voltar">‹ Locais que você já usou</button></div><div class="stack">${formLocal(null,'')}
@@ -2111,6 +2111,8 @@ document.addEventListener('click',e=>{
     case'trocar-local':abrirSeletor(d.p);break;
     case'lp-abrir':abrirSeletor(d.v);break;
     case'np-rapido':LP={alvo:'np'};usarLocal(d.v);break;
+    case'lp-excluir':{if(!b.dataset.sure){b.dataset.sure=1;b.textContent='Excluir?';b.classList.add('danger');setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='✕';b.classList.remove('danger')}},3500);return}
+      const id=d.v;if(S.locais[id]&&ADM())patch('locais/'+id,{oculto:true});if(window.esconderMeuLocal)window.esconderMeuLocal(id);toast('Local excluído da lista.');setTimeout(renderSeletor,60);break}
     case'lp-sel':UI.npData=UI.npHora=null;usarLocal(d.v);break;
     case'lp-slot':LP.slot=LP.slot===d.v?null:d.v;renderSeletor();break;
     case'lp-reservar':{const L=S.locais[d.v],k=LP.slot;
