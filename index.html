@@ -471,6 +471,13 @@ nav.tabs button:active svg{transform:scale(.9)}
 .gl-b{display:grid;grid-template-columns:1fr 1fr;gap:6px}.gl-b .btn{min-width:0;padding-inline:4px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gl-g{display:grid;grid-template-columns:1fr 1fr;gap:8px}.gl-p{all:unset;cursor:pointer;display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-weight:600;font-size:14px;min-width:0}
 .gl-p .av{width:32px!important;height:32px!important;font-size:12px!important;flex:none}.gl-p span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gl-p.sem{grid-column:1/-1;justify-content:center;color:var(--muted)}
+.pix-v{display:flex;flex-direction:column;align-items:center;gap:2px}.pix-v b{font-family:var(--f-display);font-size:40px;color:var(--pitch)}
+.pix-qr{width:220px;height:220px;align-self:center;border-radius:12px;background:#fff;padding:8px;border:1px solid var(--line);image-rendering:pixelated}
+.pix-qr-demo{display:grid;place-items:center;text-align:center;font-weight:800;color:var(--muted);background:repeating-linear-gradient(45deg,#fff 0 8px,#eef2ee 8px 16px)}
+#pix-cod{font-size:11px;word-break:break-all}
+.pix-st{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);justify-content:center;text-align:center}
+.pix-dot{width:10px;height:10px;border-radius:50%;background:#F2C12E;flex:none;animation:pisca 1.2s infinite}@keyframes pisca{50%{opacity:.25}}
+.pix-ok{align-items:center}.pix-ok-ic{width:72px;height:72px;border-radius:50%;background:var(--pitch);color:var(--pitch-ink);display:grid;place-items:center;font-size:40px;font-weight:800;margin:6px auto}
 .vt-chip{padding:3px 10px;font-size:12px;min-height:0}
 .enc-ic{width:30px;height:30px;border-radius:50%;background:var(--pitch);color:var(--pitch-ink);display:grid;place-items:center;font-weight:800;flex-shrink:0}
 
@@ -538,9 +545,9 @@ label.btn{position:relative;cursor:pointer}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261011j"></script>
-<script src="br.js?v=20261011j"></script>
-<script src="core.js?v=20261011j"></script>
-<script type="module" src="app.js?v=20261011j"></script>
+<script src="qrcode.js?v=20261011k"></script>
+<script src="br.js?v=20261011k"></script>
+<script src="core.js?v=20261011k"></script>
+<script type="module" src="app.js?v=20261011k"></script>
 </body>
 </html>

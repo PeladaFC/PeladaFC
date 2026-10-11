@@ -69,11 +69,23 @@ service cloud.firestore {
         allow write: if logado() && eu() == uid && membro(gid);
       }
 
+      // Chave do Mercado Pago: o administrador grava, ninguém lê pelo app (só o servidor).
+      match /segredos/{doc} {
+        allow read: if false;
+        allow write: if admin(gid);
+      }
+
+      // Cobranças Pix: o servidor cria; cada membro lê (para ver o QR e o status).
+      match /cobrancas/{doc} {
+        allow read: if membro(gid) || admin(gid);
+        allow write: if false;
+      }
+
       // Todo o resto (elenco, peladas, caixa, avisos, locais, ajustes, mural, notificações):
       // membros leem, só administradores escrevem.
       match /{colecao}/{doc} {
-        allow read: if colecao != 'votos' && (membro(gid) || admin(gid));
-        allow write: if colecao != 'membros' && colecao != 'presencas' && colecao != 'votos' && adminDepois(gid);
+        allow read: if colecao != 'votos' && colecao != 'segredos' && (membro(gid) || admin(gid));
+        allow write: if colecao != 'membros' && colecao != 'presencas' && colecao != 'votos' && colecao != 'segredos' && colecao != 'cobrancas' && adminDepois(gid);
       }
     }
   }

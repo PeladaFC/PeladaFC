@@ -1031,6 +1031,7 @@ function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GR
 /* ---------- render ---------- */
 function render(){
   NOTA_CACHE=null;POS_IDX=null;consolidarAvaliacoes();consolidarRodadas();
+  if(UI.pixAberto&&UI.pixDado&&pixPago(UI.pixAberto))setTimeout(pixConfirmado,0);
   const app=document.getElementById('app');
   const ae=document.activeElement,aid=ae&&ae.id,sel=aid&&ae.selectionStart!=null?[ae.selectionStart,ae.selectionEnd]:null;
   renderNav();setTimeout(checarPush,0);
@@ -1085,7 +1086,7 @@ function renderTab(){
   const pe=UI.tab==='jogo'&&UI.recemEnc&&S.pel[UI.recemEnc];
   const ban=pe?`<div class="enc-ok"><div class="enc-ic">✓</div><div class="grow"><b>Pelada de ${dShort(pe.data)} encerrada</b><div class="sub">Ela foi para "Últimas peladas", com notas, prêmios e artes. Agora é só marcar a próxima.</div>
     <div class="row" style="gap:6px;margin-top:8px"><button class="btn sm" data-act="notas-pel" data-p="${UI.recemEnc}">Ver notas</button><button class="btn sm" data-act="fechar-enc">Ok</button></div></div></div>`:'';
-  return ban+({jogo:tJogo,elenco:tElenco,avisos:tAvisos,ranking:tRanking,caixa:tCaixa}[UI.tab]||tJogo)(A);
+  return ban+(UI.tab==='jogo'?painelMeusPag():'')+({jogo:tJogo,elenco:tElenco,avisos:tAvisos,ranking:tRanking,caixa:tCaixa}[UI.tab]||tJogo)(A);
 }
 
 // guarda data e horários da próxima pelada; o término acompanha o início até ser mudado à mão
@@ -1749,6 +1750,40 @@ function tCaixa(A){
     h+=`</div></div>`}
   return h;
 }
+/* ---------- Pix automático: o que o jogador logado deve ---------- */
+function minhasPendencias(){const jid=meuJogador();if(!jid||EV())return[];const out=[],m=mesAtual();
+  if(J(jid).tipo==='mensalista'&&!stPag(((S.caixa[m]||{}).mens||{})[jid]))out.push({tipo:'m',ref:m,jid,v:precoM(m),desc:'Mensalidade de '+MESES[Number(m.slice(5))-1].toLowerCase()});
+  const lim=iso(new Date(Date.now()-62*864e5));
+  for(const[pid,p] of encerradas())if(p.data>=lim&&jogaram(p).includes(jid)&&pagaPorJogo(jid)&&!stPag((p.diarias||{})[jid]))out.push({tipo:'d',ref:pid,jid,v:precoDP(p),desc:'Diária da pelada de '+dShort(p.data)});
+  return out}
+function painelMeusPag(){const L=minhasPendencias();if(!L.length)return'';const c=cfg();
+  return`<div class="panel meus-pag" style="margin-bottom:12px"><div class="panel-h"><h3>💰 Meus pagamentos</h3></div>${L.map(x=>`<div class="item"><div class="grow"><div class="name">${esc(x.desc)}</div><div class="sub num">${BRL(x.v)}</div></div>${c.pixAuto?`<button class="btn sm primary" data-act="pix-pagar" data-t="${x.tipo}" data-r="${x.ref}" data-j="${x.jid}">Pagar com Pix</button>`:c.pix?`<button class="btn sm" data-act="pix-chave">Copiar chave Pix</button>`:''}</div>`).join('')}
+    ${c.pixAuto?'<div class="sub" style="margin-top:6px">O pagamento é confirmado sozinho, na hora. Não precisa mandar comprovante.</div>':''}</div>`}
+function pixPago(x){if(!x)return false;if(x.tipo==='m')return!!stPag(((S.caixa[x.ref]||{}).mens||{})[x.jid]);const p=S.pel[x.ref];return!!(p&&stPag((p.diarias||{})[x.jid]))}
+async function sheetPix(x){UI.pixAberto=x;openSheet('Pagar com Pix','<div class="empty">Gerando o Pix…</div>');
+  let d;try{d=demo?{valor:cfg().pixRepassa?Math.ceil(x.v/(1-.0099)*100)/100:x.v,base:x.v,qr:'00020126580014br.gov.bcb.pix0136demo-pelada-fc5204000053039865802BR5925PELADA FC DEMO6009RECIFE62070503***6304ABCD',qr64:'',link:'',demo:true}:await window.pixCriar({tipo:x.tipo,ref:x.ref,jid:x.jid})}
+  catch(e){const b=document.getElementById('sheet-body');if(b)b.innerHTML=`<div class="stack"><div class="banner due" style="display:block">${esc(e.message||'Não deu para gerar o Pix agora.')}</div><button class="btn block" data-act="close">Fechar</button></div>`;return}
+  UI.pixDado=d;const b=document.getElementById('sheet-body');if(!b||UI.pixAberto!==x)return;
+  b.innerHTML=`<div class="stack pix"><div class="pix-v"><span class="sub">${esc(x.desc)}</span><b class="num">${BRL(d.valor)}</b>${d.valor!==d.base?`<span class="sub">inclui ${BRL(d.valor-d.base)} da taxa do Pix</span>`:''}</div>
+    ${d.qr64?`<img class="pix-qr" src="data:image/png;base64,${d.qr64}" alt="QR Code do Pix">`:`<div class="pix-qr pix-qr-demo">QR Code${d.demo?'<br><small>(demonstração)</small>':''}</div>`}
+    <button class="btn primary block" data-act="pix-copiar">Copiar código Pix (copia e cola)</button>
+    <textarea id="pix-cod" class="num" rows="3" readonly>${esc(d.qr)}</textarea>
+    ${d.link?`<a class="btn block" href="${esc(d.link)}" target="_blank" rel="noopener">Abrir no Mercado Pago</a>`:''}
+    <div class="pix-st"><span class="pix-dot"></span>Aguardando o pagamento. Esta tela muda sozinha quando o Pix cair.</div>
+    ${d.demo?`<button class="btn sm block" data-act="pix-demo-pagar">Simular pagamento (demonstração)</button>`:''}
+    <p class="sub" style="margin:0">Abra o app do seu banco, escolha Pix → Pix copia e cola (ou ler QR Code) e confirme. O código vale por 24 horas.</p></div>`}
+function pixConfirmado(){const b=document.getElementById('sheet-body');if(!b)return;const x=UI.pixAberto;UI.pixAberto=null;UI.pixDado=null;
+  b.innerHTML=`<div class="stack pix-ok"><div class="pix-ok-ic">✓</div><h3 style="text-align:center">Pagamento confirmado!</h3><p class="sub" style="text-align:center;margin:0">${esc(x.desc)} está paga. Valeu! 💪</p><button class="btn primary block" data-act="close">Fechar</button></div>`}
+function sheetComoMP(){openSheet('Como ligar o Pix automático',`<div class="stack small">
+  <p style="margin:0">Você vai copiar uma <b>chave de acesso</b> da sua conta do Mercado Pago e colar aqui. Ela deixa o app <b>só criar cobranças</b> Pix para a sua conta; ninguém consegue tirar dinheiro com ela.</p>
+  <ol style="margin:0;padding-left:20px;display:grid;gap:6px">
+  <li>No computador ou no navegador do celular, entre em <b>mercadopago.com.br/developers</b> com a conta que vai receber.</li>
+  <li>Toque em <b>Suas integrações</b> e depois em <b>Criar aplicação</b>. Dê o nome "Pelada FC", escolha <b>Pagamentos online</b> e, se perguntar, <b>Checkout Transparente / API</b>.</li>
+  <li>Abra a aplicação e vá em <b>Credenciais de produção</b>. Se pedir, complete os dados da conta para ativar.</li>
+  <li>Copie o <b>Access Token</b> (começa com <b>APP_USR-</b>).</li>
+  <li>Volte aqui, cole no campo da chave e toque em <b>Salvar chave</b>. Depois marque <b>Ligar Pix automático</b> e salve os ajustes.</li></ol>
+  <p class="sub" style="margin:0">Faça um teste com um valor pequeno antes de avisar a galera. Para trocar de conta depois (por exemplo, para a do CNPJ), é só colar a chave nova.</p>
+  <button class="btn block" data-act="cfg">Voltar aos ajustes</button></div>`)}
 function sheetPag(kind,key,id,m){const c=cfg(),src=kind==='m'?((S.caixa[key]||{}).mens||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[id])||{},padrao=kind==='m'?precoM(key):precoDP(S.pel[key]);
   const dl=st.d||dataLanc(m||mesAtual());
   openSheet(nm(id),`<div class="stack"><div class="sub" style="margin-top:-6px">${kind==='m'?'Mensalidade de '+MESES[Number(key.slice(5))-1]:(EV()?'Pagamento do evento':'Diária da pelada de '+dShort(S.pel[key].data))}</div>
@@ -1802,6 +1837,12 @@ function sheetCfg(){
     <div class="grid2"><label class="field"><span>Mensalidade (R$)</span><input type="number" id="c-mensal" min="0" step="0.01" value="${c.mensal}"></label>
     <label class="field"><span>Diária (R$)</span><input type="number" id="c-diaria" min="0" step="0.01" value="${c.diaria}"></label></div>
     <label class="field"><span>Chave Pix</span><input type="text" id="c-pix" value="${esc(c.pix)}" placeholder="Telefone, e-mail ou chave aleatória"></label>
+    <div class="panel stack mp-cfg"><div class="panel-h"><h3>💳 Pix automático</h3><span class="sub">Mercado Pago</span></div>
+      <div class="sub">Cada jogador paga pelo app e o Caixa marca <b>PAGO</b> sozinho. Taxa do Mercado Pago: 0,99% por Pix.</div>
+      <div class="row between"><span class="small">${c.mpConectadoEm?`✅ Conta conectada em ${new Date(c.mpConectadoEm).toLocaleDateString('pt-BR')}${c.mpTeste?' (modo teste)':''}`:'⚪ Nenhuma conta conectada'}</span><button type="button" class="btn sm" data-act="mp-como">Como pegar a chave</button></div>
+      <div class="row" style="flex-wrap:nowrap;gap:6px"><input type="password" id="mp-token" placeholder="Cole o Access Token (APP_USR-...)" autocomplete="off" class="grow"><button type="button" class="btn sm primary" data-act="mp-salvar">Salvar chave</button></div>
+      <label class="row"><input type="checkbox" id="c-pixauto" ${c.pixAuto?'checked':''} ${c.mpConectadoEm?'':'disabled'}> Ligar Pix automático para a galera</label>
+      <label class="row"><input type="checkbox" id="c-pixrepassa" ${c.pixRepassa?'checked':''}> Quem paga cobre a taxa de 0,99%</label></div>
     <label class="row"><input type="checkbox" id="c-nivelpub" ${c.nivelPublico?'checked':''}> Mostrar o nível da pelada (estrelas) para os jogadores</label>
     <label class="row"><input type="checkbox" id="c-mostraval" ${c.mostrarAval===false?'':'checked'}> Mostrar as avaliações dos jogadores (0 a 100) para todos. Mesmo ligado, só aparece depois da avaliação da galera.</label>
     <div class="panel"><h3 style="margin-bottom:6px">Escudo da pelada</h3><div class="row" style="gap:12px;flex-wrap:nowrap">
@@ -2153,6 +2194,14 @@ document.addEventListener('click',e=>{
       g.gols=g.gols.filter((_,i)=>i!==Number(d.i));const k=e.s==='a'?'ga':'gb';g[k]=Math.max(0,(g[k]||0)-1);
       if(ed){const st=UI.ed.st;st[e.j]={...(st[e.j]||{}),g:Math.max(0,((st[e.j]||{}).g||0)-1)};if(e.as)st[e.as]={...(st[e.as]||{}),a:Math.max(0,((st[e.as]||{}).a||0)-1)};const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetEditarPelada(d.p);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc}
       else{const s0=p.stats||{},up={[e.j]:{g:Math.max(0,((s0[e.j]||{}).g||0)-1)}};if(e.as)up[e.as]={...(up[e.as]||{}),a:Math.max(0,((s0[e.as]||{}).a||0)-1)};patch('peladas/'+d.p,{jogos:J0,stats:up});toast('Gol apagado.')}break}
+    case'pix-pagar':{const L=minhasPendencias(),x=L.find(y=>y.tipo===d.t&&y.ref===d.r&&y.jid===d.j);if(x)sheetPix(x);break}
+    case'pix-copiar':{const t=document.getElementById('pix-cod');if(!t)return;navigator.clipboard?.writeText(t.value).then(()=>toast('Código copiado. Agora cole no app do banco.'),()=>{t.select();toast('Selecione e copie o código.')})||(t.select(),toast('Selecione e copie o código.'));break}
+    case'pix-chave':navigator.clipboard?.writeText(cfg().pix||'').then(()=>toast('Chave Pix copiada.'));break;
+    case'pix-demo-pagar':{const x=UI.pixAberto;if(!x)return;const val={s:'pago',d:iso(new Date()),v:x.v,obs:'Pix automático',via:'pix'};if(x.tipo==='m'){const cx=S.caixa[x.ref]||{mens:{},desp:[]};put('caixa/'+x.ref,{...cx,mens:{...(cx.mens||{}),[x.jid]:val}})}else patch('peladas/'+x.ref,{diarias:{[x.jid]:val}});break}
+    case'mp-como':sheetComoMP();break;
+    case'mp-salvar':{const v=(document.getElementById('mp-token')||{}).value?.trim();if(!v||!/^(APP_USR|TEST)-/.test(v)){toast('Cole o Access Token: ele começa com APP_USR-');return}
+      if(demo){toast('Na demonstração a chave não é salva.');return}
+      (window.mpSalvarChave?window.mpSalvarChave(v):Promise.reject()).then(()=>{patch('config/geral',{mpConectadoEm:Date.now(),mpTeste:v.startsWith('TEST-')});document.getElementById('mp-token').value='';const cb=document.getElementById('c-pixauto');if(cb){cb.disabled=false;cb.checked=true}const st=document.querySelector('.mp-cfg .row.between .small');if(st)st.textContent='✅ Conta conectada agora'+(v.startsWith('TEST-')?' (modo teste)':'');toast('Chave salva. Toque em Salvar ajustes para ligar.')},()=>toast('Não consegui salvar a chave. Tente de novo.'));break}
     case'jg-gerar':{const p=S.pel[d.p],nj=novosJogos(p);if(nj)patch('peladas/'+d.p,{jogos:nj});break}
     case'jg-prox':{const p=S.pel[d.p],nx=proximaFase(p);if(nx)patch('peladas/'+d.p,{jogos:[...(p.jogos||[]),...nx]});break}
     case'jg-zerar':if(b.dataset.sure){patch('peladas/'+d.p,{jogos:null});toast('Tabela apagada.')}else{b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar tabela de jogos'}},3500)}break;
@@ -2199,7 +2248,7 @@ document.addEventListener('click',e=>{
       document.getElementById('gol-txt').textContent=F.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
       const ev=g('c-tipo')==='evento',dataEv=null,diaEv=Number(g('c-dia'));
-      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
+      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),pixAuto:!!document.getElementById('c-pixauto')?.checked,pixRepassa:!!document.getElementById('c-pixrepassa')?.checked,formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',evento:ev,data:dataEv});
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':case'pagou-d':{const kind=d.act==='pagou-m'?'m':'d',key=kind==='m'?d.m:d.p,src=kind==='m'?((S.caixa[key]||{}).mens||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[d.j]);

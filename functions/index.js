@@ -22,6 +22,9 @@ const db = admin.firestore();
 setGlobalOptions({ region: 'southamerica-east1', maxInstances: 5, memory: '256MiB', timeoutSeconds: 60 });
 
 const URL_APP = 'https://peladafc.github.io/PeladaFC/';
+
+/* Pix automático (Mercado Pago) */
+Object.assign(exports, require('./pagamentos')(db));
 const MAX_DESTINOS = 300;
 
 /* ---------- chaves VAPID ---------- */

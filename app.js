@@ -35,6 +35,7 @@ async function backendReal() {
     },
     reset: e => A.sendPasswordResetEmail(auth, e).catch(erro),
     sair: () => A.signOut(auth),
+    token: async () => auth.currentUser ? auth.currentUser.getIdToken() : null,
     get: async p => { const s = await F.getDoc(ref(p)).catch(erro); return s.exists() ? s.data() : null; },
     set: (p, d, o) => F.setDoc(ref(p), d, o && o.merge ? { merge: true } : {}).catch(erro),
     del: p => F.deleteDoc(ref(p)).catch(erro),
@@ -65,6 +66,7 @@ function backendMock() {
     google: async () => api.cadastrar('Teste Google', 'g' + Date.now() + '@gmail.com', 'x'),
     reset: async () => { },
     sair: async () => setA(null),
+    token: async () => cur ? 'mock' : null,
     get: async p => clone(store.get(p)) ?? null,
     set: async (p, d, o) => { store.set(p, o && o.merge ? merge(store.get(p), clone(d)) : clone(d)); fire(p); },
     del: async p => { store.delete(p); fire(p); },
@@ -446,6 +448,25 @@ window.sincronizarGrupo = async d => { if (ABERTO) try { GRUPOS[ABERTO] = { ...(
 
 /* ================= Notificações no celular (Web Push) ================= */
 const URL_CHAVE = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/chavePush';
+/* ---------- Pix automático (Mercado Pago) ---------- */
+const URL_PIX = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/criarPix';
+window.mpSalvarChave = async token => { if (!ABERTO) throw new Error('sem grupo'); await B.set(`grupos/${ABERTO}/segredos/mp`, { token, em: Date.now(), por: EU && EU.uid }); };
+window.pixCriar = async ({ tipo, ref, jid }) => {
+  if (!ABERTO) throw new Error('Abra a pelada de novo.');
+  if (MOCK) {
+    const d = { mpId: 'mock' + Date.now(), valor: 80, base: 80, status: 'pending', qr: '00020126580014br.gov.bcb.pix0136teste-mock5204000053039865802BR5925PELADA FC TESTE6009RECIFE62070503***6304ABCD', qr64: '', link: '', criadoEm: Date.now(), tipo, ref, jid };
+    await B.set(`grupos/${ABERTO}/cobrancas/${tipo}_${ref}_${jid}`, d); window.__ultimaCobranca = { gid: ABERTO, tipo, ref, jid }; return d;
+  }
+  let t = null; try { t = await B.token(); } catch (e) { }
+  if (!t) throw new Error('Entre na sua conta de novo.');
+  let r; try { r = await fetch(URL_PIX, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify({ gid: ABERTO, tipo, ref, jid }) }); }
+  catch (e) { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.erro || 'Não deu para gerar o Pix agora.');
+  return j;
+};
+if (MOCK) window.__pixAprovar = async () => { const c = window.__ultimaCobranca; if (!c) return; const val = { s: 'pago', d: new Date().toISOString().slice(0, 10), v: 80, obs: 'Pix automático', via: 'pix', mp: 'mock' };
+  if (c.tipo === 'm') await B.set(`grupos/${c.gid}/caixa/${c.ref}`, { mens: { [c.jid]: val } }, { merge: true }); else await B.set(`grupos/${c.gid}/peladas/${c.ref}`, { diarias: { [c.jid]: val } }, { merge: true }); };
 const PUSH = { pub: null, estado: 'carregando' }; if (MOCK) window.__PUSH = PUSH;
 const ehIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const noIcone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;

@@ -28,5 +28,5 @@ fi
 echo "==> Limpando cópias antigas do servidor (evita custo de armazenamento)"
 $FB functions:artifacts:setpolicy --project "$PROJ" --location southamerica-east1 --days 1 --force >/dev/null 2>&1 || true
 echo
-echo "✅ Pronto! Servidor de notificações publicado e regras atualizadas."
+echo "✅ Pronto! Servidor (notificações e Pix automático) publicado e regras atualizadas."
 echo "   Agora abra o Pelada FC pelo ícone e toque em 'Ativar notificações'."
