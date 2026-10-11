@@ -450,7 +450,26 @@ window.sincronizarGrupo = async d => { if (ABERTO) try { GRUPOS[ABERTO] = { ...(
 const URL_CHAVE = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/chavePush';
 /* ---------- Pix automático (Mercado Pago) ---------- */
 const URL_PIX = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/criarPix';
-window.mpSalvarChave = async token => { if (!ABERTO) throw new Error('sem grupo'); await B.set(`grupos/${ABERTO}/segredos/mp`, { token, em: Date.now(), por: EU && EU.uid }); };
+const URL_MPCONTA = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/mpConectar';
+// conectar (vai para o Mercado Pago autorizar) ou desconectar a conta do grupo
+window.mpConta = async acao => {
+  if (!ABERTO) throw new Error('Abra a pelada de novo.');
+  if (MOCK) {
+    if (acao === 'desconectar') { await B.set(`grupos/${ABERTO}/config/geral`, { mpConectadoEm: null, pixAuto: false }, { merge: true }); return {}; }
+    await B.set(`grupos/${ABERTO}/config/geral`, { mpConectadoEm: Date.now(), mpTaxaApp: 0.01, mpTeste: false }, { merge: true }); aviso('Mercado Pago conectado! Agora ligue o Pix automático.'); return {};
+  }
+  let t = null; try { t = await B.token(); } catch (e) { }
+  if (!t) throw new Error('Entre na sua conta de novo.');
+  let r; try { r = await fetch(URL_MPCONTA, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify({ gid: ABERTO, acao }) }); }
+  catch (e) { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.erro || 'Não deu certo agora. Tente de novo.');
+  if (j.url) location.assign(j.url);
+  return j;
+};
+{ const mpVolta = new URLSearchParams(location.search).get('mp');
+  if (mpVolta) { history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : ''));
+    setTimeout(() => aviso(mpVolta === 'ok' ? '✅ Mercado Pago conectado! Em Ajustes, ligue o Pix automático e salve.' : 'Não deu para conectar o Mercado Pago. Tente de novo em Ajustes.'), 1800); } }
 window.pixCriar = async ({ tipo, ref, jid }) => {
   if (!ABERTO) throw new Error('Abra a pelada de novo.');
   if (MOCK) {

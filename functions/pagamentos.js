@@ -1,19 +1,27 @@
-/* Pelada FC · Pix automático pelo Mercado Pago (fase 1: cada grupo usa a própria conta).
+/* Pelada FC · Pix automático pelo Mercado Pago, com comissão da plataforma (split).
+   - mpConectar: o administrador do grupo toca em "Conectar Mercado Pago"; o servidor devolve o
+     endereço de autorização do Mercado Pago (OAuth) ou desconecta a conta.
+   - mpRetorno: o Mercado Pago volta para cá com um código; o servidor troca pela chave da conta
+     do grupo e guarda em grupos/{gid}/segredos/mp.
    - criarPix: o jogador pede a cobrança; o servidor calcula o valor (nunca confia no app),
      cria o Pix no Mercado Pago e guarda o QR em grupos/{gid}/cobrancas/{chave}.
    - mpWebhook: o Mercado Pago avisa que algo mudou; o servidor busca o pagamento de novo
      no Mercado Pago (com a chave do grupo) e, se estiver aprovado, marca PAGO no Caixa.
-   A chave de acesso do Mercado Pago fica em grupos/{gid}/segredos/mp: o administrador grava,
-   ninguém consegue ler pelo app (regras do Firestore); só este servidor lê. */
+   A aplicação do Mercado Pago é da plataforma: servidor/mp guarda {clientId, clientSecret, comissao}
+   (gravado pelo configurar-mp.sh). Cada cobrança leva application_fee = comissão da plataforma,
+   que o Mercado Pago separa sozinho para a conta do app. Nada disso é lido pelo app (regras). */
 'use strict';
 const { onRequest } = require('firebase-functions/v2/https');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
 
 const MP = 'https://api.mercadopago.com';
-const URL_WEBHOOK = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/mpWebhook';
+const BASE = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net';
+const URL_WEBHOOK = BASE + '/mpWebhook', URL_RETORNO = BASE + '/mpRetorno';
+const URL_APP = 'https://peladafc.github.io/PeladaFC/';
 const TAXA = 0.0099;            // taxa do Pix online no Mercado Pago (conferida em 10/10/2026)
 const VALIDADE_H = 24;          // o QR vale por 24 horas
+const COMISSAO_PADRAO = 0.01;   // comissão da plataforma, se servidor/mp não disser outra
 
 const pad = n => String(n).padStart(2, '0');
 function agoraRecife() { return new Date(Date.now() - 3 * 3600e3); }
@@ -23,7 +31,29 @@ function stPag(x) { if (!x) return null; if (x === true) return { s: 'pago' }; r
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
 module.exports = db => {
-  async function tokenMP(gid) { const s = await db.doc(`grupos/${gid}/segredos/mp`).get(); return s.exists ? s.data().token : null; }
+  const erro = (m, http) => Object.assign(new Error(m), { http });
+  async function plataforma() {
+    const d = (await db.doc('servidor/mp').get()).data() || {};
+    return { id: d.clientId || '', segredo: d.clientSecret || '', comissao: d.comissao != null ? Number(d.comissao) : COMISSAO_PADRAO };
+  }
+  async function trocaOAuth(corpo) {
+    const r = await fetch(MP + '/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(corpo) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.access_token) { logger.error('mp oauth', r.status, j.message || j.error); throw erro('O Mercado Pago não liberou a conta.', 502); }
+    return { token: j.access_token, refresh: j.refresh_token || null, expira: Date.now() + (Number(j.expires_in) || 15552000) * 1000, mpUser: j.user_id != null ? String(j.user_id) : null };
+  }
+  // chave da conta do grupo; renova sozinha quando está perto de vencer (vale ~6 meses)
+  async function contaMP(gid) {
+    const ref = db.doc(`grupos/${gid}/segredos/mp`), s = await ref.get();
+    if (!s.exists || !s.data().token) return null;
+    let d = s.data();
+    if (d.refresh && d.expira && d.expira < Date.now() + 15 * 864e5) {
+      try { const P = await plataforma(); const n = await trocaOAuth({ client_id: P.id, client_secret: P.segredo, grant_type: 'refresh_token', refresh_token: d.refresh }); await ref.set(n, { merge: true }); d = { ...d, ...n }; }
+      catch (e) { logger.warn('renovar chave', gid, e.message); }
+    }
+    return d;
+  }
+  async function tokenMP(gid) { const d = await contaMP(gid); return d ? d.token : null; }
   async function usuario(req) {
     const h = req.get('Authorization') || '', t = h.startsWith('Bearer ') ? h.slice(7) : '';
     if (!t) throw Object.assign(new Error('Entre na sua conta.'), { http: 401 });
@@ -67,11 +97,13 @@ module.exports = db => {
       const adm = (grupo.admins || []).includes(u.uid);
       const pres = await ler(`grupos/${gid}/presencas/${u.uid}`);
       if (!adm && (!pres || pres.jogador !== jid)) return res.status(403).json({ erro: 'Você só pode pagar as suas cobranças.' });
-      const token = await tokenMP(gid);
+      const conta = await contaMP(gid), token = conta && conta.token;
       if (!token) return res.status(412).json({ erro: 'O Pix automático ainda não foi ligado nesta pelada.' });
       const { v, cfg, desc } = await devido(gid, tipo, ref, jid);
       if (!(v > 0)) return res.status(400).json({ erro: 'Não há valor a pagar.' });
-      const valor = cfg.pixRepassa ? Math.ceil(v / (1 - TAXA) * 100) / 100 : Math.round(v * 100) / 100;
+      const com = conta.via === 'oauth' ? (await plataforma()).comissao : 0;
+      const valor = cfg.pixRepassa ? Math.ceil(v / (1 - TAXA - com) * 100) / 100 : Math.round(v * 100) / 100;
+      const fee = com > 0 ? Math.round(valor * com * 100) / 100 : 0;
       const chave = `${tipo}_${ref}_${jid}`, cobRef = db.doc(`grupos/${gid}/cobrancas/${chave}`);
       const ant = (await cobRef.get()).data();
       if (ant && ant.status === 'pending' && ant.valor === valor && ant.expira > Date.now() + 10 * 60e3) return res.json(ant);
@@ -85,6 +117,7 @@ module.exports = db => {
         notification_url: `${URL_WEBHOOK}?g=${encodeURIComponent(gid)}`,
         date_of_expiration: isoRecife(expira)
       };
+      if (fee > 0) corpo.application_fee = fee;
       const r = await fetch(MP + '/v1/payments', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', 'X-Idempotency-Key': `${chave}_${Date.now()}` },
@@ -93,7 +126,7 @@ module.exports = db => {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { logger.error('mp criar', r.status, j); return res.status(502).json({ erro: r.status === 401 ? 'A chave do Mercado Pago está errada ou venceu. Avise o administrador.' : 'O Mercado Pago não aceitou o pedido agora. Tente de novo.' }); }
       const td = (j.point_of_interaction || {}).transaction_data || {};
-      const dado = { mpId: String(j.id), valor, base: v, status: j.status || 'pending', qr: td.qr_code || '', qr64: td.qr_code_base64 || '', link: td.ticket_url || '', criadoEm: Date.now(), expira, tipo, ref, jid, uid: u.uid, desc };
+      const dado = { mpId: String(j.id), valor, base: v, fee, status: j.status || 'pending', qr: td.qr_code || '', qr64: td.qr_code_base64 || '', link: td.ticket_url || '', criadoEm: Date.now(), expira, tipo, ref, jid, uid: u.uid, desc };
       await cobRef.set(dado);
       res.json(dado);
     } catch (e) { logger.error(e); res.status(e.http || 500).json({ erro: e.http ? e.message : 'Algo deu errado. Tente de novo.' }); }
@@ -125,5 +158,46 @@ module.exports = db => {
     } catch (e) { logger.error(e); res.status(200).send('ok'); }
   });
 
-  return { criarPix, mpWebhook };
+  // conectar / desconectar a conta do Mercado Pago do grupo (só administrador)
+  const mpConectar = onRequest({ cors: true, maxInstances: 5 }, async (req, res) => {
+    try {
+      if (req.method !== 'POST') return res.status(405).json({ erro: 'Use POST.' });
+      const u = await usuario(req);
+      const { gid, acao } = req.body || {};
+      if (typeof gid !== 'string' || !gid || gid.length > 120 || gid.includes('/')) return res.status(400).json({ erro: 'Pedido inválido.' });
+      const grupo = await ler(`grupos/${gid}`);
+      if (!grupo || !(grupo.admins || []).includes(u.uid)) return res.status(403).json({ erro: 'Só o administrador pode fazer isso.' });
+      if (acao === 'desconectar') {
+        await db.doc(`grupos/${gid}/segredos/mp`).delete();
+        await db.doc(`grupos/${gid}/config/geral`).set({ mpConectadoEm: null, pixAuto: false }, { merge: true });
+        return res.json({ ok: true });
+      }
+      const P = await plataforma();
+      if (!P.id || !P.segredo) return res.status(503).json({ erro: 'O Pix automático ainda está sendo preparado. Tente mais tarde.' });
+      const estado = require('crypto').randomBytes(18).toString('hex');
+      await db.doc(`servidor/mp/estados/${estado}`).set({ gid, uid: u.uid, criadoEm: Date.now() });
+      const q = new URLSearchParams({ client_id: P.id, response_type: 'code', platform_id: 'mp', state: estado, redirect_uri: URL_RETORNO });
+      res.json({ url: 'https://auth.mercadopago.com.br/authorization?' + q });
+    } catch (e) { logger.error(e); res.status(e.http || 500).json({ erro: e.http ? e.message : 'Algo deu errado. Tente de novo.' }); }
+  });
+
+  // o Mercado Pago volta para cá depois que o administrador autoriza
+  const mpRetorno = onRequest({ maxInstances: 5 }, async (req, res) => {
+    const volta = r => res.redirect(302, URL_APP + '?mp=' + r);
+    try {
+      const code = String(req.query.code || ''), estado = String(req.query.state || '');
+      if (!code || !/^[a-f0-9]{36}$/.test(estado)) return volta('erro');
+      const eRef = db.doc(`servidor/mp/estados/${estado}`), e = (await eRef.get()).data();
+      await eRef.delete().catch(() => { });
+      if (!e || Date.now() - e.criadoEm > 30 * 60e3) return volta('erro');
+      const P = await plataforma();
+      const n = await trocaOAuth({ client_id: P.id, client_secret: P.segredo, grant_type: 'authorization_code', code, redirect_uri: URL_RETORNO });
+      await db.doc(`grupos/${e.gid}/segredos/mp`).set({ ...n, via: 'oauth', em: Date.now(), por: e.uid });
+      await db.doc(`grupos/${e.gid}/config/geral`).set({ mpConectadoEm: Date.now(), mpTaxaApp: P.comissao, mpTeste: false }, { merge: true });
+      logger.info('mp conectado', e.gid, n.mpUser);
+      volta('ok');
+    } catch (err) { logger.error(err); volta('erro'); }
+  });
+
+  return { criarPix, mpWebhook, mpConectar, mpRetorno };
 };

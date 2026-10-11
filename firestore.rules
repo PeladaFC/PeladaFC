@@ -69,10 +69,9 @@ service cloud.firestore {
         allow write: if logado() && eu() == uid && membro(gid);
       }
 
-      // Chave do Mercado Pago: o administrador grava, ninguém lê pelo app (só o servidor).
+      // Chave do Mercado Pago do grupo: só o servidor lê e grava (conexão pelo botão "Conectar").
       match /segredos/{doc} {
-        allow read: if false;
-        allow write: if admin(gid);
+        allow read, write: if false;
       }
 
       // Cobranças Pix: o servidor cria; cada membro lê (para ver o QR e o status).
