@@ -782,6 +782,20 @@ function artePoster(p,k,story){
   if(L.end){ctx.fillStyle='rgba(255,255,255,.8)';ctx.font=`600 32px ${FAM}`;const e='📍 '+L.end.toUpperCase();espacado(ctx,e.length>58?e.slice(0,56)+'…':e,W/2,H-Y.rod+52,4)}
   ctx.textAlign='left';return cv}
 /* arte de convocação: estádio à noite, escudo no centro, faixa com a data */
+/* cores do escudo: as duas cores mais fortes da imagem (ignora fundo transparente, branco e preto) */
+let CORES_ESC=null;
+function coresDoEscudo(){const src=cfg().escudo,im=src&&FOTO_CACHE[src];if(!im)return[];if(CORES_ESC&&CORES_ESC.src===src)return CORES_ESC.c;
+  const n=64,cv=document.createElement('canvas');cv.width=n;cv.height=n;const x=cv.getContext('2d');let px;
+  try{x.drawImage(im,0,0,n,n);px=x.getImageData(0,0,n,n).data}catch(e){return[]}
+  const bins={};for(let i=0;i<px.length;i+=4){const[R,G,B,A]=[px[i],px[i+1],px[i+2],px[i+3]];if(A<200)continue;
+    const mx=Math.max(R,G,B),mn=Math.min(R,G,B),l=(mx+mn)/510,sat=mx===mn?0:(mx-mn)/(255-Math.abs(mx+mn-255));if(sat<.35||l<.12||l>.9)continue;
+    let h;const d=mx-mn;h=mx===R?((G-B)/d)%6:mx===G?(B-R)/d+2:(R-G)/d+4;h=Math.round(((h*60)+360)%360/20);const k=h%18;
+    const b=bins[k]||(bins[k]={n:0,r:0,g:0,b:0});b.n++;b.r+=R;b.g+=G;b.b+=B}
+  const hx=v=>Math.round(v).toString(16).padStart(2,'0');
+  const tot=Object.values(bins).reduce((t,b)=>t+b.n,0),out=Object.entries(bins).filter(([,b])=>b.n>=Math.max(12,tot*.04)).sort((a,b)=>b[1].n-a[1].n);const pick=[];
+  for(const[k,b] of out){if(pick.some(q=>Math.min(Math.abs(q.k-k),18-Math.abs(q.k-k))<2))continue;pick.push({k:+k,c:'#'+hx(b.r/b.n)+hx(b.g/b.n)+hx(b.b/b.n)});if(pick.length>=4)break}
+  CORES_ESC={src,c:pick.map(q=>q.c)};return CORES_ESC.c}
+function coresConvoc(){const s=cfg().artCores;if(s&&s.a&&s.b)return s;const d=coresDoEscudo();return{a:d[0]||corEscudo(),b:d[1]||'#F2C12E'}}
 function arteConvocacao(p,story){
   const W=1080,H=story?1920:1350,cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
   const FAM='"Saira Condensed", Impact, sans-serif',c=cfg(),L=localDe(p)||{},d=parseD(p.data),cor=corEscudo();
@@ -806,7 +820,7 @@ function arteConvocacao(p,story){
   g=ctx.createRadialGradient(W/2,H/2,W*.35,W/2,H/2,W*.95);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.6)');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
   // faixas laterais inclinadas
   const fx=(x,y,w,h,col,dir)=>{ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+w,y+dir*h*.55);ctx.lineTo(x+w,y+dir*h*.55+h);ctx.lineTo(x,y+h);ctx.closePath();ctx.fill()};
-  const sy=H*.42-150;[[cor,0],['#F2C12E',1],[cor,2]].forEach(([col,i])=>{fx(30,sy+i*120,62,100,col,-1);fx(W-92,sy+i*120,62,100,col,1)});
+  const CC=coresConvoc(),sy=H*.42-150;[[CC.a,0],[CC.b,1],[CC.a,2]].forEach(([col,i])=>{fx(30,sy+i*120,62,100,col,-1);fx(W-92,sy+i*120,62,100,col,1)});
   // nome da pelada
   ctx.textAlign='center';ctx.fillStyle='rgba(255,255,255,.9)';ctx.font=`700 ${Math.round(40*S0)}px ${FAM}`;espacado(ctx,(c.nome||'PELADA').toUpperCase(),W/2,oy+92,12);
   // CONVOCAÇÃO em caixa dourada translúcida
@@ -837,7 +851,10 @@ async function sheetConvocArte(pid){const p=S.pel[pid];if(!p)return;
   for(const[st,nome,label] of[[false,`convocacao-${p.data}.png`,'Feed'],[true,`convocacao-story-${p.data}.png`,'Story']]){const cv=arteConvocacao(p,st);const blob=await new Promise(r=>cv.toBlob(r,'image/png'));ARTS.push({blob,url:URL.createObjectURL(blob),nome,label})}
   const body=document.getElementById('sheet-body');if(!body)return;
   const btn=i=>dl?`<button class="btn sm ${i===0?'primary':''}" data-act="salvar-arte" data-i="${i}">Salvar imagem</button>`:'';
-  body.innerHTML=`<div class="stack"><div class="arts">${ARTS.map((a,i)=>`<figure><img src="${a.url}" alt="Arte de convocação, ${a.label}"><figcaption>${a.label}</figcaption>${btn(i)}</figure>`).join('')}</div>
+  const CC=coresConvoc(),det=coresDoEscudo(),PAL=[...new Set([...det,'#B8322A','#2F5FB8','#F2C12E','#1B6A36','#F0662A','#6B3FA0','#111111','#F5F5F5'])];
+  const linha=(k,t)=>`<div class="cor-lin"><span class="sub" style="min-width:52px">${t}</span><div class="cores">${PAL.map(c=>`<button class="cor ${CC[k].toLowerCase()===c.toLowerCase()?'on':''}" style="background:${c}" data-act="convoc-cor" data-k="${k}" data-v="${c}" data-p="${pid}" aria-label="Cor ${c}"></button>`).join('')}<label class="cor cor-mais" aria-label="Outra cor">+<input type="color" data-act="convoc-cor-livre" data-k="${k}" data-p="${pid}" value="${CC[k]}"></label></div></div>`;
+  body.innerHTML=`<div class="stack">${ADM()?`<div class="panel"><div class="panel-h"><h3>Cores das faixas</h3>${cfg().artCores?`<button class="btn sm" data-act="convoc-cor-auto" data-p="${pid}">Usar do escudo</button>`:''}</div>${linha('a','Cor 1')}${linha('b','Cor 2')}<div class="sub" style="margin-top:6px">${det.length?'As primeiras cores vieram do seu escudo.':'Suba um escudo nos Ajustes para o app sugerir as cores dele.'} A escolha fica salva para as próximas artes.</div></div>`:''}
+    <div class="arts">${ARTS.map((a,i)=>`<figure><img src="${a.url}" alt="Arte de convocação, ${a.label}"><figcaption>${a.label}</figcaption>${btn(i)}</figure>`).join('')}</div>
     <p class="sub" style="margin:0">${dl?'"Salvar imagem" abre o compartilhamento: dá para mandar direto para o WhatsApp ou o Instagram.':'Toque e segure a imagem para salvar.'} Usa o escudo, a data, o horário e o local desta pelada.</p></div>`}
 async function sheetArtes(pid){
   const p=S.pel[pid],PR=premiosDe(p,pid),ks=['mvp','art','gar','gol'].filter(k=>PR[k]);
@@ -1116,8 +1133,8 @@ function tJogo(A){
     return h+renderHist(A);
   }
   const[pid,p]=cur,l=lista(p);
-  h+=`<div class="board"><div class="when">${dShort(p.data)}<br>${esc(horaIniDe(p))}<small class="ate"> às ${esc(horaFimDe(p))}</small></div><div class="where row" style="gap:8px">${(()=>{const LL=localDe(p);return LL?`<span>📍 ${esc(LL.nome)}${LL.end?' · '+esc(LL.end):''}</span>${LL.end||LL.tel?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="como-chegar" data-p="${pid}">${LL.end?'🗺️ Como chegar':'📞 Contato'}</button>`:''}`:'Local a definir'})()}${A?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="trocar-local" data-p="${pid}">${localDe(p)?'Trocar local':'Definir local'}</button><button class="btn sm warn" data-act="convoc-arte" data-p="${pid}">🎨 Arte de convocação</button>`:''}</div>
-    <div class="stats"><div class="stat"><b class="num">${l.escalados.length}/${l.vagas}</b><span>Linha</span></div><div class="stat"><b class="num">${l.gks.length}</b><span>Goleiros</span></div><div class="stat"><b class="num">${l.espera.length}</b><span>Espera</span></div><div class="stat"><b class="num">${l.pend.length}</b><span>Sem resposta</span></div></div></div>`;
+  h+=`<div class="board"><div class="when">${dShort(p.data)}<br>${esc(horaIniDe(p))}<small class="ate"> às ${esc(horaFimDe(p))}</small></div><div class="where row" style="gap:8px">${(()=>{const LL=localDe(p);return LL?`<span>📍 ${esc(LL.nome)}${LL.end?' · '+esc(LL.end):''}</span>${LL.end||LL.tel?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="como-chegar" data-p="${pid}">${LL.end?'🗺️ Como chegar':'📞 Contato'}</button>`:''}`:'Local a definir'})()}${A?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="trocar-local" data-p="${pid}">${localDe(p)?'Trocar local':'Definir local'}</button>`:''}</div>
+    <div class="stats"><div class="stat"><b class="num">${l.escalados.length}/${l.vagas}</b><span>Linha</span></div><div class="stat"><b class="num">${l.gks.length}</b><span>Goleiros</span></div><div class="stat"><b class="num">${l.espera.length}</b><span>Espera</span></div><div class="stat"><b class="num">${l.pend.length}</b><span>Sem resposta</span></div>${A?`<button class="stat stat-arte" data-act="convoc-arte" data-p="${pid}"><b>🎨 Arte</b><span>de convocação</span></button>`:''}</div></div>`;
   h+=`<div class="seg" style="margin-block:12px" role="group">${[['presenca','Presença'],['times','Times'],['pos','Pós-jogo']].map(([k,n])=>`<button data-act="sub" data-v="${k}" aria-pressed="${UI.sub===k}">${n}</button>`).join('')}</div>`;
   if(!A)h+=painelJogador(pid,p,l);
   if(UI.sub==='presenca')h+=subPresenca(pid,p,l,A);
@@ -1877,6 +1894,8 @@ document.addEventListener('click',e=>{
       b.setAttribute('aria-checked',String(pr[d.v]));break}
     case'arte':sheetArtes(d.p);break;
     case'convoc-arte':sheetConvocArte(d.p);break;
+    case'convoc-cor':{const cur=coresConvoc();patch('config/geral',{artCores:{...cur,[d.k]:d.v}});const sc=document.querySelector('.sheet')?.scrollTop||0;sheetConvocArte(d.p).then(()=>{const sh=document.querySelector('.sheet');if(sh)sh.scrollTop=sc});break}
+    case'convoc-cor-auto':{patch('config/geral',{artCores:null});sheetConvocArte(d.p);break}
     case'arte-sem':sheetPremios(d.p);toast('Escolha os prêmios para gerar as artes.');break;
     case'carta':sheetCarta(d.j);break;
     case'salvar-arte':{const a=ARTS[Number(d.i)];if(!a||!dl)return;
@@ -2025,6 +2044,7 @@ document.addEventListener('change',e=>{
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
   const t=e.target;
   if(t.dataset.act==='cmp'){UI.cmp=t.value||null;const sc=document.querySelector('.sheet').scrollTop;sheetVerJog(t.dataset.j);document.querySelector('.sheet').scrollTop=sc}
+  if(t.dataset.act==='convoc-cor-livre'){const cur=coresConvoc();patch('config/geral',{artCores:{...cur,[t.dataset.k]:t.value}});sheetConvocArte(t.dataset.p);return}
   if(t.id==='cx-data'){UI.cxData=t.value||null;render();return}
   if(t.id==='cx-pm'||t.id==='cx-pd'){const m=t.dataset.m,cx=S.caixa[m]||{mens:{},desp:[]},v=t.value===''?null:Number(String(t.value).replace(',','.'));
     // quem já pagou continua com o valor antigo

@@ -411,6 +411,12 @@ nav.tabs button:active svg{transform:scale(.9)}
 @media (prefers-reduced-motion: no-preference){#app{transition:opacity .26s ease,transform .26s ease}#app.saindo{opacity:0;transform:translateY(10px)}#app.entrando{animation:entra .5s ease-out}@keyframes entra{from{opacity:0;transform:translateY(-8px)}}.enc-ok{animation:entra .6s ease-out .1s both}}
 .enc-ok{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--pitch);border-left:5px solid var(--pitch);border-radius:12px;padding:12px 14px;margin-bottom:12px}
 .notas-acoes{position:sticky;bottom:calc(-20px - env(safe-area-inset-bottom,0px));background:var(--bg);padding:10px 0 calc(14px + env(safe-area-inset-bottom,0px));margin-bottom:-6px;box-shadow:0 -8px 12px -8px rgba(0,0,0,.15);z-index:2}
+.board .stat-arte{flex:1 1 auto;border:0;cursor:pointer;background:#F2C12E;color:#1E1700;text-align:left;font:inherit}
+.board .stat-arte b{color:#1E1700;font-size:22px}.board .stat-arte span{opacity:1}
+.cor-lin{display:flex;align-items:center;gap:8px;margin-top:8px}.cores{display:flex;flex-wrap:wrap;gap:6px}
+.cor{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);padding:0;cursor:pointer;position:relative}
+.cor.on{outline:3px solid var(--pitch);outline-offset:2px}
+.cor-mais{display:grid;place-items:center;font-weight:800;background:var(--surface);overflow:hidden}.cor-mais input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .vt-chip{padding:3px 10px;font-size:12px;min-height:0}
 .enc-ic{width:30px;height:30px;border-radius:50%;background:var(--pitch);color:var(--pitch-ink);display:grid;place-items:center;font-weight:800;flex-shrink:0}
 
