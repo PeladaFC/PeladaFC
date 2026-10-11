@@ -104,6 +104,8 @@ function nomeTime(cor){const v=((cfg().nomesTimes||[])[cor]||'').trim();return v
    Sem mensalista nem diarista: todo mundo confirma direto e quem passa das vagas vai para a espera.
    O grupo nunca é apagado: ao encerrar uma pelada ela vai para o histórico e o grupo segue para os próximos eventos. */
 const EV=()=>!!cfg().evento;
+/* caixa ligado/desligado é separado do tipo de pelada (padrão: fixa usa, evento livre não) */
+const CX=()=>{const c=cfg();return c.usarCaixa!=null?!!c.usarCaixa:!c.evento};
 const ehDiarista=id=>!EV()&&J(id).tipo==='diarista';
 const pagaPorJogo=id=>!EV()&&J(id).tipo==='diarista';
 const tipoTxt=id=>EV()?'Participante':J(id).tipo==='diarista'?'Diarista':'Mensalista';
@@ -546,9 +548,10 @@ function msg0(tipo,ctx={}){
     return out.join('\n')}
   if(tipo==='pagamento'){const m=ctx.mes||mesAtual(),d=devedores(m),[y,mm]=m.split('-').map(Number);
     const out=[`💰 *PENDÊNCIAS · ${MESES[mm-1].toUpperCase()}/${y}*`,''];
-    if(!d.mens.length&&!d.dia.length)return out.concat(['Tudo pago! Obrigado, galera 🙌']).join('\n');
+    if(!d.mens.length&&!d.dia.length&&!d.ext.length)return out.concat(['Tudo pago! Obrigado, galera 🙌']).join('\n');
     if(d.mens.length){out.push(`*Mensalidade* (${BRL(precoM(m))})`);d.mens.forEach(id=>out.push('• '+nm(id)))}
     if(d.dia.length){out.push('',`*Diárias*`);d.dia.forEach(x=>out.push(`• ${nm(x.id)} · ${dShort(x.data)} · ${BRL(x.pid&&S.pel[x.pid]?precoDP(S.pel[x.pid]):precoD(m))}`))}
+    d.ext.forEach(x=>{out.push('',`*${x.nome}* (${BRL(x.v)})`);x.ids.forEach(id=>out.push('• '+nm(id)))});
     if(c.pix)out.push('','Pix: '+c.pix);return out.join('\n')}
   if(tipo==='convite'){const j=ctx.jid?J(ctx.jid):null;
     return[`Fala${j?', '+(j.apelido||j.nome.split(' ')[0]):''}! 👋`,`Você está convidado pra *${c.nome}*.`,(()=>{const pe2=atual();return pe2?`📅 Próxima: *${dLong(pe2[1].data)}* às *${pe2[1].hora||c.hora}*`:EV()?'📅 Datas livres: o administrador avisa cada pelada no app':`📅 ${[0,6].includes(Number(c.dia))?'Todo':'Toda'} ${DIAS[c.dia].toLowerCase()} às ${c.hora}`})(),(()=>{const pe2=atual(),LL=localDe(pe2&&pe2[1]);return LL?'📍 '+LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):''})(),linkConvite()?'\nEntre na pelada pelo app: '+linkConvite():'',INSTALAR,'\nConfirma por aqui se topa!'].filter(Boolean).join('\n')}
@@ -558,10 +561,11 @@ function msg0(tipo,ctx={}){
 /* ---------- caixa ---------- */
 function mesAtual(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)}
 function devedores(m){
-  const cx=S.caixa[m]||{},mens=EV()?[]:ativos().filter(id=>J(id).tipo==='mensalista'&&!stPag((cx.mens||{})[id]));
-  const dia=[];for(const[pid,p] of Object.entries(S.pel)){if(!p.data.startsWith(m)||p.status!=='encerrada')continue;
+  const cx=S.caixa[m]||{},mens=EV()||!(precoM(m)>0)?[]:ativos().filter(id=>J(id).tipo==='mensalista'&&!stPag((cx.mens||{})[id]));
+  const dia=[];for(const[pid,p] of Object.entries(S.pel)){if(!p.data.startsWith(m)||p.status!=='encerrada'||!(precoDP(p)>0))continue;
     for(const id of jogaram(p))if(pagaPorJogo(id)&&!stPag((p.diarias||{})[id]))dia.push({id,data:p.data,pid})}
-  return{mens,dia};
+  const ext=extrasDe(m).filter(([,x])=>x.v>0).map(([xid,x])=>({xid,nome:x.nome,v:Number(x.v),ids:(x.quem||[]).filter(id=>S.jog[id]&&!stPag((x.pag||{})[id]))})).filter(x=>x.ids.length);
+  return{mens,dia,ext};
 }
 
 /* ---------- nível da pelada (estrelas) ---------- */
@@ -1068,7 +1072,7 @@ function renderTop(){
   return h;
 }
 function renderNav(){
-  const tabs=[['jogo','Jogo'],['elenco','Elenco'],['avisos','Avisos'],['ranking','Ranking'],['caixa','Caixa']].filter(([k])=>(ADM()||!['avisos','caixa'].includes(k))&&!(k==='caixa'&&EV()));
+  const tabs=[['jogo','Jogo'],['elenco','Elenco'],['avisos','Avisos'],['ranking','Ranking'],['caixa','Caixa']].filter(([k])=>(ADM()||!['avisos','caixa'].includes(k))&&!(k==='caixa'&&!CX()));
   if(!tabs.some(([k])=>k===UI.tab))UI.tab='jogo';
   document.getElementById('nav').innerHTML='<div class="in">'+tabs.map(([k,n])=>`<button data-act="tab" data-v="${k}" ${UI.tab===k?'aria-current="page"':''}>${ICON[k]}${n}</button>`).join('')+'</div>';
 }
@@ -1692,6 +1696,8 @@ function tRanking(){
 function stPag(x){if(!x)return null;if(x===true)return{s:'pago'};return x.s?x:null}
 const dBR=d=>d?d.slice(8,10)+'/'+d.slice(5,7):'';
 /* valores podem mudar de um mês para o outro (e a diária, de uma pelada para outra) */
+function extrasDe(m){return Object.entries((S.caixa[m]||{}).extras||{}).filter(([,x])=>x&&!x.apagado).sort((a,b)=>(a[1].d||'').localeCompare(b[1].d||'')||(a[1].criadoEm||0)-(b[1].criadoEm||0))}
+function gravarExtra(m,xid,x){const cx=S.caixa[m]||{mens:{},desp:[]};const ex={...(cx.extras||{})};if(x==null)delete ex[xid];else ex[xid]=x;put('caixa/'+m,{...cx,extras:ex})}
 function precoM(m){const v=(S.caixa[m]||{}).precoMensal;return v!=null?Number(v):Number(cfg().mensal)||0}
 function precoD(m){const v=(S.caixa[m]||{}).precoDiaria;return v!=null?Number(v):Number(cfg().diaria)||0}
 function precoDP(p){return p&&p.precoDiaria!=null?Number(p.precoDiaria):precoD(p?p.data.slice(0,7):mesAtual())}
@@ -1702,6 +1708,7 @@ function caixaMes(m){const c=cfg(),cx=S.caixa[m]||{},mov=[];
   for(const id of mensal){const x=stPag((cx.mens||{})[id]);if(x)mov.push({tipo:x.s==='isento'?'isento':'ent',cat:'Mensalidade',quem:id,d:x.d||'',v:x.s==='isento'?0:Number(x.v??precoM(m)),obs:x.obs||''})}
   const pels=Object.entries(S.pel).filter(([,p])=>p.data.startsWith(m)&&(p.status==='encerrada'||EV())).sort((a,b)=>a[1].data.localeCompare(b[1].data));
   for(const[,p] of pels)for(const id of jogaram(p))if(pagaPorJogo(id)){const x=stPag((p.diarias||{})[id]);if(x)mov.push({tipo:x.s==='isento'?'isento':'ent',cat:EV()?'Pagamento do evento':'Diária '+dBR(p.data),quem:id,d:x.d||p.data,v:x.s==='isento'?0:Number(x.v??precoDP(p)),obs:x.obs||''})}
+  for(const[,x] of extrasDe(m))for(const id of x.quem||[]){const st=stPag((x.pag||{})[id]);if(st&&S.jog[id])mov.push({tipo:st.s==='isento'?'isento':'ent',cat:x.nome,quem:id,d:st.d||x.d||'',v:st.s==='isento'?0:Number(st.v??x.v),obs:st.obs||''})}
   for(const e of cx.ent||[])mov.push({tipo:'ent',cat:e.d,d:e.dt||'',v:Number(e.v)||0,id:e.id,av:1});
   for(const e of cx.desp||[])mov.push({tipo:'sai',cat:e.d,d:e.dt||'',v:Number(e.v)||0,id:e.id,av:1});
   mov.sort((a,b)=>(a.d||'9').localeCompare(b.d||'9'));
@@ -1717,24 +1724,35 @@ function tCaixa(A){
     <div class="money"><div><span>Entradas</span><b class="num">${BRL(ent)}</b></div><div><span>Saídas</span><b class="num">${BRL(sai)}</b></div><div><span>Saldo</span><b class="num" style="color:${ent-sai<0?'var(--red)':'var(--pitch)'}">${BRL(ent-sai)}</b></div></div>`;
   if(isentos)h+=`<div class="sub" style="margin-top:6px">${isentos} isenç${isentos>1?'ões':'ão'} neste mês (não entram no saldo).</div>`;
   if(A)h+=`<div class="panel cx-data" style="margin-top:12px"><label class="row between" style="gap:10px;flex-wrap:nowrap"><span><b>Data dos lançamentos</b><span class="sub" style="display:block">Tudo que você marcar agora entra com esta data.</span></span><input type="date" id="cx-data" value="${dl}" min="${m}-01" max="${m}-31"></label>
-      <div class="cx-precos">${EV()?'':`<label class="field"><span>Mensalidade de ${MESES[mm-1].toLowerCase()}</span><input type="number" id="cx-pm" data-m="${m}" inputmode="decimal" min="0" step="0.01" value="${precoM(m)}"></label>`}<label class="field"><span>${EV()?'Valor por pessoa':'Diária de '+MESES[mm-1].toLowerCase()}</span><input type="number" id="cx-pd" data-m="${m}" inputmode="decimal" min="0" step="0.01" value="${precoD(m)}"></label></div>
-      <div class="sub" style="margin-top:4px">Mudou o campo ou o preço? Ajuste aqui. Vale só para este mês; os outros meses não mudam.</div></div>
+      ${EV()?'':`<div class="cx-precos"><label class="field"><span>Mensalidade de ${MESES[mm-1].toLowerCase()}</span><input type="number" id="cx-pm" data-m="${m}" inputmode="decimal" min="0" step="0.01" value="${precoM(m)}"></label><label class="field"><span>Diária de ${MESES[mm-1].toLowerCase()}</span><input type="number" id="cx-pd" data-m="${m}" inputmode="decimal" min="0" step="0.01" value="${precoD(m)}"></label></div>
+      <div class="sub" style="margin-top:4px">Mudou o campo ou o preço? Ajuste aqui. Vale só para este mês. Coloque <b>0</b> para não cobrar neste mês.</div>`}</div>
     <div class="lado" style="margin-top:10px"><button class="btn warn" data-act="msg" data-v="pagamento" data-m="${m}">Cobrar pendências</button><button class="btn" data-act="msg" data-v="prestacao" data-m="${m}">Prestação de contas</button></div>`;
-  if(!EV()){h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Mensalidades</h3><span class="sub num">${pagosM.length}/${mensal.length} · ${BRL(precoM(m))}</span></div><div class="list">`;
+  if(!EV()&&!(precoM(m)>0))h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Mensalidades</h3><span class="sub">sem cobrança</span></div><div class="empty">Sem mensalidade em ${MESES[mm-1].toLowerCase()}. Ninguém aparece devendo.</div></div>`;
+  else if(!EV()){h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Mensalidades</h3><span class="sub num">${pagosM.length}/${mensal.length} · ${BRL(precoM(m))}</span></div><div class="list">`;
     if(!mensal.length)h+='<div class="empty">Nenhum mensalista.</div>';
     for(const id of mensal.slice().sort((a,b)=>nm(a).localeCompare(nm(b)))){const x=(cx.mens||{})[id],st=stPag(x);
       const sb=[notaValor(st,precoM(m)),st&&st.obs?esc(st.obs):''].filter(Boolean).join(' · ');
       h+=`<div class="item"><div class="grow"><div class="name">${esc(nm(id))}</div>${sb?`<div class="sub">${sb}</div>`:''}</div>${botaoPag(x,'pagou-m',`data-m="${m}" data-j="${id}"`,A)}</div>`}
     h+='</div></div>'}
-  h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>${EV()?'Pagamentos do evento':'Diárias'}</h3><span class="sub">${BRL(precoD(m))} ${EV()?'por pessoa':'por jogo'}</span></div>`;
+  if(!EV()){h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Diárias</h3><span class="sub">${precoD(m)>0?BRL(precoD(m))+' por jogo':'sem cobrança'}</span></div>`;
   let any=false;
   for(const[pid,p] of pels){const ds=jogaram(p).filter(id=>pagaPorJogo(id));if(!ds.length)continue;any=true;const falta=ds.filter(id=>!stPag((p.diarias||{})[id])).length;
     const pd=precoDP(p),dif=p.precoDiaria!=null&&pd!==precoD(m);
+    if(!(pd>0)){h+=`<div class="row between" style="margin-top:10px;gap:6px"><span class="sub"><b style="font-weight:700">Pelada de ${dShort(p.data)}</b> · sem cobrança</span>${A?`<button class="btn sm" data-act="preco-pel" data-p="${pid}" aria-label="Valor da diária nesta pelada">R$ ✎</button>`:''}</div>`;continue}
     h+=`<div class="row between" style="margin-top:10px;gap:6px"><span class="sub"><b style="font-weight:700">Pelada de ${dShort(p.data)}</b>${dif?` · <b class="num" style="color:var(--pitch)">${BRL(pd)}</b>`:''}</span><div class="row" style="gap:4px">${A?`<button class="btn sm" data-act="preco-pel" data-p="${pid}" aria-label="Valor da diária nesta pelada">R$ ✎</button>`:''}${A&&falta?`<button class="btn sm" data-act="diarias-todas" data-p="${pid}">Todos pagos</button>`:''}</div></div><div class="list">`;
     for(const id of ds){const x=(p.diarias||{})[id],st=stPag(x),sb=[notaValor(st,pd),st&&st.obs?esc(st.obs):''].filter(Boolean).join(' · ');h+=`<div class="item"><div class="grow"><div class="name">${esc(nm(id))}</div>${sb?`<div class="sub">${sb}</div>`:''}</div>${botaoPag(x,'pagou-d',`data-p="${pid}" data-j="${id}"`,A)}</div>`}
     h+='</div>'}
-  if(!any)h+=(EV()?'<div class="empty">Ninguém confirmado ainda.</div>':'<div class="empty">Nenhum diarista jogou neste mês.</div>');
-  h+='</div>';
+  if(!any)h+='<div class="empty">Nenhum diarista jogou neste mês.</div>';
+  h+='</div>'}
+  // cobranças extras (churrasco, camisa, evento…)
+  {const X=extrasDe(m);h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Cobranças extras</h3>${A?`<button class="btn sm primary" data-act="x-nova" data-m="${m}">+ Nova</button>`:''}</div>`;
+    if(!X.length)h+=`<div class="empty">${EV()?'Vai cobrar este evento? Crie uma cobrança: quadra, churrasco, camisa…':'Ex.: churrasco, camisa nova, evento extra. Quem estiver na lista vê a cobrança no app.'}</div>`;
+    for(const[xid,x] of X){const ids=(x.quem||[]).filter(id=>S.jog[id]).sort((a,b)=>nm(a).localeCompare(nm(b))),pg=ids.filter(id=>stPag((x.pag||{})[id])).length,falta=ids.length-pg;
+      h+=`<div class="row between" style="margin-top:10px;gap:6px"><span class="sub"><b style="font-weight:700">${esc(x.nome)}</b> · <b class="num">${BRL(x.v)}</b> por pessoa${x.d?' · '+dShort(x.d):''} · <span class="num">${pg}/${ids.length}</span></span>${A?`<div class="row" style="gap:4px">${falta?`<button class="btn sm" data-act="x-todos" data-m="${m}" data-x="${xid}">Todos pagos</button>`:''}<button class="btn sm" data-act="x-editar" data-m="${m}" data-x="${xid}" aria-label="Editar cobrança">✎</button></div>`:''}</div><div class="list">`;
+      for(const id of ids){const v0=(x.pag||{})[id],st=stPag(v0),sb=[notaValor(st,Number(x.v)),st&&st.obs?esc(st.obs):''].filter(Boolean).join(' · ');h+=`<div class="item"><div class="grow"><div class="name">${esc(nm(id))}</div>${sb?`<div class="sub">${sb}</div>`:''}</div>${botaoPag(v0,'pagou-x',`data-m="${m}" data-x="${xid}" data-j="${id}"`,A)}</div>`}
+      if(!ids.length)h+='<div class="empty">Ninguém na lista.</div>';
+      h+='</div>'}
+    h+='</div>'}
   // lançamentos avulsos
   const av=mov.filter(x=>x.av);
   h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Outras entradas e saídas</h3></div><div class="list">`;
@@ -1751,17 +1769,20 @@ function tCaixa(A){
   return h;
 }
 /* ---------- Pix automático: o que o jogador logado deve ---------- */
-function minhasPendencias(){const jid=meuJogador();if(!jid||EV())return[];const out=[],m=mesAtual();
-  if(J(jid).tipo==='mensalista'&&!stPag(((S.caixa[m]||{}).mens||{})[jid]))out.push({tipo:'m',ref:m,jid,v:precoM(m),desc:'Mensalidade de '+MESES[Number(m.slice(5))-1].toLowerCase()});
+function minhasPendencias(){const jid=meuJogador();if(!jid||!CX())return[];const out=[],m=mesAtual();
+  const lim0=iso(new Date(Date.now()-62*864e5)).slice(0,7);
+  for(const mx of Object.keys(S.caixa).filter(k=>k>=lim0&&k<=m).sort())for(const[xid,x] of extrasDe(mx))if(x.v>0&&(x.quem||[]).includes(jid)&&!stPag((x.pag||{})[jid]))out.push({tipo:'x',ref:mx+'~'+xid,jid,v:Number(x.v),desc:x.nome});
+  if(EV())return out;
+  if(J(jid).tipo==='mensalista'&&precoM(m)>0&&!stPag(((S.caixa[m]||{}).mens||{})[jid]))out.push({tipo:'m',ref:m,jid,v:precoM(m),desc:'Mensalidade de '+MESES[Number(m.slice(5))-1].toLowerCase()});
   const lim=iso(new Date(Date.now()-62*864e5));
-  for(const[pid,p] of encerradas())if(p.data>=lim&&jogaram(p).includes(jid)&&pagaPorJogo(jid)&&!stPag((p.diarias||{})[jid]))out.push({tipo:'d',ref:pid,jid,v:precoDP(p),desc:'Diária da pelada de '+dShort(p.data)});
+  for(const[pid,p] of encerradas())if(p.data>=lim&&jogaram(p).includes(jid)&&pagaPorJogo(jid)&&precoDP(p)>0&&!stPag((p.diarias||{})[jid]))out.push({tipo:'d',ref:pid,jid,v:precoDP(p),desc:'Diária da pelada de '+dShort(p.data)});
   return out}
 const TAXA_MP=.0099;function taxaApp(c){c=c||cfg();return c.mpTaxaApp!=null?Number(c.mpTaxaApp):.01}function taxaTotal(c){return TAXA_MP+taxaApp(c)}
 function pct(x){return(Math.round(x*10000)/100).toLocaleString('pt-BR')+'%'}function taxasTxt(c){return`${pct(taxaTotal(c))} por pagamento`}
 function painelMeusPag(){const L=minhasPendencias();if(!L.length)return'';const c=cfg();
   return`<div class="panel meus-pag" style="margin-bottom:12px"><div class="panel-h"><h3>💰 Meus pagamentos</h3></div>${L.map(x=>`<div class="item"><div class="grow"><div class="name">${esc(x.desc)}</div><div class="sub num">${BRL(x.v)}</div></div>${c.pixAuto?`<button class="btn sm primary" data-act="pix-pagar" data-t="${x.tipo}" data-r="${x.ref}" data-j="${x.jid}">Pagar com Pix</button>`:c.pix?`<button class="btn sm" data-act="pix-chave">Copiar chave Pix</button>`:''}</div>`).join('')}
     ${c.pixAuto?'<div class="sub" style="margin-top:6px">O pagamento é confirmado sozinho, na hora. Não precisa mandar comprovante.</div>':''}</div>`}
-function pixPago(x){if(!x)return false;if(x.tipo==='m')return!!stPag(((S.caixa[x.ref]||{}).mens||{})[x.jid]);const p=S.pel[x.ref];return!!(p&&stPag((p.diarias||{})[x.jid]))}
+function pixPago(x){if(!x)return false;if(x.tipo==='x'){const[mx,xid]=x.ref.split('~'),e=((S.caixa[mx]||{}).extras||{})[xid];return!!(e&&stPag((e.pag||{})[x.jid]))}if(x.tipo==='m')return!!stPag(((S.caixa[x.ref]||{}).mens||{})[x.jid]);const p=S.pel[x.ref];return!!(p&&stPag((p.diarias||{})[x.jid]))}
 async function sheetPix(x){UI.pixAberto=x;openSheet('Pagar com Pix','<div class="empty">Gerando o Pix…</div>');
   let d;try{d=demo?{valor:cfg().pixRepassa?Math.ceil(x.v/(1-taxaTotal())*100)/100:x.v,base:x.v,qr:'00020126580014br.gov.bcb.pix0136demo-pelada-fc5204000053039865802BR5925PELADA FC DEMO6009RECIFE62070503***6304ABCD',qr64:'',link:'',demo:true}:await window.pixCriar({tipo:x.tipo,ref:x.ref,jid:x.jid})}
   catch(e){const b=document.getElementById('sheet-body');if(b)b.innerHTML=`<div class="stack"><div class="banner due" style="display:block">${esc(e.message||'Não deu para gerar o Pix agora.')}</div><button class="btn block" data-act="close">Fechar</button></div>`;return}
@@ -1785,9 +1806,22 @@ function sheetComoMP(){const c=cfg();openSheet('Como funciona o Pix automático'
   <p style="margin:0">Taxa do Pix: ${taxasTxt(c)}. Ela sai do valor recebido. Se preferir, marque <b>Quem paga cobre a taxa</b> e a pelada recebe o valor cheio.</p>
   <p class="sub" style="margin:0">O app só consegue <b>criar cobranças</b> para a sua conta; ninguém consegue tirar dinheiro dela. Dá para desconectar quando quiser. A conta precisa estar com a identidade confirmada no Mercado Pago.</p>
   <button class="btn block" data-act="cfg">Voltar aos ajustes</button></div>`)}
-function sheetPag(kind,key,id,m){const c=cfg(),src=kind==='m'?((S.caixa[key]||{}).mens||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[id])||{},padrao=kind==='m'?precoM(key):precoDP(S.pel[key]);
+/* cobrança extra: churrasco, camisa, evento… (fica em caixa/{mês}.extras) */
+function sheetExtra(){const X=UI.xc;if(!X)return;const e=X.xid?(((S.caixa[X.m]||{}).extras||{})[X.xid]||{}):{};
+  const ids=ativos().sort((a,b)=>nm(a).localeCompare(nm(b))),sel=new Set(X.sel),at=atual(),conf=at?(()=>{const l=lista(at[1],at[0]);return[...l.escalados,...l.gks]})():[];
+  openSheet(X.xid?'Editar cobrança':'Nova cobrança',`<div class="stack">
+    <label class="field"><span>O que é</span><input type="text" id="xc-nome" maxlength="60" value="${esc(X.nome??e.nome??'')}" placeholder="Ex.: Churrasco de fim de ano, camisa nova"></label>
+    <div class="grid2"><label class="field"><span>Valor por pessoa (R$)</span><input type="number" id="xc-v" inputmode="decimal" min="0" step="0.01" value="${X.v??e.v??''}"></label><label class="field"><span>Data</span><input type="date" id="xc-d" value="${X.d??e.d??dataLanc(X.m)}"></label></div>
+    <div class="field"><span>Quem paga <b class="num">${sel.size}</b></span><div class="pick"><button type="button" data-act="xc-quick" data-v="todos">Todos</button>${conf.length?`<button type="button" data-act="xc-quick" data-v="conf">Confirmados ${dShort(at[1].data)}</button>`:''}${EV()?'':`<button type="button" data-act="xc-quick" data-v="mensal">Mensalistas</button>`}<button type="button" data-act="xc-quick" data-v="ninguem">Ninguém</button></div></div>
+    <div class="list xc-list">${ids.map(id=>`<label class="item" style="cursor:pointer"><input type="checkbox" data-act="xc-sel" data-j="${id}" ${sel.has(id)?'checked':''}><div class="grow name">${esc(nm(id))}</div></label>`).join('')}</div>
+    <button class="btn primary block" data-act="xc-salvar">${X.xid?'Salvar':'Criar cobrança'}</button>
+    ${X.xid?`<button class="btn danger block" data-act="xc-apagar">Apagar cobrança</button>`:''}
+    <p class="sub" style="margin:0">Cada pessoa da lista vê a cobrança no app${cfg().pixAuto?' e pode pagar com Pix':''}. Entra no saldo do mês quando for paga.</p></div>`);
+  UI.xc.conf=conf}
+function xcLer(){const X=UI.xc;if(!X)return;const g=id=>document.getElementById(id);if(g('xc-nome'))X.nome=g('xc-nome').value;if(g('xc-v'))X.v=g('xc-v').value;if(g('xc-d'))X.d=g('xc-d').value}
+function sheetPag(kind,key,id,m){const c=cfg(),xe=kind==='x'?(((S.caixa[key.split('~')[0]]||{}).extras||{})[key.split('~')[1]]||{}):null,src=kind==='m'?((S.caixa[key]||{}).mens||{}):kind==='x'?(xe.pag||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[id])||{},padrao=kind==='m'?precoM(key):kind==='x'?Number(xe.v)||0:precoDP(S.pel[key]);
   const dl=st.d||dataLanc(m||mesAtual());
-  openSheet(nm(id),`<div class="stack"><div class="sub" style="margin-top:-6px">${kind==='m'?'Mensalidade de '+MESES[Number(key.slice(5))-1]:(EV()?'Pagamento do evento':'Diária da pelada de '+dShort(S.pel[key].data))}</div>
+  openSheet(nm(id),`<div class="stack"><div class="sub" style="margin-top:-6px">${kind==='m'?'Mensalidade de '+MESES[Number(key.slice(5))-1]:kind==='x'?esc(xe.nome||'Cobrança extra'):(EV()?'Pagamento do evento':'Diária da pelada de '+dShort(S.pel[key].data))}</div>
     <div class="grid2"><label class="field"><span>Data</span><input type="date" id="pg-data" value="${dl}"></label><label class="field"><span>Valor (R$)</span><input type="number" id="pg-valor" inputmode="decimal" value="${st.v??padrao}"></label></div>
     <div><div class="sub" style="margin-bottom:6px">Valor cheio: <b class="num">${BRL(padrao)}</b></div><div class="seg pg-pct">${[[1,'Cheio'],[.75,'25% off'],[.5,'50% off']].map(([f,t])=>`<button type="button" data-act="pg-pct" data-v="${Math.round(padrao*f*100)/100}" aria-pressed="${Number(st.v??padrao)===Math.round(padrao*f*100)/100}">${t}</button>`).join('')}</div></div>
     <label class="field"><span>Observação <i class="opc">opcional</i></span><input type="text" id="pg-obs" value="${esc(st.obs||'')}" placeholder="Ex.: desconto pra trazer diarista, ajuda, lesão…"></label>
@@ -1795,12 +1829,12 @@ function sheetPag(kind,key,id,m){const c=cfg(),src=kind==='m'?((S.caixa[key]||{}
     <button class="btn block pag-isento" data-act="pag-set" data-k="${kind}" data-key="${key}" data-j="${id}" data-v="isento">Isentar de pagamento</button>
     ${st.s?`<button class="btn danger block" data-act="pag-set" data-k="${kind}" data-key="${key}" data-j="${id}" data-v="deve">Voltar para "deve"</button>`:''}
     <p class="sub" style="margin:0">Desconto: escolha acima ou digite o valor. Isento (não paga nada) fica anotado no extrato e na prestação de contas, mas não entra no saldo.</p></div>`)}
-function gravarPag(kind,key,id,val){if(kind==='m'){const cx=S.caixa[key]||{mens:{},desp:[]};put('caixa/'+key,{...cx,mens:{...(cx.mens||{}),[id]:val}})}else patch('peladas/'+key,{diarias:{[id]:val}})}
+function gravarPag(kind,key,id,val){if(kind==='x'){const[mx,xid]=key.split('~'),e=((S.caixa[mx]||{}).extras||{})[xid];if(e)gravarExtra(mx,xid,{...e,pag:{...(e.pag||{}),[id]:val}});return}if(kind==='m'){const cx=S.caixa[key]||{mens:{},desp:[]};put('caixa/'+key,{...cx,mens:{...(cx.mens||{}),[id]:val}})}else patch('peladas/'+key,{diarias:{[id]:val}})}
 /* ---------- folhas (sheets) ---------- */
 function openSheet(title,body,foot=''){
   document.getElementById('sheet').innerHTML=`<div class="scrim" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-h"><h2>${esc(title)}</h2><button class="iconbtn" data-act="close" aria-label="Fechar">✕</button></div><div id="sheet-body">${body}</div>${foot}</div></div>`;
 }
-function closeSheet(){document.getElementById('sheet').innerHTML='';F=null;UI.rasc=null;UI.ed=null;UI.mt=null}
+function closeSheet(){document.getElementById('sheet').innerHTML='';F=null;UI.rasc=null;UI.ed=null;UI.mt=null;UI.xc=null}
 let F=null;
 
 function sheetMsg(tipo,ctx={}){
@@ -1826,7 +1860,8 @@ function sheetCfg(){
     <div class="grid2"><label class="field"><span>Dia fixo</span><select id="c-dia">${DIAS.map((d,i)=>`<option value="${i}" ${c.dia==i?'selected':''}>${d}</option>`).join('')}</select></label>
     <label class="field"><span>Início</span><input type="time" id="c-hora" value="${esc(c.hora)}"></label></div>
     <label class="field"><span>Término</span><input type="time" id="c-fim" value="${esc(horaFimDe(null))}"></label>
-    <div class="field"><span>Tipo de pelada</span><select id="c-tipo"><option value="fixa" ${c.evento?'':'selected'}>Fixa (toda semana, com mensalistas e diaristas)</option><option value="evento" ${c.evento?'selected':''}>Evento livre (sem cobrança, datas livres)</option></select></div>
+    <div class="field"><span>Tipo de pelada</span><select id="c-tipo"><option value="fixa" ${c.evento?'':'selected'}>Fixa (toda semana, com mensalistas e diaristas)</option><option value="evento" ${c.evento?'selected':''}>Evento livre (datas livres, sem mensalistas)</option></select></div>
+    <label class="row"><input type="checkbox" id="c-caixa" ${CX()?'checked':''}> Usar o Caixa (mensalidades, diárias e cobranças extras). Desligar só esconde: nada é apagado.</label>
     <label class="field"><span>Local padrão</span>${selLocais('c-localid',c.localId,'Sem local padrão')}</label>
     <button class="btn sm" data-act="locais">Gerenciar locais</button>
     <label class="field"><span>Vagas na pelada (jogadores de linha)</span><input type="number" id="c-vagas" min="2" max="60" inputmode="numeric" value="${vagasCfg()}"></label>
@@ -2198,11 +2233,26 @@ document.addEventListener('click',e=>{
     case'pix-pagar':{const L=minhasPendencias(),x=L.find(y=>y.tipo===d.t&&y.ref===d.r&&y.jid===d.j);if(x)sheetPix(x);break}
     case'pix-copiar':{const t=document.getElementById('pix-cod');if(!t)return;navigator.clipboard?.writeText(t.value).then(()=>toast('Código copiado. Agora cole no app do banco.'),()=>{t.select();toast('Selecione e copie o código.')})||(t.select(),toast('Selecione e copie o código.'));break}
     case'pix-chave':navigator.clipboard?.writeText(cfg().pix||'').then(()=>toast('Chave Pix copiada.'));break;
-    case'pix-demo-pagar':{const x=UI.pixAberto;if(!x)return;const val={s:'pago',d:iso(new Date()),v:x.v,obs:'Pix automático',via:'pix'};if(x.tipo==='m'){const cx=S.caixa[x.ref]||{mens:{},desp:[]};put('caixa/'+x.ref,{...cx,mens:{...(cx.mens||{}),[x.jid]:val}})}else patch('peladas/'+x.ref,{diarias:{[x.jid]:val}});break}
+    case'pix-demo-pagar':{const x=UI.pixAberto;if(!x)return;const val={s:'pago',d:iso(new Date()),v:x.v,obs:'Pix automático',via:'pix'};if(x.tipo==='x'){const[mx,xid]=x.ref.split('~'),e=((S.caixa[mx]||{}).extras||{})[xid];if(e)gravarExtra(mx,xid,{...e,pag:{...(e.pag||{}),[x.jid]:val}})}else if(x.tipo==='m'){const cx=S.caixa[x.ref]||{mens:{},desp:[]};put('caixa/'+x.ref,{...cx,mens:{...(cx.mens||{}),[x.jid]:val}})}else patch('peladas/'+x.ref,{diarias:{[x.jid]:val}});break}
     case'mp-como':sheetComoMP();break;
     case'mp-conectar':if(demo){toast('Na demonstração não dá para conectar uma conta.');return}b.disabled=true;b.textContent='Abrindo o Mercado Pago…';(window.mpConta?window.mpConta('conectar'):Promise.reject(new Error('Indisponível.'))).then(r=>{if(r&&!r.url)setTimeout(sheetCfg,300)}).catch(e=>{b.disabled=false;b.textContent='Conectar Mercado Pago';toast(e.message||'Não deu certo. Tente de novo.')});break;
     case'mp-desconectar':if(demo){toast('Na demonstração não dá para desconectar.');return}if(!b.dataset.sure){b.dataset.sure=1;b.textContent='Toque de novo';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Desconectar'}},3500);return}
       b.disabled=true;window.mpConta('desconectar').then(()=>{toast('Conta do Mercado Pago desconectada. O Pix automático foi desligado.');closeSheet()},e=>{b.disabled=false;toast(e.message||'Não deu certo. Tente de novo.')});break;
+    case'pagou-x':{const e=((S.caixa[d.m]||{}).extras||{})[d.x];if(!e)return;const st=stPag((e.pag||{})[d.j]);if(st){sheetPag('x',d.m+'~'+d.x,d.j,d.m);break}
+      const dt=dataLanc(d.m);gravarPag('x',d.m+'~'+d.x,d.j,{s:'pago',d:dt,v:Number(e.v)||0});toast(`${nm(d.j)}: pago em ${dBR(dt)}.`);break}
+    case'pagou-x-mais':sheetPag('x',d.m+'~'+d.x,d.j,d.m);break;
+    case'x-todos':{const e=((S.caixa[d.m]||{}).extras||{})[d.x];if(!e)return;const dt=dataLanc(d.m),pg={...(e.pag||{})};let n=0;for(const id of e.quem||[])if(S.jog[id]&&!stPag(pg[id])){pg[id]={s:'pago',d:dt,v:Number(e.v)||0};n++}gravarExtra(d.m,d.x,{...e,pag:pg});toast(`${n} pagamento(s) marcados em ${dBR(dt)}.`);break}
+    case'x-nova':UI.xc={m:d.m,xid:null,sel:ativos()};sheetExtra();break;
+    case'x-editar':{const e=((S.caixa[d.m]||{}).extras||{})[d.x];if(!e)return;UI.xc={m:d.m,xid:d.x,sel:(e.quem||[]).filter(id=>S.jog[id])};sheetExtra();break}
+    case'xc-sel':{const X=UI.xc;if(!X)return;const on=b.checked;X.sel=on?[...new Set([...X.sel,d.j])]:X.sel.filter(x=>x!==d.j);const lb=document.querySelector('.sheet .field b.num');if(lb)lb.textContent=X.sel.length;return}
+    case'xc-quick':{const X=UI.xc;if(!X)return;xcLer();X.sel=d.v==='todos'?ativos():d.v==='ninguem'?[]:d.v==='mensal'?ativos().filter(id=>J(id).tipo==='mensalista'):(X.conf||[]).filter(id=>S.jog[id]);const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetExtra();const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc;break}
+    case'xc-salvar':{const X=UI.xc;if(!X)return;xcLer();const nome=(X.nome||'').trim(),v=Number(String(X.v||'').replace(',','.'));
+      if(!nome){toast('Diga o que é a cobrança.');return}if(!(v>=0)||String(X.v||'').trim()===''){toast('Coloque o valor por pessoa.');return}if(!X.sel.length){toast('Escolha quem paga.');return}
+      const e=X.xid?(((S.caixa[X.m]||{}).extras||{})[X.xid]||{}):{},xid=X.xid||('x'+Date.now().toString(36)),mx=(X.d||'').slice(0,7)||X.m;
+      const novo={...e,nome,v:Math.round(v*100)/100,d:X.d||dataLanc(X.m),quem:X.sel,pag:Object.fromEntries(Object.entries(e.pag||{}).filter(([k])=>X.sel.includes(k))),criadoEm:e.criadoEm||Date.now()};
+      if(X.xid&&mx!==X.m)gravarExtra(X.m,X.xid,null);gravarExtra(mx,xid,novo);if(mx!==UI.mes&&mx!==X.m)UI.mes=mx;closeSheet();toast(X.xid?'Cobrança atualizada.':`Cobrança criada para ${novo.quem.length} pessoa(s).`);break}
+    case'xc-apagar':{const X=UI.xc;if(!X||!X.xid)return;if(!b.dataset.sure){b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar cobrança'}},3500);return}
+      gravarExtra(X.m,X.xid,null);closeSheet();toast('Cobrança apagada.');break}
     case'jg-gerar':{const p=S.pel[d.p],nj=novosJogos(p);if(nj)patch('peladas/'+d.p,{jogos:nj});break}
     case'jg-prox':{const p=S.pel[d.p],nx=proximaFase(p);if(nx)patch('peladas/'+d.p,{jogos:[...(p.jogos||[]),...nx]});break}
     case'jg-zerar':if(b.dataset.sure){patch('peladas/'+d.p,{jogos:null});toast('Tabela apagada.')}else{b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar tabela de jogos'}},3500)}break;
@@ -2249,7 +2299,7 @@ document.addEventListener('click',e=>{
       document.getElementById('gol-txt').textContent=F.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
       const ev=g('c-tipo')==='evento',dataEv=null,diaEv=Number(g('c-dia'));
-      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),pixAuto:!!document.getElementById('c-pixauto')?.checked,pixRepassa:!!document.getElementById('c-pixrepassa')?.checked,formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
+      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),usarCaixa:!!document.getElementById('c-caixa')?.checked,pixAuto:!!document.getElementById('c-pixauto')?.checked,pixRepassa:!!document.getElementById('c-pixrepassa')?.checked,formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',evento:ev,data:dataEv});
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':case'pagou-d':{const kind=d.act==='pagou-m'?'m':'d',key=kind==='m'?d.m:d.p,src=kind==='m'?((S.caixa[key]||{}).mens||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[d.j]);

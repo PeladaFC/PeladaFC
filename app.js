@@ -485,6 +485,7 @@ window.pixCriar = async ({ tipo, ref, jid }) => {
   return j;
 };
 if (MOCK) window.__pixAprovar = async () => { const c = window.__ultimaCobranca; if (!c) return; const val = { s: 'pago', d: new Date().toISOString().slice(0, 10), v: 80, obs: 'Pix automático', via: 'pix', mp: 'mock' };
+  if (c.tipo === 'x') { const [m, xid] = c.ref.split('~'); await B.set(`grupos/${c.gid}/caixa/${m}`, { extras: { [xid]: { pag: { [c.jid]: val } } } }, { merge: true }); return; }
   if (c.tipo === 'm') await B.set(`grupos/${c.gid}/caixa/${c.ref}`, { mens: { [c.jid]: val } }, { merge: true }); else await B.set(`grupos/${c.gid}/peladas/${c.ref}`, { diarias: { [c.jid]: val } }, { merge: true }); };
 const PUSH = { pub: null, estado: 'carregando' }; if (MOCK) window.__PUSH = PUSH;
 const ehIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);

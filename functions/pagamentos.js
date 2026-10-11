@@ -82,6 +82,14 @@ module.exports = db => {
       const [, mm, dd] = String(p.data).split('-');
       return { v, cfg, desc: `Diária da pelada de ${dd}/${mm}` };
     }
+    if (tipo === 'x') {
+      const [m, xid] = ref.split('~');
+      if (!/^\d{4}-\d{2}$/.test(m || '') || !/^[a-z0-9]{2,30}$/.test(xid || '')) throw Object.assign(new Error('Cobrança inválida.'), { http: 400 });
+      const cx = (await ler(`grupos/${gid}/caixa/${m}`)) || {}, x = (cx.extras || {})[xid];
+      if (!x || !(x.quem || []).includes(jid)) throw Object.assign(new Error('Cobrança não encontrada.'), { http: 404 });
+      if (stPag((x.pag || {})[jid])) throw Object.assign(new Error('Essa cobrança já está paga.'), { http: 409 });
+      return { v: Number(x.v) || 0, cfg, desc: String(x.nome || 'Cobrança extra').slice(0, 60) };
+    }
     throw Object.assign(new Error('Tipo inválido.'), { http: 400 });
   }
 
@@ -152,6 +160,7 @@ module.exports = db => {
         const val = { s: 'pago', d: hojeRecife(), v: Number(cob.base != null ? cob.base : p.transaction_amount), obs: 'Pix automático', via: 'pix', mp: String(p.id) };
         if (tipo === 'm') await db.doc(`grupos/${gid}/caixa/${ref}`).set({ mens: { [jid]: val } }, { merge: true });
         else if (tipo === 'd') await db.doc(`grupos/${gid}/peladas/${ref}`).set({ diarias: { [jid]: val } }, { merge: true });
+        else if (tipo === 'x') { const [m, xid] = ref.split('~'); await db.doc(`grupos/${gid}/caixa/${m}`).set({ extras: { [xid]: { pag: { [jid]: val } } } }, { merge: true }); }
         logger.info('pago', gid, chave, p.id);
       }
       res.status(200).send('ok');
