@@ -112,6 +112,12 @@ module.exports = db => {
       const conta = await contaMP(gid), token = conta && conta.token;
       if (!token) return res.status(412).json({ erro: 'O Pix automático ainda não foi ligado nesta pelada.' });
       const { v, cfg, desc } = await devido(gid, tipo, ref, jid);
+      // o dono da conta que recebe não paga por Pix (o Mercado Pago recusa pagar para si mesmo)
+      if (conta.por) {
+        if (cfg.mpDono !== conta.por) await db.doc(`grupos/${gid}/config/geral`).set({ mpDono: conta.por }, { merge: true });
+        const pd = await ler(`grupos/${gid}/presencas/${conta.por}`);
+        if (pd && pd.jogador === jid) return res.status(409).json({ erro: 'A conta do Mercado Pago que recebe é sua. Pagar para si mesmo não é permitido: marque sua parte como paga no Caixa.', dono: true });
+      }
       if (!(v > 0)) return res.status(400).json({ erro: 'Não há valor a pagar.' });
       const com = conta.via === 'oauth' ? (await plataforma()).comissao : 0;
       const valor = cfg.pixRepassa !== false ? Math.ceil(v / (1 - TAXA - com) * 100) / 100 : Math.round(v * 100) / 100;
@@ -182,7 +188,7 @@ module.exports = db => {
       if (!grupo || !(grupo.admins || []).includes(u.uid)) return res.status(403).json({ erro: 'Só o administrador pode fazer isso.' });
       if (acao === 'desconectar') {
         await db.doc(`grupos/${gid}/segredos/mp`).delete();
-        await db.doc(`grupos/${gid}/config/geral`).set({ mpConectadoEm: null, pixAuto: false }, { merge: true });
+        await db.doc(`grupos/${gid}/config/geral`).set({ mpConectadoEm: null, pixAuto: false, mpDono: null }, { merge: true });
         return res.json({ ok: true });
       }
       const P = await plataforma();
@@ -206,7 +212,7 @@ module.exports = db => {
       const P = await plataforma();
       const n = await trocaOAuth({ client_id: P.id, client_secret: P.segredo, grant_type: 'authorization_code', code, redirect_uri: URL_RETORNO });
       await db.doc(`grupos/${e.gid}/segredos/mp`).set({ ...n, via: 'oauth', em: Date.now(), por: e.uid });
-      await db.doc(`grupos/${e.gid}/config/geral`).set({ mpConectadoEm: Date.now(), mpTaxaApp: P.comissao, mpTeste: false }, { merge: true });
+      await db.doc(`grupos/${e.gid}/config/geral`).set({ mpConectadoEm: Date.now(), mpTaxaApp: P.comissao, mpTeste: false, mpDono: e.uid }, { merge: true });
       logger.info('mp conectado', e.gid, n.mpUser);
       volta('ok');
     } catch (err) { logger.error(err); volta('erro'); }

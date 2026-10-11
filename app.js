@@ -460,8 +460,8 @@ const URL_MPCONTA = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.n
 window.mpConta = async acao => {
   if (!ABERTO) throw new Error('Abra a pelada de novo.');
   if (MOCK) {
-    if (acao === 'desconectar') { await B.set(`grupos/${ABERTO}/config/geral`, { mpConectadoEm: null, pixAuto: false }, { merge: true }); return {}; }
-    await B.set(`grupos/${ABERTO}/config/geral`, { mpConectadoEm: Date.now(), mpTaxaApp: 0.01, mpTeste: false }, { merge: true }); aviso('Mercado Pago conectado! Agora ligue o Pix automático.'); return {};
+    if (acao === 'desconectar') { await B.set(`grupos/${ABERTO}/config/geral`, { mpConectadoEm: null, pixAuto: false, mpDono: null }, { merge: true }); return {}; }
+    await B.set(`grupos/${ABERTO}/config/geral`, { mpConectadoEm: Date.now(), mpTaxaApp: 0.01, mpTeste: false, mpDono: EU && EU.uid }, { merge: true }); aviso('Mercado Pago conectado!'); return {};
   }
   let t = null; try { t = await B.token(); } catch (e) { }
   if (!t) throw new Error('Entre na sua conta de novo.');
@@ -474,7 +474,7 @@ window.mpConta = async acao => {
 };
 { const mpVolta = MP_VOLTA;
   if (mpVolta) { history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : ''));
-    setTimeout(() => aviso(mpVolta === 'ok' ? '✅ Mercado Pago conectado! Em Ajustes, ligue o Pix automático e salve.' : 'Não deu para conectar o Mercado Pago. Tente de novo em Ajustes.'), 1800); } }
+    setTimeout(() => aviso(mpVolta === 'ok' ? '✅ Mercado Pago conectado! O Pix pelo app já está ligado.' : 'Não deu para conectar o Mercado Pago. Tente de novo em Ajustes.'), 1800); } }
 window.pixCriar = async ({ tipo, ref, jid }) => {
   if (!ABERTO) throw new Error('Abra a pelada de novo.');
   if (MOCK) {

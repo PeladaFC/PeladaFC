@@ -1810,11 +1810,16 @@ function pendenciasDe(jid){if(!jid||!CX())return[];const out=[],m=mesAtual();
 const TAXA_MP=.0099;function taxaApp(c){c=c||cfg();return c.mpTaxaApp!=null?Number(c.mpTaxaApp):.01}function taxaTotal(c){return TAXA_MP+taxaApp(c)}
 function pct(x){return(Math.round(x*10000)/100).toLocaleString('pt-BR')+'%'}function taxasTxt(c){return`${pct(taxaTotal(c))} por pagamento`}
 function mpOn(){return!!cfg().mpConectadoEm}
+/* dono da conta do Mercado Pago que recebe: não pode pagar por Pix para si mesmo */
+function donoJid(){const u=cfg().mpDono;return u&&S.pres[u]&&S.jog[S.pres[u].jogador]?S.pres[u].jogador:null}
+function ehDono(jid){return!!jid&&jid===donoJid()}
+function pagarDono(x){const dt=iso(new Date());gravarPag(x.tipo,x.ref,x.jid,{s:'pago',d:dt,v:x.v,obs:'Dono da conta (sem Pix)'});toast(nm(x.jid)+': marcado como pago.')}
 function painelMeusPag(){const L=minhasPendencias();if(!L.length)return'';const c=cfg(),auto=mpOn(),tot=L.reduce((a,x)=>a+x.v,0);
-  const bt=x=>auto?`<button class="btn sm pag-bt" data-act="pix-pagar" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pagar com Pix</button>`:'';
+  const dono=auto&&ehDono(L[0].jid);
+  const bt=x=>dono?`<button class="btn sm pag-bt" data-act="dono-pago" data-t="${x.tipo}" data-r="${esc(x.ref)}">Marcar como pago</button>`:auto?`<button class="btn sm pag-bt" data-act="pix-pagar" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pagar com Pix</button>`:'';
   return`<div class="pag-alerta"><div class="pag-h"><span class="pag-ic">💰</span><b class="grow">Você tem ${BRL(tot)} para pagar</b></div>
     ${L.map(x=>`<div class="pag-it"><span class="grow name">${esc(x.desc)}</span><span class="num">${BRL(x.v)}</span>${bt(x)}</div>`).join('')}
-    <div class="pag-s" style="margin-top:6px">${auto?'Confirmado na hora, sem comprovante.':'O pagamento pelo app ainda não foi ligado. Avise o administrador.'}</div></div>`}
+    <div class="pag-s" style="margin-top:6px">${dono?'A conta do Mercado Pago que recebe é <b>sua</b>, e ninguém pode pagar Pix para si mesmo. Sua parte já está com você: é só marcar como paga.':auto?'Confirmado na hora, sem comprovante.':'O pagamento pelo app ainda não foi ligado. Avise o administrador.'}</div></div>`}
 function sheetNaHora(){const m=mesAtual(),ids=ativos().sort((a,b)=>nm(a).localeCompare(nm(b))),L=ids.map(id=>[id,pendenciasDe(id)]).filter(([,x])=>x.length);
   openSheet('Cobrar na hora',`<div class="stack"><p class="sub" style="margin:0">Escolha quem vai pagar. Abre um QR Code só dele e o Caixa marca PAGO sozinho quando o Pix cair.</p>
     <div class="list">${L.map(([id,x])=>x.map(y=>`<button class="item" style="width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line)" data-act="nahora" data-t="${y.tipo}" data-r="${esc(y.ref)}" data-j="${id}"><div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub">${esc(y.desc)}</div></div><b class="num">${BRL(y.v)}</b></button>`).join('')).join('')||'<div class="empty">Ninguém devendo agora. 🙌</div>'}</div></div>`)}
@@ -1841,6 +1846,7 @@ function sheetComoMP(){const c=cfg();openSheet('Como funciona o Pix automático'
   <li>Marque <b>Ligar Pix automático</b> e salve os ajustes.</li></ol>
   <p style="margin:0">A partir daí cada jogador vê <b>Pagar com Pix</b> no app. Quando o Pix cai, o Caixa marca <b>PAGO</b> na hora, sem comprovante.</p>
   <p style="margin:0">Taxa do Pix: ${taxasTxt(c)}. Ela sai do valor recebido. Se preferir, marque <b>Quem paga cobre a taxa</b> e a pelada recebe o valor cheio.</p>
+  <p style="margin:0"><b>Importante:</b> quem conectar a conta é o <b>dono</b> dela. O dono não paga por Pix (o Mercado Pago não deixa pagar para si mesmo): a parte dele aparece com o botão <b>Marcar como pago</b>.</p>
   <p class="sub" style="margin:0">O app só consegue <b>criar cobranças</b> para a sua conta; ninguém consegue tirar dinheiro dela. Dá para desconectar quando quiser. A conta precisa estar com a identidade confirmada no Mercado Pago.</p>
   <button class="btn block" data-act="cfg">Voltar aos ajustes</button></div>`)}
 /* cobrança extra: churrasco, camisa, evento… (fica em caixa/{mês}.extras) */
@@ -1926,7 +1932,7 @@ function sheetCfg(){
     <div class="panel stack mp-cfg"><div class="panel-h"><h3>💳 Pix automático</h3><span class="sub">Mercado Pago</span></div>
       <div class="sub">Cada jogador paga pelo app e o Caixa marca <b>PAGO</b> sozinho. O dinheiro cai na conta do Mercado Pago da pelada. Taxa do Pix: ${taxasTxt(c)}.</div>
       <div class="row between"><span class="small">${c.mpConectadoEm?`✅ Conta conectada em ${new Date(c.mpConectadoEm).toLocaleDateString('pt-BR')}`:'⚪ Nenhuma conta conectada'}</span>${c.mpConectadoEm?`<button type="button" class="btn sm" data-act="mp-desconectar">Desconectar</button>`:`<button type="button" class="btn sm" data-act="mp-como">Como funciona</button>`}</div>
-      ${c.mpConectadoEm?'':`<button type="button" class="btn primary block" data-act="mp-conectar">Conectar Mercado Pago</button>`}
+      ${c.mpConectadoEm?`<div class="sub">${donoJid()?`Conta de <b>${esc(nm(donoJid()))}</b>. `:''}O dono da conta não paga por Pix (não dá para pagar para si mesmo): a parte dele é marcada como paga, sem taxa.</div>`:`<button type="button" class="btn primary block" data-act="mp-conectar">Conectar Mercado Pago</button>`}
       <label class="row"><input type="checkbox" id="c-pixrepassa" ${c.pixRepassa!==false?'checked':''}> Quem paga cobre a taxa (${pct(taxaTotal(c))})</label></div>
     <label class="row"><input type="checkbox" id="c-nivelpub" ${c.nivelPublico?'checked':''}> Mostrar o nível da pelada (estrelas) para os jogadores</label>
     <label class="row"><input type="checkbox" id="c-mostraval" ${c.mostrarAval===false?'':'checked'}> Mostrar as avaliações dos jogadores (0 a 100) para todos. Mesmo ligado, só aparece depois da avaliação da galera.</label>
@@ -2311,9 +2317,11 @@ document.addEventListener('click',e=>{
       if(X.xid&&mx!==X.m)gravarExtra(X.m,X.xid,null);gravarExtra(mx,xid,novo);if(mx!==UI.mes&&mx!==X.m)UI.mes=mx;closeSheet();toast(X.xid?'Cobrança atualizada.':`Cobrança criada para ${novo.quem.length} pessoa(s).`);break}
     case'xc-apagar':{const X=UI.xc;if(!X||!X.xid)return;if(!b.dataset.sure){b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar cobrança'}},3500);return}
       gravarExtra(X.m,X.xid,null);closeSheet();toast('Cobrança apagada.');break}
+    case'dono-pago':{const j=d.j||meuJogador(),x=pendenciasDe(j).find(y=>y.tipo===d.t&&y.ref===d.r);if(x){pagarDono(x);closeSheet()}break}
     case'nahora-lista':sheetNaHora();break;
     case'nahora':{const x=pendenciasDe(d.j).find(y=>y.tipo===d.t&&y.ref===d.r)||(()=>{/* item fora da janela de 2 meses: monta na mão */const v=d.t==='m'?precoM(d.r):d.t==='d'?valorDe(S.pel[d.r],d.j):Number((((S.caixa[d.r.split('~')[0]]||{}).extras||{})[d.r.split('~')[1]]||{}).v)||0;
         const desc=d.t==='m'?'Mensalidade de '+MESES[Number(d.r.slice(5))-1].toLowerCase():d.t==='d'?(S.pel[d.r].extra?'Evento extra de ':EV()?'Evento de ':'Diária da pelada de ')+dShort(S.pel[d.r].data):((((S.caixa[d.r.split('~')[0]]||{}).extras||{})[d.r.split('~')[1]]||{}).nome||'Cobrança extra');return{tipo:d.t,ref:d.r,jid:d.j,v,desc}})();
+      if(mpOn()&&ehDono(x.jid)){openSheet('Dono da conta',`<div class="stack"><p style="margin:0"><b>${esc(nm(x.jid))}</b> é o dono da conta do Mercado Pago que recebe. Pix para si mesmo não é permitido.</p><p class="sub" style="margin:0">${esc(x.desc)} · <b class="num">${BRL(x.v)}</b>. O dinheiro já está com ele: é só marcar como pago.</p><button class="btn primary block" data-act="dono-pago" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Marcar como pago</button></div>`);break}
       if(mpOn())sheetPix(x);else openSheet('Cobrar na hora',`<div class="stack"><div class="banner due" style="display:block">Para cobrar pelo app, conecte o Mercado Pago da pelada em Ajustes. Todo pagamento por Pix passa por ele e é confirmado sozinho.</div><button class="btn primary block" data-act="cfg">Abrir ajustes</button></div>`);break}
     case'nahora-pago':{const dt=iso(new Date()),val={s:'pago',d:dt,v:Number(d.v)||0,obs:'Pix (QR na hora)'};gravarPag(d.t,d.r,d.j,val);closeSheet();toast(nm(d.j)+': pago.');break}
     case'jg-gerar':{const p=S.pel[d.p],nj=novosJogos(p);if(nj)patch('peladas/'+d.p,{jogos:nj});break}
