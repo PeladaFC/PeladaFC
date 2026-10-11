@@ -114,7 +114,7 @@ module.exports = db => {
       const { v, cfg, desc } = await devido(gid, tipo, ref, jid);
       if (!(v > 0)) return res.status(400).json({ erro: 'Não há valor a pagar.' });
       const com = conta.via === 'oauth' ? (await plataforma()).comissao : 0;
-      const valor = cfg.pixRepassa ? Math.ceil(v / (1 - TAXA - com) * 100) / 100 : Math.round(v * 100) / 100;
+      const valor = cfg.pixRepassa !== false ? Math.ceil(v / (1 - TAXA - com) * 100) / 100 : Math.round(v * 100) / 100;
       const fee = com > 0 ? Math.round(valor * com * 100) / 100 : 0;
       const chave = `${tipo}_${ref}_${jid}`, cobRef = db.doc(`grupos/${gid}/cobrancas/${chave}`);
       const ant = (await cobRef.get()).data();

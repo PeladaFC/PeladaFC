@@ -1812,15 +1812,15 @@ function pct(x){return(Math.round(x*10000)/100).toLocaleString('pt-BR')+'%'}func
 function mpOn(){return!!cfg().mpConectadoEm}
 function painelMeusPag(){const L=minhasPendencias();if(!L.length)return'';const c=cfg(),auto=mpOn(),tot=L.reduce((a,x)=>a+x.v,0);
   const bt=x=>auto?`<button class="btn sm pag-bt" data-act="pix-pagar" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pagar com Pix</button>`:'';
-  return`<div class="pag-alerta"><div class="pag-h"><span class="pag-ic">💰</span><div class="grow"><b>Você tem ${BRL(tot)} para pagar</b><div class="pag-s">${L.length>1?L.length+' cobranças':'1 cobrança'} da pelada</div></div></div>
-    ${L.map(x=>`<div class="pag-it"><div class="grow"><div class="name">${esc(x.desc)}</div><div class="num">${BRL(x.v)}</div></div>${bt(x)}</div>`).join('')}
-    <div class="pag-s" style="margin-top:6px">${auto?'Pague pelo app: o pagamento é confirmado sozinho, na hora. Não precisa mandar comprovante.':'O pagamento pelo app ainda não foi ligado. Avise o administrador.'}</div></div>`}
+  return`<div class="pag-alerta"><div class="pag-h"><span class="pag-ic">💰</span><b class="grow">Você tem ${BRL(tot)} para pagar</b></div>
+    ${L.map(x=>`<div class="pag-it"><span class="grow name">${esc(x.desc)}</span><span class="num">${BRL(x.v)}</span>${bt(x)}</div>`).join('')}
+    <div class="pag-s" style="margin-top:6px">${auto?'Confirmado na hora, sem comprovante.':'O pagamento pelo app ainda não foi ligado. Avise o administrador.'}</div></div>`}
 function sheetNaHora(){const m=mesAtual(),ids=ativos().sort((a,b)=>nm(a).localeCompare(nm(b))),L=ids.map(id=>[id,pendenciasDe(id)]).filter(([,x])=>x.length);
   openSheet('Cobrar na hora',`<div class="stack"><p class="sub" style="margin:0">Escolha quem vai pagar. Abre um QR Code só dele e o Caixa marca PAGO sozinho quando o Pix cair.</p>
     <div class="list">${L.map(([id,x])=>x.map(y=>`<button class="item" style="width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line)" data-act="nahora" data-t="${y.tipo}" data-r="${esc(y.ref)}" data-j="${id}"><div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub">${esc(y.desc)}</div></div><b class="num">${BRL(y.v)}</b></button>`).join('')).join('')||'<div class="empty">Ninguém devendo agora. 🙌</div>'}</div></div>`)}
 function pixPago(x){if(!x)return false;if(x.tipo==='x'){const[mx,xid]=x.ref.split('~'),e=((S.caixa[mx]||{}).extras||{})[xid];return!!(e&&stPag((e.pag||{})[x.jid]))}if(x.tipo==='m')return!!stPag(((S.caixa[x.ref]||{}).mens||{})[x.jid]);const p=S.pel[x.ref];return!!(p&&stPag((p.diarias||{})[x.jid]))}
 async function sheetPix(x){UI.pixAberto=x;openSheet('Pagar com Pix','<div class="empty">Gerando o Pix…</div>');
-  let d;try{d=demo?{valor:cfg().pixRepassa?Math.ceil(x.v/(1-taxaTotal())*100)/100:x.v,base:x.v,qr:'00020126580014br.gov.bcb.pix0136demo-pelada-fc5204000053039865802BR5925PELADA FC DEMO6009RECIFE62070503***6304ABCD',qr64:'',link:'',demo:true}:await window.pixCriar({tipo:x.tipo,ref:x.ref,jid:x.jid})}
+  let d;try{d=demo?{valor:cfg().pixRepassa!==false?Math.ceil(x.v/(1-taxaTotal())*100)/100:x.v,base:x.v,qr:'00020126580014br.gov.bcb.pix0136demo-pelada-fc5204000053039865802BR5925PELADA FC DEMO6009RECIFE62070503***6304ABCD',qr64:'',link:'',demo:true}:await window.pixCriar({tipo:x.tipo,ref:x.ref,jid:x.jid})}
   catch(e){const b=document.getElementById('sheet-body');if(b)b.innerHTML=`<div class="stack"><div class="banner due" style="display:block">${esc(e.message||'Não deu para gerar o Pix agora.')}</div><button class="btn block" data-act="close">Fechar</button></div>`;return}
   UI.pixDado=d;const b=document.getElementById('sheet-body');if(!b||UI.pixAberto!==x)return;
   const outro=x.jid!==meuJogador();
@@ -1927,7 +1927,7 @@ function sheetCfg(){
       <div class="sub">Cada jogador paga pelo app e o Caixa marca <b>PAGO</b> sozinho. O dinheiro cai na conta do Mercado Pago da pelada. Taxa do Pix: ${taxasTxt(c)}.</div>
       <div class="row between"><span class="small">${c.mpConectadoEm?`✅ Conta conectada em ${new Date(c.mpConectadoEm).toLocaleDateString('pt-BR')}`:'⚪ Nenhuma conta conectada'}</span>${c.mpConectadoEm?`<button type="button" class="btn sm" data-act="mp-desconectar">Desconectar</button>`:`<button type="button" class="btn sm" data-act="mp-como">Como funciona</button>`}</div>
       ${c.mpConectadoEm?'':`<button type="button" class="btn primary block" data-act="mp-conectar">Conectar Mercado Pago</button>`}
-      <label class="row"><input type="checkbox" id="c-pixrepassa" ${c.pixRepassa?'checked':''}> Quem paga cobre a taxa (${pct(taxaTotal(c))})</label></div>
+      <label class="row"><input type="checkbox" id="c-pixrepassa" ${c.pixRepassa!==false?'checked':''}> Quem paga cobre a taxa (${pct(taxaTotal(c))})</label></div>
     <label class="row"><input type="checkbox" id="c-nivelpub" ${c.nivelPublico?'checked':''}> Mostrar o nível da pelada (estrelas) para os jogadores</label>
     <label class="row"><input type="checkbox" id="c-mostraval" ${c.mostrarAval===false?'':'checked'}> Mostrar as avaliações dos jogadores (0 a 100) para todos. Mesmo ligado, só aparece depois da avaliação da galera.</label>
     <div class="panel"><h3 style="margin-bottom:6px">Escudo da pelada</h3><div class="row" style="gap:12px;flex-wrap:nowrap">
