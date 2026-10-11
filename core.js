@@ -1243,8 +1243,8 @@ function painelJogos(pid,p,A){const f=formatoDe(p),T=p.times||[];if(f==='conv'||
     if(nx)h+=`<button class="btn primary block" style="margin-top:10px" data-act="jg-prox" data-p="${pid}">${FASE_N[nx[0].fase]==='Final'?'Montar a final':'Montar '+FASE_N[nx[0].fase].toLowerCase()}</button>`;
     if(A)h+=`<button class="btn sm danger" style="margin-top:10px" data-act="jg-zerar" data-p="${pid}">Apagar tabela de jogos</button>`}
   return h+'</div>'}
-function painelFormato(pid,p){const f=formatoDe(p),T=(p.times||[]).length,iv=idaVoltaDe(p),nj=f==='conv'?0:f==='mm'?T-1:T*(T-1)/2*(iv?2:1)+(f==='ligamm'?nClassDe(p)-1:0),min=minutosPelada(p);
-  return`<div class="panel stack"><div class="panel-h"><h3>Formato desta pelada</h3></div>
+function painelFormato(pid,p){const f=formatoDe(p),T=(p.times||[]).length||Number(p.nTimes||cfg().times)||3,iv=idaVoltaDe(p),nj=f==='conv'?0:f==='mm'?T-1:T*(T-1)/2*(iv?2:1)+(f==='ligamm'?nClassDe(p)-1:0),min=minutosPelada(p);
+  return`<div class="panel stack"><div class="panel-h"><h3>🏆 Formato / campeonato</h3></div>
     <select data-act="formato" data-p="${pid}" aria-label="Formato">${Object.entries(FORMATOS).map(([k,n])=>`<option value="${k}" ${k===f?'selected':''}>${n}</option>`).join('')}</select>
     ${f==='liga'||f==='ligamm'?`<label class="row" style="gap:8px"><input type="checkbox" data-act="ida-volta" data-p="${pid}" ${iv?'checked':''}> Ida e volta</label>`:''}
     ${f==='ligamm'?`<label class="field"><span>Classificados para o mata-mata</span><select data-act="n-class" data-p="${pid}">${[2,4,8].filter(n=>n<=T).map(n=>`<option value="${n}" ${n===nClassDe(p)?'selected':''}>${n} (${n===2?'final':n===4?'semifinal':'quartas'})</option>`).join('')}</select></label>`:''}
@@ -1272,6 +1272,8 @@ function subTimes(pid,p,l,A){
       ${rs.length?`<div class="list">${rs.map(r=>`<div class="item"><span style="font-size:20px">${r.tipo==='separar'?'🚫':'🤝'}</span><div class="grow small">${textoRegra(r)}${(()=>{const ids=idsRegra(r),fora=ids.filter(x=>!vai.has(x));return!fora.length?'':ids.length-fora.length<2?'<div class="sub">Não vale hoje: falta gente confirmar</div>':`<div class="sub">Hoje sem: ${nomesLista(fora)}</div>`})()}</div><button class="btn sm" data-act="regra-del" data-i="${(c.restr||[]).indexOf(r)}" aria-label="Apagar regra">✕</button></div>`).join('')}</div>`:'<div class="sub" style="margin-top:-4px">Ex.: dois amigos que querem jogar juntos, ou dois irmãos que não podem cair no mesmo time.</div>'}
       <div class="lado"><button class="btn sm" data-act="regra-nova" data-v="juntar">🤝 Jogar juntos</button><button class="btn sm" data-act="regra-nova" data-v="separar">🚫 Não jogar juntos</button></div>
       ${rs.length&&p.times?'<div class="sub">Mudou as regras? Toque em <b>Sortear de novo</b>.</div>':''}</div>`}
+  // formato do campeonato (aparece já antes de montar os times)
+  sec.formato=painelFormato(pid,p);
   // 3. sortear
   sec.sortear=`<div class="panel stack"><div class="row between"><div><b>${l.escalados.length} na linha · ${l.gks.length} goleiro(s)</b><div class="sub">${c.golSorteio?'Goleiros entram no sorteio':'Goleiros ficam fora do sorteio (extra)'} · equilibra por nota e posição${(c.restr||[]).length?' · respeita '+c.restr.length+' regra(s)':''}</div></div>
     <div class="row"><select id="nt" aria-label="Número de times" style="width:auto">${[2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
@@ -1284,13 +1286,12 @@ function subTimes(pid,p,l,A){
     sec.equil=`<div class="panel"><div class="row between"><b>Equilíbrio</b><span class="num small muted">diferença de ${ovr(mx-mn)} ponto${ovr(mx-mn)===1?'':'s'} na média</span></div><div class="meter" style="margin-top:8px"><i style="width:${Math.max(5,100-(mx-mn)*60)}%"></i></div><div class="sub" style="margin-top:6px">Toque em um jogador e depois em outro de outro time para trocar os dois.</div></div>`;
     // 5. times
     sec.times=blocoTimes(pid,p,true);
-    sec.formato=painelFormato(pid,p);
     // 6. publicar
     sec.pub=timesPub(p)?`<div class="banner" style="display:block"><b>✓ Times publicados.</b> A galera já vê no app.<div class="lado" style="margin-top:8px"><button class="btn sm" data-act="msg" data-v="times">Mandar no WhatsApp</button><button class="btn sm" data-act="pub-times" data-p="${pid}" data-v="0">Esconder da galera</button></div></div>`
       :`<div class="banner due" style="display:block"><b>🔒 Rascunho: só os administradores veem estes times.</b><br><span class="sub" style="color:inherit">Sorteie e troque jogadores quantas vezes quiser. A galera só vê depois que você publicar.</span>
         <button class="btn primary block" style="margin-top:8px" data-act="pub-times" data-p="${pid}" data-v="1">Publicar times no app</button>
         <button class="btn block" style="margin-top:8px" data-act="msg" data-v="times">Mandar times no WhatsApp</button></div>`}
-  return['semNota','regras','sortear','equil','times','formato','pub'].filter(k=>sec[k]).map((k,i)=>i?`<div style="${M}">${sec[k]}</div>`:sec[k]).join('')+(p.times?'':`<div class="empty">Os times aparecem aqui depois do sorteio.</div>`);
+  return['semNota','regras','formato','sortear','equil','times','pub'].filter(k=>sec[k]).map((k,i)=>i?`<div style="${M}">${sec[k]}</div>`:sec[k]).join('')+(p.times?'':`<div class="empty">Os times aparecem aqui depois do sorteio.</div>`);
 }
 function blocoTimes(pid,p,A){let h='<div class="teams">';
   p.times.forEach((t,ti)=>{const co=CORES[t.cor];
