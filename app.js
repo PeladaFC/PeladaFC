@@ -84,6 +84,7 @@ function backendMock() {
 const $ = id => document.getElementById(id);
 const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { } } };
+const MP_VOLTA = new URLSearchParams(location.search).get('mp'); // volta do Mercado Pago (?mp=ok|erro)
 const novoId = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
 const novoCodigo = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('');
 const POSN = { GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral', VOL: 'Volante', MEI: 'Meio-campo', ATA: 'Atacante' };
@@ -324,6 +325,9 @@ async function depoisDoLogin() {
   if (!PERFIL || !PERFIL.apelido && !PERFIL.pos) { ir('perfil'); return; }
   const conv = ls.get('pelada.convite');
   if (conv) { ls.set('pelada.convite', null); await buscarCodigo(conv); return; }
+  // Voltando do Mercado Pago: reabre a pelada direto nos Ajustes.
+  const mv = ls.get('pelada.mpVolta');
+  if (MP_VOLTA && mv && GRUPOS[mv]) { ls.set('pelada.mpVolta', null); window.__abrirCfgPix = true; abrirGrupo(mv); renovarPush(); return; }
   // Ao abrir o app (ícone ou site), sempre começa em "Minhas peladas".
   ir('minhas');
   renovarPush();
@@ -464,10 +468,10 @@ window.mpConta = async acao => {
   catch (e) { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.erro || 'Não deu certo agora. Tente de novo.');
-  if (j.url) location.assign(j.url);
+  if (j.url) { ls.set('pelada.mpVolta', ABERTO); location.assign(j.url); }
   return j;
 };
-{ const mpVolta = new URLSearchParams(location.search).get('mp');
+{ const mpVolta = MP_VOLTA;
   if (mpVolta) { history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : ''));
     setTimeout(() => aviso(mpVolta === 'ok' ? '✅ Mercado Pago conectado! Em Ajustes, ligue o Pix automático e salve.' : 'Não deu para conectar o Mercado Pago. Tente de novo em Ajustes.'), 1800); } }
 window.pixCriar = async ({ tipo, ref, jid }) => {
