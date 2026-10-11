@@ -1843,7 +1843,8 @@ function sheetAntesMP(){openSheet('Antes de conectar',`<div class="stack small">
   <ol style="margin:0;padding-left:20px;display:grid;gap:6px">
   <li>Ser de alguém <b>maior de 18 anos</b>. Conta de menor não pode receber pagamentos.</li>
   <li>Ter a <b>identidade confirmada</b> no Mercado Pago (documento e selfie).</li>
-  <li>Ter uma <b>chave Pix cadastrada</b> no Mercado Pago.</li></ol>
+  <li>Ter uma <b>chave Pix cadastrada</b> no Mercado Pago.</li>
+  <li>Estar no modo <b>"Uso pessoal e vendas"</b> (o Mercado Pago pergunta ao abrir a conta ou ao cobrar pela primeira vez).</li></ol>
   <p style="margin:0"><b>Atenção:</b> o dono da conta não paga por Pix para ela mesma (o Mercado Pago recusa pagamento para o mesmo CPF). A parte dele é marcada como paga no Caixa.</p>
   <button class="btn primary block" data-act="mp-conectar">Entendi, conectar</button><button class="btn block" data-act="cfg">Voltar</button></div>`)}
 function sheetComoMP(){const c=cfg();openSheet('Como funciona o Pix automático',`<div class="stack small">
@@ -1853,7 +1854,7 @@ function sheetComoMP(){const c=cfg();openSheet('Como funciona o Pix automático'
   <li>Marque <b>Ligar Pix automático</b> e salve os ajustes.</li></ol>
   <p style="margin:0">A partir daí cada jogador vê <b>Pagar com Pix</b> no app. Quando o Pix cai, o Caixa marca <b>PAGO</b> na hora, sem comprovante.</p>
   <p style="margin:0">Taxa do Pix: ${taxasTxt(c)}. Ela sai do valor recebido. Se preferir, marque <b>Quem paga cobre a taxa</b> e a pelada recebe o valor cheio.</p>
-  <p style="margin:0"><b>Requisitos da conta:</b> dono maior de 18 anos, identidade confirmada e chave Pix cadastrada no Mercado Pago.</p>
+  <p style="margin:0"><b>Requisitos da conta:</b> dono maior de 18 anos, identidade confirmada, chave Pix cadastrada e conta em "Uso pessoal e vendas".</p>
   <p style="margin:0"><b>Importante:</b> quem conectar a conta é o <b>dono</b> dela. O dono não paga por Pix (o Mercado Pago não deixa pagar para si mesmo): a parte dele aparece com o botão <b>Marcar como pago</b>.</p>
   <p class="sub" style="margin:0">O app só consegue <b>criar cobranças</b> para a sua conta; ninguém consegue tirar dinheiro dela. Dá para desconectar quando quiser. A conta precisa estar com a identidade confirmada no Mercado Pago.</p>
   <button class="btn block" data-act="cfg">Voltar aos ajustes</button></div>`)}
