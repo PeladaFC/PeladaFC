@@ -701,13 +701,13 @@ function cabecalho(ctx,W,p){
   ctx.fillStyle=ART.w2;ctx.font='600 34px Figtree, sans-serif';ctx.textAlign='left';ctx.fillText(c.nome.toUpperCase(),90,130);
   ctx.textAlign='right';ctx.fillText(dShort(p.data),W-90,130);ctx.textAlign='left';
 }
-function arteGeral(p){
-  const W=1080,H=1350,cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
-  campo(ctx,W,H);cabecalho(ctx,W,p);
-  ctx.fillStyle=ART.y;ctx.font='800 150px "Saira Condensed", Impact, sans-serif';ctx.fillText('DESTAQUES',86,290);
-  ctx.fillStyle=ART.w;ctx.font='700 58px "Saira Condensed", Impact, sans-serif';ctx.fillText('DA PELADA',92,355);
+function arteGeral(p,story){
+  const W=1080,H=story?1920:1350,oy=story?170:0,cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
+  campo(ctx,W,H);ctx.save();ctx.translate(0,oy);cabecalho(ctx,W,p);ctx.restore();
+  ctx.fillStyle=ART.y;fit(ctx,'DESTAQUES',W-170,story?170:150,800,'"Saira Condensed", Impact, sans-serif');ctx.fillText('DESTAQUES',86,290+oy);
+  ctx.fillStyle=ART.w;ctx.font=`700 ${story?66:58}px "Saira Condensed", Impact, sans-serif`;ctx.fillText('DA PELADA',92,(story?370:355)+oy);
   const PR=premiosDe(p),ks=PREMIOS_ARTE.filter(k=>PR[k]);
-  const top=430,rowH=Math.min(210,(H-top-110)/Math.max(1,ks.length));
+  const top=(story?470:430)+oy,rowH=Math.min(story?250:210,(H-top-(story?260:110))/Math.max(1,ks.length));
   ks.forEach((k,i)=>{const y=top+i*rowH,id=PR[k],j=J(id);
     ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.roundRect(80,y,W-160,rowH-24,22);ctx.fill();
     const cx=80+28+62,cy=y+(rowH-24)/2,im=imgDe(id);ctx.fillStyle=POSCOR[j.pos]||'#555';ctx.beginPath();ctx.arc(cx,cy,62,0,Math.PI*2);ctx.fill();
@@ -868,7 +868,8 @@ async function sheetArtes(pid){
   ARTS.forEach(a=>URL.revokeObjectURL(a.url));ARTS=[];
   const mk=async(cv,nome,label)=>{const blob=await new Promise(r=>cv.toBlob(r,'image/png'));ARTS.push({blob,url:URL.createObjectURL(blob),nome,label})};
   await mk(arteGeral(p),`destaques-${p.data}.png`,'Destaques');
-  const STO=[];for(const k of ks){const cv=artePoster(p,k,true);const blob=await new Promise(r=>cv.toBlob(r,'image/png'));STO.push({blob,url:URL.createObjectURL(blob),nome:`story-${k==='mvp'?'craque':k==='art'?'artilheiro':k==='gar'?'garcom':k==='def'?'xerife':'goleiro'}-${p.data}.png`,label:'Story · '+PREMIO[k].t+' · '+nm(PR[k])})}
+  const STO=[];{const cv=arteGeral(p,true);const blob=await new Promise(r=>cv.toBlob(r,'image/png'));STO.push({blob,url:URL.createObjectURL(blob),nome:`story-destaques-${p.data}.png`,label:'Story · Destaques'})}
+  for(const k of ks){const cv=artePoster(p,k,true);const blob=await new Promise(r=>cv.toBlob(r,'image/png'));STO.push({blob,url:URL.createObjectURL(blob),nome:`story-${k==='mvp'?'craque':k==='art'?'artilheiro':k==='gar'?'garcom':k==='def'?'xerife':'goleiro'}-${p.data}.png`,label:'Story · '+PREMIO[k].t+' · '+nm(PR[k])})}
   for(const k of ks)await mk(artePoster(p,k),`${k==='mvp'?'craque':k==='art'?'artilheiro':k==='gar'?'garcom':k==='def'?'xerife':'goleiro'}-${p.data}.png`,PREMIO[k].t+' · '+nm(PR[k]));
   const nInd=ARTS.length;ARTS.push(...STO);
   const body=document.getElementById('sheet-body');if(!body)return;
@@ -1229,13 +1230,26 @@ function tabelaNotas(pid,p,A,draft){const st=draft||p.stats||{},pr=premiosDe(p,p
     return`<div class="item" style="flex-wrap:wrap"><span class="pos num" style="width:22px;text-align:center;font-weight:800">${x.n!=null?(pos<=3?['🥇','🥈','🥉'][pos-1]:pos+'º'):'–'}</span>${avHTML(x.id)}<div class="grow" style="min-width:110px"><div class="name">${esc(nm(x.id))}${pr.mvp===x.id?' 🏆':''}${pr.per===x.id?' 🐢':''}</div>
       <div class="sub">${[x.n!=null?(x.a?x.a.n+' voto'+(x.a.n>1?'s':''):''):(x.a?`só ${x.a.n} voto, não conta`:'sem votos'),A?'':`⚽ ${s.g||0} · 🅰️ ${s.a||0}`].filter(Boolean).join(' · ')}</div></div>
       ${A?`<div class="row" style="gap:6px">${step('g','Gols',s.g||0)}${step('a','Assist.',s.a||0)}</div>`:''}<span class="nota num" style="min-width:44px;text-align:right">${x.n!=null?fmtN(x.n):'—'}</span></div>`}).join('')}</div>`}
+/* destaques de uma pelada (prêmio, jogador e o número que deu o prêmio) */
+function destaquesDe(p,pid){const pr=premiosDe(p,pid),stt=p.stats||{},EMO={mvp:'🏆',art:'⚽',gar:'🅰️',def:'🛡️',gol:'🧤',per:'🐢'},TIT={mvp:'Craque',art:'Artilheiro',gar:'Garçom',def:'Xerife',gol:'Goleiro',per:'Pereba'};
+  const det=k=>{const id=pr[k],x=stt[id]||{};if(k==='art')return(x.g||0)+(x.g===1?' gol':' gols');if(k==='gar')return(x.a||0)+(x.a===1?' assist.':' assist.');const n=notaJogo(p,pid,id);return n!=null?'nota '+fmtN(n):''};
+  return[...PREMIOS_ARTE,'per'].filter(k=>pr[k]&&S.jog[pr[k]]).map(k=>({k,id:pr[k],e:EMO[k],t:TIT[k],d:det(k)}))}
+function destaquesMini(pid,p){const L=destaquesDe(p,pid);if(!L.length)return'';
+  return`<div class="panel dmini" style="margin-top:16px"><div class="panel-h"><h3>Destaques</h3><span class="sub">${dShort(p.data)}</span></div><div class="dmini-g">${L.map(x=>`<button class="dm${x.k==='mvp'?' top':''}" data-act="ver-jog" data-j="${x.id}">${avHTML(x.id)}<span class="dm-tx"><span class="dm-t">${x.e} ${x.t}</span><b>${esc(nm(x.id))}</b>${x.d?`<span class="dm-d num">${x.d}</span>`:''}</span></button>`).join('')}</div></div>`}
+function sheetEquipes(pid){const p=S.pel[pid];if(!p)return;
+  if(!p.times||!p.times.length){openSheet('Equipes · '+dShort(p.data),'<div class="empty">Não teve sorteio de times nesta pelada.</div>');return}
+  const vit=p.vit||[],mx=Math.max(0,...vit),camp=mx>0?vit.map((v,i)=>v===mx?i:-1).filter(i=>i>=0):[],pr=premiosDe(p,pid);
+  const ord=p.times.map((t,i)=>({t,i})).sort((a,b)=>(vit[b.i]||0)-(vit[a.i]||0));
+  const tag=id=>(pr.mvp===id?' 🏆':'')+(pr.art===id?' ⚽':'')+(pr.gar===id?' 🅰️':'')+(pr.def===id?' 🛡️':'');
+  const linha=(id,gk)=>`<div class="eq-j">${avHTML(id)}<span class="grow">${esc(nm(id))}${tag(id)}</span><span class="chip p-${gk?'GOL':posLinha(id)}">${gk?'GOL':posLinha(id)}</span></div>`;
+  const gx=(p.goleiros||[]).filter(id=>S.jog[id]);
+  openSheet('Equipes · '+dShort(p.data),`<div class="stack">${camp.length===1?`<div class="sub">Campeão: <b>${CORES[p.times[camp[0]].cor].e} ${esc(nomeTime(p.times[camp[0]].cor))}</b> com ${mx} vitória${mx>1?'s':''}.</div>`:camp.length>1?'<div class="sub">Empate no número de vitórias.</div>':'<div class="sub">As vitórias desta pelada não foram lançadas.</div>'}
+    ${ord.map(({t,i})=>{const c=CORES[t.cor]||{},ch=camp.length===1&&camp[0]===i;return`<div class="panel eq${ch?' campeao':''}" style="border-left:6px solid ${c.c}"><div class="panel-h"><h3>${c.e||''} ${esc(nomeTime(t.cor))}</h3><span class="sub num">${ch?'<b class="eq-camp">🏆 CAMPEÃO</b> · ':''}${vit[i]||0} vitória${(vit[i]||0)===1?'':'s'}</span></div>${t.gk&&S.jog[t.gk]?linha(t.gk,true):''}${t.ids.filter(id=>S.jog[id]).map(id=>linha(id)).join('')}</div>`}).join('')}
+    ${gx.length?`<div class="panel"><div class="panel-h"><h3>🧤 Goleiros</h3><span class="sub">fora do sorteio</span></div>${gx.map(id=>linha(id,true)).join('')}</div>`:''}</div>`)}
 function sheetNotasPelada(pid,edit){const p=S.pel[pid];if(!p)return;const A0=ADM(),A=A0&&!!edit,ids=jogaram(p);
   if(A&&(!UI.rasc||UI.rasc.pid!==pid))UI.rasc={pid,st:JSON.parse(JSON.stringify(p.stats||{}))};if(!A)UI.rasc=null;
-  const pr=premiosDe(p,pid),stt=p.stats||{},EMO={mvp:'🏆',art:'⚽',gar:'🅰️',def:'🛡️',gol:'🧤',per:'🐢'},TIT={...Object.fromEntries(Object.entries(PREMIO).map(([k,v])=>[k,v.t])),per:'Pereba da pelada'};
-  const det=k=>{const id=pr[k],x=stt[id]||{};if(k==='art')return(x.g||0)+(x.g===1?' gol':' gols');if(k==='gar')return(x.a||0)+(x.a===1?' assistência':' assistências');const n=notaJogo(p,pid,id);return n!=null?'nota '+fmtN(n):''};
-  const dest=[...PREMIOS_ARTE,'per'].filter(k=>pr[k]&&S.jog[pr[k]]);
-  const destHTML=dest.length?`<div class="panel destaques"><div class="panel-h"><h3>Destaques</h3></div>${dest.map(k=>`<div class="dest${k==='mvp'?' top':''}"><span class="dest-ic">${EMO[k]}</span>${avHTML(pr[k])}<div class="grow"><div class="sub dest-t">${TIT[k]}</div><div class="name">${esc(nm(pr[k]))}</div></div><span class="dest-v num">${det(k)}</span></div>`).join('')}</div>`:'';
-  openSheet('Pelada de '+dShort(p.data),`<div class="stack"><div class="sub">${statusVotacao(p,pid,ids)}</div>${A?'':destHTML}
+  const stt=p.stats||{};
+  openSheet('Pelada de '+dShort(p.data),`<div class="stack"><div class="sub">${statusVotacao(p,pid,ids)}</div>
     ${p.aval||A0||Object.keys(stt).length?`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Gols e assistências'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div>${tabelaNotas(pid,p,A,A?UI.rasc.st:null)}</div>`:''}
     ${A?`<div class="lado notas-acoes"><button class="btn" data-act="notas-pel" data-p="${pid}">Cancelar</button><button class="btn primary" data-act="notas-salvar" data-p="${pid}">Salvar</button></div><p class="sub" style="margin:0">Nada muda até você tocar em Salvar.</p>`:A0?`<button class="btn block" data-act="notas-editar" data-p="${pid}">✏️ Editar gols e assistências</button>`:''}</div>`)}
 function subPos(pid,p,A){
@@ -1293,10 +1307,10 @@ function painelAprovar(){const ps=lancPendentes();if(!ps.length)return'';
 function renderHist(A){
   const enc=encerradas();if(!enc.length)return'';
   const show=UI.showHist?enc:enc.slice(0,3);
-  let h=`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Últimas peladas</h3></div>`;
+  let h=destaquesMini(enc[0][0],enc[0][1])+`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Últimas peladas</h3></div>`;
   for(const[pid,p] of show){const pr=premiosDe(p,pid);
     const vAb=A&&!p.aval&&Date.now()<fimAval(p);
-    h+=`<div class="hist"><div class="grow"><div class="row" style="gap:8px;align-items:center"><b class="num">${dShort(p.data)}</b>${vAb?`<button class="btn sm warn vt-chip" data-act="votacao-pel" data-p="${pid}">Votação aberta</button>`:''}</div><div class="sub">${jogaram(p).length} jogadores${pr.mvp?' · 🏆 '+esc(nm(pr.mvp)):''}${pr.art?' · ⚽ '+esc(nm(pr.art)):''}</div></div><div class="row hist-bt" style="gap:6px"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button>${A?`<button class="btn sm" data-act="premios-pel" data-p="${pid}">Prêmios</button><button class="btn sm" data-act="${PREMIOS_ARTE.some(k=>pr[k])?'arte':'arte-sem'}" data-p="${pid}">Artes</button><button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button>`:''}</div></div>`}
+    h+=`<div class="hist"><div class="grow"><div class="row" style="gap:8px;align-items:center"><b class="num">${dShort(p.data)}</b>${vAb?`<button class="btn sm warn vt-chip" data-act="votacao-pel" data-p="${pid}">Votação aberta</button>`:''}</div><div class="sub">${jogaram(p).length} jogadores${pr.mvp?' · 🏆 '+esc(nm(pr.mvp)):''}${pr.art?' · ⚽ '+esc(nm(pr.art)):''}</div></div><div class="row hist-bt" style="gap:6px;grid-template-columns:repeat(${A?4:2},1fr)"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button>${A?`<button class="btn sm" data-act="premios-pel" data-p="${pid}">Prêmios</button>`:''}<button class="btn sm" data-act="equipes-pel" data-p="${pid}">Equipes</button>${A?`<button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button>`:''}</div></div>`}
   if(enc.length>3)h+=`<button class="btn sm block" style="margin-top:8px" data-act="hist">${UI.showHist?'Mostrar menos':'Ver todas ('+enc.length+')'}</button>`;
   return h+'</div>';
 }
@@ -1998,6 +2012,7 @@ document.addEventListener('click',e=>{
     case'time-nome-ok':{const cor=Number(d.c),v=document.getElementById('tn-in').value.trim(),arr=CORES.map((_,i)=>(cfg().nomesTimes||[])[i]||'');arr[cor]=v;
       put('config/geral',{...(S.config||{}),nomesTimes:arr});closeSheet();toast('Nome do time salvo.');break}
     case'notas-pel':sheetNotasPelada(d.p);break;
+    case'equipes-pel':sheetEquipes(d.p);break;
     case'notas-editar':UI.rasc=null;sheetNotasPelada(d.p,true);break;
     case'stat-rasc':{if(!UI.rasc||UI.rasc.pid!==d.p)return;const s=UI.rasc.st[d.j]={...(UI.rasc.st[d.j]||{})};s[d.f]=Math.max(0,(s[d.f]||0)+Number(d.d));
       const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetNotasPelada(d.p,true);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc;break}
