@@ -1839,6 +1839,13 @@ async function sheetPix(x){UI.pixAberto=x;openSheet('Pagar com Pix','<div class=
     <p class="sub" style="margin:0">${outro?`Mostre esta tela para ${esc(nm(x.jid))}: no app do banco, Pix → <b>ler QR Code</b>. Quando o Pix cair, o Caixa marca PAGO sozinho.`:'Abra o app do seu banco, escolha Pix → Pix copia e cola (ou ler QR Code) e confirme.'} O código vale por 24 horas.</p></div>`}
 function pixConfirmado(){const b=document.getElementById('sheet-body');if(!b)return;const x=UI.pixAberto;UI.pixAberto=null;UI.pixDado=null;
   b.innerHTML=`<div class="stack pix-ok"><div class="pix-ok-ic">✓</div><h3 style="text-align:center">Pagamento confirmado!</h3><p class="sub" style="text-align:center;margin:0">${x.jid!==meuJogador()?esc(nm(x.jid))+' · ':''}${esc(x.desc)} está paga. Valeu! 💪</p><button class="btn primary block" data-act="close">Fechar</button></div>`}
+function sheetAntesMP(){openSheet('Antes de conectar',`<div class="stack small"><p style="margin:0">A conta do Mercado Pago que você vai conectar é a que <b>recebe</b> os pagamentos da pelada. Ela precisa:</p>
+  <ol style="margin:0;padding-left:20px;display:grid;gap:6px">
+  <li>Ser de alguém <b>maior de 18 anos</b>. Conta de menor não pode receber pagamentos.</li>
+  <li>Ter a <b>identidade confirmada</b> no Mercado Pago (documento e selfie).</li>
+  <li>Ter uma <b>chave Pix cadastrada</b> no Mercado Pago.</li></ol>
+  <p style="margin:0"><b>Atenção:</b> o dono da conta não paga por Pix para ela mesma (o Mercado Pago recusa pagamento para o mesmo CPF). A parte dele é marcada como paga no Caixa.</p>
+  <button class="btn primary block" data-act="mp-conectar">Entendi, conectar</button><button class="btn block" data-act="cfg">Voltar</button></div>`)}
 function sheetComoMP(){const c=cfg();openSheet('Como funciona o Pix automático',`<div class="stack small">
   <ol style="margin:0;padding-left:20px;display:grid;gap:6px">
   <li>Toque em <b>Conectar Mercado Pago</b>. Vai abrir a página do Mercado Pago.</li>
@@ -1846,6 +1853,7 @@ function sheetComoMP(){const c=cfg();openSheet('Como funciona o Pix automático'
   <li>Marque <b>Ligar Pix automático</b> e salve os ajustes.</li></ol>
   <p style="margin:0">A partir daí cada jogador vê <b>Pagar com Pix</b> no app. Quando o Pix cai, o Caixa marca <b>PAGO</b> na hora, sem comprovante.</p>
   <p style="margin:0">Taxa do Pix: ${taxasTxt(c)}. Ela sai do valor recebido. Se preferir, marque <b>Quem paga cobre a taxa</b> e a pelada recebe o valor cheio.</p>
+  <p style="margin:0"><b>Requisitos da conta:</b> dono maior de 18 anos, identidade confirmada e chave Pix cadastrada no Mercado Pago.</p>
   <p style="margin:0"><b>Importante:</b> quem conectar a conta é o <b>dono</b> dela. O dono não paga por Pix (o Mercado Pago não deixa pagar para si mesmo): a parte dele aparece com o botão <b>Marcar como pago</b>.</p>
   <p class="sub" style="margin:0">O app só consegue <b>criar cobranças</b> para a sua conta; ninguém consegue tirar dinheiro dela. Dá para desconectar quando quiser. A conta precisa estar com a identidade confirmada no Mercado Pago.</p>
   <button class="btn block" data-act="cfg">Voltar aos ajustes</button></div>`)}
@@ -1932,7 +1940,7 @@ function sheetCfg(){
     <div class="panel stack mp-cfg"><div class="panel-h"><h3>💳 Pix automático</h3><span class="sub">Mercado Pago</span></div>
       <div class="sub">Cada jogador paga pelo app e o Caixa marca <b>PAGO</b> sozinho. O dinheiro cai na conta do Mercado Pago da pelada. Taxa do Pix: ${taxasTxt(c)}.</div>
       <div class="row between"><span class="small">${c.mpConectadoEm?`✅ Conta conectada em ${new Date(c.mpConectadoEm).toLocaleDateString('pt-BR')}`:'⚪ Nenhuma conta conectada'}</span>${c.mpConectadoEm?`<button type="button" class="btn sm" data-act="mp-desconectar">Desconectar</button>`:`<button type="button" class="btn sm" data-act="mp-como">Como funciona</button>`}</div>
-      ${c.mpConectadoEm?`<div class="sub">${donoJid()?`Conta de <b>${esc(nm(donoJid()))}</b>. `:''}O dono da conta não paga por Pix (não dá para pagar para si mesmo): a parte dele é marcada como paga, sem taxa.</div>`:`<button type="button" class="btn primary block" data-act="mp-conectar">Conectar Mercado Pago</button>`}
+      ${c.mpConectadoEm?`<div class="sub">${donoJid()?`Conta de <b>${esc(nm(donoJid()))}</b>. `:''}O dono da conta não paga por Pix (não dá para pagar para si mesmo): a parte dele é marcada como paga, sem taxa.</div>`:`<button type="button" class="btn primary block" data-act="mp-antes">Conectar Mercado Pago</button>`}
       <label class="row"><input type="checkbox" id="c-pixrepassa" ${c.pixRepassa!==false?'checked':''}> Quem paga cobre a taxa (${pct(taxaTotal(c))})</label></div>
     <label class="row"><input type="checkbox" id="c-nivelpub" ${c.nivelPublico?'checked':''}> Mostrar o nível da pelada (estrelas) para os jogadores</label>
     <label class="row"><input type="checkbox" id="c-mostraval" ${c.mostrarAval===false?'':'checked'}> Mostrar as avaliações dos jogadores (0 a 100) para todos. Mesmo ligado, só aparece depois da avaliação da galera.</label>
@@ -2298,6 +2306,7 @@ document.addEventListener('click',e=>{
     case'pix-pagar':{const L=minhasPendencias(),x=L.find(y=>y.tipo===d.t&&y.ref===d.r&&y.jid===d.j);if(x)sheetPix(x);break}
     case'pix-copiar':{const t=document.getElementById('pix-cod');if(!t)return;navigator.clipboard?.writeText(t.value).then(()=>toast('Código copiado. Agora cole no app do banco.'),()=>{t.select();toast('Selecione e copie o código.')})||(t.select(),toast('Selecione e copie o código.'));break}
     case'pix-demo-pagar':{const x=UI.pixAberto;if(!x)return;const val={s:'pago',d:iso(new Date()),v:x.v,obs:'Pix automático',via:'pix'};if(x.tipo==='x'){const[mx,xid]=x.ref.split('~'),e=((S.caixa[mx]||{}).extras||{})[xid];if(e)gravarExtra(mx,xid,{...e,pag:{...(e.pag||{}),[x.jid]:val}})}else if(x.tipo==='m'){const cx=S.caixa[x.ref]||{mens:{},desp:[]};put('caixa/'+x.ref,{...cx,mens:{...(cx.mens||{}),[x.jid]:val}})}else patch('peladas/'+x.ref,{diarias:{[x.jid]:val}});break}
+    case'mp-antes':if(demo){toast('Na demonstração não dá para conectar uma conta.');return}sheetAntesMP();break;
     case'mp-como':sheetComoMP();break;
     case'mp-conectar':if(demo){toast('Na demonstração não dá para conectar uma conta.');return}b.disabled=true;b.textContent='Abrindo o Mercado Pago…';(window.mpConta?window.mpConta('conectar'):Promise.reject(new Error('Indisponível.'))).then(r=>{if(r&&!r.url)setTimeout(sheetCfg,300)}).catch(e=>{b.disabled=false;b.textContent='Conectar Mercado Pago';toast(e.message||'Não deu certo. Tente de novo.')});break;
     case'mp-desconectar':if(demo){toast('Na demonstração não dá para desconectar.');return}if(!b.dataset.sure){b.dataset.sure=1;b.textContent='Toque de novo';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Desconectar'}},3500);return}
