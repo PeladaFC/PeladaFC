@@ -1234,19 +1234,12 @@ function tabelaNotas(pid,p,A,draft){const st=draft||p.stats||{},pr=premiosDe(p,p
 function destaquesDe(p,pid){const pr=premiosDe(p,pid),stt=p.stats||{},EMO={mvp:'🏆',art:'⚽',gar:'🅰️',def:'🛡️',gol:'🧤',per:'🐢'},TIT={mvp:'Craque',art:'Artilheiro',gar:'Garçom',def:'Xerife',gol:'Goleiro',per:'Pereba'};
   const det=k=>{const id=pr[k],x=stt[id]||{};if(k==='art')return(x.g||0)+(x.g===1?' gol':' gols');if(k==='gar')return(x.a||0)+(x.a===1?' assist.':' assist.');const n=notaJogo(p,pid,id);return n!=null?'nota '+fmtN(n):''};
   return[...PREMIOS_ARTE,'per'].filter(k=>pr[k]&&S.jog[pr[k]]).map(k=>({k,id:pr[k],e:EMO[k],t:TIT[k],d:det(k)}))}
-function destaquesMini(pid,p){const L=destaquesDe(p,pid);if(!L.length)return'';const v=UI.dmv||'a';
+function destaquesMini(pid,p){const L=destaquesDe(p,pid);if(!L.length)return'';
   const foto=(id,cls)=>{const f=fotoDe(id),j=J(id);return`<span class="${cls} bg-${j.pos}" style="${fotoStyle(f)}">${f?'':esc(initials(nm(id)))}</span>`};
-  if(v==='b'){// figurinhas: cartas verticais deslizando para o lado
-    return`<div class="dfig-w" style="margin-top:16px"><div class="row between" style="margin-bottom:8px"><h3 class="dfig-h">Destaques</h3><span class="sub">${dShort(p.data)}</span></div><div class="dfig">${L.map(x=>`<button class="fig${x.k==='mvp'?' ouro':''}" data-act="ver-jog" data-j="${x.id}">${foto(x.id,'fig-f')}<span class="fig-e">${x.e}</span><span class="fig-t">${x.t}</span><b class="fig-n">${esc(nm(x.id))}</b>${x.d?`<span class="fig-d num">${x.d}</span>`:''}</button>`).join('')}</div></div>`}
-  if(v==='d'){// misto: craque grande + figurinhas dos outros
-    const c=L.find(x=>x.k==='mvp')||L[0],o=L.filter(x=>x!==c);
-    return`<div class="board dcq" style="margin-top:16px"><div class="dcq-top">${foto(c.id,'dcq-f')}<div class="grow"><div class="dcq-t">${c.e} ${c.k==='mvp'?'Craque da pelada':c.t} · ${dShort(p.data)}</div><div class="dcq-n">${esc(nm(c.id))}</div>${c.d?`<div class="dcq-d num">${c.d}</div>`:''}</div></div></div>
-      ${o.length?`<div class="dfig" style="margin-top:10px">${o.map(x=>`<button class="fig" data-act="ver-jog" data-j="${x.id}">${foto(x.id,'fig-f')}<span class="fig-e">${x.e}</span><span class="fig-t">${x.t}</span><b class="fig-n">${esc(nm(x.id))}</b>${x.d?`<span class="fig-d num">${x.d}</span>`:''}</button>`).join('')}</div>`:''}`}
-  if(v==='c'){// craque em destaque + os outros em fila
-    const c=L.find(x=>x.k==='mvp')||L[0],o=L.filter(x=>x!==c);
-    return`<div class="board dcq" style="margin-top:16px"><div class="dcq-top">${foto(c.id,'dcq-f')}<div class="grow"><div class="dcq-t">${c.e} ${c.k==='mvp'?'Craque da pelada':c.t} · ${dShort(p.data)}</div><div class="dcq-n">${esc(nm(c.id))}</div>${c.d?`<div class="dcq-d num">${c.d}</div>`:''}</div></div>
-      ${o.length?`<div class="dcq-o">${o.map(x=>`<button class="dcq-i" data-act="ver-jog" data-j="${x.id}">${foto(x.id,'dcq-s')}<span class="dcq-ie">${x.e}</span><span class="dcq-in">${esc(nm(x.id).split(' ')[0])}</span><span class="dcq-it">${x.t}</span></button>`).join('')}</div>`:''}</div>`}
-  return`<div class="panel dmini" style="margin-top:16px"><div class="panel-h"><h3>Destaques</h3><span class="sub">${dShort(p.data)}</span></div><div class="dmini-g">${L.map(x=>`<button class="dm${x.k==='mvp'?' top':''}" data-act="ver-jog" data-j="${x.id}">${avHTML(x.id)}<span class="dm-tx"><span class="dm-t">${x.e} ${x.t}</span><b>${esc(nm(x.id))}</b>${x.d?`<span class="dm-d num">${x.d}</span>`:''}</span></button>`).join('')}</div></div>`}
+  // craque em destaque e os outros premiados em fila
+  const c=L.find(x=>x.k==='mvp')||L[0],o=L.filter(x=>x!==c);
+  return`<div class="board dcq" style="margin-top:16px"><button class="dcq-top" data-act="ver-jog" data-j="${c.id}">${foto(c.id,'dcq-f')}<div class="grow"><div class="dcq-t">${c.e} ${c.k==='mvp'?'Craque da pelada':c.t} · ${dShort(p.data)}</div><div class="dcq-n">${esc(nm(c.id))}</div>${c.d?`<div class="dcq-d num">${c.d}</div>`:''}</div></button>
+    ${o.length?`<div class="dcq-o">${o.map(x=>`<button class="dcq-i" data-act="ver-jog" data-j="${x.id}">${foto(x.id,'dcq-s')}<span class="dcq-in">${esc(nm(x.id).split(' ')[0])}</span><span class="dcq-it">${x.t}</span></button>`).join('')}</div>`:''}</div>`}
 function sheetEquipes(pid){const p=S.pel[pid];if(!p)return;
   if(!p.times||!p.times.length){openSheet('Equipes · '+dShort(p.data),'<div class="empty">Não teve sorteio de times nesta pelada.</div>');return}
   const vit=p.vit||[],mx=Math.max(0,...vit),camp=mx>0?vit.map((v,i)=>v===mx?i:-1).filter(i=>i>=0):[],pr=premiosDe(p,pid);
