@@ -1906,8 +1906,8 @@ function sheetCfg(){
     <label class="field"><span>Vagas na pelada (jogadores de linha)</span><input type="number" id="c-vagas" min="2" max="60" inputmode="numeric" value="${vagasCfg()}"></label>
     <div class="sub" style="margin-top:-6px">Os primeiros a confirmar ficam com as vagas, mensalista ou não. Quem confirmar depois vai para a lista de espera. Goleiros ficam fora dessa conta.</div>
     <label class="field"><span>Formato padrão das peladas</span><select id="c-formato">${Object.entries(FORMATOS).map(([k,n])=>`<option value="${k}" ${(c.formato||'conv')===k?'selected':''}>${n}</option>`).join('')}</select></label>
-    <div class="grid2"><label class="row" style="gap:8px"><input type="checkbox" id="c-idavolta" ${c.idaVolta?'checked':''}> Pontos corridos com ida e volta</label>
-    <label class="field"><span>Classificados p/ mata-mata</span><select id="c-nclass">${[2,4,8].map(n=>`<option value="${n}" ${Number(c.nClass||2)===n?'selected':''}>${n}</option>`).join('')}</select></label></div>
+    <label class="row" id="cfg-iv" style="gap:8px" ${['liga','ligamm'].includes(c.formato||'conv')?'':'hidden'}><input type="checkbox" id="c-idavolta" ${c.idaVolta?'checked':''}> Pontos corridos com ida e volta</label>
+    <label class="field" id="cfg-nc" ${(c.formato||'conv')==='ligamm'?'':'hidden'}><span>Classificados p/ mata-mata</span><select id="c-nclass">${[2,4,8].map(n=>`<option value="${n}" ${Number(c.nClass||2)===n?'selected':''}>${n} (${n===2?'final':n===4?'semifinal':'quartas'})</option>`).join('')}</select></label>
     <label class="field"><span>Times no sorteio (padrão)</span><select id="c-times">${[2,3,4,5,6,7,8,9,10].map(n=>`<option ${c.times==n?'selected':''}>${n}</option>`).join('')}</select></label>
     <div class="grid2"><label class="field"><span>Mensalidade (R$)</span><input type="number" id="c-mensal" min="0" step="0.01" value="${c.mensal}"></label>
     <label class="field"><span>Diária (R$)</span><input type="number" id="c-diaria" min="0" step="0.01" value="${c.diaria}"></label></div>
@@ -2376,6 +2376,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',e=>{
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
   const t=e.target;
+  if(t.id==='c-formato'){const iv=document.getElementById('cfg-iv'),nc=document.getElementById('cfg-nc');if(iv)iv.hidden=!['liga','ligamm'].includes(t.value);if(nc)nc.hidden=t.value!=='ligamm'}
   if(t.dataset.act==='cmp'){UI.cmp=t.value||null;const sc=document.querySelector('.sheet').scrollTop;sheetVerJog(t.dataset.j);document.querySelector('.sheet').scrollTop=sc}
   if(t.dataset.act==='mt-n'&&UI.mt){UI.mt.T=Number(t.value);sheetMontar(UI.mt.pid);return}
   if(t.dataset.act==='formato'){const p=S.pel[t.dataset.p];const go=()=>patch('peladas/'+t.dataset.p,{formato:t.value,jogos:null});if((p.jogos||[]).some(g=>g.ga!=null)&&!confirm('Trocar o formato apaga a tabela de jogos e os placares. Continuar?')){render();return}go();return}
