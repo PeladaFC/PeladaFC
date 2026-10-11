@@ -1757,7 +1757,7 @@ function minhasPendencias(){const jid=meuJogador();if(!jid||EV())return[];const 
   for(const[pid,p] of encerradas())if(p.data>=lim&&jogaram(p).includes(jid)&&pagaPorJogo(jid)&&!stPag((p.diarias||{})[jid]))out.push({tipo:'d',ref:pid,jid,v:precoDP(p),desc:'Diária da pelada de '+dShort(p.data)});
   return out}
 const TAXA_MP=.0099;function taxaApp(c){c=c||cfg();return c.mpTaxaApp!=null?Number(c.mpTaxaApp):.01}function taxaTotal(c){return TAXA_MP+taxaApp(c)}
-function pct(x){return(Math.round(x*10000)/100).toLocaleString('pt-BR')+'%'}function taxasTxt(c){return`${pct(TAXA_MP)} do Mercado Pago + ${pct(taxaApp(c))} do app`}
+function pct(x){return(Math.round(x*10000)/100).toLocaleString('pt-BR')+'%'}function taxasTxt(c){return`${pct(taxaTotal(c))} por pagamento`}
 function painelMeusPag(){const L=minhasPendencias();if(!L.length)return'';const c=cfg();
   return`<div class="panel meus-pag" style="margin-bottom:12px"><div class="panel-h"><h3>💰 Meus pagamentos</h3></div>${L.map(x=>`<div class="item"><div class="grow"><div class="name">${esc(x.desc)}</div><div class="sub num">${BRL(x.v)}</div></div>${c.pixAuto?`<button class="btn sm primary" data-act="pix-pagar" data-t="${x.tipo}" data-r="${x.ref}" data-j="${x.jid}">Pagar com Pix</button>`:c.pix?`<button class="btn sm" data-act="pix-chave">Copiar chave Pix</button>`:''}</div>`).join('')}
     ${c.pixAuto?'<div class="sub" style="margin-top:6px">O pagamento é confirmado sozinho, na hora. Não precisa mandar comprovante.</div>':''}</div>`}
@@ -1766,7 +1766,7 @@ async function sheetPix(x){UI.pixAberto=x;openSheet('Pagar com Pix','<div class=
   let d;try{d=demo?{valor:cfg().pixRepassa?Math.ceil(x.v/(1-taxaTotal())*100)/100:x.v,base:x.v,qr:'00020126580014br.gov.bcb.pix0136demo-pelada-fc5204000053039865802BR5925PELADA FC DEMO6009RECIFE62070503***6304ABCD',qr64:'',link:'',demo:true}:await window.pixCriar({tipo:x.tipo,ref:x.ref,jid:x.jid})}
   catch(e){const b=document.getElementById('sheet-body');if(b)b.innerHTML=`<div class="stack"><div class="banner due" style="display:block">${esc(e.message||'Não deu para gerar o Pix agora.')}</div><button class="btn block" data-act="close">Fechar</button></div>`;return}
   UI.pixDado=d;const b=document.getElementById('sheet-body');if(!b||UI.pixAberto!==x)return;
-  b.innerHTML=`<div class="stack pix"><div class="pix-v"><span class="sub">${esc(x.desc)}</span><b class="num">${BRL(d.valor)}</b>${d.valor!==d.base?`<span class="sub">inclui ${BRL(d.valor-d.base)} das taxas do Pix</span>`:''}</div>
+  b.innerHTML=`<div class="stack pix"><div class="pix-v"><span class="sub">${esc(x.desc)}</span><b class="num">${BRL(d.valor)}</b>${d.valor!==d.base?`<span class="sub">inclui ${BRL(d.valor-d.base)} da taxa do Pix</span>`:''}</div>
     ${d.qr64?`<img class="pix-qr" src="data:image/png;base64,${d.qr64}" alt="QR Code do Pix">`:`<div class="pix-qr pix-qr-demo">QR Code${d.demo?'<br><small>(demonstração)</small>':''}</div>`}
     <button class="btn primary block" data-act="pix-copiar">Copiar código Pix (copia e cola)</button>
     <textarea id="pix-cod" class="num" rows="3" readonly>${esc(d.qr)}</textarea>
@@ -1782,7 +1782,7 @@ function sheetComoMP(){const c=cfg();openSheet('Como funciona o Pix automático'
   <li>Entre com a conta que vai <b>receber</b> o dinheiro da pelada e toque em <b>Permitir</b>. Você volta para o app sozinho.</li>
   <li>Marque <b>Ligar Pix automático</b> e salve os ajustes.</li></ol>
   <p style="margin:0">A partir daí cada jogador vê <b>Pagar com Pix</b> no app. Quando o Pix cai, o Caixa marca <b>PAGO</b> na hora, sem comprovante.</p>
-  <p style="margin:0">Taxas por Pix: ${taxasTxt(c)}. Elas saem do valor recebido. Se preferir, marque <b>Quem paga cobre as taxas</b> e a pelada recebe o valor cheio.</p>
+  <p style="margin:0">Taxa do Pix: ${taxasTxt(c)}. Ela sai do valor recebido. Se preferir, marque <b>Quem paga cobre a taxa</b> e a pelada recebe o valor cheio.</p>
   <p class="sub" style="margin:0">O app só consegue <b>criar cobranças</b> para a sua conta; ninguém consegue tirar dinheiro dela. Dá para desconectar quando quiser. A conta precisa estar com a identidade confirmada no Mercado Pago.</p>
   <button class="btn block" data-act="cfg">Voltar aos ajustes</button></div>`)}
 function sheetPag(kind,key,id,m){const c=cfg(),src=kind==='m'?((S.caixa[key]||{}).mens||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[id])||{},padrao=kind==='m'?precoM(key):precoDP(S.pel[key]);
@@ -1839,11 +1839,11 @@ function sheetCfg(){
     <label class="field"><span>Diária (R$)</span><input type="number" id="c-diaria" min="0" step="0.01" value="${c.diaria}"></label></div>
     <label class="field"><span>Chave Pix</span><input type="text" id="c-pix" value="${esc(c.pix)}" placeholder="Telefone, e-mail ou chave aleatória"></label>
     <div class="panel stack mp-cfg"><div class="panel-h"><h3>💳 Pix automático</h3><span class="sub">Mercado Pago</span></div>
-      <div class="sub">Cada jogador paga pelo app e o Caixa marca <b>PAGO</b> sozinho. O dinheiro cai na conta do Mercado Pago da pelada. Taxas por Pix: ${taxasTxt(c)}.</div>
+      <div class="sub">Cada jogador paga pelo app e o Caixa marca <b>PAGO</b> sozinho. O dinheiro cai na conta do Mercado Pago da pelada. Taxa do Pix: ${taxasTxt(c)}.</div>
       <div class="row between"><span class="small">${c.mpConectadoEm?`✅ Conta conectada em ${new Date(c.mpConectadoEm).toLocaleDateString('pt-BR')}`:'⚪ Nenhuma conta conectada'}</span>${c.mpConectadoEm?`<button type="button" class="btn sm" data-act="mp-desconectar">Desconectar</button>`:`<button type="button" class="btn sm" data-act="mp-como">Como funciona</button>`}</div>
       ${c.mpConectadoEm?'':`<button type="button" class="btn primary block" data-act="mp-conectar">Conectar Mercado Pago</button>`}
       <label class="row"><input type="checkbox" id="c-pixauto" ${c.pixAuto?'checked':''} ${c.mpConectadoEm?'':'disabled'}> Ligar Pix automático para a galera</label>
-      <label class="row"><input type="checkbox" id="c-pixrepassa" ${c.pixRepassa?'checked':''}> Quem paga cobre as taxas (${pct(taxaTotal(c))})</label></div>
+      <label class="row"><input type="checkbox" id="c-pixrepassa" ${c.pixRepassa?'checked':''}> Quem paga cobre a taxa (${pct(taxaTotal(c))})</label></div>
     <label class="row"><input type="checkbox" id="c-nivelpub" ${c.nivelPublico?'checked':''}> Mostrar o nível da pelada (estrelas) para os jogadores</label>
     <label class="row"><input type="checkbox" id="c-mostraval" ${c.mostrarAval===false?'':'checked'}> Mostrar as avaliações dos jogadores (0 a 100) para todos. Mesmo ligado, só aparece depois da avaliação da galera.</label>
     <div class="panel"><h3 style="margin-bottom:6px">Escudo da pelada</h3><div class="row" style="gap:12px;flex-wrap:nowrap">
