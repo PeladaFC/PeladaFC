@@ -1809,9 +1809,11 @@ function pendenciasDe(jid){if(!jid||!CX())return[];const out=[],m=mesAtual();
   return out}
 const TAXA_MP=.0099;function taxaApp(c){c=c||cfg();return c.mpTaxaApp!=null?Number(c.mpTaxaApp):.01}function taxaTotal(c){return TAXA_MP+taxaApp(c)}
 function pct(x){return(Math.round(x*10000)/100).toLocaleString('pt-BR')+'%'}function taxasTxt(c){return`${pct(taxaTotal(c))} por pagamento`}
-function painelMeusPag(){const L=minhasPendencias();if(!L.length)return'';const c=cfg();
-  return`<div class="panel meus-pag" style="margin-bottom:12px"><div class="panel-h"><h3>💰 Meus pagamentos</h3></div>${L.map(x=>`<div class="item"><div class="grow"><div class="name">${esc(x.desc)}</div><div class="sub num">${BRL(x.v)}</div></div>${c.pixAuto?`<button class="btn sm primary" data-act="pix-pagar" data-t="${x.tipo}" data-r="${x.ref}" data-j="${x.jid}">Pagar com Pix</button>`:c.pix?`<button class="btn sm" data-act="pix-chave">Copiar chave Pix</button>`:''}</div>`).join('')}
-    ${c.pixAuto?'<div class="sub" style="margin-top:6px">O pagamento é confirmado sozinho, na hora. Não precisa mandar comprovante.</div>':''}</div>`}
+function painelMeusPag(){const L=minhasPendencias();if(!L.length)return'';const c=cfg(),auto=c.pixAuto&&c.mpConectadoEm,tot=L.reduce((a,x)=>a+x.v,0);
+  const bt=x=>auto?`<button class="btn sm pag-bt" data-act="pix-pagar" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pagar com Pix</button>`:c.pix?`<button class="btn sm pag-bt" data-act="pix-qr" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pagar com Pix</button>`:'';
+  return`<div class="pag-alerta"><div class="pag-h"><span class="pag-ic">💰</span><div class="grow"><b>Você tem ${BRL(tot)} para pagar</b><div class="pag-s">${L.length>1?L.length+' cobranças':'1 cobrança'} da pelada</div></div></div>
+    ${L.map(x=>`<div class="pag-it"><div class="grow"><div class="name">${esc(x.desc)}</div><div class="num">${BRL(x.v)}</div></div>${bt(x)}</div>`).join('')}
+    <div class="pag-s" style="margin-top:6px">${auto?'O pagamento é confirmado sozinho, na hora. Não precisa mandar comprovante.':c.pix?'Depois de pagar, o administrador confirma no Caixa.':'Combine o pagamento com o administrador.'}</div></div>`}
 /* Pix "copia e cola" estático a partir da chave Pix da pelada (quando o Pix automático está desligado) */
 function crc16(t){let c=0xFFFF;for(let i=0;i<t.length;i++){c^=t.charCodeAt(i)<<8;for(let k=0;k<8;k++)c=c&0x8000?((c<<1)^0x1021)&0xFFFF:(c<<1)&0xFFFF}return c.toString(16).toUpperCase().padStart(4,'0')}
 function cpfOk(d){if(!/^\d{11}$/.test(d)||/^(\d)\1{10}$/.test(d))return false;const f=n=>{let s=0;for(let i=0;i<n;i++)s+=+d[i]*(n+1-i);const r=s*10%11%10;return r};return f(9)==d[9]&&f(10)==d[10]}
@@ -1827,11 +1829,11 @@ function sheetNaHora(){const m=mesAtual(),ids=ativos().sort((a,b)=>nm(a).localeC
     <div class="list">${L.map(([id,x])=>x.map(y=>`<button class="item" style="width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line)" data-act="nahora" data-t="${y.tipo}" data-r="${esc(y.ref)}" data-j="${id}"><div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub">${esc(y.desc)}</div></div><b class="num">${BRL(y.v)}</b></button>`).join('')).join('')||'<div class="empty">Ninguém devendo agora. 🙌</div>'}</div></div>`)}
 function sheetQRManual(x){UI.pixAberto=null;const cod=pixEstatico(x.v,x.desc);
   if(!cod){openSheet('Cobrar na hora',`<div class="stack"><div class="banner due" style="display:block">Cadastre a chave Pix da pelada em Ajustes para gerar o QR Code.</div><button class="btn block" data-act="cfg">Abrir ajustes</button></div>`);return}
-  openSheet('Cobrar na hora',`<div class="stack pix"><div class="pix-v"><div class="name" style="font-size:20px">${esc(nm(x.jid))}</div><span class="sub">${esc(x.desc)}</span><b class="num">${BRL(x.v)}</b></div>
+  openSheet(ADM()&&x.jid!==meuJogador()?'Cobrar na hora':'Pagar com Pix',`<div class="stack pix"><div class="pix-v"><div class="name" style="font-size:20px">${esc(nm(x.jid))}</div><span class="sub">${esc(x.desc)}</span><b class="num">${BRL(x.v)}</b></div>
     <div class="pix-qr">${window.qrSVG?window.qrSVG(cod):''}</div>
     <button class="btn block" data-act="pix-copiar">Copiar código Pix (copia e cola)</button><textarea id="pix-cod" class="num" rows="3" readonly>${esc(cod)}</textarea>
-    <button class="btn primary block" data-act="nahora-pago" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}" data-v="${x.v}">Recebi, marcar como pago</button>
-    <p class="sub" style="margin:0">QR da chave Pix da pelada. Como o Pix automático está desligado, confira no seu banco se o dinheiro caiu e toque em <b>Recebi</b>.</p></div>`)}
+    ${ADM()?`<button class="btn primary block" data-act="nahora-pago" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}" data-v="${x.v}">Recebi, marcar como pago</button>
+    <p class="sub" style="margin:0">QR da chave Pix da pelada. Como o Pix automático está desligado, confira no seu banco se o dinheiro caiu e toque em <b>Recebi</b>.</p>`:`<p class="sub" style="margin:0">No app do banco: Pix → <b>ler QR Code</b> ou <b>Pix copia e cola</b>. Depois de pagar, o administrador confirma no Caixa.</p>`}</div>`)}
 function pixPago(x){if(!x)return false;if(x.tipo==='x'){const[mx,xid]=x.ref.split('~'),e=((S.caixa[mx]||{}).extras||{})[xid];return!!(e&&stPag((e.pag||{})[x.jid]))}if(x.tipo==='m')return!!stPag(((S.caixa[x.ref]||{}).mens||{})[x.jid]);const p=S.pel[x.ref];return!!(p&&stPag((p.diarias||{})[x.jid]))}
 async function sheetPix(x){UI.pixAberto=x;openSheet('Pagar com Pix','<div class="empty">Gerando o Pix…</div>');
   let d;try{d=demo?{valor:cfg().pixRepassa?Math.ceil(x.v/(1-taxaTotal())*100)/100:x.v,base:x.v,qr:'00020126580014br.gov.bcb.pix0136demo-pelada-fc5204000053039865802BR5925PELADA FC DEMO6009RECIFE62070503***6304ABCD',qr64:'',link:'',demo:true}:await window.pixCriar({tipo:x.tipo,ref:x.ref,jid:x.jid})}
@@ -2328,6 +2330,7 @@ document.addEventListener('click',e=>{
       if(X.xid&&mx!==X.m)gravarExtra(X.m,X.xid,null);gravarExtra(mx,xid,novo);if(mx!==UI.mes&&mx!==X.m)UI.mes=mx;closeSheet();toast(X.xid?'Cobrança atualizada.':`Cobrança criada para ${novo.quem.length} pessoa(s).`);break}
     case'xc-apagar':{const X=UI.xc;if(!X||!X.xid)return;if(!b.dataset.sure){b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar cobrança'}},3500);return}
       gravarExtra(X.m,X.xid,null);closeSheet();toast('Cobrança apagada.');break}
+    case'pix-qr':{const x=minhasPendencias().find(y=>y.tipo===d.t&&y.ref===d.r);if(x)sheetQRManual(x);break}
     case'nahora-lista':sheetNaHora();break;
     case'nahora':{const x=pendenciasDe(d.j).find(y=>y.tipo===d.t&&y.ref===d.r)||(()=>{/* item fora da janela de 2 meses: monta na mão */const v=d.t==='m'?precoM(d.r):d.t==='d'?valorDe(S.pel[d.r],d.j):Number((((S.caixa[d.r.split('~')[0]]||{}).extras||{})[d.r.split('~')[1]]||{}).v)||0;
         const desc=d.t==='m'?'Mensalidade de '+MESES[Number(d.r.slice(5))-1].toLowerCase():d.t==='d'?(S.pel[d.r].extra?'Evento extra de ':EV()?'Evento de ':'Diária da pelada de ')+dShort(S.pel[d.r].data):((((S.caixa[d.r.split('~')[0]]||{}).extras||{})[d.r.split('~')[1]]||{}).nome||'Cobrança extra');return{tipo:d.t,ref:d.r,jid:d.j,v,desc}})();
