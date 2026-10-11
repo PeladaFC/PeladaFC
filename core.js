@@ -8,7 +8,8 @@ const CRIT={
 const DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 const DIAS3=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const CORES=[{n:'Laranja',c:'#E8742A',e:'🟠'},{n:'Azul',c:'#2F6FD0',e:'🔵'},{n:'Branco',c:'#F4F4F0',e:'⚪'},{n:'Preto',c:'#22262A',e:'⚫'}];
+const CORES=[{n:'Laranja',c:'#E8742A',e:'🟠'},{n:'Azul',c:'#2F6FD0',e:'🔵'},{n:'Branco',c:'#F4F4F0',e:'⚪'},{n:'Preto',c:'#22262A',e:'⚫'},{n:'Verde',c:'#2E9E4F',e:'🟢'},{n:'Vermelho',c:'#D23B32',e:'🔴'},{n:'Amarelo',c:'#F2C12E',e:'🟡'},{n:'Roxo',c:'#7E57C2',e:'🟣'},{n:'Marrom',c:'#8B5A2B',e:'🟤'},{n:'Cinza',c:'#8A8F98',e:'🔘'}];
+const MAX_TIMES=CORES.length;
 const AVISOS={
   convocacao:{n:'Convocação',d:'Abre a lista e chama todo mundo'},
   cobrar:{n:'Cobrar respostas',d:'Lista quem ainda não respondeu'},
@@ -28,7 +29,7 @@ const NOTIF={
   posicao:{n:'Troca de posição',d:'Jogador mudou a própria posição no grupo',def:true},
   aviso:{n:'Hora de mandar mensagem',d:'Os avisos programados na aba Avisos',def:true}
 };
-const DEF_CFG={nivelPublico:false,nome:'Pelada de Sábado',dia:6,hora:'08:00',local:'',times:2,porTime:5,mensal:80,diaria:20,pix:'',link:'',restr:[]};
+const DEF_CFG={nivelPublico:false,nome:'Pelada de Sábado',dia:6,hora:'08:00',local:'',times:3,porTime:5,mensal:80,diaria:20,pix:'',link:'',restr:[]};
 const ICON={
   jogo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/><path d="M12 3v4M21 10l-5 0M3 10h5M7 20l2.5-5.5M17 20l-2.5-5.5"/></svg>',
   elenco:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3l-5 3 2 4 2-1v12h10V9l2 1 2-4-5-3c0 2-2 3-4 3S8 5 8 3z"/></svg>',
@@ -521,7 +522,9 @@ function msg0(tipo,ctx={}){
     if(tipo==='cobrarvoto')return[`⭐ VOTAÇÃO DA PELADA · ${dShort(p.data)}`,'',`Ainda falta votar (${nao.length}):`,...nao.map(x=>'• '+x),'',`Entra no app e dá suas estrelas pra galera${Date.now()<fa?' até '+quandoCurto(fa):''}. É rapidinho e o voto é secreto! 🔒`].join('\n');
     return[`⭐ VOTAÇÃO DA PELADA · ${dShort(p.data)}`,'',...(ja.length?[`Já votaram (${ja.length} de ${lista.length}):`,...ja.map(x=>'✅ '+x)]:['Ninguém votou ainda.']),'',nao.length?`Falta${nao.length>1?'m':''} ${nao.length}. Bora completar${Date.now()<fa?' até '+quandoCurto(fa):''}! 💪`:'Todo mundo votou. Valeu, galera! 🙌'].join('\n')}
   if(tipo==='resultado'){const pr=premiosDe(p),st=p.stats||{},out=[`🏁 *RESULTADO · ${dShort(p.data)}*`,''];
-    if(p.times&&p.vit&&p.vit.some(v=>v>0)){p.times.forEach((t,i)=>out.push(`${CORES[t.cor].e} ${nomeTime(t.cor)}: ${p.vit[i]||0} vitória(s)`));out.push('')}
+    {const cp=p.times?campeaoDe(p):null,vv=p.times?vitDe(p):[];if(cp!=null)out.push(`🏆 Campeão: ${CORES[p.times[cp].cor].e} ${nomeTime(p.times[cp].cor)}`);
+      if(formatoDe(p)!=='conv'&&(p.jogos||[]).length){out.push('','⚽ JOGOS');let fa=null;for(const g of p.jogos){if(g.fase!==fa){fa=g.fase;out.push(FASE_N[fa]||fa)}if(g.bye||g.ga==null)continue;const tn=i=>CORES[p.times[i].cor].e+' '+nomeTime(p.times[i].cor);out.push(`${tn(g.a)} ${g.ga} × ${g.gb} ${tn(g.b)}${g.pa!=null&&g.ga===g.gb?` (pên. ${g.pa}×${g.pb})`:''}`)}out.push('')}
+      else if(vv.some(v=>v>0)){p.times.forEach((t,i)=>out.push(`${CORES[t.cor].e} ${nomeTime(t.cor)}: ${vv[i]||0} vitória(s)`));out.push('')}else if(cp!=null)out.push('')}
     if(pr.mvp)out.push('🏆 Craque da pelada: *'+nm(pr.mvp)+'*');
     if(pr.art)out.push(`⚽ Artilheiro: *${nm(pr.art)}* (${st[pr.art]?.g||0} gol${(st[pr.art]?.g||0)===1?'':'s'})`);
     if(pr.gar)out.push(`🅰️ Garçom: *${nm(pr.gar)}* (${st[pr.gar]?.a||0} assist.)`);
@@ -1168,6 +1171,81 @@ function subPresenca(pid,p,l,A){
   if(A)h+=`<div class="row" style="margin-top:12px"><button class="btn danger sm" data-act="cancel-pel" data-p="${pid}">Cancelar esta pelada</button></div>`;
   return h;
 }
+/* ---------- formato da pelada: convencional, pontos corridos, mata-mata ---------- */
+const FORMATOS={conv:'Convencional',liga:'Pontos corridos',mm:'Mata-mata',ligamm:'Pontos corridos + mata-mata'};
+const FASE_N={liga:'Pontos corridos',r16:'Oitavas',qf:'Quartas',sf:'Semifinal',fin:'Final'};
+function formatoDe(p){return(p&&p.formato)||cfg().formato||'conv'}
+function idaVoltaDe(p){return p&&p.idaVolta!=null?!!p.idaVolta:!!cfg().idaVolta}
+function nClassDe(p){const T=(p&&p.times||[]).length||4;return Math.min(T,Number((p&&p.nClass)||cfg().nClass||2))}
+function faseMM(n){return n<=2?'fin':n<=4?'sf':n<=8?'qf':'r16'}
+function gerarLiga(T,iv){const ids=[...Array(T).keys()];if(T%2)ids.push(null);const n=ids.length;let arr=ids.slice();const ida=[];
+  for(let r=0;r<n-1;r++){for(let i=0;i<n/2;i++){const a=arr[i],b=arr[n-1-i];if(a!=null&&b!=null)ida.push([a,b])}arr=[arr[0],arr[n-1],...arr.slice(1,n-1)]}
+  const out=ida.map(([a,b],k)=>({id:'l'+k,fase:'liga',a,b,ga:null,gb:null}));
+  if(iv)ida.forEach(([a,b],k)=>out.push({id:'v'+k,fase:'liga',a:b,b:a,ga:null,gb:null}));return out}
+function chave(seeds,fase){let P=1;while(P<seeds.length)P*=2;const s=seeds.concat(Array(P-seeds.length).fill(null)),out=[];
+  for(let i=0;i<P/2;i++){const a=s[i],b=s[P-1-i];out.push({id:fase+i,fase,a,b,ga:null,gb:null,bye:b==null})}return out}
+function vencedor(g){if(g.bye)return g.a;if(g.ga==null||g.gb==null)return null;if(g.ga!==g.gb)return g.ga>g.gb?g.a:g.b;
+  if(g.fase==='liga')return null;if(g.pa==null||g.pb==null||g.pa===g.pb)return null;return g.pa>g.pb?g.a:g.b}
+function jogado(g){return g.bye||(g.ga!=null&&g.gb!=null&&(g.fase==='liga'||vencedor(g)!=null))}
+function classificacao(p,jogos){const T=(p.times||[]).length,tab=[...Array(T).keys()].map(t=>({t,j:0,v:0,e:0,d:0,gp:0,gc:0,pts:0}));
+  const L=(jogos||p.jogos||[]).filter(g=>g.fase==='liga'&&g.ga!=null&&g.gb!=null);
+  for(const g of L){const A=tab[g.a],B=tab[g.b];if(!A||!B)continue;A.j++;B.j++;A.gp+=g.ga;A.gc+=g.gb;B.gp+=g.gb;B.gc+=g.ga;
+    if(g.ga>g.gb){A.v++;B.d++;A.pts+=3}else if(g.ga<g.gb){B.v++;A.d++;B.pts+=3}else{A.e++;B.e++;A.pts++;B.pts++}}
+  const h2h=(x,y)=>{let d=0;for(const g of L){if(g.a===x&&g.b===y)d+=g.ga-g.gb;if(g.a===y&&g.b===x)d+=g.gb-g.ga}return d};
+  return tab.sort((x,y)=>(y.pts-x.pts)||((y.gp-y.gc)-(x.gp-x.gc))||(y.gp-x.gp)||h2h(y.t,x.t)||(x.t-y.t))}
+function faseAtual(jogos){const mm=(jogos||[]).filter(g=>g.fase!=='liga');return mm.length?mm[mm.length-1].fase:null}
+/* campeão: índice do time ou null */
+function campeaoDe(p){const f=formatoDe(p),J=p.jogos||[];
+  if(f==='conv'||!J.length){const v=p.vit||[],mx=Math.max(0,...v);if(!mx)return null;const c=v.map((x,i)=>x===mx?i:-1).filter(i=>i>=0);return c.length===1?c[0]:null}
+  if(f==='liga'){if(!J.every(jogado))return null;return classificacao(p)[0].t}
+  const fin=J.find(g=>g.fase==='fin');return fin?vencedor(fin):null}
+function vitDe(p){const T=(p.times||[]).length;if(formatoDe(p)==='conv'||!(p.jogos||[]).length)return(p.vit||[]).slice(0,T);
+  const v=Array(T).fill(0);for(const g of p.jogos){if(g.bye)continue;const w=vencedor(g);if(w!=null)v[w]++}return v}
+function novosJogos(p){const T=(p.times||[]).length,f=formatoDe(p);if(T<2||f==='conv')return null;
+  if(f==='mm')return chave([...Array(T).keys()],faseMM(T));return gerarLiga(T,idaVoltaDe(p))}
+function proximaFase(p,jogos){const f=formatoDe(p),J=jogos||p.jogos||[];
+  const liga=J.filter(g=>g.fase==='liga'),mm=J.filter(g=>g.fase!=='liga');
+  if(!mm.length){if(f!=='ligamm'||!liga.length||!liga.every(jogado))return null;const n=nClassDe(p);return chave(classificacao(p,J).slice(0,n).map(x=>x.t),faseMM(n))}
+  const fa=faseAtual(J);if(fa==='fin')return null;const cur=mm.filter(g=>g.fase===fa);if(!cur.every(jogado))return null;
+  const w=cur.map(vencedor);return chave(w,faseMM(w.length))}
+function minutosPelada(p){const[a,b]=horaIniDe(p).split(':').map(Number),[c,d]=horaFimDe(p).split(':').map(Number);let m=(c*60+d)-(a*60+b);if(m<=0)m+=1440;return m}
+/* lista de jogos (act: 'jg' grava direto; 'ed-jg' mexe no rascunho do Editar) */
+function htmlJogos(pid,p,A,jogos,act){const T=p.times||[];if(!jogos||!jogos.length)return'';
+  const nomeT=i=>i==null?'—':`${(CORES[(T[i]||{}).cor]||{}).e||''} ${esc(nomeTime((T[i]||{}).cor))}`;
+  const st=(gi,k,v)=>A?`<span class="jg-st"><button data-act="${act}" data-p="${pid}" data-g="${gi}" data-k="${k}" data-d="-1" aria-label="Menos">−</button><b class="num">${v==null?'–':v}</b><button data-act="${act}" data-p="${pid}" data-g="${gi}" data-k="${k}" data-d="1" aria-label="Mais">+</button></span>`:`<b class="num jg-n">${v==null?'–':v}</b>`;
+  let h='',fa=null;
+  jogos.forEach((g,gi)=>{if(g.fase!==fa){fa=g.fase;h+=`<div class="jg-fase">${FASE_N[fa]||fa}</div>`}
+    if(g.bye){h+=`<div class="jg bye"><span>${nomeT(g.a)}</span><span class="sub">passa direto</span></div>`;return}
+    const w=vencedor(g),emp=g.fase!=='liga'&&g.ga!=null&&g.ga===g.gb;
+    h+=`<div class="jg${w!=null?' ok':''}"><div class="jg-l"><span class="jg-t${w===g.a?' win':''}">${nomeT(g.a)}</span>${st(gi,'ga',g.ga)}</div><div class="jg-x">×</div><div class="jg-l"><span class="jg-t${w===g.b?' win':''}">${nomeT(g.b)}</span>${st(gi,'gb',g.gb)}</div>
+      ${emp?`<div class="jg-pen"><span class="sub">Pênaltis</span>${st(gi,'pa',g.pa)}<span class="sub">×</span>${st(gi,'pb',g.pb)}</div>`:''}</div>`});
+  return h}
+function htmlClassif(p,jogos){const T=p.times||[],c=classificacao(p,jogos);if(!(jogos||[]).some(g=>g.fase==='liga'))return'';
+  return`<div class="clas"><div class="clas-r h"><span></span><span>Time</span><span>P</span><span>J</span><span>V</span><span>E</span><span>D</span><span>SG</span></div>${c.map((x,k)=>`<div class="clas-r"><span class="num">${k+1}º</span><span>${(CORES[(T[x.t]||{}).cor]||{}).e||''} ${esc(nomeTime((T[x.t]||{}).cor))}</span><b class="num">${x.pts}</b><span class="num">${x.j}</span><span class="num">${x.v}</span><span class="num">${x.e}</span><span class="num">${x.d}</span><span class="num">${x.gp-x.gc>0?'+':''}${x.gp-x.gc}</span></div>`).join('')}</div>`}
+function painelJogos(pid,p,A){const f=formatoDe(p),T=p.times||[];if(f==='conv'||T.length<2)return'';const J=p.jogos||[],c=campeaoDe(p),nx=A?proximaFase(p):null;
+  let h=`<div class="panel" style="margin-bottom:12px"><div class="panel-h"><h3>Jogos</h3><span class="sub">${FORMATOS[f]}${f!=='mm'&&idaVoltaDe(p)?' · ida e volta':''}</span></div>`;
+  if(c!=null)h+=`<div class="banner campeao-b"><b>🏆 Campeão: ${(CORES[T[c].cor]||{}).e} ${esc(nomeTime(T[c].cor))}</b></div>`;
+  if(!J.length)h+=A?`<button class="btn primary block" data-act="jg-gerar" data-p="${pid}">Montar a tabela de jogos</button>`:'<div class="empty">A tabela de jogos ainda não foi montada.</div>';
+  else{h+=htmlJogos(pid,p,A,J,'jg');h+=htmlClassif(p,J);
+    if(nx)h+=`<button class="btn primary block" style="margin-top:10px" data-act="jg-prox" data-p="${pid}">${FASE_N[nx[0].fase]==='Final'?'Montar a final':'Montar '+FASE_N[nx[0].fase].toLowerCase()}</button>`;
+    if(A)h+=`<button class="btn sm danger" style="margin-top:10px" data-act="jg-zerar" data-p="${pid}">Apagar tabela de jogos</button>`}
+  return h+'</div>'}
+function painelFormato(pid,p){const f=formatoDe(p),T=(p.times||[]).length,iv=idaVoltaDe(p),nj=f==='conv'?0:f==='mm'?T-1:T*(T-1)/2*(iv?2:1)+(f==='ligamm'?nClassDe(p)-1:0),min=minutosPelada(p);
+  return`<div class="panel stack"><div class="panel-h"><h3>Formato desta pelada</h3></div>
+    <select data-act="formato" data-p="${pid}" aria-label="Formato">${Object.entries(FORMATOS).map(([k,n])=>`<option value="${k}" ${k===f?'selected':''}>${n}</option>`).join('')}</select>
+    ${f==='liga'||f==='ligamm'?`<label class="row" style="gap:8px"><input type="checkbox" data-act="ida-volta" data-p="${pid}" ${iv?'checked':''}> Ida e volta</label>`:''}
+    ${f==='ligamm'?`<label class="field"><span>Classificados para o mata-mata</span><select data-act="n-class" data-p="${pid}">${[2,4,8].filter(n=>n<=T).map(n=>`<option value="${n}" ${n===nClassDe(p)?'selected':''}>${n} (${n===2?'final':n===4?'semifinal':'quartas'})</option>`).join('')}</select></label>`:''}
+    <div class="sub">${f==='conv'?'Conta só as vitórias de cada time (quem ganha fica ou rodízio).':`${nj} jogo${nj>1?'s':''} em ${min} min · uns ${Math.max(1,Math.floor(min/Math.max(1,nj)))} min por jogo.${min/Math.max(1,nj)<6?' <b>Pouco tempo:</b> pense no mata-mata.':''} A tabela e o placar ficam no Pós-jogo.`}</div></div>`}
+/* montar os times na mão */
+function sheetMontar(pid){const p=S.pel[pid];if(!p)return;const l=lista(p,pid),gente=[...l.escalados,...l.gks].filter(id=>S.jog[id]);
+  if(!UI.mt||UI.mt.pid!==pid){const asg={};(p.times||[]).forEach((t,i)=>[t.gk,...t.ids].filter(Boolean).forEach(id=>asg[id]=i));UI.mt={pid,T:(p.times||[]).length||Number(cfg().times)||3,asg}}
+  const M=UI.mt;for(const k in M.asg)if(M.asg[k]>=M.T)delete M.asg[k];
+  const sem=gente.filter(id=>M.asg[id]==null).length,cont=[...Array(M.T).keys()].map(i=>gente.filter(id=>M.asg[id]===i).length);
+  openSheet('Montar os times',`<div class="stack"><label class="field"><span>Número de times</span><select data-act="mt-n">${[...Array(MAX_TIMES-1)].map((_,k)=>k+2).map(n=>`<option value="${n}" ${n===M.T?'selected':''}>${n} times</option>`).join('')}</select></label>
+    <div class="mt-cont">${cont.map((n,i)=>`<span><i class="sw" style="background:${CORES[i].c}"></i>${esc(nomeTime(i))} <b class="num">${n}</b></span>`).join('')}${sem?`<span class="sub">Sem time: <b>${sem}</b></span>`:''}</div>
+    <div class="panel"><div class="sub" style="margin-bottom:6px">Toque na cor do time de cada jogador.</div>${gente.sort((a,b)=>nm(a).localeCompare(nm(b))).map(id=>`<div class="mt-l"><span class="chip p-${J(id).pos==='GOL'?'GOL':posLinha(id)}">${J(id).pos==='GOL'?'GOL':posLinha(id)}</span><span class="grow name">${esc(nm(id))}</span><span class="mt-cores">${[...Array(M.T).keys()].map(i=>`<button class="mt-c${M.asg[id]===i?' on':''}" style="background:${CORES[i].c}" data-act="mt-set" data-j="${id}" data-i="${i}" aria-label="${esc(nomeTime(i))}"></button>`).join('')}</span></div>`).join('')}</div>
+    <div class="lado notas-acoes"><button class="btn" data-act="mt-cancelar">Cancelar</button><button class="btn primary" data-act="mt-salvar" data-p="${pid}">Salvar times</button></div>
+    <p class="sub" style="margin:0">${sem?'Quem ficar sem time não entra na pelada. ':''}Depois de salvar, os times ficam como rascunho até você publicar.</p></div>`)}
 function subTimes(pid,p,l,A){
   const c=cfg(),M='margin-top:12px';const sec={};
   if(!A){if(!timesPub(p))return`<div class="empty">🔒 Os times aparecem aqui quando o administrador divulgar.</div>`;return blocoTimes(pid,p,false)}
@@ -1183,8 +1261,9 @@ function subTimes(pid,p,l,A){
       ${rs.length&&p.times?'<div class="sub">Mudou as regras? Toque em <b>Sortear de novo</b>.</div>':''}</div>`}
   // 3. sortear
   sec.sortear=`<div class="panel stack"><div class="row between"><div><b>${l.escalados.length} na linha · ${l.gks.length} goleiro(s)</b><div class="sub">${c.golSorteio?'Goleiros entram no sorteio':'Goleiros ficam fora do sorteio (extra)'} · equilibra por nota e posição${(c.restr||[]).length?' · respeita '+c.restr.length+' regra(s)':''}</div></div>
-    <div class="row"><select id="nt" aria-label="Número de times" style="width:auto">${[2,3,4].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
+    <div class="row"><select id="nt" aria-label="Número de times" style="width:auto">${[2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
     <button class="btn primary" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div>
+    <button class="btn block" data-act="montar" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>✋ ${p.times?'Ajustar os times na mão':'Montar os times na mão'}</button>
     ${p.times?`<button class="btn sm danger" style="align-self:flex-start" data-act="apagar-sorteio" data-p="${pid}">Apagar sorteio</button><div class="sub" style="margin-top:-4px">Com o sorteio feito, os jogadores não podem trocar de posição. Apagando, a troca abre de novo.</div>`:'<div class="sub" style="margin-top:-4px">Até o sorteio, cada jogador pode trocar a própria posição.</div>'}</div>`;
   if(p.times){
     // 4. equilíbrio
@@ -1192,12 +1271,13 @@ function subTimes(pid,p,l,A){
     sec.equil=`<div class="panel"><div class="row between"><b>Equilíbrio</b><span class="num small muted">diferença de ${ovr(mx-mn)} ponto${ovr(mx-mn)===1?'':'s'} na média</span></div><div class="meter" style="margin-top:8px"><i style="width:${Math.max(5,100-(mx-mn)*60)}%"></i></div><div class="sub" style="margin-top:6px">Toque em um jogador e depois em outro de outro time para trocar os dois.</div></div>`;
     // 5. times
     sec.times=blocoTimes(pid,p,true);
+    sec.formato=painelFormato(pid,p);
     // 6. publicar
     sec.pub=timesPub(p)?`<div class="banner" style="display:block"><b>✓ Times publicados.</b> A galera já vê no app.<div class="lado" style="margin-top:8px"><button class="btn sm" data-act="msg" data-v="times">Mandar no WhatsApp</button><button class="btn sm" data-act="pub-times" data-p="${pid}" data-v="0">Esconder da galera</button></div></div>`
       :`<div class="banner due" style="display:block"><b>🔒 Rascunho: só os administradores veem estes times.</b><br><span class="sub" style="color:inherit">Sorteie e troque jogadores quantas vezes quiser. A galera só vê depois que você publicar.</span>
         <button class="btn primary block" style="margin-top:8px" data-act="pub-times" data-p="${pid}" data-v="1">Publicar times no app</button>
         <button class="btn block" style="margin-top:8px" data-act="msg" data-v="times">Mandar times no WhatsApp</button></div>`}
-  return['semNota','regras','sortear','equil','times','pub'].filter(k=>sec[k]).map((k,i)=>i?`<div style="${M}">${sec[k]}</div>`:sec[k]).join('')+(p.times?'':`<div class="empty">Os times aparecem aqui depois do sorteio.</div>`);
+  return['semNota','regras','sortear','equil','times','formato','pub'].filter(k=>sec[k]).map((k,i)=>i?`<div style="${M}">${sec[k]}</div>`:sec[k]).join('')+(p.times?'':`<div class="empty">Os times aparecem aqui depois do sorteio.</div>`);
 }
 function blocoTimes(pid,p,A){let h='<div class="teams">';
   p.times.forEach((t,ti)=>{const co=CORES[t.cor];
@@ -1242,24 +1322,27 @@ function destaquesMini(pid,p){const L=destaquesDe(p,pid);if(!L.length)return'';
     ${o.length?`<div class="dcq-o">${o.map(x=>`<button class="dcq-i" data-act="ver-jog" data-j="${x.id}">${foto(x.id,'dcq-s')}<span class="dcq-in">${esc(nm(x.id).split(' ')[0])}</span><span class="dcq-it">${x.t}</span></button>`).join('')}</div>`:''}</div>`}
 function sheetEquipes(pid){const p=S.pel[pid];if(!p)return;
   if(!p.times||!p.times.length){openSheet('Equipes · '+dShort(p.data),'<div class="empty">Não teve sorteio de times nesta pelada.</div>');return}
-  const vit=p.vit||[],mx=Math.max(0,...vit),camp=mx>0?vit.map((v,i)=>v===mx?i:-1).filter(i=>i>=0):[],pr=premiosDe(p,pid);
-  const ord=p.times.map((t,i)=>({t,i})).sort((a,b)=>(vit[b.i]||0)-(vit[a.i]||0));
+  const vit=vitDe(p),cp=campeaoDe(p),f=formatoDe(p),mx=Math.max(0,...vit),camp=cp!=null?[cp]:f==='conv'&&mx>0?vit.map((v,i)=>v===mx?i:-1).filter(i=>i>=0):[],pr=premiosDe(p,pid);
+  const pos=f!=='conv'&&(p.jogos||[]).some(g=>g.fase==='liga')?Object.fromEntries(classificacao(p).map((x,k)=>[x.t,k])):null;
+  const ord=p.times.map((t,i)=>({t,i})).sort((a,b)=>(b.i===cp)-(a.i===cp)||(pos?pos[a.i]-pos[b.i]:0)||(vit[b.i]||0)-(vit[a.i]||0));
   const tag=id=>(pr.mvp===id?' 🏆':'')+(pr.art===id?' ⚽':'')+(pr.gar===id?' 🅰️':'')+(pr.def===id?' 🛡️':'');
   const linha=(id,gk)=>`<div class="eq-j">${avHTML(id)}<span class="grow">${esc(nm(id))}${tag(id)}</span><span class="chip p-${gk?'GOL':posLinha(id)}">${gk?'GOL':posLinha(id)}</span></div>`;
   const gx=(p.goleiros||[]).filter(id=>S.jog[id]);
-  openSheet('Equipes · '+dShort(p.data),`<div class="stack">${camp.length===1?`<div class="sub">Campeão: <b>${CORES[p.times[camp[0]].cor].e} ${esc(nomeTime(p.times[camp[0]].cor))}</b> com ${mx} vitória${mx>1?'s':''}.</div>`:camp.length>1?'<div class="sub">Empate no número de vitórias.</div>':'<div class="sub">As vitórias desta pelada não foram lançadas.</div>'}
+  openSheet('Equipes · '+dShort(p.data),`<div class="stack">${camp.length===1?`<div class="sub">Campeão: <b>${CORES[p.times[camp[0]].cor].e} ${esc(nomeTime(p.times[camp[0]].cor))}</b> com ${mx} vitória${mx>1?'s':''}.</div>`:camp.length>1?'<div class="sub">Empate no número de vitórias.</div>':`<div class="sub">${f==='conv'?'As vitórias desta pelada não foram lançadas.':'O campeão sai quando os jogos terminarem.'}</div>`}
+    ${f!=='conv'&&(p.jogos||[]).length?`<div class="panel"><div class="panel-h"><h3>Jogos</h3><span class="sub">${FORMATOS[f]}</span></div>${htmlJogos(pid,p,false,p.jogos,'')}${htmlClassif(p,p.jogos)}</div>`:''}
     ${ord.map(({t,i})=>{const c=CORES[t.cor]||{},ch=camp.length===1&&camp[0]===i;return`<div class="panel eq${ch?' campeao':''}" style="border-left:6px solid ${c.c}"><div class="panel-h"><h3>${c.e||''} ${esc(nomeTime(t.cor))}</h3><span class="sub num">${ch?'<b class="eq-camp">🏆 CAMPEÃO</b> · ':''}${vit[i]||0} vitória${(vit[i]||0)===1?'':'s'}</span></div>${t.gk&&S.jog[t.gk]?linha(t.gk,true):''}${t.ids.filter(id=>S.jog[id]).map(id=>linha(id)).join('')}</div>`}).join('')}
     ${gx.length?`<div class="panel"><div class="panel-h"><h3>🧤 Goleiros</h3><span class="sub">fora do sorteio</span></div>${gx.map(id=>linha(id,true)).join('')}</div>`:''}</div>`)}
 /* editar uma pelada (mesmo depois de encerrada): gols, assistências, vitórias e prêmios. Nada é gravado até Salvar. */
 function sheetEditarPelada(pid){const p=S.pel[pid];if(!p)return;
-  if(!UI.ed||UI.ed.pid!==pid)UI.ed={pid,st:JSON.parse(JSON.stringify(p.stats||{})),vit:(p.vit||(p.times||[]).map(()=>0)).slice(),pr:{...(p.premios||{})}};
+  if(!UI.ed||UI.ed.pid!==pid)UI.ed={pid,st:JSON.parse(JSON.stringify(p.stats||{})),vit:(p.vit||(p.times||[]).map(()=>0)).slice(),pr:{...(p.premios||{})},jogos:JSON.parse(JSON.stringify(p.jogos||[]))};
   const E=UI.ed,ids=jogaram(p).filter(id=>S.jog[id]).sort((a,b)=>nm(a).localeCompare(nm(b))),auto=premiosDe({...p,premios:{}},pid);
   const step=(act,attrs,v,lbl)=>`<div class="stepbox"><div class="step"><button data-act="${act}" ${attrs} data-d="-1" aria-label="Menos ${lbl}" ${v<=0?'disabled':''}>−</button><output class="num">${v}</output><button data-act="${act}" ${attrs} data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`;
   const opts=(k,list)=>`<option value="">Automático${auto[k]&&S.jog[auto[k]]?' ('+esc(nm(auto[k]))+')':''}</option>`+list.map(id=>`<option value="${id}" ${E.pr[k]===id?'selected':''}>${esc(nm(id))}</option>`).join('');
   const zg=ids.filter(id=>POS_XERIFE.includes(J(id).pos)),gks=ids.filter(id=>J(id).pos==='GOL');
   const PRS=[['mvp','🏆 Craque',ids],['art','⚽ Artilheiro',ids],['gar','🅰️ Garçom',ids],['def','🛡️ Xerife',zg.length?zg:ids],['gol','🧤 Goleiro',gks.length?gks:ids],['per','🐢 Pereba',ids]];
   openSheet('Editar pelada · '+dShort(p.data),`<div class="stack">
-    ${p.times&&p.times.length?`<div class="panel"><div class="panel-h"><h3>Vitórias</h3></div><div class="ed-lista">${p.times.map((t,i)=>`<div class="ed-l"><span class="grow"><b>${(CORES[t.cor]||{}).e||''} ${esc(nomeTime(t.cor))}</b></span>${step('ed-vit',`data-i="${i}"`,E.vit[i]||0,'Vitórias')}</div>`).join('')}</div></div>`:''}
+    ${p.times&&formatoDe(p)!=='conv'&&E.jogos.length?`<div class="panel"><div class="panel-h"><h3>Jogos</h3><span class="sub">${FORMATOS[formatoDe(p)]}</span></div>${htmlJogos(pid,{...p,jogos:E.jogos},true,E.jogos,'ed-jg')}</div>`:''}
+    ${p.times&&p.times.length&&(formatoDe(p)==='conv'||!E.jogos.length)?`<div class="panel"><div class="panel-h"><h3>Vitórias</h3></div><div class="ed-lista">${p.times.map((t,i)=>`<div class="ed-l"><span class="grow"><b>${(CORES[t.cor]||{}).e||''} ${esc(nomeTime(t.cor))}</b></span>${step('ed-vit',`data-i="${i}"`,E.vit[i]||0,'Vitórias')}</div>`).join('')}</div></div>`:''}
     <div class="panel"><div class="panel-h"><h3>Gols e assistências</h3></div><div class="ed-lista">${ids.map(id=>{const x=E.st[id]||{};return`<div class="ed-j"><div class="ed-who">${avHTML(id)}<span class="name">${esc(nm(id))}</span></div><div class="ed-st">${step('ed-st',`data-j="${id}" data-f="g"`,x.g||0,'Gols')}${step('ed-st',`data-j="${id}" data-f="a"`,x.a||0,'Assist.')}</div></div>`}).join('')||'<div class="empty">Ninguém jogou nesta pelada.</div>'}</div></div>
     <div class="panel"><div class="panel-h"><h3>Prêmios</h3></div><div class="awards">${PRS.map(([k,l,list])=>`<div class="award"><label for="ed-${k}">${l}</label><select id="ed-${k}" data-act="ed-pr" data-f="${k}">${opts(k,list)}</select></div>`).join('')}</div><div class="sub" style="margin-top:6px">"Automático" usa os votos da galera e os gols lançados.</div></div>
     <div class="lado notas-acoes"><button class="btn" data-act="ed-cancelar">Cancelar</button><button class="btn primary" data-act="ed-salvar" data-p="${pid}">Salvar</button></div>
@@ -1274,7 +1357,8 @@ function subPos(pid,p,A){
   const ids=jogaram(p),st=p.stats||{},pr=premiosDe(p,pid),manual=p.premios||{};
   if(!ids.length)return`<div class="empty">Confirme a presença e sorteie os times antes do pós-jogo.</div>`;
   let h=A?painelVotacaoPos(pid,p):'';
-  if(p.times&&A){h+=`<div class="panel" style="margin-bottom:12px"><h3 style="margin-bottom:8px">Vitórias por time</h3><div class="row" style="gap:16px">`;
+  if(p.times&&formatoDe(p)!=='conv')h+=painelJogos(pid,p,A);
+  else if(p.times&&A){h+=`<div class="panel" style="margin-bottom:12px"><h3 style="margin-bottom:8px">Vitórias por time</h3><div class="row" style="gap:16px">`;
     p.times.forEach((t,i)=>{const v=(p.vit||[])[i]||0;h+=`<div class="stepbox"><div class="step"><button data-act="vit" data-p="${pid}" data-i="${i}" data-d="-1" aria-label="Menos">−</button><output class="num">${v}</output><button data-act="vit" data-p="${pid}" data-i="${i}" data-d="1" aria-label="Mais">+</button></div><span class="lbl">${esc(nomeTime(t.cor))}</span></div>`});
     h+='</div></div>'}
   h+=`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Avaliação da galera'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div><div class="sub" style="margin-bottom:6px">${statusVotacao(p,pid,ids)}</div>${tabelaNotas(pid,p,A)}</div>`;
@@ -1662,7 +1746,7 @@ function gravarPag(kind,key,id,val){if(kind==='m'){const cx=S.caixa[key]||{mens:
 function openSheet(title,body,foot=''){
   document.getElementById('sheet').innerHTML=`<div class="scrim" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-h"><h2>${esc(title)}</h2><button class="iconbtn" data-act="close" aria-label="Fechar">✕</button></div><div id="sheet-body">${body}</div>${foot}</div></div>`;
 }
-function closeSheet(){document.getElementById('sheet').innerHTML='';F=null;UI.rasc=null;UI.ed=null}
+function closeSheet(){document.getElementById('sheet').innerHTML='';F=null;UI.rasc=null;UI.ed=null;UI.mt=null}
 let F=null;
 
 function sheetMsg(tipo,ctx={}){
@@ -1693,7 +1777,10 @@ function sheetCfg(){
     <button class="btn sm" data-act="locais">Gerenciar locais</button>
     <label class="field"><span>Vagas na pelada (jogadores de linha)</span><input type="number" id="c-vagas" min="2" max="60" inputmode="numeric" value="${vagasCfg()}"></label>
     <div class="sub" style="margin-top:-6px">Os primeiros a confirmar ficam com as vagas, mensalista ou não. Quem confirmar depois vai para a lista de espera. Goleiros ficam fora dessa conta.</div>
-    <label class="field"><span>Times no sorteio (padrão)</span><select id="c-times">${[2,3,4].map(n=>`<option ${c.times==n?'selected':''}>${n}</option>`).join('')}</select></label>
+    <label class="field"><span>Formato padrão das peladas</span><select id="c-formato">${Object.entries(FORMATOS).map(([k,n])=>`<option value="${k}" ${(c.formato||'conv')===k?'selected':''}>${n}</option>`).join('')}</select></label>
+    <div class="grid2"><label class="row" style="gap:8px"><input type="checkbox" id="c-idavolta" ${c.idaVolta?'checked':''}> Pontos corridos com ida e volta</label>
+    <label class="field"><span>Classificados p/ mata-mata</span><select id="c-nclass">${[2,4,8].map(n=>`<option value="${n}" ${Number(c.nClass||2)===n?'selected':''}>${n}</option>`).join('')}</select></label></div>
+    <label class="field"><span>Times no sorteio (padrão)</span><select id="c-times">${[2,3,4,5,6,7,8,9,10].map(n=>`<option ${c.times==n?'selected':''}>${n}</option>`).join('')}</select></label>
     <div class="grid2"><label class="field"><span>Mensalidade (R$)</span><input type="number" id="c-mensal" min="0" step="0.01" value="${c.mensal}"></label>
     <label class="field"><span>Diária (R$)</span><input type="number" id="c-diaria" min="0" step="0.01" value="${c.diaria}"></label></div>
     <label class="field"><span>Chave Pix</span><input type="text" id="c-pix" value="${esc(c.pix)}" placeholder="Telefone, e-mail ou chave aleatória"></label>
@@ -2034,6 +2121,24 @@ document.addEventListener('click',e=>{
       put('config/geral',{...(S.config||{}),nomesTimes:arr});closeSheet();toast('Nome do time salvo.');break}
     case'notas-pel':sheetNotasPelada(d.p);break;
     case'equipes-pel':sheetEquipes(d.p);break;
+    case'jg':case'ed-jg':{const ed=d.act==='ed-jg';if(ed&&!UI.ed)return;const p=S.pel[d.p],J0=ed?UI.ed.jogos:JSON.parse(JSON.stringify(p.jogos||[])),g=J0[Number(d.g)];if(!g)return;
+      const k=d.k,o={ga:'gb',gb:'ga',pa:'pb',pb:'pa'}[k];if(g[k]==null){g[k]=0;if(g[o]==null)g[o]=0;if(Number(d.d)>0)g[k]=1}else g[k]=Math.max(0,g[k]+Number(d.d));
+      if((k==='ga'||k==='gb')&&g.ga!==g.gb){delete g.pa;delete g.pb}
+      // se um resultado do mata-mata mudou, apaga as fases seguintes que dependiam dele
+      {const ix=J0.indexOf(g),fs=['liga','r16','qf','sf','fin'],fi=fs.indexOf(g.fase);for(let i=J0.length-1;i>ix;i--)if(fs.indexOf(J0[i].fase)>fi&&J0[i].fase!==g.fase)J0.splice(i,1)}
+      if(ed){const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetEditarPelada(UI.ed.pid);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc}else patch('peladas/'+d.p,{jogos:J0});break}
+    case'jg-gerar':{const p=S.pel[d.p],nj=novosJogos(p);if(nj)patch('peladas/'+d.p,{jogos:nj});break}
+    case'jg-prox':{const p=S.pel[d.p],nx=proximaFase(p);if(nx)patch('peladas/'+d.p,{jogos:[...(p.jogos||[]),...nx]});break}
+    case'jg-zerar':if(b.dataset.sure){patch('peladas/'+d.p,{jogos:null});toast('Tabela apagada.')}else{b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar tabela de jogos'}},3500)}break;
+    case'montar':UI.mt=null;sheetMontar(d.p);break;
+    case'mt-set':{const M=UI.mt;if(!M)return;const i=Number(d.i);M.asg[d.j]=M.asg[d.j]===i?null:i;if(M.asg[d.j]==null)delete M.asg[d.j];const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetMontar(M.pid);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc;break}
+    case'mt-cancelar':UI.mt=null;closeSheet();break;
+    case'mt-salvar':{const M=UI.mt;if(!M)return;const p=S.pel[d.p],l=lista(p,d.p),gol=!!cfg().golSorteio,ord={ZAG:0,LAT:1,VOL:2,MEI:3,ATA:4};
+      const times=[...Array(M.T).keys()].map(i=>({cor:i,gk:null,ids:[]}));
+      for(const[id,i] of Object.entries(M.asg)){if(i==null||!times[i]||!S.jog[id])continue;if(J(id).pos==='GOL'&&!times[i].gk)times[i].gk=id;else times[i].ids.push(id)}
+      times.forEach(t=>t.ids.sort((a,b)=>ord[posLinha(a)]-ord[posLinha(b)]));
+      const goleiros=gol?[]:l.gks.filter(id=>M.asg[id]==null);
+      patch('peladas/'+d.p,{times,goleiros,nTimes:M.T,vit:times.map(()=>0),jogos:null,sorteadoEm:Date.now(),publicado:false,manual:true});UI.mt=null;UI.sel=null;closeSheet();toast('Times montados. Só os administradores estão vendo.');break}
     case'editar-pel':UI.ed=null;sheetEditarPelada(d.p);break;
     case'ed-cancelar':UI.ed=null;closeSheet();break;
     case'ed-vit':case'ed-st':{const E=UI.ed;if(!E)return;if(d.act==='ed-vit')E.vit[d.i]=Math.max(0,(E.vit[d.i]||0)+Number(d.d));else{const x=E.st[d.j]={...(E.st[d.j]||{})};x[d.f]=Math.max(0,(x[d.f]||0)+Number(d.d))}
@@ -2041,7 +2146,7 @@ document.addEventListener('click',e=>{
     case'ed-salvar':{const E=UI.ed;if(!E||E.pid!==d.p)return;const p=S.pel[d.p],o=p.stats||{},st={};
       for(const[id,x] of Object.entries(E.st)){const a=o[id]||{};if((x.g||0)!==(a.g||0)||(x.a||0)!==(a.a||0))st[id]={g:x.g||0,a:x.a||0}}
       const pr={};for(const k of['mvp','art','gar','def','gol','per'])if((E.pr[k]||null)!==((p.premios||{})[k]||null))pr[k]=E.pr[k]||null;
-      const up={};if(Object.keys(st).length)up.stats=st;if(Object.keys(pr).length)up.premios=pr;if(p.times&&JSON.stringify(E.vit)!==JSON.stringify(p.vit||[]))up.vit=E.vit;
+      const up={};if(Object.keys(st).length)up.stats=st;if(Object.keys(pr).length)up.premios=pr;if(p.times&&JSON.stringify(E.vit)!==JSON.stringify(p.vit||[]))up.vit=E.vit;if(JSON.stringify(E.jogos)!==JSON.stringify(p.jogos||[]))up.jogos=E.jogos;
       if(Object.keys(up).length)patch('peladas/'+d.p,up);UI.ed=null;closeSheet();toast(Object.keys(up).length?'Pelada atualizada.':'Nada foi alterado.');break}
     case'notas-editar':UI.rasc=null;sheetNotasPelada(d.p,true);break;
     case'stat-rasc':{if(!UI.rasc||UI.rasc.pid!==d.p)return;const s=UI.rasc.st[d.j]={...(UI.rasc.st[d.j]||{})};s[d.f]=Math.max(0,(s[d.f]||0)+Number(d.d));
@@ -2068,7 +2173,7 @@ document.addEventListener('click',e=>{
       document.getElementById('gol-txt').textContent=F.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
       const ev=g('c-tipo')==='evento',dataEv=null,diaEv=Number(g('c-dia'));
-      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
+      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,pix:g('c-pix').trim(),nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',evento:ev,data:dataEv});
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':case'pagou-d':{const kind=d.act==='pagou-m'?'m':'d',key=kind==='m'?d.m:d.p,src=kind==='m'?((S.caixa[key]||{}).mens||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[d.j]);
@@ -2098,6 +2203,10 @@ document.addEventListener('change',e=>{
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
   const t=e.target;
   if(t.dataset.act==='cmp'){UI.cmp=t.value||null;const sc=document.querySelector('.sheet').scrollTop;sheetVerJog(t.dataset.j);document.querySelector('.sheet').scrollTop=sc}
+  if(t.dataset.act==='mt-n'&&UI.mt){UI.mt.T=Number(t.value);sheetMontar(UI.mt.pid);return}
+  if(t.dataset.act==='formato'){const p=S.pel[t.dataset.p];const go=()=>patch('peladas/'+t.dataset.p,{formato:t.value,jogos:null});if((p.jogos||[]).some(g=>g.ga!=null)&&!confirm('Trocar o formato apaga a tabela de jogos e os placares. Continuar?')){render();return}go();return}
+  if(t.dataset.act==='ida-volta'){patch('peladas/'+t.dataset.p,{idaVolta:t.checked,jogos:null});return}
+  if(t.dataset.act==='n-class'){const p=S.pel[t.dataset.p];patch('peladas/'+t.dataset.p,{nClass:Number(t.value),jogos:(p.jogos||[]).filter(g=>g.fase==='liga')});return}
   if(t.dataset.act==='ed-pr'&&UI.ed){UI.ed.pr[t.dataset.f]=t.value||null;return}
   if(t.dataset.act==='convoc-cor-livre'){const cur=coresConvoc();patch('config/geral',{artCores:{...cur,[t.dataset.k]:t.value}});sheetConvocArte(t.dataset.p);return}
   if(t.id==='cx-data'){UI.cxData=t.value||null;render();return}
