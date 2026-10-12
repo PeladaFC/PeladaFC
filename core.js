@@ -540,6 +540,33 @@ function msg0(tipo,ctx={}){
     const ja=lista.filter(x=>x.st===2).map(x=>nm(x.jog)),nao=lista.filter(x=>x.st<2).map(x=>nm(x.jog));
     if(tipo==='cobrarvoto')return[`⭐ VOTAÇÃO DA PELADA · ${dShort(p.data)}`,'',`Ainda falta votar (${nao.length}):`,...nao.map(x=>'• '+x),'',`Entra no app e dá suas estrelas pra galera${Date.now()<fa?' até '+quandoCurto(fa):''}. É rapidinho e o voto é secreto! 🔒`].join('\n');
     return[`⭐ VOTAÇÃO DA PELADA · ${dShort(p.data)}`,'',...(ja.length?[`Já votaram (${ja.length} de ${lista.length}):`,...ja.map(x=>'✅ '+x)]:['Ninguém votou ainda.']),'',nao.length?`Falta${nao.length>1?'m':''} ${nao.length}. Bora completar${Date.now()<fa?' até '+quandoCurto(fa):''}! 💪`:'Todo mundo votou. Valeu, galera! 🙌'].join('\n')}
+  if(tipo==='campeonato'){const T=p.times||[],f=formatoDe(p),J=p.jogos||[],st=p.stats||{},pr=premiosDe(p),tn=i=>T[i]?`${(CORES[T[i].cor]||{}).e||''} ${nomeTime(T[i].cor)}`:'—';
+    const out=[`📋 *RELATÓRIO DO CAMPEONATO*`,`${c.nome} · ${dLong(p.data)} · ${FORMATOS[f]}${f!=='mm'&&f!=='conv'&&idaVoltaDe(p)?' (ida e volta)':''}`];
+    const cp=T.length?campeaoDe(p):null;
+    if(cp!=null){out.push('',`🏆 *CAMPEÃO: ${tn(cp).trim().toUpperCase()}*`);const fin=J.find(g=>g.fase==='fin'&&!g.bye);if(fin&&vencedor(fin)!=null){const vi=vencedor(fin)===fin.a?fin.b:fin.a;out.push(`🥈 Vice: ${tn(vi)}`)}}
+    else out.push('','⏳ Campeonato em andamento');
+    // times
+    if(T.length){out.push('','👕 *TIMES*');T.forEach((t,i)=>out.push(`${tn(i)}: ${[t.gk,...t.ids].filter(id=>id&&S.jog[id]).map(nm).join(', ')}`))}
+    // classificação
+    if(J.some(g=>g.fase==='liga')){out.push('','📊 *CLASSIFICAÇÃO*');classificacao(p).forEach((x,k)=>out.push(`${k+1}º ${tn(x.t)}: ${x.pts} pts · ${x.j}J ${x.v}V ${x.e}E ${x.d}D · SG ${x.gp-x.gc>0?'+':''}${x.gp-x.gc}`))}
+    else if(f==='conv'){const vv=vitDe(p);if(vv.some(v=>v>0)){out.push('','📊 *VITÓRIAS*');T.map((t,i)=>[i,vv[i]||0]).sort((a,b)=>b[1]-a[1]).forEach(([i,v])=>out.push(`${tn(i)}: ${v} vitória${v===1?'':'s'}`))}}
+    // jogos por fase
+    if(J.length){out.push('','⚽ *JOGOS*');let fa=null;for(const g of J){const cab=g.fase==='liga'&&g.rd?g.rd+'ª rodada':(FASE_N[g.fase]||g.fase);if(cab!==fa){fa=cab;out.push('',`*${cab}*`)}
+      if(g.bye){out.push(`${tn(g.a)} passa direto`);continue}
+      if(!feito(g)){out.push(`${tn(g.a)} × ${tn(g.b)} · a jogar`);continue}
+      out.push(`${tn(g.a)} ${g.ga||0} × ${g.gb||0} ${tn(g.b)}${g.pa!=null&&(g.ga||0)===(g.gb||0)?` (pênaltis ${g.pa}×${g.pb})`:''}`);
+      if((g.gols||[]).length)out.push('   ⚽ '+g.gols.map(e=>nm(e.j)+(e.as?' ('+nm(e.as)+')':'')).join(', '))}}
+    // artilharia e assistências
+    const ids=Object.keys(st).filter(id=>S.jog[id]),art=ids.filter(id=>(st[id].g||0)>0).sort((a,b)=>st[b].g-st[a].g||nm(a).localeCompare(nm(b))),gar=ids.filter(id=>(st[id].a||0)>0).sort((a,b)=>st[b].a-st[a].a||nm(a).localeCompare(nm(b)));
+    if(art.length){out.push('','🥅 *ARTILHARIA*');art.forEach(id=>out.push(`${nm(id)}: ${st[id].g} gol${st[id].g===1?'':'s'}`))}
+    if(gar.length){out.push('','🅰️ *ASSISTÊNCIAS*');gar.forEach(id=>out.push(`${nm(id)}: ${st[id].a} assist.`))}
+    // destaques
+    const dq=[['mvp','🏆 Craque'],['art','⚽ Artilheiro'],['gar','🅰️ Garçom'],['def','🛡️ Xerife'],['gol','🧤 Melhor goleiro']].filter(([k])=>pr[k]);
+    if(dq.length){out.push('','⭐ *DESTAQUES*');dq.forEach(([k,n])=>out.push(`${n}: ${nm(pr[k])}`))}
+    // resumo
+    const fe=J.filter(g=>!g.bye&&feito(g)),gols=sum(fe.map(g=>(g.ga||0)+(g.gb||0)));
+    if(J.length){out.push('','📌 *RESUMO*',`Jogos disputados: ${fe.length} de ${J.filter(g=>!g.bye).length}`,`Gols: ${gols}${fe.length?` · média de ${(gols/fe.length).toFixed(1).replace('.',',')} por jogo`:''}`)}
+    return out.join('\n')}
   if(tipo==='resultado'){const pr=premiosDe(p),st=p.stats||{},out=[`🏁 *RESULTADO · ${dShort(p.data)}*`,''];
     {const cp=p.times?campeaoDe(p):null,vv=p.times?vitDe(p):[];if(cp!=null)out.push(`🏆 Campeão: ${CORES[p.times[cp].cor].e} ${nomeTime(p.times[cp].cor)}`);
       if(formatoDe(p)!=='conv'&&(p.jogos||[]).length){if(cp!=null)out.push('');out.push('⚽ JOGOS');let fa=null;for(const g of p.jogos){if(g.bye||!feito(g))continue;{const cab=g.fase==='liga'&&g.rd?g.rd+'ª rodada':(FASE_N[g.fase]||g.fase);if(cab!==fa){fa=cab;out.push(cab)}}const tn=i=>CORES[p.times[i].cor].e+' '+nomeTime(p.times[i].cor);out.push(`${tn(g.a)} ${g.ga} × ${g.gb} ${tn(g.b)}${g.pa!=null&&g.ga===g.gb?` (pên. ${g.pa}×${g.pb})`:''}`);if((g.gols||[]).length)out.push('   ⚽ '+g.gols.map(e=>nm(e.j)+(e.as?' ('+nm(e.as)+')':'')).join(', '))}out.push('')}
@@ -1346,6 +1373,7 @@ function painelJogos(pid,p,A){const f=formatoDe(p),T=p.times||[];if(f==='conv'||
   if(!J.length)h+=A?`<button class="btn primary block" data-act="jg-gerar" data-p="${pid}">Montar a tabela de jogos</button>`:'<div class="empty">A tabela de jogos ainda não foi montada.</div>';
   else{h+=htmlJogos(pid,p,A,J,'jg');h+=htmlClassif(p,J);
     if(nx)h+=`<button class="btn primary block" style="margin-top:10px" data-act="jg-prox" data-p="${pid}">${FASE_N[nx[0].fase]==='Final'?'Montar a final':'Montar '+FASE_N[nx[0].fase].toLowerCase()}</button>`;
+    h+=`<button class="btn block" style="margin-top:10px" data-act="msg" data-v="campeonato" data-p="${pid}">📋 Relatório do campeonato</button>`;
     if(A)h+=`<button class="btn sm danger" style="margin-top:10px" data-act="jg-zerar" data-p="${pid}">Apagar tabela de jogos</button>`}
   return h+'</div>'}
 /* quantos jogos cada fase vai ter, no formato escolhido */
@@ -2016,13 +2044,14 @@ let F=null;
 
 function sheetMsg(tipo,ctx={}){
   const text=msg(tipo,ctx);
-  const titulo=tipo==='convite'?'Convite':tipo==='cobrarvoto'?'Cobrar votação':tipo==='javotaram'?'Quem já votou':tipo==='prestacao'?'Prestação de contas':AVISOS[tipo]?.n||'Mensagem';
+  const titulo=tipo==='convite'?'Convite':tipo==='cobrarvoto'?'Cobrar votação':tipo==='javotaram'?'Quem já votou':tipo==='prestacao'?'Prestação de contas':tipo==='campeonato'?'Relatório do campeonato':AVISOS[tipo]?.n||'Mensagem';
   const tel=ctx.jid&&J(ctx.jid).tel?String(J(ctx.jid).tel).replace(/\D/g,''):'';
   const fone=tel?(tel.length<=11?'55'+tel:tel):'';
   MSG_ORIG=text;
   openSheet(titulo,`<div class="row between" style="margin-bottom:6px"><span class="sub">✎ Toque no texto para editar do seu jeito</span><button class="btn sm" data-act="msg-reset">Restaurar texto</button></div>
     <textarea id="msg-text" rows="14" class="num" aria-label="Texto da mensagem, editável">${esc(text)}</textarea>
     ${tipo==='prestacao'?`<button class="btn warn block" style="margin-top:10px" data-act="prest-pdf" data-m="${ctx.mes||mesAtual()}">📄 Baixar em PDF</button>`:''}
+    ${tipo==='campeonato'&&ctx.pel?`<button class="btn warn block" style="margin-top:10px" data-act="camp-pdf" data-d="${ctx.pel.data}">📄 Baixar em PDF</button>`:''}
     ${tipo==='convocacao'&&atual()?`<button class="btn warn block" style="margin-top:10px" data-act="convoc-arte" data-p="${atual()[0]}">🎨 Gerar arte de convocação</button>`:''}
     <div class="stack" style="margin-top:12px">
       ${ADM()?`<button class="btn primary block" data-act="enviar-app" data-titulo="${esc(titulo)}">Enviar no app para todos</button>`:''}
@@ -2346,6 +2375,9 @@ document.addEventListener('click',e=>{
         if(!calmo){app.classList.add('entrando');setTimeout(()=>app.classList.remove('entrando'),600)}};
       if(calmo)fim();else{app.classList.add('saindo');setTimeout(fim,260)}break}
     case'fechar-enc':UI.recemEnc=null;render();break;
+    case'camp-pdf':{const t=(document.getElementById('msg-text')||{}).value||'',blob=pdfPrestacao(t),fn='campeonato-'+(d.d||'pelada')+'.pdf';
+      const salvar=dl&&dl.save?dl.save({filename:fn,data:blob,type:'application/pdf'}):Promise.resolve((()=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;document.body.appendChild(a);a.click();a.remove();return{status:'saved'}})());
+      salvar.then(r=>{if(r&&r.status==='saved')toast('PDF pronto.')},e=>{if(e&&e.name!=='AbortError')toast('Não deu para gerar o PDF.')});break}
     case'prest-pdf':{const t=(document.getElementById('msg-text')||{}).value||msg('prestacao',{mes:d.m}),blob=pdfPrestacao(t),fn='prestacao-'+d.m+'.pdf';
       const salvar=dl&&dl.save?dl.save({filename:fn,data:blob,type:'application/pdf'}):Promise.resolve((()=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;document.body.appendChild(a);a.click();a.remove();return{status:'saved'}})());
       salvar.then(r=>{if(r&&r.status==='saved')toast('PDF pronto.')},e=>{if(e&&e.name!=='AbortError')toast('Não deu para gerar o PDF.')});break}
