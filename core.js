@@ -2880,3 +2880,15 @@ function pdfCampeonato(pid){const p=S.pel[pid];if(!p)return null;const c=cfg(),T
   secao(dq.length?'DESTAQUES E RESUMO':'RESUMO');{const GAP=12,TW=dq.length?(LW-GAP)/2:LW,RH=16,n=Math.max(dq.length,res.length);
     for(let i=0;i<n;i++){P.cabe(RH);[[dq,M],[res,dq.length?M+TW+GAP:M]].forEach(([L,x0],q)=>{if(!dq.length&&q===0)return;const r=L[i];if(!r)return;P.ret(x0,P.y,TW,RH,{fill:i%2?CLARO:'#FFFFFF'});P.txt(r[0],x0+8,P.y+11.5,{sz:8.5,cor:CINZA});P.txt(r[1],x0+TW-8,P.y+11.5,{sz:9,b:true,al:'r',w:TW/2})});P.y+=RH}}
   return P.fim()}
+/* iPhone: depois de abrir/fechar o teclado ou voltar para o app, a barra fixa de baixo às vezes fica "flutuando" no meio da tela.
+   Aqui ela é reancorada no fundo da área visível sempre que a tela muda de tamanho. */
+(function(){const vv=window.visualViewport;let pend=false;
+  const ajustar=()=>{pend=false;const n=document.getElementById('nav');if(!n)return;n.style.transform='';if(!vv)return;
+    const base=vv.offsetTop+vv.height,r=n.getBoundingClientRect(),dif=base-r.bottom;
+    // só corrige quando a barra ficou acima do fundo (teclado aberto não conta: aí o fundo visível fica acima da barra)
+    if(dif>2&&!(document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)))n.style.transform=`translateY(${Math.round(dif)}px)`};
+  const agenda=()=>{if(pend)return;pend=true;requestAnimationFrame(ajustar)};
+  const firmar=()=>{agenda();setTimeout(()=>{window.scrollTo(window.scrollX,window.scrollY);agenda()},120);setTimeout(agenda,400)};
+  if(vv){vv.addEventListener('resize',agenda);vv.addEventListener('scroll',agenda)}
+  window.addEventListener('resize',agenda);window.addEventListener('scroll',agenda,{passive:true});window.addEventListener('orientationchange',firmar);
+  window.addEventListener('pageshow',firmar);document.addEventListener('visibilitychange',()=>{if(!document.hidden)firmar()});document.addEventListener('focusout',firmar)})();
