@@ -1976,7 +1976,7 @@ function gravarPag(kind,key,id,val){const at=kind==='x'?((((S.caixa[key.split('~
 function openSheet(title,body,foot=''){
   document.getElementById('sheet').innerHTML=`<div class="scrim" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-h"><h2>${esc(title)}</h2><button class="iconbtn" data-act="close" aria-label="Fechar">✕</button></div><div id="sheet-body">${body}</div>${foot}</div></div>`;
 }
-function closeSheet(){document.getElementById('sheet').innerHTML='';F=null;UI.rasc=null;UI.ed=null;UI.mt=null;UI.xc=null}
+function closeSheet(){if(UI.trocaPend){UI.trocaPend=null;UI.sel=null;setTimeout(render,0)}document.getElementById('sheet').innerHTML='';F=null;UI.rasc=null;UI.ed=null;UI.mt=null;UI.xc=null}
 let F=null;
 
 function sheetMsg(tipo,ctx={}){
@@ -2292,8 +2292,14 @@ document.addEventListener('click',e=>{
       if(UI.sel.id===d.j||UI.sel.t===ti){UI.sel=UI.sel.id===d.j?null:{t:ti,id:d.j};render();break}
       const times=JSON.parse(JSON.stringify(p.times));const A1=UI.sel,B1={t:ti,id:d.j};
       const place=(tm,from,to)=>{if(tm.gk===from)tm.gk=to;else tm.ids=tm.ids.map(x=>x===from?to:x)};
-      place(times[A1.t],A1.id,B1.id);place(times[B1.t],B1.id,A1.id);UI.sel=null;
-      patch('peladas/'+d.p,{times});break}
+      place(times[A1.t],A1.id,B1.id);place(times[B1.t],B1.id,A1.id);
+      const ta=p.times[A1.t],tb=p.times[B1.t],na=nomeTime(ta.cor),nb=nomeTime(tb.cor),ce=t=>(CORES[t.cor]||{}).e||'';
+      UI.trocaPend={pid:d.p,times};
+      openSheet('Trocar jogadores?',`<div class="stack"><div class="troca-box"><div><b>${esc(nm(A1.id))}</b><span class="sub">${ce(ta)} ${esc(na)} → ${ce(tb)} ${esc(nb)}</span></div><div class="troca-x">⇄</div><div><b>${esc(nm(B1.id))}</b><span class="sub">${ce(tb)} ${esc(nb)} → ${ce(ta)} ${esc(na)}</span></div></div>
+        <p class="sub" style="margin:0">Média depois da troca: ${esc(na)} <b class="num">${ovr(teamMedia(times[A1.t]))}</b> (era ${ovr(teamMedia(ta))}) · ${esc(nb)} <b class="num">${ovr(teamMedia(times[B1.t]))}</b> (era ${ovr(teamMedia(tb))})</p>
+        <div class="lado"><button class="btn" data-act="troca-nao">Cancelar</button><button class="btn primary" data-act="troca-sim">Trocar</button></div></div>`);break}
+    case'troca-sim':{const T=UI.trocaPend;UI.trocaPend=null;UI.sel=null;closeSheet();if(T){patch('peladas/'+T.pid,{times:T.times});toast('Jogadores trocados.')}else render();break}
+    case'troca-nao':{UI.trocaPend=null;UI.sel=null;closeSheet();render();break}
     case'stat':{const p=S.pel[d.p],s=p.stats?.[d.j]||{},dl=Number(d.d);let v;
       if(d.f==='n')v=s.n==null?6:Math.min(10,Math.max(0,s.n+dl*.5));else v=Math.max(0,(s[d.f]||0)+dl);
       patch('peladas/'+d.p,{stats:{[d.j]:{[d.f]:v}}});break}
