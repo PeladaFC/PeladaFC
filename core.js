@@ -1797,6 +1797,8 @@ function mesProx(m){let[y,mm]=m.split('-').map(Number);mm++;if(mm>12){mm=1;y++}r
 function nomeMes(m){return MESES[Number(m.slice(5))-1].toLowerCase()}
 function eventosMes(m){const out=[];for(const[pid,p] of Object.entries(S.pel).filter(([,p])=>(p.data||'').startsWith(m)&&PA(p)).sort((a,b)=>a[1].data.localeCompare(b[1].data)))out.push(['p:'+pid,(p.nome||(p.extra?'Evento extra':'Evento'))+' '+dShort(p.data)]);for(const[xid,x] of extrasDe(m))out.push(['x:'+xid,x.nome]);return out}
 function saldoAnterior(m){const ks=[...Object.keys(S.caixa),...Object.values(S.pel).map(p=>(p.data||'').slice(0,7))].filter(k=>/^\d{4}-\d{2}$/.test(k)&&k<m).sort();if(!ks.length)return 0;let t=0;for(let k=ks[0];k<m;k=mesProx(k))t+=caixaMes(k).saldo;return Math.round(t*100)/100}
+/* apagar em dois toques: o ✕ vira "Excluir" vermelho por 4 s */
+function armarDel(id){UI.delArm=id;render();clearTimeout(armarDel.t);armarDel.t=setTimeout(()=>{if(UI.delArm===id){UI.delArm=null;render()}},4000)}
 function ajDif(){const A0=UI.aj,i=document.getElementById('aj-saldo'),o=document.getElementById('aj-dif');if(!A0||!i||!o)return;const v=Math.round(((Number(String(i.value).replace(',','.'))||0)-A0.base)*100)/100;o.innerHTML='Ajuste: <b class="num" style="color:'+(v<0?'var(--red)':'var(--pitch)')+'">'+(v?sinal(v):BRL(0))+'</b>'}
 function botaoPag(x,act,attrs,A){const st=stPag(x),cls=!st?'':st.s==='isento'?'isento':'on',txt=!st?'DEVE':st.s==='isento'?'ISENTO':'PAGO'+(st.d?' '+dBR(st.d):'');
   return A?`<div class="row" style="gap:4px;flex-wrap:nowrap"><button class="paid ${cls}" data-act="${act}" ${attrs}>${txt}</button><button class="btn sm pag-mais" data-act="${act}-mais" ${attrs} aria-label="Mais opções">⋯</button></div>`:`<span class="paid ${cls}">${txt}</span>`}
@@ -1847,12 +1849,12 @@ function tCaixa(A){
     h+='</div>'}
   // ajustes de saldo (com motivo)
   {const L=mov.filter(x=>x.tipo==='aj');if(L.length){h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Ajustes de saldo</h3><span class="sub num">${sinal(aj)}</span></div><div class="list">`;
-    L.forEach(x=>{h+=`<div class="item"><span class="cx-dt num">${dBR(x.d)||'—'}</span><div class="grow"><div class="name">${esc(x.obs)}</div>${x.por?`<div class="sub">por ${esc(nm(x.por))}</div>`:''}</div><b class="num" style="color:${x.v<0?'var(--red)':'var(--pitch)'}">${sinal(x.v)}</b>${A?`<button class="btn sm" data-act="aj-del" data-m="${m}" data-id="${x.id}" aria-label="Apagar ajuste">✕</button>`:''}</div>`});
+    L.forEach(x=>{h+=`<div class="item"><span class="cx-dt num">${dBR(x.d)||'—'}</span><div class="grow"><div class="name">${esc(x.obs)}</div>${x.por?`<div class="sub">por ${esc(nm(x.por))}</div>`:''}</div><b class="num" style="color:${x.v<0?'var(--red)':'var(--pitch)'}">${sinal(x.v)}</b>${A?`${UI.delArm===x.id?`<button class="btn sm excluir" data-act="aj-del" data-m="${m}" data-id="${x.id}">Excluir</button>`:`<button class="btn sm" data-act="aj-del" data-m="${m}" data-id="${x.id}" aria-label="Apagar ajuste">✕</button>`}`:''}</div>`});
     h+='</div></div>'}}
   // lançamentos avulsos
   const av=mov.filter(x=>x.av);
   h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Outras entradas e saídas</h3></div><div class="list">`;
-  const nEv=Object.fromEntries(eventosMes(m));av.forEach(x=>{h+=`<div class="item"><span class="cx-dt num">${dBR(x.d)||'—'}</span><div class="grow"><div class="name">${esc(x.cat)}</div>${x.grupo&&nEv[x.grupo]?`<div class="sub">${esc(nEv[x.grupo])}</div>`:''}</div><b class="num" style="color:${x.tipo==='sai'?'var(--red)':'var(--pitch)'}">${x.tipo==='sai'?'−':'+'} ${BRL(x.v)}</b>${A?`<button class="btn sm" data-act="del-lanc" data-m="${m}" data-t="${x.tipo}" data-id="${x.id}" aria-label="Apagar lançamento">✕</button>`:''}</div>`});
+  const nEv=Object.fromEntries(eventosMes(m));av.forEach(x=>{h+=`<div class="item"><span class="cx-dt num">${dBR(x.d)||'—'}</span><div class="grow"><div class="name">${esc(x.cat)}</div>${x.grupo&&nEv[x.grupo]?`<div class="sub">${esc(nEv[x.grupo])}</div>`:''}</div><b class="num" style="color:${x.tipo==='sai'?'var(--red)':'var(--pitch)'}">${x.tipo==='sai'?'−':'+'} ${BRL(x.v)}</b>${A?`${UI.delArm===x.id?`<button class="btn sm excluir" data-act="del-lanc" data-m="${m}" data-t="${x.tipo}" data-id="${x.id}">Excluir</button>`:`<button class="btn sm" data-act="del-lanc" data-m="${m}" data-t="${x.tipo}" data-id="${x.id}" aria-label="Apagar lançamento">✕</button>`}`:''}</div>`});
   if(!av.length)h+='<div class="empty">Nada lançado. Ex.: aluguel do campo, bola, colete, patrocínio.</div>';
   h+='</div>';
   if(A){const EVs=eventosMes(m);h+=`<div class="stack" style="margin-top:10px;gap:8px"><div class="row" style="flex-wrap:nowrap"><input type="text" id="desp-d" placeholder="Descrição (bola, água, carnes…)" class="grow"><input type="number" id="desp-v" placeholder="R$" inputmode="decimal" style="width:90px"></div>
@@ -2501,9 +2503,9 @@ document.addEventListener('click',e=>{
     case'aj-ok':{const A0=UI.aj;if(!A0)return;const alvo=Number(String(document.getElementById('aj-saldo').value).replace(',','.')),mot=document.getElementById('aj-motivo').value.trim();
       if(isNaN(alvo)){toast('Coloque o saldo certo do mês.');return}const v=Math.round((alvo-A0.base)*100)/100;if(!v){toast('O saldo em conta já está nesse valor.');return}if(!mot){toast('Escreva o motivo do ajuste.');return}
       const cx=S.caixa[A0.m]||{mens:{},desp:[]};put('caixa/'+A0.m,{...cx,ajustes:[...(cx.ajustes||[]),{id:uid('a'),v,motivo:mot,dt:dataLanc(A0.m),por:meuJogador()||'',em:Date.now()}]});UI.aj=null;closeSheet();toast('Ajuste de '+sinal(v)+' salvo.');break}
-    case'aj-del':{const cx=S.caixa[d.m];if(!cx||!confirm('Apagar este ajuste de saldo?'))return;put('caixa/'+d.m,{...cx,ajustes:(cx.ajustes||[]).filter(x=>x.id!==d.id)});break}
+    case'aj-del':{const cx=S.caixa[d.m];if(!cx)return;if(UI.delArm!==d.id){armarDel(d.id);return}UI.delArm=null;put('caixa/'+d.m,{...cx,ajustes:(cx.ajustes||[]).filter(x=>x.id!==d.id)});break}
     case'del-lanc':{const cx=S.caixa[d.m],f=d.t==='ent'?'ent':'desp',it=((cx&&cx[f])||[]).find(x=>x.id===d.id);if(!cx||!it)return;
-      if(!confirm(`Apagar ${d.t==='ent'?'a entrada':'a saída'} "${it.d}" (${d.t==='ent'?'+':'−'} ${BRL(it.v)})?\n\nEla sai do caixa, do extrato e da prestação de contas.`))return;put('caixa/'+d.m,{...cx,[f]:(cx[f]||[]).filter(x=>x.id!==d.id)});toast((d.t==='ent'?'Entrada':'Saída')+' apagada.');break}
+      if(UI.delArm!==d.id){armarDel(d.id);return}UI.delArm=null;put('caixa/'+d.m,{...cx,[f]:(cx[f]||[]).filter(x=>x.id!==d.id)});toast((d.t==='ent'?'Entrada':'Saída')+' apagada.');break}
   }
 });
 function npQpAtualiza(){const box=document.getElementById('np-qp'),v=document.getElementById('np-valor');if(!box||!v)return;UI.npValor=v.value;const pa=EV()||UI.npTipo==='extra';
