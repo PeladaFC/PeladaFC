@@ -1981,6 +1981,8 @@ function sheetPag(kind,key,id,m){const c=cfg(),xe=kind==='x'?(((S.caixa[key.spli
 function gravarPag(kind,key,id,val){const at=kind==='x'?((((S.caixa[key.split('~')[0]]||{}).extras||{})[key.split('~')[1]]||{}).pag||{})[id]:kind==='m'?((S.caixa[key]||{}).mens||{})[id]:((S.pel[key]||{}).diarias||{})[id];if(pagoPorPix(at)){toast('Pago por Pix pelo app: não dá para alterar. Para devolver, lance uma saída.');return}if(kind==='x'){const[mx,xid]=key.split('~'),e=((S.caixa[mx]||{}).extras||{})[xid];if(e)gravarExtra(mx,xid,{...e,pag:{...(e.pag||{}),[id]:val}});return}if(kind==='m'){const cx=S.caixa[key]||{mens:{},desp:[]};put('caixa/'+key,{...cx,mens:{...(cx.mens||{}),[id]:val}})}else patch('peladas/'+key,{diarias:{[id]:val}})}
 /* ---------- folhas (sheets) ---------- */
 function openSheet(title,body,foot=''){
+  // mesma folha já aberta: troca só o conteúdo (sem animar de novo nem pular a rolagem)
+  const cur=document.querySelector('#sheet .sheet');if(cur&&cur.getAttribute('aria-label')===title){const sb=cur.querySelector('#sheet-body');if(sb){while(sb.nextSibling)sb.nextSibling.remove();sb.innerHTML=body;if(foot)sb.insertAdjacentHTML('afterend',foot);return}}
   document.getElementById('sheet').innerHTML=`<div class="scrim" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-h"><h2>${esc(title)}</h2><button class="iconbtn" data-act="close" aria-label="Fechar">✕</button></div><div id="sheet-body">${body}</div>${foot}</div></div>`;
 }
 function closeSheet(){if(UI.trocaPend){UI.trocaPend=null;UI.sel=null;setTimeout(render,0)}document.getElementById('sheet').innerHTML='';F=null;UI.rasc=null;UI.ed=null;UI.mt=null;UI.xc=null}
