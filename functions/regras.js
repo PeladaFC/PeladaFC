@@ -187,7 +187,7 @@ function devidas(ctx, hoje) {
   }
   return out;
 }
-const linhaDono = (ctx, uid) => (ctx.cfg || {}).mpConectadoEm && (ctx.cfg || {}).mpDono === uid ? ' A conta que recebe é sua: pague por outra conta ou marque como pago no app.' : '';
+const linhaDono = (ctx, uid) => { const c = ctx.cfg || {}; return c.mpConectadoEm && c.mpDonoJid && (ctx.pres || {})[uid] && ctx.pres[uid].jogador === c.mpDonoJid ? ' A conta que recebe é sua: pague por outra conta ou marque como pago no app.' : ''; };
 // aviso diário (10h): mensalidade nova no dia 1º, vence hoje, 5 dias de atraso
 function avisosCobranca(ctx, hoje) {
   const out = [], g = nomePelada(ctx), atraso = somaDias(hoje, -5);

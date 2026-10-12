@@ -116,9 +116,9 @@ function pagaEm(p,id){return pagaBase(p,id)&&precoDP(p)>0}
 /* descontos por atleta: {pct:.25|.5} desconto, {v:10} valor combinado, {isento:true} */
 function descDe(p,id){return((p&&p.descontos)||{})[id]||null}
 function aberto(p){return!!(p&&p.dividir&&p.precoDiaria==null)}
-function baseDivisao(p){let tot=Number(p.dividir)||0,w=0;for(const id of jogaram(p).filter(id=>pagaBase(p,id))){const d=descDe(p,id);if(d&&d.isento)continue;if(d&&d.v!=null){tot-=Number(d.v);continue}w+=1-(Number(d&&d.pct)||0)}return w>0?Math.max(0,Math.ceil(tot/w*100)/100):0}
-function valorDe(p,id){const d=descDe(p,id);if(d&&d.isento)return 0;if(d&&d.v!=null)return Number(d.v);return Math.round(precoDP(p)*(1-(Number(d&&d.pct)||0))*100)/100}
-function descTxt(d){return!d?'':d.isento?'Isento':d.v!=null?'Valor combinado '+BRL(d.v):d.pct?Math.round(d.pct*100)+'% de desconto':''}
+function baseDivisao(p){let tot=Number(p.dividir)||0,w=0;for(const id of jogaram(p).filter(id=>pagaBase(p,id))){const d=descDe(p,id);if(d&&d.isento)continue;if(d&&Number(d.v)>0){tot-=Number(d.v);continue}w+=1-(Number(d&&d.pct)||0)}return w>0?Math.max(0,Math.ceil(tot/w*100)/100):0}
+function valorDe(p,id){const d=descDe(p,id);if(d&&d.isento)return 0;if(d&&Number(d.v)>0)return Number(d.v);return Math.round(precoDP(p)*(1-(Number(d&&d.pct)||0))*100)/100}
+function descTxt(d){return!d?'':d.isento?'Isento':Number(d.v)>0?'Valor combinado '+BRL(d.v):d.pct?Math.round(d.pct*100)+'% de desconto':''}
 function valorTxt(p){const v=precoDP(p);if(aberto(p))return BRL(p.dividir)+' dividido'+(v>0?' · hoje dá ~'+BRL(v)+' por atleta':'');return v>0?(PA(p)?BRL(v)+' por atleta':'Diária '+BRL(v)+' para diaristas'):''}
 const tipoTxt=id=>EV()?'Participante':J(id).tipo==='diarista'?'Diarista':'Mensalista';
 // peso de cada critério na nota, conforme a posição (como no FIFA)
@@ -1046,6 +1046,7 @@ function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GR
 
 /* ---------- render ---------- */
 function render(){
+  if(!demo&&ADM()&&S.config&&S.config.mpConectadoEm&&!S.config.mpConta&&!UI.mpInfo&&window.mpConta){UI.mpInfo=1;window.mpConta('info').catch(e=>console.warn(e))}
   if(window.__abrirCfgPix&&S.config&&ADM()){window.__abrirCfgPix=false;setTimeout(()=>{sheetCfg();const e=document.querySelector('.mp-cfg');if(e)e.scrollIntoView({block:'center'})},80)}
   NOTA_CACHE=null;POS_IDX=null;consolidarAvaliacoes();consolidarRodadas();
   if(UI.pixAberto&&UI.pixDado&&pixPago(UI.pixAberto))setTimeout(pixConfirmado,0);
@@ -1831,16 +1832,20 @@ function pendenciasDe(jid){if(!jid||!CX())return[];const out=[],m=mesAtual();
 const TAXA_MP=.0099;function taxaApp(c){c=c||cfg();return c.mpTaxaApp!=null?Number(c.mpTaxaApp):.01}function taxaTotal(c){return TAXA_MP+taxaApp(c)}
 function pct(x){return(Math.round(x*10000)/100).toLocaleString('pt-BR')+'%'}function taxasTxt(c){return`${pct(taxaTotal(c))} por pagamento`}
 function mpOn(){return!!cfg().mpConectadoEm}
+const semAc=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+// palpite do dono pelo nome da conta do Mercado Pago (o administrador confirma)
+function donoSugerido(){const c=cfg();if(!c.mpConta||!c.mpConta.nome||c.mpDonoJid!=null)return'';const n=semAc(c.mpConta.nome),p=n.split(/\s+/);
+  const ok=ativos().filter(id=>{const a=semAc(J(id).nome);return a&&(a===n||(p.length>1&&a.startsWith(p[0]+' ')&&a.includes(p[p.length-1])))});return ok.length===1?ok[0]:''}
 /* dono da conta do Mercado Pago que recebe: não pode pagar por Pix para si mesmo */
-function donoJid(){const u=cfg().mpDono;return u&&S.pres[u]&&S.jog[S.pres[u].jogador]?S.pres[u].jogador:null}
+function donoJid(){const j=cfg().mpDonoJid;return j&&S.jog[j]?j:null}
 function ehDono(jid){return!!jid&&jid===donoJid()}
 function pagarDono(x){const dt=iso(new Date());gravarPag(x.tipo,x.ref,x.jid,{s:'pago',d:dt,v:x.v,obs:'Dono da conta (sem Pix)'});toast(nm(x.jid)+': marcado como pago.')}
 function painelMeusPag(){const L=minhasPendencias();if(!L.length)return'';const c=cfg(),auto=mpOn(),tot=L.reduce((a,x)=>a+x.v,0);
   const dono=auto&&ehDono(L[0].jid);
-  const bt=x=>dono?`<button class="btn sm pag-bt" data-act="dono-pago" data-t="${x.tipo}" data-r="${esc(x.ref)}">Marcar como pago</button>`:auto?`<button class="btn sm pag-bt" data-act="pix-pagar" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pagar com Pix</button>`:'';
+  const bt=x=>dono?`<div class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm pag-bt" data-act="pix-pagar" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pix</button>${ADM()?`<button class="btn sm" data-act="dono-pago" data-t="${x.tipo}" data-r="${esc(x.ref)}">Marcar pago</button>`:''}</div>`:auto?`<button class="btn sm pag-bt" data-act="pix-pagar" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pagar com Pix</button>`:'';
   return`<div class="pag-alerta"><div class="pag-h"><span class="pag-ic">💰</span><b class="grow">Você tem ${BRL(tot)} para pagar</b></div>
     ${L.map(x=>`<div class="pag-it"><span class="grow name">${esc(x.desc)}${x.ate?`<span class="pag-s" style="display:block;font-weight:700">⏳ pague até ${pad(new Date(x.ate).getHours())}:${pad(new Date(x.ate).getMinutes())} ou a vaga vai para o próximo</span>`:x.venc?`<span class="pag-s" style="display:block;font-weight:500">${x.venc<iso(new Date())?'⚠️ venceu '+dBR(x.venc):x.venc===iso(new Date())?'vence hoje':'vence '+dBR(x.venc)}</span>`:''}</span><span class="num">${BRL(x.v)}</span>${bt(x)}</div>`).join('')}
-    <div class="pag-s" style="margin-top:6px">${dono?'A conta do Mercado Pago que recebe é <b>sua</b>, e ninguém pode pagar Pix para si mesmo. Sua parte já está com você: é só marcar como paga.':auto?'Confirmado na hora, sem comprovante.':'O pagamento pelo app ainda não foi ligado. Avise o administrador.'}</div></div>`}
+    <div class="pag-s" style="margin-top:6px">${dono?`A conta do Mercado Pago que recebe é <b>sua</b>: o Pix tem que sair de <b>outra conta</b> (outro CPF). ${ADM()?'Ou marque como pago e acerte no caixa.':'Ou peça ao administrador para marcar como pago.'}`:auto?'Confirmado na hora, sem comprovante.':'O pagamento pelo app ainda não foi ligado. Avise o administrador.'}</div></div>`}
 function sheetNaHora(){const m=mesAtual(),ids=ativos().sort((a,b)=>nm(a).localeCompare(nm(b))),L=ids.map(id=>[id,pendenciasDe(id)]).filter(([,x])=>x.length);
   openSheet('Cobrar na hora',`<div class="stack"><p class="sub" style="margin:0">Escolha quem vai pagar. Abre um QR Code só dele e o Caixa marca PAGO sozinho quando o Pix cair.</p>
     <div class="list">${L.map(([id,x])=>x.map(y=>`<button class="item" style="width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line)" data-act="nahora" data-t="${y.tipo}" data-r="${esc(y.ref)}" data-j="${id}"><div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub">${esc(y.desc)}</div></div><b class="num">${BRL(y.v)}</b></button>`).join('')).join('')||'<div class="empty">Ninguém devendo agora. 🙌</div>'}</div></div>`)}
@@ -1894,7 +1899,7 @@ function sheetExtra(){const X=UI.xc;if(!X)return;const e=X.xid?(((S.caixa[X.m]||
   UI.xc.conf=conf}
 function xcLer(){const X=UI.xc;if(!X)return;const g=id=>document.getElementById(id);if(g('xc-venc'))X.venc=g('xc-venc').value;if(g('xc-nome'))X.nome=g('xc-nome').value;if(g('xc-v'))X.v=g('xc-v').value;if(g('xc-d'))X.d=g('xc-d').value}
 /* lista "quem paga" + total (com e sem a taxa do Pix). act: prefixo das ações (npd = formulário, ds = folha) */
-function htmlQuemPaga(ids,map,base,act,conf){conf=conf||new Set();const t=taxaTotal(),vv=id=>{const d=map[id];return d&&d.isento?0:d&&d.v!=null?Number(d.v):Math.round((base||0)*(1-(Number(d&&d.pct)||0))*100)/100};
+function htmlQuemPaga(ids,map,base,act,conf){conf=conf||new Set();const t=taxaTotal(),vv=id=>{const d=map[id];return d&&d.isento?0:d&&Number(d.v)>0?Number(d.v):Math.round((base||0)*(1-(Number(d&&d.pct)||0))*100)/100};
   const pag=ids.filter(id=>vv(id)>0&&conf.has(id)),tot=pag.reduce((a,id)=>a+vv(id),0),comTaxa=pag.reduce((a,id)=>a+Math.ceil(vv(id)/(1-t)*100)/100,0);
   return`<div class="qp">${ids.map(id=>{const d=map[id]||{},k=d.isento?'isento':d.v!=null?'v':d.pct==.25?'25':d.pct==.5?'50':'cheio',x=vv(id);
     return`<div class="qp-row"><span class="qp-n">${conf.has(id)?'✓ ':''}${esc(nm(id))}</span><select data-act="${act}-sel" data-j="${id}" aria-label="Quanto ${esc(nm(id))} paga">${[['cheio','Paga'],['25','−25%'],['50','−50%'],['isento','Não paga'],['v','Outro valor']].map(([v,tx])=>`<option value="${v}" ${k===v?'selected':''}>${tx}</option>`).join('')}</select>${k==='v'?`<input type="number" inputmode="decimal" min="0" step="0.01" data-act="${act}-v" data-j="${id}" value="${d.v}" aria-label="Valor de ${esc(nm(id))}">`:`<b class="num${x>0?'':' qp-0'}">${x>0?BRL(x):'—'}</b>`}</div>`}).join('')||'<div class="empty">Ninguém no elenco ainda.</div>'}</div>
@@ -1965,7 +1970,9 @@ function sheetCfg(){
     <div class="panel stack mp-cfg"><div class="panel-h"><h3>💳 Pix automático</h3><span class="sub">Mercado Pago</span></div>
       <div class="sub">Cada jogador paga pelo app e o Caixa marca <b>PAGO</b> sozinho. O dinheiro cai na conta do Mercado Pago da pelada. Taxa do Pix: ${taxasTxt(c)}.</div>
       <div class="row between"><span class="small">${c.mpConectadoEm?`✅ Conta conectada em ${new Date(c.mpConectadoEm).toLocaleDateString('pt-BR')}`:'⚪ Nenhuma conta conectada'}</span>${c.mpConectadoEm?`<button type="button" class="btn sm" data-act="mp-desconectar">Desconectar</button>`:`<button type="button" class="btn sm" data-act="mp-como">Como funciona</button>`}</div>
-      ${c.mpConectadoEm?`<div class="sub">${donoJid()?`Conta de <b>${esc(nm(donoJid()))}</b>. `:''}O dono da conta não paga por Pix (não dá para pagar para si mesmo): a parte dele é marcada como paga, sem taxa.</div>`:`<button type="button" class="btn primary block" data-act="mp-antes">Conectar Mercado Pago</button>`}
+      ${c.mpConectadoEm?`<div class="mp-conta">${c.mpConta?`<div class="small">Conta: <b>${esc(c.mpConta.nome||'—')}</b>${c.mpConta.doc?` · ${c.mpConta.tipoDoc||'CPF'} <span class="num">${esc(c.mpConta.doc)}</span>`:''}</div>`:'<div class="sub">Buscando os dados da conta…</div>'}
+      <label class="field" style="margin-top:6px"><span>Quem é o dono desta conta no elenco?</span><select id="c-mpdono" data-act="mp-dono"><option value="">Ninguém do elenco</option>${ativos().sort((a,b)=>nm(a).localeCompare(nm(b))).map(id=>`<option value="${id}" ${(c.mpDonoJid||donoSugerido())===id?'selected':''}>${esc(nm(id))}${J(id).nome&&J(id).nome!==nm(id)?' ('+esc(J(id).nome)+')':''}</option>`).join('')}</select></label>
+      <div class="sub">O dono não paga por Pix para a própria conta (o Mercado Pago recusa): ele recebe a cobrança como todo mundo e paga por outra conta ou marca como pago.</div></div>`:`<button type="button" class="btn primary block" data-act="mp-antes">Conectar Mercado Pago</button>`}
       <label class="row"><input type="checkbox" id="c-pixrepassa" ${c.pixRepassa!==false?'checked':''}> Quem paga cobre a taxa (${pct(taxaTotal(c))})</label></div>
     <label class="row"><input type="checkbox" id="c-nivelpub" ${c.nivelPublico?'checked':''}> Mostrar o nível da pelada (estrelas) para os jogadores</label>
     <label class="row"><input type="checkbox" id="c-mostraval" ${c.mostrarAval===false?'':'checked'}> Mostrar as avaliações dos jogadores (0 a 100) para todos. Mesmo ligado, só aparece depois da avaliação da galera.</label>
@@ -2359,7 +2366,7 @@ document.addEventListener('click',e=>{
     case'nahora-lista':sheetNaHora();break;
     case'nahora':{const x=pendenciasDe(d.j).find(y=>y.tipo===d.t&&y.ref===d.r)||(()=>{/* item fora da janela de 2 meses: monta na mão */const v=d.t==='m'?precoM(d.r):d.t==='d'?valorDe(S.pel[d.r],d.j):Number((((S.caixa[d.r.split('~')[0]]||{}).extras||{})[d.r.split('~')[1]]||{}).v)||0;
         const desc=d.t==='m'?'Mensalidade de '+MESES[Number(d.r.slice(5))-1].toLowerCase():d.t==='d'?(S.pel[d.r].extra?'Evento extra de ':EV()?'Evento de ':'Diária da pelada de ')+dShort(S.pel[d.r].data):((((S.caixa[d.r.split('~')[0]]||{}).extras||{})[d.r.split('~')[1]]||{}).nome||'Cobrança extra');return{tipo:d.t,ref:d.r,jid:d.j,v,desc}})();
-      if(mpOn()&&ehDono(x.jid)){openSheet('Dono da conta',`<div class="stack"><p style="margin:0"><b>${esc(nm(x.jid))}</b> é o dono da conta do Mercado Pago que recebe. Pix para si mesmo não é permitido.</p><p class="sub" style="margin:0">${esc(x.desc)} · <b class="num">${BRL(x.v)}</b>. O dinheiro já está com ele: é só marcar como pago.</p><button class="btn primary block" data-act="dono-pago" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Marcar como pago</button></div>`);break}
+      if(mpOn()&&ehDono(x.jid))toast('Dono da conta: o Pix tem que sair de outra conta (outro CPF).');
       if(mpOn())sheetPix(x);else openSheet('Cobrar na hora',`<div class="stack"><div class="banner due" style="display:block">Para cobrar pelo app, conecte o Mercado Pago da pelada em Ajustes. Todo pagamento por Pix passa por ele e é confirmado sozinho.</div><button class="btn primary block" data-act="cfg">Abrir ajustes</button></div>`);break}
     case'nahora-pago':{const dt=iso(new Date()),val={s:'pago',d:dt,v:Number(d.v)||0,obs:'Pix (QR na hora)'};gravarPag(d.t,d.r,d.j,val);closeSheet();toast(nm(d.j)+': pago.');break}
     case'jg-gerar':{const p=S.pel[d.p],nj=novosJogos(p);if(nj)patch('peladas/'+d.p,{jogos:nj});break}
@@ -2408,7 +2415,7 @@ document.addEventListener('click',e=>{
       document.getElementById('gol-txt').textContent=F.golSorteio?'Cada time recebe um goleiro no sorteio.':'Os goleiros ficam fora do sorteio e jogam como extras.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
       const ev=g('c-tipo')==='evento',dataEv=null,diaEv=Number(g('c-dia'));
-      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),usarCaixa:!!document.getElementById('c-caixa')?.checked,convAuto:g('c-convauto')==='1',vencMens:Math.min(28,Math.max(1,Number(g('c-vencmens'))||10)),pixRepassa:!!document.getElementById('c-pixrepassa')?.checked,formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
+      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),usarCaixa:!!document.getElementById('c-caixa')?.checked,...(document.getElementById('c-mpdono')?{mpDonoJid:g('c-mpdono')||null}:{}),convAuto:g('c-convauto')==='1',vencMens:Math.min(28,Math.max(1,Number(g('c-vencmens'))||10)),pixRepassa:!!document.getElementById('c-pixrepassa')?.checked,formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',evento:ev,data:dataEv});
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':case'pagou-d':{const kind=d.act==='pagou-m'?'m':'d',key=kind==='m'?d.m:d.p,src=kind==='m'?((S.caixa[key]||{}).mens||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[d.j]);

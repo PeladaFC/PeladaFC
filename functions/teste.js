@@ -31,7 +31,7 @@ t('15 minutos antes: só mensalista sem resposta', () => {
   const av = R.lembreteMens(p, 'p1', ctx); assert.deepStrictEqual(av[0].para, ['uB']);
 });
 t('cobranças: dia 1º, vence hoje, 5 dias de atraso e dono da conta', () => {
-  const c2 = { ...ctx, cfg: { ...ctx.cfg, mensal: 80, vencMens: 10, mpConectadoEm: 1, mpDono: 'uB' }, caixa: { '2026-10': { extras: { x1: { nome: 'Camisa', v: 35, quem: ['jC'], venc: '2026-10-15', pag: {} } } } }, pel: {} };
+  const c2 = { ...ctx, cfg: { ...ctx.cfg, mensal: 80, vencMens: 10, mpConectadoEm: 1, mpDonoJid: 'jB' }, caixa: { '2026-10': { extras: { x1: { nome: 'Camisa', v: 35, quem: ['jC'], venc: '2026-10-15', pag: {} } } } }, pel: {} };
   const d1 = R.avisosCobranca(c2, '2026-10-01'); assert.ok(d1.some(x => x.para[0] === 'uB' && /Mensalidade de outubro/.test(x.titulo) && /vence dia 10\/10/.test(x.texto) && /A conta que recebe é sua/.test(x.texto)));
   const d10 = R.avisosCobranca(c2, '2026-10-10'); assert.ok(d10.some(x => /Vence hoje/.test(x.titulo)));
   const d15 = R.avisosCobranca(c2, '2026-10-15'); assert.ok(d15.some(x => x.para[0] === 'uC' && /Camisa: R\$ 35,00 vence hoje/.test(x.texto)));

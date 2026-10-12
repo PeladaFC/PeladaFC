@@ -460,8 +460,9 @@ const URL_MPCONTA = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.n
 window.mpConta = async acao => {
   if (!ABERTO) throw new Error('Abra a pelada de novo.');
   if (MOCK) {
-    if (acao === 'desconectar') { await B.set(`grupos/${ABERTO}/config/geral`, { mpConectadoEm: null, pixAuto: false, mpDono: null }, { merge: true }); return {}; }
-    await B.set(`grupos/${ABERTO}/config/geral`, { mpConectadoEm: Date.now(), mpTaxaApp: 0.01, mpTeste: false, mpDono: EU && EU.uid }, { merge: true }); aviso('Mercado Pago conectado!'); return {};
+    if (acao === 'desconectar') { await B.set(`grupos/${ABERTO}/config/geral`, { mpConectadoEm: null, pixAuto: false, mpDono: null, mpDonoJid: null, mpConta: null }, { merge: true }); return {}; }
+    if (acao === 'info') { await B.set(`grupos/${ABERTO}/config/geral`, { mpConta: { nome: 'Maria Teste da Silva', doc: '***.456.789-**', tipoDoc: 'CPF' } }, { merge: true }); return {}; }
+    await B.set(`grupos/${ABERTO}/config/geral`, { mpConectadoEm: Date.now(), mpTaxaApp: 0.01, mpTeste: false, mpDono: null, mpDonoJid: null, mpConta: { nome: 'Maria Teste da Silva', doc: '***.456.789-**', tipoDoc: 'CPF' } }, { merge: true }); aviso('Mercado Pago conectado!'); return {};
   }
   let t = null; try { t = await B.token(); } catch (e) { }
   if (!t) throw new Error('Entre na sua conta de novo.');

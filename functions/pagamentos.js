@@ -53,6 +53,15 @@ module.exports = db => {
     }
     return d;
   }
+  // nome e CPF (mascarado) do dono da conta do Mercado Pago conectada
+  async function dadosConta(token) {
+    try {
+      const r = await fetch(MP + '/users/me', { headers: { Authorization: 'Bearer ' + token } }); if (!r.ok) return null;
+      const u = await r.json(), id = u.identification || {}, n = String(id.number || '').replace(/\D/g, '');
+      const doc = n.length === 11 ? `***.${n.slice(3, 6)}.${n.slice(6, 9)}-**` : n.length === 14 ? `**.***.${n.slice(5, 8)}/${n.slice(8, 12)}-**` : '';
+      return { nome: [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || u.nickname || '', doc, tipoDoc: id.type || '' };
+    } catch (e) { return null; }
+  }
   async function tokenMP(gid) { const d = await contaMP(gid); return d ? d.token : null; }
   async function usuario(req) {
     const h = req.get('Authorization') || '', t = h.startsWith('Bearer ') ? h.slice(7) : '';
@@ -113,11 +122,7 @@ module.exports = db => {
       if (!token) return res.status(412).json({ erro: 'O Pix automático ainda não foi ligado nesta pelada.' });
       const { v, cfg, desc } = await devido(gid, tipo, ref, jid);
       // o dono da conta que recebe não paga por Pix (o Mercado Pago recusa pagar para si mesmo)
-      if (conta.por) {
-        if (cfg.mpDono !== conta.por) await db.doc(`grupos/${gid}/config/geral`).set({ mpDono: conta.por }, { merge: true });
-        const pd = await ler(`grupos/${gid}/presencas/${conta.por}`);
-        if (pd && pd.jogador === jid) return res.status(409).json({ erro: 'A conta do Mercado Pago que recebe é sua. Pagar para si mesmo não é permitido: marque sua parte como paga no Caixa.', dono: true });
-      }
+      // o dono da conta que recebe pode pagar a própria parte por outra conta (outro CPF); o app só avisa
       if (!(v > 0)) return res.status(400).json({ erro: 'Não há valor a pagar.' });
       const com = conta.via === 'oauth' ? (await plataforma()).comissao : 0;
       const valor = cfg.pixRepassa !== false ? Math.ceil(v / (1 - TAXA - com) * 100) / 100 : Math.round(v * 100) / 100;
@@ -186,9 +191,14 @@ module.exports = db => {
       if (typeof gid !== 'string' || !gid || gid.length > 120 || gid.includes('/')) return res.status(400).json({ erro: 'Pedido inválido.' });
       const grupo = await ler(`grupos/${gid}`);
       if (!grupo || !(grupo.admins || []).includes(u.uid)) return res.status(403).json({ erro: 'Só o administrador pode fazer isso.' });
+      if (acao === 'info') {
+        const c = await contaMP(gid); if (!c || !c.token) return res.status(404).json({ erro: 'Nenhuma conta conectada.' });
+        const conta = await dadosConta(c.token); if (conta) await db.doc(`grupos/${gid}/config/geral`).set({ mpConta: conta }, { merge: true });
+        return res.json({ conta });
+      }
       if (acao === 'desconectar') {
         await db.doc(`grupos/${gid}/segredos/mp`).delete();
-        await db.doc(`grupos/${gid}/config/geral`).set({ mpConectadoEm: null, pixAuto: false, mpDono: null }, { merge: true });
+        await db.doc(`grupos/${gid}/config/geral`).set({ mpConectadoEm: null, pixAuto: false, mpDono: null, mpDonoJid: null, mpConta: null }, { merge: true });
         return res.json({ ok: true });
       }
       const P = await plataforma();
@@ -212,7 +222,8 @@ module.exports = db => {
       const P = await plataforma();
       const n = await trocaOAuth({ client_id: P.id, client_secret: P.segredo, grant_type: 'authorization_code', code, redirect_uri: URL_RETORNO });
       await db.doc(`grupos/${e.gid}/segredos/mp`).set({ ...n, via: 'oauth', em: Date.now(), por: e.uid });
-      await db.doc(`grupos/${e.gid}/config/geral`).set({ mpConectadoEm: Date.now(), mpTaxaApp: P.comissao, mpTeste: false, mpDono: e.uid }, { merge: true });
+      const conta = await dadosConta(n.token);
+      await db.doc(`grupos/${e.gid}/config/geral`).set({ mpConectadoEm: Date.now(), mpTaxaApp: P.comissao, mpTeste: false, mpDono: null, mpDonoJid: null, mpConta: conta || null }, { merge: true });
       logger.info('mp conectado', e.gid, n.mpUser);
       volta('ok');
     } catch (err) { logger.error(err); volta('erro'); }
