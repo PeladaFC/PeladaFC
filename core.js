@@ -1342,12 +1342,17 @@ function painelJogos(pid,p,A){const f=formatoDe(p),T=p.times||[];if(f==='conv'||
     if(nx)h+=`<button class="btn primary block" style="margin-top:10px" data-act="jg-prox" data-p="${pid}">${FASE_N[nx[0].fase]==='Final'?'Montar a final':'Montar '+FASE_N[nx[0].fase].toLowerCase()}</button>`;
     if(A)h+=`<button class="btn sm danger" style="margin-top:10px" data-act="jg-zerar" data-p="${pid}">Apagar tabela de jogos</button>`}
   return h+'</div>'}
-function painelFormato(pid,p){const f=formatoDe(p),T=(p.times||[]).length||Number(p.nTimes||cfg().times)||3,iv=idaVoltaDe(p),nj=f==='conv'?0:f==='mm'?T-1:T*(T-1)/2*(iv?2:1)+(f==='ligamm'?nClassDe(p)-1:0),min=minutosPelada(p);
+/* quantos jogos cada fase vai ter, no formato escolhido */
+function jogosPorFase(f,T,iv,nc){const out=[];if(f==='liga'||f==='ligamm')out.push(['Pontos corridos',T*(T-1)/2*(iv?2:1)]);
+  const mmN=f==='mm'?T:f==='ligamm'?nc:0;if(mmN>=2){let P=1;while(P<mmN)P*=2;let jogos=mmN-P/2;
+    for(let n=P;n>=2;n/=2){out.push([FASE_N[faseMM(n)],n===P?jogos:n/2])}}
+  return out.filter(x=>x[1]>0)}
+function painelFormato(pid,p){const f=formatoDe(p),T=(p.times||[]).length||Number(p.nTimes||cfg().times)||3,iv=idaVoltaDe(p),fases=f==='conv'?[]:jogosPorFase(f,T,iv,nClassDe(p)),nj=sum(fases.map(x=>x[1]));
   return`<div class="panel stack"><div class="panel-h"><h3>🏆 Formato / campeonato</h3></div>
     <select data-act="formato" data-p="${pid}" aria-label="Formato">${Object.entries(FORMATOS).map(([k,n])=>`<option value="${k}" ${k===f?'selected':''}>${n}</option>`).join('')}</select>
     ${f==='liga'||f==='ligamm'?`<label class="row" style="gap:8px"><input type="checkbox" data-act="ida-volta" data-p="${pid}" ${iv?'checked':''}> Ida e volta</label>`:''}
     ${f==='ligamm'?`<label class="field"><span>Classificados para o mata-mata</span><select data-act="n-class" data-p="${pid}">${[2,4,8].filter(n=>n<=T).map(n=>`<option value="${n}" ${n===nClassDe(p)?'selected':''}>${n} (${n===2?'final':n===4?'semifinal':'quartas'})</option>`).join('')}</select></label>`:''}
-    <div class="sub">${f==='conv'?'Conta só as vitórias de cada time (quem ganha fica ou rodízio).':`${nj} jogo${nj>1?'s':''} em ${min} min · uns ${Math.max(1,Math.floor(min/Math.max(1,nj)))} min por jogo.${min/Math.max(1,nj)<6?' <b>Pouco tempo:</b> pense no mata-mata.':''} A tabela e o placar ficam no Pós-jogo.`}</div></div>`}
+    <div class="sub">${f==='conv'?'Conta só as vitórias de cada time (quem ganha fica ou rodízio).':fases.map(([n,q])=>`${n}: <b class="num">${q}</b> jogo${q>1?'s':''}`).join(' · ')+(fases.length>1?` · Total: <b class="num">${nj}</b> jogos`:'')}</div></div>`}
 /* montar os times na mão */
 function sheetMontar(pid){const p=S.pel[pid];if(!p)return;const l=lista(p,pid),gente=[...l.escalados,...l.gks].filter(id=>S.jog[id]);
   if(!UI.mt||UI.mt.pid!==pid){const asg={},ord=[];(p.times||[]).forEach((t,i)=>[t.gk,...t.ids].filter(Boolean).forEach(id=>{asg[id]=i;ord.push(id)}));UI.mt={pid,T:(p.times||[]).length||Number(cfg().times)||3,asg,ord,at:0}}
