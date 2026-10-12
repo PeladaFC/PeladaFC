@@ -2502,7 +2502,8 @@ document.addEventListener('click',e=>{
       if(isNaN(alvo)){toast('Coloque o saldo certo do mês.');return}const v=Math.round((alvo-A0.base)*100)/100;if(!v){toast('O saldo em conta já está nesse valor.');return}if(!mot){toast('Escreva o motivo do ajuste.');return}
       const cx=S.caixa[A0.m]||{mens:{},desp:[]};put('caixa/'+A0.m,{...cx,ajustes:[...(cx.ajustes||[]),{id:uid('a'),v,motivo:mot,dt:dataLanc(A0.m),por:meuJogador()||'',em:Date.now()}]});UI.aj=null;closeSheet();toast('Ajuste de '+sinal(v)+' salvo.');break}
     case'aj-del':{const cx=S.caixa[d.m];if(!cx||!confirm('Apagar este ajuste de saldo?'))return;put('caixa/'+d.m,{...cx,ajustes:(cx.ajustes||[]).filter(x=>x.id!==d.id)});break}
-    case'del-lanc':{const cx=S.caixa[d.m],f=d.t==='ent'?'ent':'desp';put('caixa/'+d.m,{...cx,[f]:(cx[f]||[]).filter(x=>x.id!==d.id)});break}
+    case'del-lanc':{const cx=S.caixa[d.m],f=d.t==='ent'?'ent':'desp',it=((cx&&cx[f])||[]).find(x=>x.id===d.id);if(!cx||!it)return;
+      if(!confirm(`Apagar ${d.t==='ent'?'a entrada':'a saída'} "${it.d}" (${d.t==='ent'?'+':'−'} ${BRL(it.v)})?\n\nEla sai do caixa, do extrato e da prestação de contas.`))return;put('caixa/'+d.m,{...cx,[f]:(cx[f]||[]).filter(x=>x.id!==d.id)});toast((d.t==='ent'?'Entrada':'Saída')+' apagada.');break}
   }
 });
 function npQpAtualiza(){const box=document.getElementById('np-qp'),v=document.getElementById('np-valor');if(!box||!v)return;UI.npValor=v.value;const pa=EV()||UI.npTipo==='extra';
