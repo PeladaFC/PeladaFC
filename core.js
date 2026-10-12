@@ -542,7 +542,7 @@ function msg0(tipo,ctx={}){
     return[`⭐ VOTAÇÃO DA PELADA · ${dShort(p.data)}`,'',...(ja.length?[`Já votaram (${ja.length} de ${lista.length}):`,...ja.map(x=>'✅ '+x)]:['Ninguém votou ainda.']),'',nao.length?`Falta${nao.length>1?'m':''} ${nao.length}. Bora completar${Date.now()<fa?' até '+quandoCurto(fa):''}! 💪`:'Todo mundo votou. Valeu, galera! 🙌'].join('\n')}
   if(tipo==='resultado'){const pr=premiosDe(p),st=p.stats||{},out=[`🏁 *RESULTADO · ${dShort(p.data)}*`,''];
     {const cp=p.times?campeaoDe(p):null,vv=p.times?vitDe(p):[];if(cp!=null)out.push(`🏆 Campeão: ${CORES[p.times[cp].cor].e} ${nomeTime(p.times[cp].cor)}`);
-      if(formatoDe(p)!=='conv'&&(p.jogos||[]).length){if(cp!=null)out.push('');out.push('⚽ JOGOS');let fa=null;for(const g of p.jogos){if(g.bye||g.ga==null)continue;{const cab=g.fase==='liga'&&g.rd?g.rd+'ª rodada':(FASE_N[g.fase]||g.fase);if(cab!==fa){fa=cab;out.push(cab)}}const tn=i=>CORES[p.times[i].cor].e+' '+nomeTime(p.times[i].cor);out.push(`${tn(g.a)} ${g.ga} × ${g.gb} ${tn(g.b)}${g.pa!=null&&g.ga===g.gb?` (pên. ${g.pa}×${g.pb})`:''}`);if((g.gols||[]).length)out.push('   ⚽ '+g.gols.map(e=>nm(e.j)+(e.as?' ('+nm(e.as)+')':'')).join(', '))}out.push('')}
+      if(formatoDe(p)!=='conv'&&(p.jogos||[]).length){if(cp!=null)out.push('');out.push('⚽ JOGOS');let fa=null;for(const g of p.jogos){if(g.bye||!feito(g))continue;{const cab=g.fase==='liga'&&g.rd?g.rd+'ª rodada':(FASE_N[g.fase]||g.fase);if(cab!==fa){fa=cab;out.push(cab)}}const tn=i=>CORES[p.times[i].cor].e+' '+nomeTime(p.times[i].cor);out.push(`${tn(g.a)} ${g.ga} × ${g.gb} ${tn(g.b)}${g.pa!=null&&g.ga===g.gb?` (pên. ${g.pa}×${g.pb})`:''}`);if((g.gols||[]).length)out.push('   ⚽ '+g.gols.map(e=>nm(e.j)+(e.as?' ('+nm(e.as)+')':'')).join(', '))}out.push('')}
       else if(vv.some(v=>v>0)){p.times.forEach((t,i)=>out.push(`${CORES[t.cor].e} ${nomeTime(t.cor)}: ${vv[i]||0} vitória(s)`));out.push('')}else if(cp!=null)out.push('')}
     if(pr.mvp)out.push('🏆 Craque da pelada: *'+nm(pr.mvp)+'*');
     if(pr.art)out.push(`⚽ Artilheiro: *${nm(pr.art)}* (${st[pr.art]?.g||0} gol${(st[pr.art]?.g||0)===1?'':'s'})`);
@@ -1279,15 +1279,17 @@ function nClassDe(p){const T=(p&&p.times||[]).length||4;return Math.min(T,Number
 function faseMM(n){return n<=2?'fin':n<=4?'sf':n<=8?'qf':'r16'}
 function gerarLiga(T,iv){const ids=[...Array(T).keys()];if(T%2)ids.push(null);const n=ids.length;let arr=ids.slice();const ida=[];
   for(let r=0;r<n-1;r++){for(let i=0;i<n/2;i++){const a=arr[i],b=arr[n-1-i];if(a!=null&&b!=null)ida.push([a,b,r+1])}arr=[arr[0],arr[n-1],...arr.slice(1,n-1)]}
-  const out=ida.map(([a,b,rd],k)=>({id:'l'+k,fase:'liga',rd,a,b,ga:null,gb:null}));
-  if(iv)ida.forEach(([a,b,rd],k)=>out.push({id:'v'+k,fase:'liga',rd:rd+n-1,a:b,b:a,ga:null,gb:null}));return out}
+  const out=ida.map(([a,b,rd],k)=>({id:'l'+k,fase:'liga',rd,a,b,ga:null,gb:null,fim:false}));
+  if(iv)ida.forEach(([a,b,rd],k)=>out.push({id:'v'+k,fase:'liga',rd:rd+n-1,a:b,b:a,ga:null,gb:null,fim:false}));return out}
 function chave(seeds,fase){let P=1;while(P<seeds.length)P*=2;const s=seeds.concat(Array(P-seeds.length).fill(null)),out=[];
-  for(let i=0;i<P/2;i++){const a=s[i],b=s[P-1-i];out.push({id:fase+i,fase,a,b,ga:null,gb:null,bye:b==null})}return out}
-function vencedor(g){if(g.bye)return g.a;if(g.ga==null||g.gb==null)return null;if(g.ga!==g.gb)return g.ga>g.gb?g.a:g.b;
+  for(let i=0;i<P/2;i++){const a=s[i],b=s[P-1-i];out.push({id:fase+i,fase,a,b,ga:null,gb:null,fim:false,bye:b==null})}return out}
+/* jogo concluído: o administrador marca "Jogo finalizado" (placar começa 0 a 0). Tabelas antigas: vale ter placar. */
+function feito(g){return!!g&&(g.bye||(g.fim!=null?!!g.fim:(g.ga!=null&&g.gb!=null)))}
+function vencedor(g){if(g.bye)return g.a;if(!feito(g))return null;const ga=g.ga||0,gb=g.gb||0;if(ga!==gb)return ga>gb?g.a:g.b;
   if(g.fase==='liga')return null;if(g.pa==null||g.pb==null||g.pa===g.pb)return null;return g.pa>g.pb?g.a:g.b}
-function jogado(g){return g.bye||(g.ga!=null&&g.gb!=null&&(g.fase==='liga'||vencedor(g)!=null))}
+function jogado(g){return g.bye||(feito(g)&&(g.fase==='liga'||vencedor(g)!=null))}
 function classificacao(p,jogos){const T=(p.times||[]).length,tab=[...Array(T).keys()].map(t=>({t,j:0,v:0,e:0,d:0,gp:0,gc:0,pts:0}));
-  const L=(jogos||p.jogos||[]).filter(g=>g.fase==='liga'&&g.ga!=null&&g.gb!=null);
+  const L=(jogos||p.jogos||[]).filter(g=>g.fase==='liga'&&feito(g)).map(g=>({...g,ga:g.ga||0,gb:g.gb||0}));
   for(const g of L){const A=tab[g.a],B=tab[g.b];if(!A||!B)continue;A.j++;B.j++;A.gp+=g.ga;A.gc+=g.gb;B.gp+=g.gb;B.gc+=g.ga;
     if(g.ga>g.gb){A.v++;B.d++;A.pts+=3}else if(g.ga<g.gb){B.v++;A.d++;B.pts+=3}else{A.e++;B.e++;A.pts++;B.pts++}}
   const h2h=(x,y)=>{let d=0;for(const g of L){if(g.a===x&&g.b===y)d+=g.ga-g.gb;if(g.a===y&&g.b===x)d+=g.gb-g.ga}return d};
@@ -1311,16 +1313,17 @@ function minutosPelada(p){const[a,b]=horaIniDe(p).split(':').map(Number),[c,d]=h
 /* lista de jogos (act: 'jg' grava direto; 'ed-jg' mexe no rascunho do Editar) */
 function htmlJogos(pid,p,A,jogos,act){const T=p.times||[];if(!jogos||!jogos.length)return'';
   const nomeT=i=>i==null?'—':`${(CORES[(T[i]||{}).cor]||{}).e||''} ${esc(nomeTime((T[i]||{}).cor))}`;
-  const st=(gi,k,v)=>A?`<span class="jg-st"><button data-act="${act}" data-p="${pid}" data-g="${gi}" data-k="${k}" data-d="-1" aria-label="Menos">−</button><b class="num">${v==null?'–':v}</b><button data-act="${act}" data-p="${pid}" data-g="${gi}" data-k="${k}" data-d="1" aria-label="Mais">+</button></span>`:`<b class="num jg-n">${v==null?'–':v}</b>`;
+  const st=(gi,k,v)=>A?`<span class="jg-st"><button data-act="${act}" data-p="${pid}" data-g="${gi}" data-k="${k}" data-d="-1" aria-label="Menos">−</button><b class="num">${v==null?0:v}</b><button data-act="${act}" data-p="${pid}" data-g="${gi}" data-k="${k}" data-d="1" aria-label="Mais">+</button></span>`:`<b class="num jg-n">${v==null?0:v}</b>`;
   let h='',fa=null;const ed=act==='ed-jg'?'1':'';
   const tm=i=>T[i]?[T[i].gk,...T[i].ids].filter(Boolean):[];
   const evs=(g,gi)=>{const L=(g.gols||[]).map((e,ei)=>`<div class="gl-e ${e.s}"><span>⚽ ${esc(nm(e.j))}${e.as?` <span class="sub">(🅰️ ${esc(nm(e.as))})</span>`:''}</span>${A?`<button class="gl-x" data-act="gol-del" data-p="${pid}" data-g="${gi}" data-i="${ei}" data-ed="${ed}" aria-label="Apagar gol">✕</button>`:''}</div>`).join('');
     return(L?`<div class="gl-l">${L}</div>`:'')+(A?`<div class="gl-b"><button class="btn sm" data-act="gol-add" data-p="${pid}" data-g="${gi}" data-s="a" data-ed="${ed}">+ Gol ${esc(nomeTime((T[g.a]||{}).cor))}</button><button class="btn sm" data-act="gol-add" data-p="${pid}" data-g="${gi}" data-s="b" data-ed="${ed}">+ Gol ${esc(nomeTime((T[g.b]||{}).cor))}</button></div>`:'')};
   jogos.forEach((g,gi)=>{const cab=g.fase==='liga'?(g.rd?g.rd+'ª rodada':'Pontos corridos'):(FASE_N[g.fase]||g.fase);if(cab!==fa){fa=cab;h+=`<div class="jg-fase">${cab}</div>`}
     if(g.bye){h+=`<div class="jg bye"><span>${nomeT(g.a)}</span><span class="sub">passa direto</span></div>`;return}
-    const w=vencedor(g),emp=g.fase!=='liga'&&g.ga!=null&&g.ga===g.gb;
-    h+=`<div class="jg${w!=null?' ok':''}"><div class="jg-l"><span class="jg-t${w===g.a?' win':''}">${nomeT(g.a)}</span>${st(gi,'ga',g.ga)}</div><div class="jg-x">×</div><div class="jg-l"><span class="jg-t${w===g.b?' win':''}">${nomeT(g.b)}</span>${st(gi,'gb',g.gb)}</div>
-      ${emp?`<div class="jg-pen"><span class="sub">Pênaltis</span>${st(gi,'pa',g.pa)}<span class="sub">×</span>${st(gi,'pb',g.pb)}</div>`:''}${(g.gols||[]).length||A?`<div class="jg-ev">${evs(g,gi)}</div>`:''}</div>`});
+    const fz=feito(g),w=vencedor(g),emp=g.fase!=='liga'&&fz&&(g.ga||0)===(g.gb||0);
+    const fimBt=A?`<button class="jg-fim${fz?' on':''}" data-act="jg-fim" data-p="${pid}" data-g="${gi}" data-ed="${ed}" aria-pressed="${fz}">${fz?'✓ Jogo finalizado':'Marcar jogo finalizado'}</button>`:(fz?'<span class="jg-fim on">✓ Finalizado</span>':'');
+    h+=`<div class="jg${fz?' ok':''}"><div class="jg-l"><span class="jg-t${w===g.a?' win':''}">${nomeT(g.a)}</span>${st(gi,'ga',g.ga)}</div><div class="jg-x">×</div><div class="jg-l"><span class="jg-t${w===g.b?' win':''}">${nomeT(g.b)}</span>${st(gi,'gb',g.gb)}</div>
+      ${emp?`<div class="jg-pen"><span class="sub">Pênaltis</span>${st(gi,'pa',g.pa)}<span class="sub">×</span>${st(gi,'pb',g.pb)}</div>`:''}${(g.gols||[]).length||A?`<div class="jg-ev">${evs(g,gi)}</div>`:''}${fimBt?`<div class="jg-fim-l">${fimBt}</div>`:''}</div>`});
   return h}
 function htmlClassif(p,jogos){const T=p.times||[],c=classificacao(p,jogos);if(!(jogos||[]).some(g=>g.fase==='liga'))return'';
   return`<div class="clas"><div class="clas-r h"><span></span><span>Time</span><span>P</span><span>J</span><span>V</span><span>E</span><span>D</span><span>SG</span></div>${c.map((x,k)=>`<div class="clas-r"><span class="num">${k+1}º</span><span>${(CORES[(T[x.t]||{}).cor]||{}).e||''} ${esc(nomeTime((T[x.t]||{}).cor))}</span><b class="num">${x.pts}</b><span class="num">${x.j}</span><span class="num">${x.v}</span><span class="num">${x.e}</span><span class="num">${x.d}</span><span class="num">${x.gp-x.gc>0?'+':''}${x.gp-x.gc}</span></div>`).join('')}</div>`}
@@ -2422,6 +2425,11 @@ document.addEventListener('click',e=>{
       // se um resultado do mata-mata mudou, apaga as fases seguintes que dependiam dele
       {const ix=J0.indexOf(g),fs=['liga','r16','qf','sf','fin'],fi=fs.indexOf(g.fase);for(let i=J0.length-1;i>ix;i--)if(fs.indexOf(J0[i].fase)>fi&&J0[i].fase!==g.fase)J0.splice(i,1)}
       if(ed){const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetEditarPelada(UI.ed.pid);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc}else patch('peladas/'+d.p,{jogos:J0});break}
+    case'jg-fim':{const ed=d.ed==='1';if(ed&&!UI.ed)return;const p=S.pel[d.p],J0=ed?UI.ed.jogos:JSON.parse(JSON.stringify(p.jogos||[])),g=J0[Number(d.g)];if(!g)return;
+      const on=!feito(g);g.fim=on;if(on){if(g.ga==null)g.ga=0;if(g.gb==null)g.gb=0}
+      if(!on){const ix=J0.indexOf(g),fs=['liga','r16','qf','sf','fin'],fi=fs.indexOf(g.fase);for(let i=J0.length-1;i>ix;i--)if(fs.indexOf(J0[i].fase)>fi&&J0[i].fase!==g.fase)J0.splice(i,1)}
+      if(ed){const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetEditarPelada(UI.ed.pid);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc}else patch('peladas/'+d.p,{jogos:J0});
+      if(on&&g.fase!=='liga'&&(g.ga||0)===(g.gb||0)&&(g.pa==null||g.pb==null||g.pa===g.pb))toast('Empate: marque os pênaltis para definir quem passa.');break}
     case'gol-add':UI.gl={pid:d.p,gi:Number(d.g),s:d.s,ed:d.ed==='1',j:null};sheetGol();break;
     case'gol-quem':if(UI.gl){UI.gl.j=d.j;sheetGol()}break;
     case'gol-as':if(UI.gl&&UI.gl.j){const G=UI.gl;aplicarGol(G,d.j||null)}break;
