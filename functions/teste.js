@@ -46,8 +46,11 @@ t('convocado confirmou: cobrança de 30 min; não pagou: vaga vai para o próxim
   assert.ok(av.some(x => x.para[0] === 'uC' && /Pague em até 30 minutos/.test(x.titulo) && /R\$ 20,00/.test(x.texto)));
   c4.pres.uC = { jogador: 'jC', pel: { p1: { s: 'sim', t: 5000 } } };
   assert.strictEqual(R.vencidosConv(p, 'p1', c4, 5000 + 29 * 60e3), null);
-  const r = R.vencidosConv(p, 'p1', c4, 5000 + 31 * 60e3); assert.deepStrictEqual(r, { venc: ['jC'], prox: ['jD'] });
-  const avs = R.avisosVencidos(p, 'p1', c4, r); assert.ok(avs.some(x => x.para[0] === 'uC' && /Vaga perdida/.test(x.titulo))); assert.ok(avs.some(x => x.para[0] === 'uA' && /Davi foi convocado/.test(x.texto)));
+  const r0 = R.vencidosConv(p, 'p1', c4, 5000 + 31 * 60e3); assert.deepStrictEqual(r0, { venc: ['jC'], prox: [], fila: 1 });
+  assert.ok(R.avisosVencidos(p, 'p1', c4, r0).some(x => x.para[0] === 'uA' && /escolha o próximo \(1 na fila/.test(x.texto)));
+  c4.cfg.convAuto = true;
+  const r = R.vencidosConv(p, 'p1', c4, 5000 + 31 * 60e3); assert.deepStrictEqual(r, { venc: ['jC'], prox: ['jD'], fila: 1 });
+  const avs = R.avisosVencidos(p, 'p1', c4, r); assert.ok(avs.some(x => x.para[0] === 'uC' && /Vaga perdida/.test(x.titulo))); assert.ok(avs.some(x => x.para[0] === 'uA' && /Davi foi convocado automaticamente/.test(x.texto)));
   const pago = { ...p, diarias: { jC: { s: 'pago' } } }; assert.strictEqual(R.vencidosConv(pago, 'p1', c4, 9e9), null);
 });
 t('cobrança extra nova avisa a lista', () => {

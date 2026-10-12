@@ -142,18 +142,18 @@ function vencidosConv(p, pid, ctx, agora) {
   const venc = aPagar(p, pid, ctx).filter(x => agora >= x.ate).map(x => x.jid); if (!venc.length) return null;
   const conv = p.conv || {}, exp = p.expirou || {}, jog = ctx.jog || {};
   const fila = Object.keys(jog).filter(j => (jog[j].tipo === 'diarista') && !conv[j] && !exp[j]).map(j => [j, respDe(p, pid, ctx, j)]).filter(([, r]) => r && r.s === 'sim').sort((a, b) => (a[1].t || 0) - (b[1].t || 0)).map(x => x[0]);
-  return { venc, prox: fila.slice(0, venc.length) };
+  return { venc, prox: (ctx.cfg || {}).convAuto ? fila.slice(0, venc.length) : [], fila: fila.length };
 }
 function avisosVencidos(p, pid, ctx, r) {
   const out = [], g = nomePelada(ctx), quando = dShort(p.data), nome = j => nomeJog((ctx.jog || {})[j]);
-  for (const j of r.venc) { const u = uidDoJogador(ctx, j); if (u) out.push({ para: [u], titulo: `⌛ Vaga perdida · ${g}`, texto: `A diária da pelada de ${quando} não foi paga em 30 minutos e a vaga foi para o próximo diarista.`, tag: 'exp-' + pid }); }
-  const adm = admins(ctx); if (adm.length) out.push({ para: adm, titulo: `⌛ Vaga repassada · ${g}`, texto: `${r.venc.map(nome).join(', ')} não pagou a diária em 30 minutos.${r.prox.length ? ` ${r.prox.map(nome).join(', ')} foi convocado.` : ' Não há mais diaristas na fila.'}`, tag: 'exp-adm-' + pid });
+  for (const j of r.venc) { const u = uidDoJogador(ctx, j); if (u) out.push({ para: [u], titulo: `⌛ Vaga perdida · ${g}`, texto: `A diária da pelada de ${quando} não foi paga em 30 minutos e sua vaga foi liberada.`, tag: 'exp-' + pid }); }
+  const adm = admins(ctx); if (adm.length) out.push({ para: adm, titulo: `⌛ Vaga repassada · ${g}`, texto: `${r.venc.map(nome).join(', ')} não pagou a diária em 30 minutos.${r.prox.length ? ` ${r.prox.map(nome).join(', ')} foi convocado automaticamente.` : (ctx.cfg || {}).convAuto ? ' Não há mais diaristas na fila.' : ` A vaga está livre: abra "Convocar diaristas" e escolha o próximo${r.fila ? ` (${r.fila} na fila de pedidos)` : ''}.`}`, tag: 'exp-adm-' + pid });
   return out;
 }
 function cobrancaConvocado(p, pid, jid, uid, ctx) {
   const cfg = ctx.cfg || {}; if (!p || ehPA(p, cfg) || !(p.conv || {})[jid] || !mpOn(cfg)) return [];
   const v = valorJog(p, cfg, jid); if (!(v > 0) || stPag0((p.diarias || {})[jid])) return [];
-  return [{ para: [uid], titulo: `💰 Pague em até 30 minutos · ${nomePelada(ctx)}`, texto: `Diária da pelada de ${dShort(p.data)}: ${BRL(v)}. Pague pelo app até ${horaMs(Date.now() + PRAZO_PAG)} para garantir sua vaga; depois disso ela vai para o próximo diarista.`, tag: 'pag30-' + pid }];
+  return [{ para: [uid], titulo: `💰 Pague em até 30 minutos · ${nomePelada(ctx)}`, texto: `Diária da pelada de ${dShort(p.data)}: ${BRL(v)}. Pague pelo app até ${horaMs(Date.now() + PRAZO_PAG)} para garantir sua vaga; depois disso ela é liberada para outro diarista.`, tag: 'pag30-' + pid }];
 }
 /* ---------- cobranças ---------- */
 const stPag = x => !!x && (x === true || !!x.s);
