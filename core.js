@@ -1087,7 +1087,8 @@ function renderTop(){
 function renderNav(){
   const tabs=[['jogo','Jogo'],['elenco','Elenco'],['avisos','Avisos'],['ranking','Ranking'],['caixa','Caixa']].filter(([k])=>(ADM()||!['avisos','caixa'].includes(k))&&!(k==='caixa'&&!CX()));
   if(!tabs.some(([k])=>k===UI.tab))UI.tab='jogo';
-  document.getElementById('nav').innerHTML='<div class="in">'+tabs.map(([k,n])=>`<button data-act="tab" data-v="${k}" ${UI.tab===k?'aria-current="page"':''}>${ICON[k]}${n}</button>`).join('')+'</div>';
+  const pend=ADM()&&!demo?membrosSemCadastro().filter(([u])=>!((GRUPO&&GRUPO.admins)||[]).includes(u)).length:0;
+  document.getElementById('nav').innerHTML='<div class="in">'+tabs.map(([k,n])=>`<button data-act="tab" data-v="${k}" ${UI.tab===k?'aria-current="page"':''} style="position:relative">${ICON[k]}${n}${k==='elenco'&&pend?`<span class="badge" style="top:2px;right:calc(50% - 22px)" aria-label="${pend} esperando autorização">${pend}</span>`:''}</button>`).join('')+'</div>';
 }
 function renderTab(){
   const A=ADM();
@@ -1103,7 +1104,9 @@ function renderTab(){
   const pe=UI.tab==='jogo'&&UI.recemEnc&&S.pel[UI.recemEnc];
   const ban=pe?`<div class="enc-ok"><div class="enc-ic">✓</div><div class="grow"><b>Pelada de ${dShort(pe.data)} encerrada</b><div class="sub">Ela foi para "Últimas peladas", com notas, prêmios e artes. Agora é só marcar a próxima.</div>
     <div class="row" style="gap:6px;margin-top:8px"><button class="btn sm" data-act="notas-pel" data-p="${UI.recemEnc}">Ver notas</button><button class="btn sm" data-act="fechar-enc">Ok</button></div></div></div>`:'';
-  return ban+(UI.tab==='jogo'?painelMeusPag():'')+({jogo:tJogo,elenco:tElenco,avisos:tAvisos,ranking:tRanking,caixa:tCaixa}[UI.tab]||tJogo)(A);
+  const pendN=A&&!demo&&UI.tab!=='elenco'?membrosSemCadastro().filter(([u])=>!((GRUPO&&GRUPO.admins)||[]).includes(u)):[];
+  const banPend=pendN.length?`<button class="pag-alerta" style="display:flex;width:100%;align-items:center;gap:10px;text-align:left;border:0;cursor:pointer" data-act="tab" data-v="elenco"><span class="pag-ic">👋</span><span class="grow"><b style="font-size:15px">${pendN.length===1?esc(pendN[0][1].apelido||pendN[0][1].nome||'Alguém')+' quer entrar':pendN.length+' pessoas querem entrar'}</b><span class="pag-s" style="display:block">Esperando sua autorização no Elenco.</span></span><b>Ver ›</b></button>`:'';
+  return ban+banPend+(UI.tab==='jogo'?painelMeusPag():'')+({jogo:tJogo,elenco:tElenco,avisos:tAvisos,ranking:tRanking,caixa:tCaixa}[UI.tab]||tJogo)(A);
 }
 
 // guarda data e horários da próxima pelada; o término acompanha o início até ser mudado à mão
