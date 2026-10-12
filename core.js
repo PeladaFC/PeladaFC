@@ -1220,7 +1220,7 @@ function tJogo(A){
 }
 function rowPlayer(id,right,extra='',tipo,tag=''){
   const j=J(id);
-  return`<div class="item">${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}${tag}</div><div class="sub row" style="gap:5px"><span class="chip p-${j.pos}">${j.pos}</span>${tipo!=null?tipo:`<span>${tipoTxt(id)}</span>`}${extra}</div></div>${right}</div>`;
+  return`<div class="item">${avHTML(id)}<div class="grow"><div class="name${tag?' name-tag':''}">${tag?`<span>${esc(nm(id))}</span>${tag}`:esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${j.pos}">${j.pos}</span>${tipo!=null?tipo:`<span>${tipoTxt(id)}</span>`}${extra}</div></div>${right}</div>`;
 }
 /* diarista convocado e confirmado: 30 minutos para pagar (com Mercado Pago conectado) */
 function convOk(p,pid,jid){return!!(p&&(p.conv||{})[jid]&&!(p.expirou||{})[jid]&&respDe(p,pid)[jid]?.s==='sim')}
@@ -1252,7 +1252,7 @@ function subPresenca(pid,p,l,A){
     if(mensL.length&&diaL.length&&(id===mensL[0]||id===diaL[0]))h+=`<div class="lista-grupo">${id===mensL[0]?'Mensalistas':'Diaristas'} <span class="num">${id===mensL[0]?mensL.length:diaL.length}</span></div>`;
     const ag=l.aguardando.includes(id),hp=resp[id]?.t?horaPedido(resp[id].t).slice(-5):'';
     // fora da lista: uma linha curta no lugar de "Mensalista/Diarista" (o número da fila só o administrador vê)
-    const naFila=ag||wait.has(id),tagFila=naFila?`<span class="tag-fila">${A&&ordPed[id]?ordPed[id]+'º na fila':ag?'Pediu vaga':'Espera'}</span>`:'',fila=naFila?`<span>${tipoTxt(id)}${A&&hp?' · '+hp:''}</span>`:null;
+    const naFila=ag||wait.has(id),tagFila=naFila?`<span class="chip tag-espera">${A&&ordPed[id]?ordPed[id]+'º na fila':ag?'Pediu vaga':'Espera'}</span>`:'',fila=naFila?`<span>${tipoTxt(id)}</span>${A&&hp?`<span class="pediu-as">pediu vaga às ${hp}</span>`:''}`:null;
     const extra=((p.expirou||{})[id]&&!(p.conv||{})[id]?'<span class="chip tag-espera">⌛ PERDEU A VAGA</span>':(p.conv||{})[id]?(stPag((p.diarias||{})[id])?'<span class="chip solid">✅ PAGO</span>':prazoPag(p,pid,id)?`<span class="chip tag-espera">PAGAR ATÉ ${horaPedido(prazoPag(p,pid,id)).slice(-5)}</span>`:'<span class="chip solid">CONVOCADO</span>'):'');
     const libBtn=A&&ag?`<button class="btn sm primary lib-mini" data-act="liberar" data-p="${pid}" data-j="${id}" ${J(id).pos!=='GOL'&&l.escalados.length>=l.vagas?'disabled title="Lista cheia"':''}>Liberar</button>`:'';
     const right=A?`<div class="rsvp">${libBtn||`<button aria-label="Vai" class="${s==='sim'?'on-sim':''}" data-act="rsvp" data-p="${pid}" data-j="${id}" data-v="sim">✓</button>`}<button aria-label="Não vai" class="${s==='nao'?'on-nao':''}" data-act="rsvp" data-p="${pid}" data-j="${id}" data-v="nao">✕</button></div>`
