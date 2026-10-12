@@ -121,7 +121,7 @@ function rodadaNova(r, ctx) {
   if (!r || r.status !== 'aberta') return [];
   const n = (r.alvos || []).length, loc = new Date((r.fim || Date.now()) - 3 * 36e5);
   const ate = `${DIAS3[loc.getUTCDay()]} ${pad(loc.getUTCDate())}/${pad(loc.getUTCMonth() + 1)} ${pad(loc.getUTCHours())}:${pad(loc.getUTCMinutes())}`;
-  return [{ para: todos(ctx), titulo: `⭐ Votação do elenco aberta · ${nomePelada(ctx)}`, texto: `Avalie ${n} jogador${n === 1 ? '' : 'es'} do ${nomePelada(ctx)} nos 5 critérios até ${ate}. O voto é secreto.`, tag: 'rodada' }];
+  return [{ para: todos(ctx), titulo: `⭐ Votação do elenco aberta · ${nomePelada(ctx)}`, texto: `Avalie ${n} jogador${n === 1 ? '' : 'es'} da galera nos 5 critérios até ${ate}. O voto é secreto.`, tag: 'rodada' }];
 }
 /* ---------- cobranças ---------- */
 const stPag = x => !!x && (x === true || !!x.s);
@@ -163,7 +163,7 @@ function avisosCobranca(ctx, hoje) {
     const u = uidDoJogador(ctx, c.jid); if (!u) continue; const dono = linhaDono(ctx, u);
     if (c.tipo === 'm' && hoje.slice(8) === '01' && c.ini === hoje) out.push({ para: [u], titulo: `💰 ${c.desc} · ${g}`, texto: `${BRL(c.v)}, vence dia ${dBR(c.venc)}. Pague pelo app com Pix.${dono}`, tag: 'cob-' + c.tipo + c.venc });
     else if (c.venc === hoje) out.push({ para: [u], titulo: `⏰ Vence hoje · ${g}`, texto: `${c.desc}: ${BRL(c.v)} vence hoje. Pague pelo app com Pix e o Caixa confirma na hora.${dono}`, tag: 'cob-' + c.tipo + c.venc });
-    else if (c.venc === atraso) out.push({ para: [u], titulo: `🔴 Pagamento atrasado · ${g}`, texto: `${c.desc}: ${BRL(c.v)} está 5 dias atrasada. Toque para pagar com Pix.${dono}`, tag: 'cob-' + c.tipo + c.venc });
+    else if (c.venc === atraso) out.push({ para: [u], titulo: `🔴 Pagamento atrasado · ${g}`, texto: `${c.desc}: ${BRL(c.v)} venceu há 5 dias. Toque para pagar com Pix.${dono}`, tag: 'cob-' + c.tipo + c.venc });
   }
   return out;
 }

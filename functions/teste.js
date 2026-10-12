@@ -102,7 +102,7 @@ t('pelada que vira a meia-noite termina no dia seguinte', () => {
 });
 t('avaliação completa aberta avisa todo mundo com o prazo em horário de Recife', () => {
   const av = R.rodadaNova({ status: 'aberta', alvos: ['jA', 'jB'], fim: Date.parse('2026-10-11T15:00:00-03:00') }, ctx);
-  assert.deepStrictEqual(av[0].para.sort(), ['uA', 'uB', 'uC']); assert.match(av[0].texto, /Avalie 2 jogadores do Pelada Teste nos 5 critérios até dom 11\/10 15:00/);
+  assert.deepStrictEqual(av[0].para.sort(), ['uA', 'uB', 'uC']); assert.match(av[0].texto, /Avalie 2 jogadores da galera nos 5 critérios até dom 11\/10 15:00/);
 });
 t('nome do time personalizado aparece no aviso do sorteio', () => {
   const c2 = { ...ctx, cfg: { ...ctx.cfg, nomesTimes: ['Cobra', ''] } };
