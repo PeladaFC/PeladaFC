@@ -634,3 +634,20 @@ document.addEventListener('submit', async e => {
 
 // Se o navegador devolver a página da memória (voltar/reabrir), recarrega para começar do início.
 window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+
+// Voltou ao app depois de muito tempo parado (ou o celular "acordou" o app guardado na memória):
+// recomeça em "Minhas peladas", como se tivesse aberto agora.
+(() => {
+  const PARADO_MS = 30 * 60 * 1000;
+  let saiuEm = null;
+  const voltarAoInicio = () => {
+    if (!EU || saiuEm == null || Date.now() - saiuEm < PARADO_MS) return;
+    saiuEm = null;
+    const sh = document.getElementById('sheet'); if (sh) sh.innerHTML = '';
+    if (ABERTO) window.voltarGrupos(); else if (TELA !== 'minhas' && TELA !== 'perfil') ir('minhas');
+    window.scrollTo(0, 0);
+  };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saiuEm = Date.now(); else voltarAoInicio(); });
+  window.addEventListener('pagehide', () => { saiuEm = Date.now(); });
+  window.addEventListener('pageshow', e => { if (e.persisted) voltarAoInicio(); });
+})();
