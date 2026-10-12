@@ -38,6 +38,7 @@ async function backendReal() {
     token: async () => auth.currentUser ? auth.currentUser.getIdToken() : null,
     get: async p => { const s = await F.getDoc(ref(p)).catch(erro); return s.exists() ? s.data() : null; },
     set: (p, d, o) => F.setDoc(ref(p), d, o && o.merge ? { merge: true } : {}).catch(erro),
+    upd: (p, d) => F.updateDoc(ref(p), d).catch(erro),
     del: p => F.deleteDoc(ref(p)).catch(erro),
     listenDoc: (p, cb, err) => F.onSnapshot(ref(p), s => cb({ exists: s.exists(), data: s.exists() ? s.data() : null }), e => err && err(e)),
     listenCol: (p, cb, err) => F.onSnapshot(F.collection(fs, p), s => cb(s.docs.map(d => ({ id: d.id, data: d.data() }))), e => err && err(e)),
@@ -69,6 +70,7 @@ function backendMock() {
     token: async () => cur ? 'mock' : null,
     get: async p => clone(store.get(p)) ?? null,
     set: async (p, d, o) => { store.set(p, o && o.merge ? merge(store.get(p), clone(d)) : clone(d)); fire(p); },
+    upd: async (p, d) => { store.set(p, { ...(store.get(p) || {}), ...clone(d) }); fire(p); },
     del: async p => { store.delete(p); fire(p); },
     listenDoc: (p, cb) => { setTimeout(() => cb({ exists: store.has(p), data: clone(store.get(p)) ?? null }), 0); return add(docL, p, cb); },
     listenCol: (p, cb) => { setTimeout(() => cb(colDocs(p)), 0); return add(colL, p, cb); },
@@ -383,7 +385,7 @@ function makeDb(gid) {
     doc(p) {
       const full = base + p, id = p.split('/').pop();
       return {
-        set: d => B.set(full, d), update: d => B.set(full, d, { merge: true }), delete: () => B.del(full),
+        set: d => B.set(full, d), update: d => B.set(full, d, { merge: true }), replace: d => B.upd(full, d), delete: () => B.del(full),
         get: async () => { const d = await B.get(full); return { exists: !!d, data: () => d, id }; },
         onSnapshot: (n, e) => { const u = B.listenDoc(full, s => n({ exists: s.exists, data: () => s.data, id }), e); unsubs.push(u); return u; }
       };

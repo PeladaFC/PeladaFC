@@ -88,6 +88,8 @@ function patch(path,part){
   clearTimeout(timers[path]);
   const d0=db;timers[path]=setTimeout(()=>{const p=pending[path];delete pending[path];if(p)chain(path,()=>d0.doc(path).update(p))},450);
 }
+/* troca campos inteiros (sem mesclar mapas): para tirar alguém de um mapa, como descontos */
+function troca(path,part){slotSet(path,{...(slotGet(path)||{}),...part});render();if(demo||!db)return;if(pending[path])for(const k in part)delete pending[path][k];const d0=db;return chain(path,()=>{const r=d0.doc(path);return r.replace?r.replace(part):r.update(part)})}
 function withPending(colName,map){for(const p in pending){const[c,id]=p.split('/');if(c===colName&&map[id])map[id]=merge(map[id],pending[p])}return map}
 
 /* ---------- regras do jogo ---------- */
@@ -2114,7 +2116,7 @@ document.addEventListener('click',e=>{
     case'npd-set':{const m={...(UI.npDesc||{})};if(d.v==='cheio')delete m[d.j];else m[d.j]=d.v==='isento'?{isento:true}:{pct:Number(d.v)/100};UI.npDesc=m;const v=document.getElementById('np-valor');if(v)UI.npValor=v.value;render();break}
     case'pel-desc':{const p=S.pel[d.p];UI.dsc={pid:d.p,map:{...(p.descontos||{})}};sheetDescontos();break}
     case'ds-set':{const D=UI.dsc;if(!D)return;if(d.v==='cheio')delete D.map[d.j];else D.map[d.j]=d.v==='isento'?{isento:true}:{pct:Number(d.v)/100};const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetDescontos();const s2=document.querySelector('.sheet');if(s2)s2.scrollTop=sc;break}
-    case'ds-salvar':{const D=UI.dsc;if(!D)return;const m={...D.map},pth='peladas/'+D.pid;if(pending[pth])delete pending[pth].descontos;patch(pth,{descontos:Object.keys(m).length?m:null});const pp=S.pel[D.pid];if(pp){if(Object.keys(m).length)pp.descontos=m;else delete pp.descontos;render()}closeSheet();toast('Quem paga: salvo.');break}
+    case'ds-salvar':{const D=UI.dsc;if(!D)return;const m={...D.map};troca('peladas/'+D.pid,{descontos:Object.keys(m).length?m:null});closeSheet();toast('Quem paga: salvo.');break}
     case'fechar-div':{const p=S.pel[d.p];if(!aberto(p))return;patch('peladas/'+d.p,{precoDiaria:baseDivisao(p)});toast('Divisão fechada: '+BRL(baseDivisao(p))+' por atleta.');break}
     case'np-cobra':UI.npCobra=d.v;render();break;
     case'np-tipo':UI.npTipo=d.v;UI.npCobra=null;UI.npValor=null;render();break;
