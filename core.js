@@ -554,12 +554,37 @@ function msg0(tipo,ctx={}){
     if(gols.length){out.push('','⚽ GOLS');gols.forEach(([id,s])=>out.push(`• ${nm(id)} ${s.g}`))}
     out.push('','Valeu, rapaziada! Até a próxima 💪');return out.join('\n').replace(/\*/g,'')}
   if(tipo==='prestacao'){const m=ctx.mes||mesAtual(),[y,mm]=m.split('-').map(Number),{mov,ent,sai,aj,saldo}=caixaMes(m),ant=saldoAnterior(m),fim=Math.round((ant+saldo)*100)/100;
-    const out=[`📊 PRESTAÇÃO DE CONTAS · ${MESES[mm-1].toUpperCase()}/${y}`,'',`🏦 Saldo anterior (${nomeMes(mesAnt(m))}): ${BRL(ant)}`,`💰 Entradas: ${BRL(ent)}`,`💸 Saídas: ${BRL(sai)}`,...(aj?[`⚖️ Ajustes: ${sinal(aj)}`]:[]),`🟰 Resultado do mês: ${sinal(saldo)}`,`🏦 Saldo em conta (vai para ${nomeMes(mesProx(m))}): ${BRL(fim)}`];
-    const E=mov.filter(x=>x.tipo==='ent'),Sx=mov.filter(x=>x.tipo==='sai'),I=mov.filter(x=>x.tipo==='isento');
-    if(E.length){out.push('','ENTRADAS');E.forEach(x=>out.push(`${dBR(x.d)||'--/--'} · ${x.quem?nm(x.quem)+' · '+x.cat:x.cat} · ${BRL(x.v)}`))}
-    if(Sx.length){out.push('','SAÍDAS');Sx.forEach(x=>out.push(`${dBR(x.d)||'--/--'} · ${x.cat} · ${BRL(x.v)}`))}
-    const AJ=mov.filter(x=>x.tipo==='aj');if(AJ.length){out.push('','AJUSTES DE SALDO');AJ.forEach(x=>out.push(`${dBR(x.d)||'--/--'} · ${x.obs} · ${sinal(x.v)}${x.por?' (por '+nm(x.por)+')':''}`))}
-    if(I.length){out.push('','ISENTOS');I.forEach(x=>out.push(`${nm(x.quem)} · ${x.cat}${x.obs?' ('+x.obs+')':''}`))}
+    const EVs=eventosMes(m),nomeEv=Object.fromEntries(EVs),ehEv=x=>!!(x.grupo&&nomeEv[x.grupo]),tot=a=>sum(a.map(x=>x.v)),nomes=a=>a.map(x=>nm(x.quem)).join(', ');
+    const out=[`📊 *PRESTAÇÃO DE CONTAS*`,`${c.nome} · ${MESES[mm-1]}/${y}`,'',`🏦 Saldo anterior (${nomeMes(mesAnt(m))}): ${BRL(ant)}`];
+    const E=mov.filter(x=>x.tipo==='ent'),Sx=mov.filter(x=>x.tipo==='sai');
+    // ENTRADAS gerais
+    out.push('',`💰 *ENTRADAS: ${BRL(ent)}*`);
+    const M=E.filter(x=>x.grupo==='mens');if(M.length)out.push(`• Mensalidades (${M.length}): ${BRL(tot(M))}`,`   ${nomes(M)}`);
+    {const fM=EV()||!(precoM(m)>0)?[]:ativos().filter(id=>J(id).tipo==='mensalista'&&!stPag(((S.caixa[m]||{}).mens||{})[id])).map(id=>({quem:id}));if(fM.length)out.push(`   Falta pagar a mensalidade: ${nomes(fM)}`)}
+    const D=E.filter(x=>x.grupo==='dia');if(D.length){out.push(`• Diárias (${D.length}): ${BRL(tot(D))}`);const pd=[...new Set(D.map(x=>x.pd))].sort();pd.forEach(dd=>{const a=D.filter(x=>x.pd===dd);out.push(`   ${dBR(dd)}: ${nomes(a)} · ${BRL(tot(a))}`)})}
+    E.filter(x=>x.av&&!ehEv(x)).forEach(x=>out.push(`• ${x.cat}${x.d?' ('+dBR(x.d)+')':''}: ${BRL(x.v)}`));
+    const Eev=E.filter(ehEv);if(Eev.length)out.push(`• Eventos e cobranças extras: ${BRL(tot(Eev))} (detalhes abaixo)`);
+    if(!E.length)out.push('Nenhuma entrada no mês.');
+    // SAÍDAS gerais
+    out.push('',`💸 *SAÍDAS: ${BRL(sai)}*`);
+    Sx.filter(x=>!ehEv(x)).forEach(x=>out.push(`• ${x.cat}${x.d?' ('+dBR(x.d)+')':''}: ${BRL(x.v)}`));
+    const Sev=Sx.filter(ehEv);if(Sev.length)out.push(`• Gastos de eventos: ${BRL(tot(Sev))} (detalhes abaixo)`);
+    if(!Sx.length)out.push('Nenhuma saída no mês.');
+    // um bloco por evento / cobrança extra
+    for(const[k,n] of EVs){const en=E.filter(x=>x.grupo===k),ga=Sx.filter(x=>x.grupo===k),pp=k[0]==='p'?S.pel[k.slice(2)]:null,xx=k[0]==='x'?(extrasDe(m).find(([i])=>'x:'+i===k)||[])[1]:null,
+        quem=pp?jogaram(pp).filter(id=>pagaEm(pp,id)):xx?(xx.quem||[]).filter(id=>S.jog[id]):[],stDe=id=>stPag(pp?(pp.diarias||{})[id]:((xx&&xx.pag)||{})[id]),
+        is=quem.filter(id=>{const st=stDe(id);return st?st.s==='isento':pp&&!(valorDe(pp,id)>0)}).map(id=>({quem:id})),deve=pp&&aberto(pp)?[]:quem.filter(id=>!stDe(id)&&(pp?valorDe(pp,id)>0:true)).map(id=>({quem:id}));if(!en.length&&!ga.length)continue;
+      const pagos=en.filter(x=>x.quem),outras=en.filter(x=>!x.quem);
+      out.push('',`${k[0]==='p'?'🎉':'🧾'} *${n.toUpperCase()}*`);
+      if(pagos.length)out.push(`Entrada: ${BRL(tot(pagos))} (${pagos.length} pagaram)`,`   ${nomes(pagos)}`);
+      outras.forEach(x=>out.push(`Entrada · ${x.cat}: ${BRL(x.v)}`));
+      if(deve.length)out.push(`Falta pagar: ${nomes(deve)}`);
+      if(is.length)out.push(`Isentos: ${nomes(is)}`);
+      if(ga.length){out.push('Gastos do evento:');ga.forEach(x=>out.push(`• ${x.cat}: ${BRL(x.v)}`))}
+      const r=tot(en)-tot(ga);out.push(`Resultado do evento: ${sinal(Math.round(r*100)/100)}`)}
+    const AJ=mov.filter(x=>x.tipo==='aj');if(AJ.length){out.push('',`⚖️ *AJUSTES: ${sinal(aj)}*`);AJ.forEach(x=>out.push(`• ${dBR(x.d)||'--/--'} · ${x.obs}: ${sinal(x.v)}${x.por?' (por '+nm(x.por)+')':''}`))}
+    out.push('','*RESUMO*',`🏦 Saldo anterior: ${BRL(ant)}`,`💰 Entradas: + ${BRL(ent)}`,`💸 Saídas: − ${BRL(sai)}`,...(aj?[`⚖️ Ajustes: ${sinal(aj)}`]:[]),`🟰 Resultado do mês: ${sinal(saldo)}`,`🏦 *Saldo em conta (vai para ${nomeMes(mesProx(m))}): ${BRL(fim)}*`);
+    const I=mov.filter(x=>x.tipo==='isento'&&!(x.grupo&&nomeEv[x.grupo]));if(I.length){out.push('','🙌 Isentos no mês');I.forEach(x=>out.push(`• ${nm(x.quem)} · ${x.cat}${x.obs?' ('+x.obs+')':''}`))}
     return out.join('\n')}
   if(tipo==='pagamento'){const m=ctx.mes||mesAtual(),d=devedores(m),[y,mm]=m.split('-').map(Number);
     const out=[`💰 *PENDÊNCIAS · ${MESES[mm-1].toUpperCase()}/${y}*`,''];
@@ -1755,12 +1780,12 @@ function notaValor(st,cheio){if(!st||st.s!=='pago'||st.v==null||Number(st.v)===c
 function dataLanc(m){const hoje=iso(new Date());if(UI.cxData&&UI.cxData.startsWith(m))return UI.cxData;return hoje.startsWith(m)?hoje:m+'-05'}
 function caixaMes(m){const c=cfg(),cx=S.caixa[m]||{},mov=[];
   const mensal=EV()?[]:ativos().filter(id=>J(id).tipo==='mensalista');
-  for(const id of mensal){const x=stPag((cx.mens||{})[id]);if(x)mov.push({tipo:x.s==='isento'?'isento':'ent',cat:'Mensalidade',quem:id,d:x.d||'',v:x.s==='isento'?0:Number(x.v??precoM(m)),obs:x.obs||''})}
+  for(const id of mensal){const x=stPag((cx.mens||{})[id]);if(x)mov.push({tipo:x.s==='isento'?'isento':'ent',cat:'Mensalidade',grupo:'mens',quem:id,d:x.d||'',v:x.s==='isento'?0:Number(x.v??precoM(m)),obs:x.obs||''})}
   const pels=Object.entries(S.pel).filter(([,p])=>p.data.startsWith(m)&&(p.status==='encerrada'||PA(p))).sort((a,b)=>a[1].data.localeCompare(b[1].data));
-  for(const[,p] of pels)for(const id of jogaram(p))if(pagaEm(p,id)){const x=stPag((p.diarias||{})[id]);if(x)mov.push({tipo:x.s==='isento'?'isento':'ent',cat:PA(p)?(p.extra?'Evento extra ':'Evento ')+dBR(p.data):'Diária '+dBR(p.data),quem:id,d:x.d||p.data,v:x.s==='isento'?0:Number(x.v??valorDe(p,id)),obs:x.obs||''})}
-  for(const[,x] of extrasDe(m))for(const id of x.quem||[]){const st=stPag((x.pag||{})[id]);if(st&&S.jog[id])mov.push({tipo:st.s==='isento'?'isento':'ent',cat:x.nome,quem:id,d:st.d||x.d||'',v:st.s==='isento'?0:Number(st.v??x.v),obs:st.obs||''})}
-  for(const e of cx.ent||[])mov.push({tipo:'ent',cat:e.d,d:e.dt||'',v:Number(e.v)||0,id:e.id,av:1});
-  for(const e of cx.desp||[])mov.push({tipo:'sai',cat:e.d,d:e.dt||'',v:Number(e.v)||0,id:e.id,av:1});
+  for(const[pid,p] of pels)for(const id of jogaram(p))if(pagaEm(p,id)){const x=stPag((p.diarias||{})[id]);if(x)mov.push({tipo:x.s==='isento'?'isento':'ent',cat:PA(p)?(p.extra?'Evento extra ':'Evento ')+dBR(p.data):'Diária '+dBR(p.data),grupo:PA(p)?'p:'+pid:'dia',pd:p.data,quem:id,d:x.d||p.data,v:x.s==='isento'?0:Number(x.v??valorDe(p,id)),obs:x.obs||''})}
+  for(const[xid,x] of extrasDe(m))for(const id of x.quem||[]){const st=stPag((x.pag||{})[id]);if(st&&S.jog[id])mov.push({tipo:st.s==='isento'?'isento':'ent',cat:x.nome,grupo:'x:'+xid,quem:id,d:st.d||x.d||'',v:st.s==='isento'?0:Number(st.v??x.v),obs:st.obs||''})}
+  for(const e of cx.ent||[])mov.push({tipo:'ent',cat:e.d,d:e.dt||'',v:Number(e.v)||0,id:e.id,av:1,grupo:e.ref||''});
+  for(const e of cx.desp||[])mov.push({tipo:'sai',cat:e.d,d:e.dt||'',v:Number(e.v)||0,id:e.id,av:1,grupo:e.ref||''});
   for(const e of cx.ajustes||[])mov.push({tipo:'aj',cat:'Ajuste de saldo',obs:e.motivo||'',d:e.dt||'',v:Number(e.v)||0,id:e.id,por:e.por||''});
   mov.sort((a,b)=>(a.d||'9').localeCompare(b.d||'9'));
   const ent=sum(mov.filter(x=>x.tipo==='ent').map(x=>x.v)),sai=sum(mov.filter(x=>x.tipo==='sai').map(x=>x.v)),aj=Math.round(sum(mov.filter(x=>x.tipo==='aj').map(x=>x.v))*100)/100;
@@ -1770,6 +1795,7 @@ const sinal=v=>v?(v<0?'− ':'+ ')+BRL(Math.abs(v)):BRL(0);
 function mesAnt(m){let[y,mm]=m.split('-').map(Number);mm--;if(!mm){mm=12;y--}return y+'-'+pad(mm)}
 function mesProx(m){let[y,mm]=m.split('-').map(Number);mm++;if(mm>12){mm=1;y++}return y+'-'+pad(mm)}
 function nomeMes(m){return MESES[Number(m.slice(5))-1].toLowerCase()}
+function eventosMes(m){const out=[];for(const[pid,p] of Object.entries(S.pel).filter(([,p])=>(p.data||'').startsWith(m)&&PA(p)).sort((a,b)=>a[1].data.localeCompare(b[1].data)))out.push(['p:'+pid,(p.nome||(p.extra?'Evento extra':'Evento'))+' '+dShort(p.data)]);for(const[xid,x] of extrasDe(m))out.push(['x:'+xid,x.nome]);return out}
 function saldoAnterior(m){const ks=[...Object.keys(S.caixa),...Object.values(S.pel).map(p=>(p.data||'').slice(0,7))].filter(k=>/^\d{4}-\d{2}$/.test(k)&&k<m).sort();if(!ks.length)return 0;let t=0;for(let k=ks[0];k<m;k=mesProx(k))t+=caixaMes(k).saldo;return Math.round(t*100)/100}
 function ajDif(){const A0=UI.aj,i=document.getElementById('aj-saldo'),o=document.getElementById('aj-dif');if(!A0||!i||!o)return;const v=Math.round(((Number(String(i.value).replace(',','.'))||0)-A0.base)*100)/100;o.innerHTML='Ajuste: <b class="num" style="color:'+(v<0?'var(--red)':'var(--pitch)')+'">'+(v?sinal(v):BRL(0))+'</b>'}
 function botaoPag(x,act,attrs,A){const st=stPag(x),cls=!st?'':st.s==='isento'?'isento':'on',txt=!st?'DEVE':st.s==='isento'?'ISENTO':'PAGO'+(st.d?' '+dBR(st.d):'');
@@ -1826,11 +1852,12 @@ function tCaixa(A){
   // lançamentos avulsos
   const av=mov.filter(x=>x.av);
   h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Outras entradas e saídas</h3></div><div class="list">`;
-  av.forEach(x=>{h+=`<div class="item"><span class="cx-dt num">${dBR(x.d)||'—'}</span><div class="grow name">${esc(x.cat)}</div><b class="num" style="color:${x.tipo==='sai'?'var(--red)':'var(--pitch)'}">${x.tipo==='sai'?'−':'+'} ${BRL(x.v)}</b>${A?`<button class="btn sm" data-act="del-lanc" data-m="${m}" data-t="${x.tipo}" data-id="${x.id}" aria-label="Apagar lançamento">✕</button>`:''}</div>`});
+  const nEv=Object.fromEntries(eventosMes(m));av.forEach(x=>{h+=`<div class="item"><span class="cx-dt num">${dBR(x.d)||'—'}</span><div class="grow"><div class="name">${esc(x.cat)}</div>${x.grupo&&nEv[x.grupo]?`<div class="sub">${esc(nEv[x.grupo])}</div>`:''}</div><b class="num" style="color:${x.tipo==='sai'?'var(--red)':'var(--pitch)'}">${x.tipo==='sai'?'−':'+'} ${BRL(x.v)}</b>${A?`<button class="btn sm" data-act="del-lanc" data-m="${m}" data-t="${x.tipo}" data-id="${x.id}" aria-label="Apagar lançamento">✕</button>`:''}</div>`});
   if(!av.length)h+='<div class="empty">Nada lançado. Ex.: aluguel do campo, bola, colete, patrocínio.</div>';
   h+='</div>';
-  if(A)h+=`<div class="stack" style="margin-top:10px;gap:8px"><div class="row" style="flex-wrap:nowrap"><input type="text" id="desp-d" placeholder="Descrição (aluguel do campo, bola…)" class="grow"><input type="number" id="desp-v" placeholder="R$" inputmode="decimal" style="width:90px"></div>
-    <div class="lado"><button class="btn" data-act="add-lanc" data-t="ent" data-m="${m}">+ Entrada</button><button class="btn primary" data-act="add-lanc" data-t="sai" data-m="${m}">− Saída</button></div></div>`;
+  if(A){const EVs=eventosMes(m);h+=`<div class="stack" style="margin-top:10px;gap:8px"><div class="row" style="flex-wrap:nowrap"><input type="text" id="desp-d" placeholder="Descrição (bola, água, carnes…)" class="grow"><input type="number" id="desp-v" placeholder="R$" inputmode="decimal" style="width:90px"></div>
+    ${EVs.length?`<label class="field"><span>Referente a</span><select id="desp-ref"><option value="">Despesa geral do mês</option>${EVs.map(([k,n])=>`<option value="${k}" ${UI.despRef===k?'selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
+    <div class="lado"><button class="btn" data-act="add-lanc" data-t="ent" data-m="${m}">+ Entrada</button><button class="btn primary" data-act="add-lanc" data-t="sai" data-m="${m}">− Saída</button></div></div>`}
   h+='</div>';
   // extrato
   if(mov.length){h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Extrato do mês</h3></div><div class="list">`;
@@ -2457,7 +2484,7 @@ document.addEventListener('click',e=>{
     case'diarias-todas':{const p=S.pel[d.p],c=cfg(),dt=dataLanc(p.data.slice(0,7)),up={};if(!aberto(p))for(const id of jogaram(p))if(pagaEm(p,id)&&valorDe(p,id)>0&&!stPag((p.diarias||{})[id]))up[id]={s:'pago',d:dt,v:valorDe(p,id)};patch('peladas/'+d.p,{diarias:up});toast(`${Object.keys(up).length} diária(s) pagas em ${dBR(dt)}.`);break}
     case'add-lanc':{const ds=document.getElementById('desp-d').value.trim(),v=Number(String(document.getElementById('desp-v').value).replace(',','.'));
       if(!ds||!v){toast('Coloque a descrição e o valor.');return}const cx=S.caixa[d.m]||{mens:{},desp:[]},f=d.t==='ent'?'ent':'desp',dt=dataLanc(d.m);
-      put('caixa/'+d.m,{...cx,[f]:[...(cx[f]||[]),{id:uid('d'),d:ds,v,dt}]});toast((d.t==='ent'?'Entrada':'Saída')+' lançada em '+dBR(dt)+'.');break}
+      const rf=(document.getElementById('desp-ref')||{}).value||'';UI.despRef=rf;put('caixa/'+d.m,{...cx,[f]:[...(cx[f]||[]),{id:uid('d'),d:ds,v,dt,...(rf?{ref:rf}:{})}]});toast((d.t==='ent'?'Entrada':'Saída')+' lançada em '+dBR(dt)+'.');break}
     case'aj-novo':{const m=d.m,fim=Math.round((saldoAnterior(m)+caixaMes(m).saldo)*100)/100,[y,mm]=m.split('-').map(Number);UI.aj={m,base:fim};
       openSheet('Ajuste de saldo',`<div class="stack"><p class="sub" style="margin:0">Saldo em conta no fim de ${MESES[mm-1].toLowerCase()}/${y}, pelas contas do app: <b class="num">${BRL(fim)}</b>. Confira com o extrato do banco. O ajuste fica lançado em ${MESES[mm-1].toLowerCase()} e passa para os meses seguintes.</p>
         <label class="field"><span>Quanto tem de verdade em conta? (R$)</span><input type="number" id="aj-saldo" inputmode="decimal" step="0.01" value="${fim}"></label>
