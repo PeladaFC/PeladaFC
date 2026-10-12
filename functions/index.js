@@ -72,7 +72,7 @@ async function enviarPara(uids, aviso) {
 async function enviarTodos(avisos) { for (const a of avisos) if (a && a.para && a.para.length) await enviarPara(a.para, a); }
 
 /* ---------- contexto do grupo (lido só quando precisa) ---------- */
-async function contexto(gid, { jog = false, pres = false, membros = false, pel = false } = {}) {
+async function contexto(gid, { jog = false, pres = false, membros = false, pel = false, caixa = false } = {}) {
   const base = db.doc(`grupos/${gid}`);
   const [g, c, j, p, m, pl] = await Promise.all([
     base.get(), base.collection('config').doc('geral').get(),
@@ -81,14 +81,15 @@ async function contexto(gid, { jog = false, pres = false, membros = false, pel =
     membros ? base.collection('membros').get() : null,
     pel ? base.collection('peladas').orderBy('data', 'desc').limit(10).get() : null
   ]);
+  const cx = caixa ? await base.collection('caixa').orderBy(admin.firestore.FieldPath.documentId(), 'desc').limit(3).get() : null;
   const map = q => q ? Object.fromEntries(q.docs.map(d => [d.id, d.data()])) : {};
-  return { gid, grupo: g.exists ? g.data() : {}, cfg: c.exists ? c.data() : {}, jog: map(j), pres: map(p), membros: map(m), pel: map(pl) };
+  return { gid, grupo: g.exists ? g.data() : {}, cfg: c.exists ? c.data() : {}, jog: map(j), pres: map(p), membros: map(m), pel: map(pl), caixa: map(cx) };
 }
 
 /* ---------- gatilhos ---------- */
 exports.pushPeladaCriada = onDocumentCreated('grupos/{gid}/peladas/{pid}', async ev => {
   const p = ev.data && ev.data.data(); if (!p) return;
-  const ctx = await contexto(ev.params.gid, { membros: true });
+  const ctx = await contexto(ev.params.gid, { membros: true, jog: true, pres: true });
   await enviarTodos(R.pelCriada(p, ev.params.pid, ctx));
 });
 
@@ -150,5 +151,37 @@ exports.pushAvaliacao = onSchedule({ schedule: 'every 15 minutes', timeZone: 'Am
       await d.ref.update({ pushAvalEm: agora }); // marca antes de enviar: nunca avisa duas vezes
       await enviarTodos(R.avisoAval(d.data(), d.id, ctx));
     }
+  }
+});
+
+// Cobrança extra nova (caixa/{mês}.extras): avisa quem está na lista
+exports.pushCobrancaExtra = onDocumentWritten('grupos/{gid}/caixa/{mes}', async ev => {
+  const a = ev.data.before.exists ? ev.data.before.data() : null, b = ev.data.after.exists ? ev.data.after.data() : null;
+  if (!b || !b.extras) return;
+  const novas = Object.keys(b.extras).filter(k => !((a && a.extras) || {})[k]); if (!novas.length) return;
+  const ctx = await contexto(ev.params.gid, { pres: true });
+  await enviarTodos(R.extrasNovas(a, b, ctx));
+});
+
+// A cada 15 minutos: 15 min antes do prazo dos mensalistas, lembra quem ainda não respondeu
+exports.pushPrazoMensalistas = onSchedule({ schedule: 'every 15 minutes', timeZone: 'America/Recife', maxInstances: 1 }, async () => {
+  const agora = Date.now(), hoje = new Date(agora - 3 * 36e5).toISOString().slice(0, 10);
+  const grupos = await db.collection('grupos').select().get();
+  for (const g of grupos.docs) {
+    const ps = await g.ref.collection('peladas').where('data', '>=', hoje).get();
+    const alvo = ps.docs.filter(d => R.prazoMensChegando(d.data(), agora + 5 * 60e3)); // agenda de 15 em 15: pega a janela
+    if (!alvo.length) continue;
+    const ctx = await contexto(g.id, { pres: true, jog: true, membros: true });
+    for (const d of alvo) { await d.ref.update({ pushMens15: agora }); await enviarTodos(R.lembreteMens(d.data(), d.id, ctx)); }
+  }
+});
+
+// Todo dia às 10h: mensalidade nova (dia 1º), vence hoje e 5 dias de atraso
+exports.pushCobrancas = onSchedule({ schedule: '0 10 * * *', timeZone: 'America/Recife', maxInstances: 1 }, async () => {
+  const hoje = new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 10);
+  const grupos = await db.collection('grupos').select().get();
+  for (const g of grupos.docs) {
+    try { const ctx = await contexto(g.id, { pres: true, jog: true, pel: true, caixa: true }); await enviarTodos(R.avisosCobranca(ctx, hoje)); }
+    catch (e) { logger.warn('cobrancas', g.id, e.message); }
   }
 });
