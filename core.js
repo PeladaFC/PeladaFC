@@ -553,11 +553,12 @@ function msg0(tipo,ctx={}){
     const gols=Object.entries(st).filter(([,s])=>s.g>0).sort((a,b)=>b[1].g-a[1].g);
     if(gols.length){out.push('','⚽ GOLS');gols.forEach(([id,s])=>out.push(`• ${nm(id)} ${s.g}`))}
     out.push('','Valeu, rapaziada! Até a próxima 💪');return out.join('\n').replace(/\*/g,'')}
-  if(tipo==='prestacao'){const m=ctx.mes||mesAtual(),[y,mm]=m.split('-').map(Number),{mov,ent,sai}=caixaMes(m);
-    const out=[`📊 PRESTAÇÃO DE CONTAS · ${MESES[mm-1].toUpperCase()}/${y}`,'',`💰 Entradas: ${BRL(ent)}`,`💸 Saídas: ${BRL(sai)}`,`🟰 Saldo: ${BRL(ent-sai)}`];
+  if(tipo==='prestacao'){const m=ctx.mes||mesAtual(),[y,mm]=m.split('-').map(Number),{mov,ent,sai,aj,saldo}=caixaMes(m);
+    const out=[`📊 PRESTAÇÃO DE CONTAS · ${MESES[mm-1].toUpperCase()}/${y}`,'',`💰 Entradas: ${BRL(ent)}`,`💸 Saídas: ${BRL(sai)}`,...(aj?[`⚖️ Ajustes: ${sinal(aj)}`]:[]),`🟰 Saldo do mês: ${BRL(saldo)}`];
     const E=mov.filter(x=>x.tipo==='ent'),Sx=mov.filter(x=>x.tipo==='sai'),I=mov.filter(x=>x.tipo==='isento');
     if(E.length){out.push('','ENTRADAS');E.forEach(x=>out.push(`${dBR(x.d)||'--/--'} · ${x.quem?nm(x.quem)+' · '+x.cat:x.cat} · ${BRL(x.v)}`))}
     if(Sx.length){out.push('','SAÍDAS');Sx.forEach(x=>out.push(`${dBR(x.d)||'--/--'} · ${x.cat} · ${BRL(x.v)}`))}
+    const AJ=mov.filter(x=>x.tipo==='aj');if(AJ.length){out.push('','AJUSTES DE SALDO');AJ.forEach(x=>out.push(`${dBR(x.d)||'--/--'} · ${x.obs} · ${sinal(x.v)}${x.por?' (por '+nm(x.por)+')':''}`))}
     if(I.length){out.push('','ISENTOS');I.forEach(x=>out.push(`${nm(x.quem)} · ${x.cat}${x.obs?' ('+x.obs+')':''}`))}
     return out.join('\n')}
   if(tipo==='pagamento'){const m=ctx.mes||mesAtual(),d=devedores(m),[y,mm]=m.split('-').map(Number);
@@ -1760,17 +1761,21 @@ function caixaMes(m){const c=cfg(),cx=S.caixa[m]||{},mov=[];
   for(const[,x] of extrasDe(m))for(const id of x.quem||[]){const st=stPag((x.pag||{})[id]);if(st&&S.jog[id])mov.push({tipo:st.s==='isento'?'isento':'ent',cat:x.nome,quem:id,d:st.d||x.d||'',v:st.s==='isento'?0:Number(st.v??x.v),obs:st.obs||''})}
   for(const e of cx.ent||[])mov.push({tipo:'ent',cat:e.d,d:e.dt||'',v:Number(e.v)||0,id:e.id,av:1});
   for(const e of cx.desp||[])mov.push({tipo:'sai',cat:e.d,d:e.dt||'',v:Number(e.v)||0,id:e.id,av:1});
+  for(const e of cx.ajustes||[])mov.push({tipo:'aj',cat:'Ajuste de saldo',obs:e.motivo||'',d:e.dt||'',v:Number(e.v)||0,id:e.id,por:e.por||''});
   mov.sort((a,b)=>(a.d||'9').localeCompare(b.d||'9'));
-  const ent=sum(mov.filter(x=>x.tipo==='ent').map(x=>x.v)),sai=sum(mov.filter(x=>x.tipo==='sai').map(x=>x.v));
-  return{mov,ent,sai,isentos:mov.filter(x=>x.tipo==='isento').length,mensal,pels}}
+  const ent=sum(mov.filter(x=>x.tipo==='ent').map(x=>x.v)),sai=sum(mov.filter(x=>x.tipo==='sai').map(x=>x.v)),aj=Math.round(sum(mov.filter(x=>x.tipo==='aj').map(x=>x.v))*100)/100;
+  return{mov,ent,sai,aj,saldo:Math.round((ent-sai+aj)*100)/100,isentos:mov.filter(x=>x.tipo==='isento').length,mensal,pels}}
+const sinal=v=>(v<0?'− ':'+ ')+BRL(Math.abs(v));
+function ajDif(){const A0=UI.aj,i=document.getElementById('aj-saldo'),o=document.getElementById('aj-dif');if(!A0||!i||!o)return;const v=Math.round(((Number(String(i.value).replace(',','.'))||0)-A0.base)*100)/100;o.innerHTML='Ajuste: <b class="num" style="color:'+(v<0?'var(--red)':'var(--pitch)')+'">'+(v?sinal(v):BRL(0))+'</b>'}
 function botaoPag(x,act,attrs,A){const st=stPag(x),cls=!st?'':st.s==='isento'?'isento':'on',txt=!st?'DEVE':st.s==='isento'?'ISENTO':'PAGO'+(st.d?' '+dBR(st.d):'');
   return A?`<div class="row" style="gap:4px;flex-wrap:nowrap"><button class="paid ${cls}" data-act="${act}" ${attrs}>${txt}</button><button class="btn sm pag-mais" data-act="${act}-mais" ${attrs} aria-label="Mais opções">⋯</button></div>`:`<span class="paid ${cls}">${txt}</span>`}
 function tCaixa(A){
   const m=UI.mes||mesAtual(),[y,mm]=m.split('-').map(Number),c=cfg(),cx=S.caixa[m]||{};
-  const{mov,ent,sai,isentos,mensal,pels}=caixaMes(m),dl=dataLanc(m);
+  const{mov,ent,sai,aj,saldo,isentos,mensal,pels}=caixaMes(m),dl=dataLanc(m);
   const pagosM=mensal.filter(id=>stPag((cx.mens||{})[id]));
   let h=`<div class="row between" style="margin-bottom:10px"><h2>Caixa</h2><div class="row" style="gap:4px"><button class="iconbtn" data-act="mes" data-d="-1" aria-label="Mês anterior">‹</button><b style="min-width:110px;text-align:center">${MESES[mm-1]} ${y}</b><button class="iconbtn" data-act="mes" data-d="1" aria-label="Próximo mês">›</button></div></div>
-    <div class="money"><div><span>Entradas</span><b class="num">${BRL(ent)}</b></div><div><span>Saídas</span><b class="num">${BRL(sai)}</b></div><div><span>Saldo</span><b class="num" style="color:${ent-sai<0?'var(--red)':'var(--pitch)'}">${BRL(ent-sai)}</b></div></div>`;
+    <div class="money"><div><span>Entradas</span><b class="num">${BRL(ent)}</b></div><div><span>Saídas</span><b class="num">${BRL(sai)}</b></div><div><span>Saldo</span><b class="num" style="color:${saldo<0?'var(--red)':'var(--pitch)'}">${BRL(saldo)}</b></div></div>
+    ${aj||A?`<div class="row between cx-aj"><span class="sub">${aj?`Saldo de ${MESES[mm-1].toLowerCase()} inclui <b class="num">${sinal(aj)}</b> de ajuste.`:`Saldo só de ${MESES[mm-1].toLowerCase()}.`}</span>${A?`<button class="btn sm" data-act="aj-novo" data-m="${m}">⚖️ Ajuste de saldo</button>`:''}</div>`:''}`;
   if(isentos)h+=`<div class="sub" style="margin-top:6px">${isentos} isenç${isentos>1?'ões':'ão'} neste mês (não entram no saldo).</div>`;
   if(A)h+=`<div class="panel cx-data" style="margin-top:12px"><label class="row between" style="gap:10px;flex-wrap:nowrap"><span><b>Data dos lançamentos</b><span class="sub" style="display:block">Tudo que você marcar agora entra com esta data.</span></span><input type="date" id="cx-data" value="${dl}" min="${m}-01" max="${m}-31"></label>
       ${EV()?'':`<div class="cx-precos"><label class="field"><span>Mensalidade de ${MESES[mm-1].toLowerCase()}</span><input type="number" id="cx-pm" data-m="${m}" inputmode="decimal" min="0" step="0.01" value="${precoM(m)}"></label><label class="field"><span>Diária de ${MESES[mm-1].toLowerCase()}</span><input type="number" id="cx-pd" data-m="${m}" inputmode="decimal" min="0" step="0.01" value="${precoD(m)}"></label></div>
@@ -1806,6 +1811,10 @@ function tCaixa(A){
       if(!ids.length)h+='<div class="empty">Ninguém na lista.</div>';
       h+='</div>'}
     h+='</div>'}
+  // ajustes de saldo (com motivo)
+  {const L=mov.filter(x=>x.tipo==='aj');if(L.length){h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Ajustes de saldo</h3><span class="sub num">${sinal(aj)}</span></div><div class="list">`;
+    L.forEach(x=>{h+=`<div class="item"><span class="cx-dt num">${dBR(x.d)||'—'}</span><div class="grow"><div class="name">${esc(x.obs)}</div>${x.por?`<div class="sub">por ${esc(nm(x.por))}</div>`:''}</div><b class="num" style="color:${x.v<0?'var(--red)':'var(--pitch)'}">${sinal(x.v)}</b>${A?`<button class="btn sm" data-act="aj-del" data-m="${m}" data-id="${x.id}" aria-label="Apagar ajuste">✕</button>`:''}</div>`});
+    h+='</div></div>'}}
   // lançamentos avulsos
   const av=mov.filter(x=>x.av);
   h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Outras entradas e saídas</h3></div><div class="list">`;
@@ -1817,7 +1826,7 @@ function tCaixa(A){
   h+='</div>';
   // extrato
   if(mov.length){h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Extrato do mês</h3></div><div class="list">`;
-    mov.forEach(x=>{h+=`<div class="item cx-ex"><span class="cx-dt num">${dBR(x.d)||'—'}</span><div class="grow"><div class="name">${x.quem?esc(nm(x.quem)):esc(x.cat)}</div>${x.quem?`<div class="sub">${esc(x.cat)}${x.obs?' · '+esc(x.obs):''}</div>`:''}</div>${x.tipo==='isento'?'<span class="paid isento">ISENTO</span>':`<b class="num" style="color:${x.tipo==='sai'?'var(--red)':'var(--pitch)'}">${x.tipo==='sai'?'−':'+'} ${BRL(x.v)}</b>`}</div>`});
+    mov.forEach(x=>{h+=`<div class="item cx-ex"><span class="cx-dt num">${dBR(x.d)||'—'}</span><div class="grow"><div class="name">${x.tipo==='aj'?'⚖️ Ajuste de saldo':x.quem?esc(nm(x.quem)):esc(x.cat)}</div>${x.tipo==='aj'?`<div class="sub">${esc(x.obs)}</div>`:x.quem?`<div class="sub">${esc(x.cat)}${x.obs?' · '+esc(x.obs):''}</div>`:''}</div>${x.tipo==='isento'?'<span class="paid isento">ISENTO</span>':x.tipo==='aj'?`<b class="num" style="color:${x.v<0?'var(--red)':'var(--pitch)'}">${sinal(x.v)}</b>`:`<b class="num" style="color:${x.tipo==='sai'?'var(--red)':'var(--pitch)'}">${x.tipo==='sai'?'−':'+'} ${BRL(x.v)}</b>`}</div>`});
     h+=`</div></div>`}
   return h;
 }
@@ -2441,18 +2450,32 @@ document.addEventListener('click',e=>{
     case'add-lanc':{const ds=document.getElementById('desp-d').value.trim(),v=Number(String(document.getElementById('desp-v').value).replace(',','.'));
       if(!ds||!v){toast('Coloque a descrição e o valor.');return}const cx=S.caixa[d.m]||{mens:{},desp:[]},f=d.t==='ent'?'ent':'desp',dt=dataLanc(d.m);
       put('caixa/'+d.m,{...cx,[f]:[...(cx[f]||[]),{id:uid('d'),d:ds,v,dt}]});toast((d.t==='ent'?'Entrada':'Saída')+' lançada em '+dBR(dt)+'.');break}
+    case'aj-novo':{const m=d.m,{saldo}=caixaMes(m),[y,mm]=m.split('-').map(Number);UI.aj={m,base:saldo};
+      openSheet('Ajuste de saldo',`<div class="stack"><p class="sub" style="margin:0">Saldo de ${MESES[mm-1].toLowerCase()}/${y} calculado pelo app: <b class="num">${BRL(saldo)}</b>. Cada mês tem o seu saldo; o ajuste vale só para este mês.</p>
+        <label class="field"><span>Qual deveria ser o saldo do mês? (R$)</span><input type="number" id="aj-saldo" inputmode="decimal" step="0.01" value="${saldo}"></label>
+        <button class="btn block" data-act="aj-zerar">Zerar o saldo deste mês</button>
+        <div class="sub" id="aj-dif">Ajuste: ${BRL(0)}</div>
+        <label class="field"><span>Motivo (obrigatório)</span><input type="text" id="aj-motivo" maxlength="120" placeholder="Ex.: dinheiro devolvido, troco, erro de lançamento"></label>
+        <p class="sub" style="margin:0">O ajuste aparece no extrato e na prestação de contas, com o motivo e quem fez.</p>
+        <button class="btn primary block" data-act="aj-ok">Salvar ajuste</button></div>`);break}
+    case'aj-zerar':{const i=document.getElementById('aj-saldo');if(i){i.value=0;ajDif()}break}
+    case'aj-ok':{const A0=UI.aj;if(!A0)return;const alvo=Number(String(document.getElementById('aj-saldo').value).replace(',','.')),mot=document.getElementById('aj-motivo').value.trim();
+      if(isNaN(alvo)){toast('Coloque o saldo certo do mês.');return}const v=Math.round((alvo-A0.base)*100)/100;if(!v){toast('O saldo já está nesse valor.');return}if(!mot){toast('Escreva o motivo do ajuste.');return}
+      const cx=S.caixa[A0.m]||{mens:{},desp:[]};put('caixa/'+A0.m,{...cx,ajustes:[...(cx.ajustes||[]),{id:uid('a'),v,motivo:mot,dt:dataLanc(A0.m),por:meuJogador()||'',em:Date.now()}]});UI.aj=null;closeSheet();toast('Ajuste de '+sinal(v)+' salvo.');break}
+    case'aj-del':{const cx=S.caixa[d.m];if(!cx||!confirm('Apagar este ajuste de saldo?'))return;put('caixa/'+d.m,{...cx,ajustes:(cx.ajustes||[]).filter(x=>x.id!==d.id)});break}
     case'del-lanc':{const cx=S.caixa[d.m],f=d.t==='ent'?'ent':'desp';put('caixa/'+d.m,{...cx,[f]:(cx[f]||[]).filter(x=>x.id!==d.id)});break}
   }
 });
 function npQpAtualiza(){const box=document.getElementById('np-qp'),v=document.getElementById('np-valor');if(!box||!v)return;UI.npValor=v.value;const pa=EV()||UI.npTipo==='extra';
   box.innerHTML=htmlQuemPaga(ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>nm(a).localeCompare(nm(b))),UI.npDesc||{},Number(String(v.value).replace(',','.'))||0,'npd')}
-document.addEventListener('input',e=>{if(e.target&&e.target.id==='np-valor')npQpAtualiza()});
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='np-valor')npQpAtualiza();if(e.target&&e.target.id==='aj-saldo')ajDif()});
 document.addEventListener('change',e=>{
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
   const t=e.target;
   if(t.dataset.act==='npd-sel'||t.dataset.act==='ds-sel'){const form=t.dataset.act==='npd-sel',m=form?{...(UI.npDesc||{})}:(UI.dsc?UI.dsc.map:null);if(!m)return;const j=t.dataset.j,v=t.value;
     if(v==='cheio')delete m[j];else if(v==='isento')m[j]={isento:true};else if(v==='v'){const p=!form&&UI.dsc&&S.pel[UI.dsc.pid];m[j]={v:form?(Number(String(document.getElementById('np-valor')?.value||'').replace(',','.'))||0):precoDP(p)}}else m[j]={pct:Number(v)/100};
     if(form){UI.npDesc=m;npQpAtualiza()}else{const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetDescontos();const s2=document.querySelector('.sheet');if(s2)s2.scrollTop=sc}return}
+  if(t.id==='aj-saldo'){ajDif();return}
   if(t.dataset.act==='npd-v'){const m={...(UI.npDesc||{})},v=Number(String(t.value).replace(',','.'));if(t.value===''||isNaN(v))delete m[t.dataset.j];else m[t.dataset.j]={v:Math.max(0,Math.round(v*100)/100)};UI.npDesc=m;npQpAtualiza();return}
 
   if(t.dataset.act==='ds-v'&&UI.dsc){const v=Number(String(t.value).replace(',','.'));if(t.value===''||isNaN(v))delete UI.dsc.map[t.dataset.j];else UI.dsc.map[t.dataset.j]={v:Math.max(0,Math.round(v*100)/100)};const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetDescontos();const s2=document.querySelector('.sheet');if(s2)s2.scrollTop=sc;return}
