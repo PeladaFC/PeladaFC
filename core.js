@@ -1714,7 +1714,7 @@ function tElenco(A){
   if(UI.filtro!=='diarista')h+=`<div class="panel" style="margin-bottom:12px"><div class="panel-h"><h3>Mensalistas <span class="muted num">${mens.length}</span></h3></div><div class="list">${mens.length?mens.map(id=>linha(id)).join(''):'<div class="empty">Nenhum mensalista aqui.</div>'}</div></div>`;
   if(UI.filtro!=='mensalista')h+=`<div class="panel"><div class="panel-h"><h3>Lista de espera <span class="muted num">${espIds.length}</span></h3></div>
     <div class="sub" style="margin-bottom:4px">Diaristas e quem confirmou com a lista cheia. Mensalista tem prioridade na espera.</div>
-    <div class="list">${espIds.length?espIds.map(id=>linha(id,exc.includes(id)?`<span class="chip" style="background:var(--card);color:var(--card-ink)">${exc.indexOf(id)+1}º na espera ${dShort(cur[1].data)}</span>`:'')).join(''):'<div class="empty">Ninguém na espera.</div>'}</div></div>`;
+    <div class="list">${espIds.length?espIds.map(id=>linha(id,'')).join(''):'<div class="empty">Ninguém na espera.</div>'}</div></div>`;
   return h;
 }
 
