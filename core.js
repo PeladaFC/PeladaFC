@@ -1334,6 +1334,9 @@ function aplicarGol(G,as){const p=S.pel[G.pid],ed=!!G.ed,J0=ed?UI.ed.jogos:JSON.
   const k=G.s==='a'?'ga':'gb',o=G.s==='a'?'gb':'ga';g[k]=(g[k]||0)+1;if(g[o]==null)g[o]=0;g.gols=[...(g.gols||[]),{s:G.s,j:G.j,as:as||null}];
   if(ed){const st=UI.ed.st;st[G.j]={...(st[G.j]||{}),g:((st[G.j]||{}).g||0)+1};if(as)st[as]={...(st[as]||{}),a:((st[as]||{}).a||0)+1};UI.gl=null;sheetEditarPelada(G.pid)}
   else{const s0=p.stats||{},up={[G.j]:{g:((s0[G.j]||{}).g||0)+1}};if(as)up[as]={...(up[as]||{}),a:((s0[as]||{}).a||0)+1};patch('peladas/'+G.pid,{jogos:J0,stats:up});UI.gl=null;closeSheet();toast('Gol de '+nm(G.j)+(as?', assistência de '+nm(as):'')+'.')}}
+/* ao apagar a tabela de jogos, tira dos números de cada jogador os gols e assistências marcados nesses jogos */
+function statsSemJogos(p){const st=p.stats||{},menos={};for(const g of p.jogos||[])for(const x of g.gols||[]){if(x.j){menos[x.j]=menos[x.j]||{g:0,a:0};menos[x.j].g++}if(x.as){menos[x.as]=menos[x.as]||{g:0,a:0};menos[x.as].a++}}
+  const up={};for(const id in menos){const s0=st[id]||{};up[id]={g:Math.max(0,(s0.g||0)-menos[id].g),a:Math.max(0,(s0.a||0)-menos[id].a)}}return up}
 function painelJogos(pid,p,A){const f=formatoDe(p),T=p.times||[];if(f==='conv'||T.length<2)return'';const J=p.jogos||[],c=campeaoDe(p),nx=A?proximaFase(p):null;
   let h=`<div class="panel" style="margin-bottom:12px"><div class="panel-h"><h3>Jogos</h3><span class="sub">${FORMATOS[f]}${f!=='mm'&&idaVoltaDe(p)?' · ida e volta':''}</span></div>`;
   if(c!=null)h+=`<div class="banner campeao-b"><b>🏆 Campeão: ${(CORES[T[c].cor]||{}).e} ${esc(nomeTime(T[c].cor))}</b></div>`;
@@ -2460,7 +2463,7 @@ document.addEventListener('click',e=>{
     case'nahora-pago':{const dt=iso(new Date()),val={s:'pago',d:dt,v:Number(d.v)||0,obs:'Pix (QR na hora)'};gravarPag(d.t,d.r,d.j,val);closeSheet();toast(nm(d.j)+': pago.');break}
     case'jg-gerar':{const p=S.pel[d.p],nj=novosJogos(p);if(nj)patch('peladas/'+d.p,{jogos:nj});break}
     case'jg-prox':{const p=S.pel[d.p],nx=proximaFase(p);if(nx)patch('peladas/'+d.p,{jogos:[...(p.jogos||[]),...nx]});break}
-    case'jg-zerar':if(b.dataset.sure){patch('peladas/'+d.p,{jogos:null});toast('Tabela apagada.')}else{b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar tabela de jogos'}},3500)}break;
+    case'jg-zerar':if(b.dataset.sure){const up=statsSemJogos(S.pel[d.p]);patch('peladas/'+d.p,{jogos:null,...(Object.keys(up).length?{stats:up}:{})});toast('Tabela apagada, com os gols e assistências dos jogos.')}else{b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar tabela de jogos'}},3500)}break;
     case'montar':UI.mt=null;sheetMontar(d.p);break;
     case'mt-time':case'mt-por':case'mt-tirar':{const M=UI.mt;if(!M)return;if(d.act==='mt-time')M.at=Number(d.i);else if(d.act==='mt-por'){M.asg[d.j]=M.at;M.ord=[...(M.ord||[]).filter(x=>x!==d.j),d.j]}else{delete M.asg[d.j];M.ord=(M.ord||[]).filter(x=>x!==d.j)}
       const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetMontar(M.pid);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc;break}
@@ -2566,7 +2569,7 @@ document.addEventListener('change',e=>{
   if(t.id==='c-formato'){const iv=document.getElementById('cfg-iv'),nc=document.getElementById('cfg-nc');if(iv)iv.hidden=!['liga','ligamm'].includes(t.value);if(nc)nc.hidden=t.value!=='ligamm'}
   if(t.dataset.act==='cmp'){UI.cmp=t.value||null;const sc=document.querySelector('.sheet').scrollTop;sheetVerJog(t.dataset.j);document.querySelector('.sheet').scrollTop=sc}
   if(t.dataset.act==='mt-n'&&UI.mt){UI.mt.T=Number(t.value);sheetMontar(UI.mt.pid);return}
-  if(t.dataset.act==='formato'){const p=S.pel[t.dataset.p];const go=()=>patch('peladas/'+t.dataset.p,{formato:t.value,jogos:null});if((p.jogos||[]).some(g=>g.ga!=null)&&!confirm('Trocar o formato apaga a tabela de jogos e os placares. Continuar?')){render();return}go();return}
+  if(t.dataset.act==='formato'){const p=S.pel[t.dataset.p];const up=statsSemJogos(p),go=()=>patch('peladas/'+t.dataset.p,{formato:t.value,jogos:null,...(Object.keys(up).length?{stats:up}:{})});if((p.jogos||[]).some(g=>g.ga!=null)&&!confirm('Trocar o formato apaga a tabela de jogos, os placares e os gols e assistências marcados nos jogos. Continuar?')){render();return}go();return}
   if(t.dataset.act==='ida-volta'){patch('peladas/'+t.dataset.p,{idaVolta:t.checked,jogos:null});return}
   if(t.dataset.act==='n-class'){const p=S.pel[t.dataset.p];patch('peladas/'+t.dataset.p,{nClass:Number(t.value),jogos:(p.jogos||[]).filter(g=>g.fase==='liga')});return}
   if(t.dataset.act==='ed-pr'&&UI.ed){UI.ed.pr[t.dataset.f]=t.value||null;return}
