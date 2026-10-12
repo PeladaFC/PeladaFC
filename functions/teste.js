@@ -38,6 +38,18 @@ t('cobranças: dia 1º, vence hoje, 5 dias de atraso e dono da conta', () => {
   const d20 = R.avisosCobranca(c2, '2026-10-20'); assert.ok(d20.some(x => /atrasado/.test(x.titulo) && /Camisa/.test(x.texto)));
   assert.ok(R.avisosCobranca(c2, '2026-10-12').length === 0);
 });
+t('convocado confirmou: cobrança de 30 min; não pagou: vaga vai para o próximo da fila', () => {
+  const c4 = { ...ctx, cfg: { ...ctx.cfg, diaria: 20, mpConectadoEm: 1 }, jog: { ...ctx.jog, jD: { nome: 'Davi', tipo: 'diarista' } }, pres: { ...ctx.pres, uD: { jogador: 'jD', pel: { p1: { s: 'sim', t: 2000 } } } } };
+  const p = { data: '2026-10-10', conv: { jC: 1000 }, resp: {} };
+  c4.pel = { p1: p };
+  const av = R.presAtualizada({ jogador: 'jC', pel: {} }, { jogador: 'jC', pel: { p1: { s: 'sim', t: 5000 } } }, 'uC', c4);
+  assert.ok(av.some(x => x.para[0] === 'uC' && /Pague em até 30 minutos/.test(x.titulo) && /R\$ 20,00/.test(x.texto)));
+  c4.pres.uC = { jogador: 'jC', pel: { p1: { s: 'sim', t: 5000 } } };
+  assert.strictEqual(R.vencidosConv(p, 'p1', c4, 5000 + 29 * 60e3), null);
+  const r = R.vencidosConv(p, 'p1', c4, 5000 + 31 * 60e3); assert.deepStrictEqual(r, { venc: ['jC'], prox: ['jD'] });
+  const avs = R.avisosVencidos(p, 'p1', c4, r); assert.ok(avs.some(x => x.para[0] === 'uC' && /Vaga perdida/.test(x.titulo))); assert.ok(avs.some(x => x.para[0] === 'uA' && /Davi foi convocado/.test(x.texto)));
+  const pago = { ...p, diarias: { jC: { s: 'pago' } } }; assert.strictEqual(R.vencidosConv(pago, 'p1', c4, 9e9), null);
+});
 t('cobrança extra nova avisa a lista', () => {
   const av = R.extrasNovas({ extras: {} }, { extras: { x1: { nome: 'Camisa', v: 35, quem: ['jB', 'jC'], venc: '2026-10-15' } } }, ctx);
   assert.strictEqual(av.length, 2); assert.match(av[0].texto, /Camisa: R\$ 35,00, vence em 15\/10/);

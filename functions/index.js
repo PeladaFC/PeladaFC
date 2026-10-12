@@ -185,3 +185,23 @@ exports.pushCobrancas = onSchedule({ schedule: '0 10 * * *', timeZone: 'America/
     catch (e) { logger.warn('cobrancas', g.id, e.message); }
   }
 });
+
+// A cada 5 minutos: diarista convocado que confirmou e não pagou em 30 minutos perde a vaga para o próximo da fila
+exports.pushPrazoPagamento = onSchedule({ schedule: 'every 5 minutes', timeZone: 'America/Recife', maxInstances: 1 }, async () => {
+  const agora = Date.now(), hoje = new Date(agora - 3 * 36e5).toISOString().slice(0, 10);
+  const grupos = await db.collection('grupos').select().get();
+  for (const g of grupos.docs) {
+    const ps = await g.ref.collection('peladas').where('data', '>=', hoje).get();
+    const comConv = ps.docs.filter(d => { const p = d.data(); return p.conv && Object.keys(p.conv).length && p.status !== 'encerrada'; });
+    if (!comConv.length) continue;
+    const ctx = await contexto(g.id, { pres: true, jog: true });
+    if (!ctx.cfg.mpConectadoEm) continue;
+    for (const d of comConv) {
+      const p = d.data(), r = R.vencidosConv(p, d.id, ctx, agora); if (!r) continue;
+      const up = {}; for (const j of r.venc) { up['expirou.' + j] = agora; up['conv.' + j] = admin.firestore.FieldValue.delete(); up['aprov.' + j] = admin.firestore.FieldValue.delete(); }
+      for (const j of r.prox) { up['conv.' + j] = agora; up['aprov.' + j] = agora; }
+      await d.ref.update(up); // a convocação do próximo dispara o aviso dele (pushPeladaAtualizada)
+      await enviarTodos(R.avisosVencidos(p, d.id, ctx, r));
+    }
+  }
+});

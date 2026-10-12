@@ -593,7 +593,7 @@ function feedItems(){
   for(const[u,doc] of Object.entries(S.pres||{})){const j=doc.jogador;if(!j||!S.jog[j])continue;
     for(const[pid,r] of Object.entries(doc.pel||{})){const p=S.pel[pid];if(!p||!r.t)continue;const q=' · '+dShort(p.data);
       let tipo,texto;
-      if(r.s==='sim'){const l=lista(p,pid);if(l.aguardando.includes(j)){tipo='pedido';texto=`${nm(j)} (${J(j).tipo}) pediu vaga pelo app. Toque em Liberar na lista`}else if(l.espera.includes(j)){tipo='espera';texto=`${nm(j)} confirmou pelo app e está na espera`}else{tipo='confirmou';texto=`${nm(j)} confirmou pelo app`}}
+      if(r.s==='sim'){const l=lista(p,pid);if(l.aguardando.includes(j)){tipo='pedido';texto=ehDiarista(j)?`${nm(j)} (diarista) pediu vaga pelo app e entrou na fila de convocação`:`${nm(j)} (${J(j).tipo}) pediu vaga pelo app. Toque em Liberar na lista`}else if(l.espera.includes(j)){tipo='espera';texto=`${nm(j)} confirmou pelo app e está na espera`}else{tipo='confirmou';texto=`${nm(j)} confirmou pelo app`}}
       else if(r.a==='sim'){tipo='desistiu';texto=`${nm(j)} desistiu pelo app`}
       else{tipo='naoVai';texto=`${nm(j)} respondeu pelo app que não vai`}
       out.push({id:u+pid,tipo,texto:texto+q,t:r.t})}}
@@ -1190,13 +1190,16 @@ function rowPlayer(id,right,extra=''){
   const j=J(id);
   return`<div class="item">${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${j.pos}">${j.pos}</span><span>${tipoTxt(id)}</span>${extra}</div></div>${right}</div>`;
 }
+/* diarista convocado e confirmado: 30 minutos para pagar (com Mercado Pago conectado) */
+function convOk(p,pid,jid){return!!(p&&(p.conv||{})[jid]&&!(p.expirou||{})[jid]&&respDe(p,pid)[jid]?.s==='sim')}
+function prazoPag(p,pid,jid){if(!mpOn()||!convOk(p,pid,jid)||PA(p))return null;const r=respDe(p,pid)[jid];return Math.max(Number(p.conv[jid])||0,Number(r&&r.t)||0)+30*60e3}
 function horaPedido(t){if(!t)return'';const d=new Date(t);return`${DIAS3[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`}
 function prazoMensTxt(p){return p&&p.mensAte?horaPedido(p.mensAte):''}
 function mensPadrao(data,hora){const d=new Date(`${data}T${hora||'08:00'}:00`);d.setTime(d.getTime()-864e5);return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`}
 function sheetConvocar(pid){const p=S.pel[pid];if(!p)return;const resp=respDe(p,pid),conv=p.conv||{},sel=UI.cv||(UI.cv=new Set());
-  const ds=ativos().filter(id=>J(id).tipo==='diarista');const pediu=ds.filter(id=>resp[id]?.s==='sim').sort((a,b)=>(resp[a].t||0)-(resp[b].t||0)),resto=ds.filter(id=>!pediu.includes(id)).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  const ds=ativos().filter(id=>J(id).tipo==='diarista');const pediu=ds.filter(id=>resp[id]?.s==='sim'&&!(p.expirou||{})[id]).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0)),resto=ds.filter(id=>!pediu.includes(id)).sort((a,b)=>nm(a).localeCompare(nm(b)));
   const l=lista(p,pid),livres=Math.max(0,l.vagas-l.escalados.length);
-  const row=(id,i)=>{const c=!!conv[id];return`<label class="item" style="cursor:${c?'default':'pointer'}"><input type="checkbox" data-act="cv-sel" data-j="${id}" ${c?'checked disabled':sel.has(id)?'checked':''}><div class="grow"><div class="name">${i!=null?`<b class="num">${i+1}º</b> `:''}${esc(nm(id))}</div><div class="sub">${c?'✅ Já convocado':resp[id]?.s==='sim'?'Pediu vaga em '+horaPedido(resp[id].t):resp[id]?.s==='nao'?'Disse que não vai':'Não pediu vaga'}</div></div></label>`};
+  const row=(id,i)=>{const c=!!conv[id];return`<label class="item" style="cursor:${c?'default':'pointer'}"><input type="checkbox" data-act="cv-sel" data-j="${id}" ${c?'checked disabled':sel.has(id)?'checked':''}><div class="grow"><div class="name">${i!=null?`<b class="num">${i+1}º</b> `:''}${esc(nm(id))}</div><div class="sub">${c?'✅ Já convocado':(p.expirou||{})[id]?'⌛ Perdeu a vaga (não pagou em 30 min)':resp[id]?.s==='sim'?'Pediu vaga em '+horaPedido(resp[id].t):resp[id]?.s==='nao'?'Disse que não vai':'Não pediu vaga'}</div></div></label>`};
   openSheet('Convocar diaristas',`<div class="stack"><p class="sub" style="margin:0">${p.mensAte?`Prazo dos mensalistas: <b>${prazoMensTxt(p)}</b>${Date.now()<p.mensAte?' (ainda aberto)':' (encerrado)'}. `:''}Vagas livres agora: <b class="num">${livres}</b>. Marque quem vai jogar: só os marcados recebem a mensagem e podem confirmar.</p>
     ${pediu.length?`<div class="sub" style="font-weight:700">PEDIRAM VAGA · por ordem de pedido</div><div class="list">${pediu.map((id,i)=>row(id,i)).join('')}</div>`:'<div class="empty">Nenhum diarista pediu vaga ainda.</div>'}
     ${resto.length?`<div class="sub" style="font-weight:700">OUTROS DIARISTAS</div><div class="list">${resto.map(id=>row(id,null)).join('')}</div>`:''}
@@ -1211,7 +1214,7 @@ function subPresenca(pid,p,l,A){
   if(!order.length)h+=`<div class="empty">Ninguém no elenco ainda.${A?' <button class="btn sm" data-act="add-jog">Adicionar jogador</button>':''}</div>`;
   h+='<div class="list">';
   for(const id of order){const s=resp[id]?.s;
-    const ag=l.aguardando.includes(id);const extra=(ag?`<span class="chip tag-espera">PEDIU VAGA${A&&resp[id]?.t?' · '+horaPedido(resp[id].t):''}</span>`:wait.has(id)?'<span class="chip tag-espera">ESPERA</span>':'')+(resp[id]?.app?'<span class="chip solid">PELO APP</span>':'');
+    const ag=l.aguardando.includes(id);const extra=(ag?`<span class="chip tag-espera">PEDIU VAGA${A&&resp[id]?.t?' · '+horaPedido(resp[id].t):''}</span>`:wait.has(id)?'<span class="chip tag-espera">ESPERA</span>':'')+(resp[id]?.app?'<span class="chip solid">PELO APP</span>':'')+((p.expirou||{})[id]&&!(p.conv||{})[id]?'<span class="chip tag-espera">⌛ PERDEU A VAGA</span>':(p.conv||{})[id]?(stPag((p.diarias||{})[id])?'<span class="chip solid">✅ PAGO</span>':prazoPag(p,pid,id)?`<span class="chip tag-espera">PAGAR ATÉ ${horaPedido(prazoPag(p,pid,id)).slice(-5)}</span>`:'<span class="chip solid">CONVOCADO</span>'):'');
     const libBtn=A&&ag?`<button class="btn sm primary" data-act="liberar" data-p="${pid}" data-j="${id}" ${J(id).pos!=='GOL'&&l.escalados.length>=l.vagas?'disabled title="Lista cheia"':''}>Liberar</button>`:'';
     const right=A?`${libBtn}<div class="rsvp"><button aria-label="Vai" class="${s==='sim'?'on-sim':''}" data-act="rsvp" data-p="${pid}" data-j="${id}" data-v="sim">✓</button><button aria-label="Não vai" class="${s==='nao'?'on-nao':''}" data-act="rsvp" data-p="${pid}" data-j="${id}" data-v="nao">✕</button></div>`
       :`<span class="chip solid">${s==='sim'?'VAI':s==='nao'?'NÃO VAI':'—'}</span>`;
@@ -1820,7 +1823,7 @@ function pendenciasDe(jid){if(!jid||!CX())return[];const out=[],m=mesAtual();
   if(EV()){const lim=iso(new Date(Date.now()-62*864e5));for(const[pid,p] of Object.entries(S.pel))if(p.data>=lim&&!aberto(p)&&jogaram(p).includes(jid)&&valorDe(p,jid)>0&&!stPag((p.diarias||{})[jid]))out.push({tipo:'d',ref:pid,jid,v:valorDe(p,jid),desc:'Evento de '+dShort(p.data),venc:p.data});return out}
   if(J(jid).tipo==='mensalista'&&precoM(m)>0&&!stPag(((S.caixa[m]||{}).mens||{})[jid]))out.push({tipo:'m',ref:m,jid,v:precoM(m),desc:'Mensalidade de '+MESES[Number(m.slice(5))-1].toLowerCase(),venc:m+'-'+pad(Number(cfg().vencMens)||10)});
   const lim=iso(new Date(Date.now()-62*864e5));
-  for(const[pid,p] of Object.entries(S.pel))if((p.status==='encerrada'||p.extra)&&p.data>=lim&&jogaram(p).includes(jid)&&pagaEm(p,jid)&&!aberto(p)&&valorDe(p,jid)>0&&!stPag((p.diarias||{})[jid]))out.push({tipo:'d',ref:pid,jid,v:valorDe(p,jid),desc:(p.extra?'Evento extra de ':'Diária da pelada de ')+dShort(p.data),venc:p.data});
+  for(const[pid,p] of Object.entries(S.pel))if((p.status==='encerrada'||p.extra||(convOk(p,pid,jid)))&&p.data>=lim&&jogaram(p).includes(jid)&&pagaEm(p,jid)&&!aberto(p)&&valorDe(p,jid)>0&&!stPag((p.diarias||{})[jid]))out.push({tipo:'d',ref:pid,jid,v:valorDe(p,jid),desc:(p.extra?'Evento extra de ':'Diária da pelada de ')+dShort(p.data),venc:p.data,ate:p.status!=='encerrada'?prazoPag(p,pid,jid):null});
   return out}
 const TAXA_MP=.0099;function taxaApp(c){c=c||cfg();return c.mpTaxaApp!=null?Number(c.mpTaxaApp):.01}function taxaTotal(c){return TAXA_MP+taxaApp(c)}
 function pct(x){return(Math.round(x*10000)/100).toLocaleString('pt-BR')+'%'}function taxasTxt(c){return`${pct(taxaTotal(c))} por pagamento`}
@@ -1833,7 +1836,7 @@ function painelMeusPag(){const L=minhasPendencias();if(!L.length)return'';const 
   const dono=auto&&ehDono(L[0].jid);
   const bt=x=>dono?`<button class="btn sm pag-bt" data-act="dono-pago" data-t="${x.tipo}" data-r="${esc(x.ref)}">Marcar como pago</button>`:auto?`<button class="btn sm pag-bt" data-act="pix-pagar" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pagar com Pix</button>`:'';
   return`<div class="pag-alerta"><div class="pag-h"><span class="pag-ic">💰</span><b class="grow">Você tem ${BRL(tot)} para pagar</b></div>
-    ${L.map(x=>`<div class="pag-it"><span class="grow name">${esc(x.desc)}${x.venc?`<span class="pag-s" style="display:block;font-weight:500">${x.venc<iso(new Date())?'⚠️ venceu '+dBR(x.venc):x.venc===iso(new Date())?'vence hoje':'vence '+dBR(x.venc)}</span>`:''}</span><span class="num">${BRL(x.v)}</span>${bt(x)}</div>`).join('')}
+    ${L.map(x=>`<div class="pag-it"><span class="grow name">${esc(x.desc)}${x.ate?`<span class="pag-s" style="display:block;font-weight:700">⏳ pague até ${pad(new Date(x.ate).getHours())}:${pad(new Date(x.ate).getMinutes())} ou a vaga vai para o próximo</span>`:x.venc?`<span class="pag-s" style="display:block;font-weight:500">${x.venc<iso(new Date())?'⚠️ venceu '+dBR(x.venc):x.venc===iso(new Date())?'vence hoje':'vence '+dBR(x.venc)}</span>`:''}</span><span class="num">${BRL(x.v)}</span>${bt(x)}</div>`).join('')}
     <div class="pag-s" style="margin-top:6px">${dono?'A conta do Mercado Pago que recebe é <b>sua</b>, e ninguém pode pagar Pix para si mesmo. Sua parte já está com você: é só marcar como paga.':auto?'Confirmado na hora, sem comprovante.':'O pagamento pelo app ainda não foi ligado. Avise o administrador.'}</div></div>`}
 function sheetNaHora(){const m=mesAtual(),ids=ativos().sort((a,b)=>nm(a).localeCompare(nm(b))),L=ids.map(id=>[id,pendenciasDe(id)]).filter(([,x])=>x.length);
   openSheet('Cobrar na hora',`<div class="stack"><p class="sub" style="margin:0">Escolha quem vai pagar. Abre um QR Code só dele e o Caixa marca PAGO sozinho quando o Pix cair.</p>

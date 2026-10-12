@@ -73,7 +73,7 @@ function pelAtualizada(a, b, pid, ctx) {
   if (!a.avalEm && b.avalEm) out.push({ para: uidsDe(ctx, participantes(b, pid, ctx)), titulo: `🏆 Saiu o resultado · ${nomePelada(ctx)}`, texto: `A votação da pelada de ${quando} terminou. Veja o craque, as notas e os prêmios.`, tag: 'notas-' + pid });
   // diaristas convocados pelo administrador
   for (const [j, t] of Object.entries(b.conv || {})) if (t && !(a.conv || {})[j]) { const u = uidDoJogador(ctx, j); if (!u) continue; const r = respDe(b, pid, ctx, j), v = precoPel(b, ctx.cfg);
-    out.push({ para: [u], titulo: `✅ Você foi convocado · ${nomePelada(ctx)}`, texto: `Pelada de ${quando} às ${horaIni(b, ctx.cfg)}${b.local ? ' · ' + b.local : ''}. ${r && r.s === 'sim' ? 'Sua vaga está garantida.' : 'Confirme sua presença pelo app.'}${v > 0 ? ` Diária ${BRL(v)}.` : ''}`, tag: 'conv-' + pid }); }
+    out.push({ para: [u], titulo: `✅ Você foi convocado · ${nomePelada(ctx)}`, texto: `Pelada de ${quando} às ${horaIni(b, ctx.cfg)}${b.local ? ' · ' + b.local : ''}. ${r && r.s === 'sim' ? 'Você já tinha pedido vaga: pague a diária em até 30 minutos para garanti-la.' : 'Confirme sua presença pelo app'}${v > 0 ? `${r && r.s === 'sim' ? '' : ' e pague a diária em até 30 minutos'}. Diária ${BRL(v)}.` : (r && r.s === 'sim' ? '' : '.')}`, tag: 'conv-' + pid }); }
   for (const [j, t] of Object.entries(b.aprov || {})) if (t && t !== (a.aprov || {})[j] && !(b.conv || {})[j]) { const u = uidDoJogador(ctx, j); if (u) out.push({ para: [u], titulo: '✅ Vaga liberada', texto: `O administrador liberou sua vaga na pelada de ${quando}.`, tag: 'lib-' + pid }); }
   for (const [u, t] of Object.entries(b.lancOk || {})) if (t && t !== (a.lancOk || {})[u]) out.push({ para: [u], titulo: '⚽ Números aprovados', texto: `Seus gols e assistências da pelada de ${quando} foram aprovados.`, tag: 'lanc-' + pid });
   return out;
@@ -82,14 +82,14 @@ function presAtualizada(a, b, uid, ctx) {
   a = a || {}; b = b || {}; const out = [], jid = b.jogador; if (!jid) return out;
   const nome = nomeJog((ctx.jog || {})[jid]), para = admins(ctx).filter(x => x !== uid);
   // quem confirmou num evento com valor recebe o aviso de cobrança
-  for (const [pid, r] of Object.entries(b.pel || {})) { const r0 = (a.pel || {})[pid]; if (r && r.s === 'sim' && !(r0 && r0.s === 'sim')) out.push(...cobrancaEvento((ctx.pel || {})[pid], pid, jid, uid, ctx)); }
+  for (const [pid, r] of Object.entries(b.pel || {})) { const r0 = (a.pel || {})[pid]; if (r && r.s === 'sim' && !(r0 && r0.s === 'sim')) out.push(...cobrancaEvento((ctx.pel || {})[pid], pid, jid, uid, ctx), ...cobrancaConvocado((ctx.pel || {})[pid], pid, jid, uid, ctx)); }
   if (!para.length) return out;
   for (const [pid, r] of Object.entries(b.pel || {})) {
     const r0 = (a.pel || {})[pid]; if (!r || (r0 && r0.s === r.s && r0.t === r.t)) continue; if (r0 && r0.s === r.s) continue;
     const p = (ctx.pel || {})[pid]; const quando = p ? ' · ' + dShort(p.data) : '';
     const j = (ctx.jog || {})[jid] || {};
     let texto;
-    if (r.s === 'sim') texto = (r.esp || j.tipo === 'diarista') ? `${nome} pediu vaga${quando}. Toque em Liberar na lista.` : `${nome} confirmou presença${quando}.`;
+    if (r.s === 'sim') texto = j.tipo === 'diarista' && !r.esp ? `${nome} (diarista) pediu vaga${quando} e entrou na fila de convocação.` : r.esp ? `${nome} pediu vaga${quando}. Toque em Liberar na lista.` : `${nome} confirmou presença${quando}.`;
     else if (r.s === 'nao') texto = r0 && r0.s === 'sim' ? `${nome} desistiu${quando}.` : `${nome} não vai${quando}.`;
     else continue;
     out.push({ para, titulo: `📋 ${nomePelada(ctx)}`, texto, tag: 'pres-' + pid });
@@ -122,6 +122,38 @@ function rodadaNova(r, ctx) {
   const n = (r.alvos || []).length, loc = new Date((r.fim || Date.now()) - 3 * 36e5);
   const ate = `${DIAS3[loc.getUTCDay()]} ${pad(loc.getUTCDate())}/${pad(loc.getUTCMonth() + 1)} ${pad(loc.getUTCHours())}:${pad(loc.getUTCMinutes())}`;
   return [{ para: todos(ctx), titulo: `⭐ Votação do elenco aberta · ${nomePelada(ctx)}`, texto: `Avalie ${n} jogador${n === 1 ? '' : 'es'} da galera nos 5 critérios até ${ate}. O voto é secreto.`, tag: 'rodada' }];
+}
+/* ---------- diarista convocado: 30 minutos para pagar ---------- */
+const PRAZO_PAG = 30 * 60e3;
+const mpOn = cfg => !!(cfg && cfg.mpConectadoEm);
+// diaristas convocados que confirmaram e ainda não pagaram: [{jid, ate}]
+function aPagar(p, pid, ctx) {
+  const out = [], cfg = ctx.cfg || {}; if (!p || ehPA(p, cfg) || p.status === 'encerrada' || !mpOn(cfg)) return out;
+  for (const [jid, tc] of Object.entries(p.conv || {})) {
+    if (!tc || (p.expirou || {})[jid]) continue; const r = respDe(p, pid, ctx, jid); if (!r || r.s !== 'sim') continue;
+    if (!(valorJog(p, cfg, jid) > 0) || stPag0((p.diarias || {})[jid])) continue;
+    out.push({ jid, ate: Math.max(Number(tc) || 0, Number(r.t) || 0) + PRAZO_PAG });
+  }
+  return out;
+}
+const stPag0 = x => !!x && (x === true || !!x.s);
+// passou o prazo: tira a vaga e chama o próximo da fila de pedidos
+function vencidosConv(p, pid, ctx, agora) {
+  const venc = aPagar(p, pid, ctx).filter(x => agora >= x.ate).map(x => x.jid); if (!venc.length) return null;
+  const conv = p.conv || {}, exp = p.expirou || {}, jog = ctx.jog || {};
+  const fila = Object.keys(jog).filter(j => (jog[j].tipo === 'diarista') && !conv[j] && !exp[j]).map(j => [j, respDe(p, pid, ctx, j)]).filter(([, r]) => r && r.s === 'sim').sort((a, b) => (a[1].t || 0) - (b[1].t || 0)).map(x => x[0]);
+  return { venc, prox: fila.slice(0, venc.length) };
+}
+function avisosVencidos(p, pid, ctx, r) {
+  const out = [], g = nomePelada(ctx), quando = dShort(p.data), nome = j => nomeJog((ctx.jog || {})[j]);
+  for (const j of r.venc) { const u = uidDoJogador(ctx, j); if (u) out.push({ para: [u], titulo: `⌛ Vaga perdida · ${g}`, texto: `A diária da pelada de ${quando} não foi paga em 30 minutos e a vaga foi para o próximo diarista.`, tag: 'exp-' + pid }); }
+  const adm = admins(ctx); if (adm.length) out.push({ para: adm, titulo: `⌛ Vaga repassada · ${g}`, texto: `${r.venc.map(nome).join(', ')} não pagou a diária em 30 minutos.${r.prox.length ? ` ${r.prox.map(nome).join(', ')} foi convocado.` : ' Não há mais diaristas na fila.'}`, tag: 'exp-adm-' + pid });
+  return out;
+}
+function cobrancaConvocado(p, pid, jid, uid, ctx) {
+  const cfg = ctx.cfg || {}; if (!p || ehPA(p, cfg) || !(p.conv || {})[jid] || !mpOn(cfg)) return [];
+  const v = valorJog(p, cfg, jid); if (!(v > 0) || stPag0((p.diarias || {})[jid])) return [];
+  return [{ para: [uid], titulo: `💰 Pague em até 30 minutos · ${nomePelada(ctx)}`, texto: `Diária da pelada de ${dShort(p.data)}: ${BRL(v)}. Pague pelo app até ${horaMs(Date.now() + PRAZO_PAG)} para garantir sua vaga; depois disso ela vai para o próximo diarista.`, tag: 'pag30-' + pid }];
 }
 /* ---------- cobranças ---------- */
 const stPag = x => !!x && (x === true || !!x.s);
@@ -184,4 +216,4 @@ function cobrancaEvento(p, pid, jid, uid, ctx) {
   const v = valorJog(p, ctx.cfg, jid); if (!(v > 0) || stPag((p.diarias || {})[jid])) return [];
   return [{ para: [uid], titulo: `💰 ${p.extra ? (p.nome || 'Evento extra') : (p.nome || 'Evento')} de ${dBR(p.data)} · ${nomePelada(ctx)}`, texto: `${BRL(v)}, vence em ${dBR(p.data)}. Pague pelo app com Pix.${linhaDono(ctx, uid)}`, tag: 'cobev-' + pid }];
 }
-module.exports = { devidas, avisosCobranca, extrasNovas, cobrancaEvento, prazoMensChegando, lembreteMens, rodadaNova, dShort, fimDe, janelaH, pelCriada, pelMudouAlgo, pelAtualizada, presAtualizada, membroNovo, muralAtualizado, avalAbriu, avisoAval, participantes, uidsDe };
+module.exports = { aPagar, vencidosConv, avisosVencidos, cobrancaConvocado, devidas, avisosCobranca, extrasNovas, cobrancaEvento, prazoMensChegando, lembreteMens, rodadaNova, dShort, fimDe, janelaH, pelCriada, pelMudouAlgo, pelAtualizada, presAtualizada, membroNovo, muralAtualizado, avalAbriu, avisoAval, participantes, uidsDe };
