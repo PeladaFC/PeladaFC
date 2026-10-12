@@ -1984,6 +1984,7 @@ function sheetMsg(tipo,ctx={}){
   MSG_ORIG=text;
   openSheet(titulo,`<div class="row between" style="margin-bottom:6px"><span class="sub">✎ Toque no texto para editar do seu jeito</span><button class="btn sm" data-act="msg-reset">Restaurar texto</button></div>
     <textarea id="msg-text" rows="14" class="num" aria-label="Texto da mensagem, editável">${esc(text)}</textarea>
+    ${tipo==='prestacao'?`<button class="btn warn block" style="margin-top:10px" data-act="prest-pdf" data-m="${ctx.mes||mesAtual()}">📄 Baixar em PDF</button>`:''}
     ${tipo==='convocacao'&&atual()?`<button class="btn warn block" style="margin-top:10px" data-act="convoc-arte" data-p="${atual()[0]}">🎨 Gerar arte de convocação</button>`:''}
     <div class="stack" style="margin-top:12px">
       ${ADM()?`<button class="btn primary block" data-act="enviar-app" data-titulo="${esc(titulo)}">Enviar no app para todos</button>`:''}
@@ -2301,6 +2302,9 @@ document.addEventListener('click',e=>{
         if(!calmo){app.classList.add('entrando');setTimeout(()=>app.classList.remove('entrando'),600)}};
       if(calmo)fim();else{app.classList.add('saindo');setTimeout(fim,260)}break}
     case'fechar-enc':UI.recemEnc=null;render();break;
+    case'prest-pdf':{const t=(document.getElementById('msg-text')||{}).value||msg('prestacao',{mes:d.m}),blob=pdfPrestacao(t),fn='prestacao-'+d.m+'.pdf';
+      const salvar=dl&&dl.save?dl.save({filename:fn,data:blob,type:'application/pdf'}):Promise.resolve((()=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;document.body.appendChild(a);a.click();a.remove();return{status:'saved'}})());
+      salvar.then(r=>{if(r&&r.status==='saved')toast('PDF pronto.')},e=>{if(e&&e.name!=='AbortError')toast('Não deu para gerar o PDF.')});break}
     case'msg':{const ctx={};if(d.p)ctx.pel=S.pel[d.p];if(d.j)ctx.jid=d.j;if(d.m)ctx.mes=d.m;if(d.aviso){ctx.aviso=d.aviso;ctx.key=d.key}sheetMsg(d.v,ctx);break}
     case'copy':{const t=document.getElementById('msg-text');navigator.clipboard?.writeText(t.value).then(()=>toast('Mensagem copiada.'),()=>{t.select();toast('Selecione e copie o texto.')})||(t.select(),toast('Selecione e copie o texto.'));break}
     case'aviso-feito':{const a=S.avisos[d.a];const feitos=Object.fromEntries(Object.entries({...(a.feitos||{}),[d.key]:true}).sort().slice(-12));put('avisos/'+d.a,{...a,feitos});closeSheet();toast('Alerta resolvido.');break}
@@ -2669,3 +2673,42 @@ function ouvirVotos(){if(unsubVotos){try{unsubVotos()}catch(e){}unsubVotos=null}
 window.pararPelada=function(){if(db&&db.unsubs)db.unsubs.splice(0).forEach(u=>{try{u()}catch(e){}});db=null;ready=false;demo=false;REAL=null};
 window.atualizarGrupo=function(g){GRUPO=g;const adm=!!(g&&(g.admins||[]).includes(myId));if(adm!==isAdmin){isAdmin=adm;ouvirVotos();if(!adm&&['avisos','caixa'].includes(UI.tab))UI.tab='jogo'}render();renderAdmins()};
 window.abrirDemo=function(){window.pararPelada();S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};myId=null;isAdmin=true;GRUPO={codigo:'DEMO01',admins:[]};ready=true;startDemo()};
+/* ---------- PDF da prestação de contas (gerador próprio, sem biblioteca) ---------- */
+const PDF_W={r:[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584],
+  b:[278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584]};
+function pdfTxt(s){return String(s).replace(/\*/g,'').replace(/[−–]/g,'-').replace(/[\u{1F000}-\u{1FFFF}☀-➿️‍⬀-⯿]/gu,'').replace(/[^\x20-\xFF•]/g,'').replace(/^\s+/,'')}
+function pdfLarg(s,neg,sz){let w=0;for(const ch of s){const b=ch.normalize('NFD')[0],c=b.charCodeAt(0);w+=ch==='•'?350:c>=32&&c<=126?PDF_W[neg?'b':'r'][c-32]:556}return w*sz/1000}
+function pdfEsc(s){let o='';for(const ch of s){const c=ch==='•'?0x95:ch.charCodeAt(0);o+=c===40||c===41||c===92?'\\'+ch:c>126?'\\'+c.toString(8).padStart(3,'0'):ch}return o}
+function pdfPrestacao(texto){
+  const W=595,H=842,M=42,pages=[];let ops=[],y=0;
+  const VERDE='0.09 0.37 0.2',CINZA='0.42 0.45 0.43',PRETO='0.1 0.12 0.11',VERM='0.75 0.2 0.15';
+  const txt=(s,x,yy,sz,neg,cor)=>ops.push(`BT /${neg?'F2':'F1'} ${sz} Tf ${cor||PRETO} rg ${x.toFixed(1)} ${yy.toFixed(1)} Td (${pdfEsc(s)}) Tj ET`);
+  const ret=(x,yy,w,h,cor)=>ops.push(`${cor} rg ${x} ${yy} ${w} ${h} re f`);
+  const nova=()=>{if(ops.length)pages.push(ops.join('\n'));ops=[];y=H-M;ret(0,H-6,W,6,VERDE)};
+  const precisa=h=>{if(y-h<M+20)nova()};
+  const linhas=String(texto).split('\n');nova();
+  // cabeçalho
+  const t0=pdfTxt(linhas[0]||'PRESTAÇÃO DE CONTAS'),t1=pdfTxt(linhas[1]||'');
+  ret(M,y-58,W-2*M,58,VERDE);txt(t0,M+14,y-26,18,true,'1 1 1');if(t1)txt(t1,M+14,y-46,11,false,'0.85 0.95 0.88');y-=80;
+  const valRe=/^(.*?):\s*((?:[+\-−]\s*)?R\$\s*[\d.,]+)(.*)$/;
+  for(const raw of linhas.slice(2)){const sub=/^\s{2,}/.test(raw),head=/^\S*\s*\*.*\*\s*$/.test(raw.trim())&&!raw.trim().startsWith('•'),s=pdfTxt(raw);
+    if(!s){y-=6;continue}
+    if(head){precisa(40);y-=8;const mm=s.match(valRe);ret(M,y-4,3,16,VERDE);txt(mm?mm[1]:s,M+10,y,12,true,VERDE);if(mm)txt(mm[2],W-M-pdfLarg(mm[2],true,12),y,12,true,VERDE);y-=8;ops.push(`${'0.85 0.88 0.86'} RG 0.6 w ${M} ${y} m ${W-M} ${y} l S`);y-=14;continue}
+    if(sub){const sz=9,max=W-2*M-24;let lin='';const out=[];for(const w of s.split(' ')){const t=lin?lin+' '+w:w;if(pdfLarg(t,false,sz)>max&&lin){out.push(lin);lin=w}else lin=t}if(lin)out.push(lin);
+      for(const l of out){precisa(12);txt(l,M+22,y,sz,false,CINZA);y-=12}y-=2;continue}
+    precisa(16);const mm=s.match(valRe),bul=s.startsWith('•'),neg=/^Saldo em conta|^Resultado/.test(s.replace(/^•\s*/,''));
+    if(mm){const lab=(mm[1]+mm[3]).replace(/^•\s*/,''),v=mm[2],cor=/^[\-−]/.test(v)?VERM:neg?VERDE:PRETO;
+      if(bul)txt('•',M+8,y,10,false,CINZA);txt(lab,M+(bul?20:8),y,10.5,neg,PRETO);txt(v,W-M-pdfLarg(v,true,10.5),y,10.5,true,cor)}
+    else{if(bul)txt('•',M+8,y,10,false,CINZA);txt(s.replace(/^•\s*/,''),M+(bul?20:8),y,10.5,false,PRETO)}
+    y-=15}
+  pages.push(ops.join('\n'));
+  // monta o arquivo
+  const objs=[],n=pages.length,add=s=>{objs.push(s);return objs.length};
+  add('<< /Type /Catalog /Pages 2 0 R >>');add('');add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+  const kids=[];pages.forEach((c,i)=>{const rodape=`BT /F1 8 Tf ${CINZA} rg ${M} 24 Td (${pdfEsc('Gerado pelo app Pelada FC · página '+(i+1)+' de '+n)}) Tj ET`,st=c+'\n'+rodape;
+    const ci=add(`<< /Length ${st.length} >>\nstream\n${st}\nendstream`);kids.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${ci} 0 R >>`))});
+  objs[1]=`<< /Type /Pages /Kids [${kids.map(k=>k+' 0 R').join(' ')}] /Count ${n} >>`;
+  let out='%PDF-1.4\n',xref=[];objs.forEach((o,i)=>{xref.push(out.length);out+=`${i+1} 0 obj\n${o}\nendobj\n`});
+  const xs=out.length;out+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`+xref.map(x=>String(x).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xs}\n%%EOF`;
+  const bytes=new Uint8Array(out.length);for(let i=0;i<out.length;i++)bytes[i]=out.charCodeAt(i)&255;
+  return new Blob([bytes],{type:'application/pdf'})}

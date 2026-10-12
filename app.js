@@ -397,8 +397,8 @@ function makeDb(gid) {
   };
 }
 const compartilhar = {
-  save: async ({ filename, data }) => {
-    const file = new File([data], filename, { type: 'image/png' });
+  save: async ({ filename, data, type }) => {
+    const file = new File([data], filename, { type: type || 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return { status: 'saved' }; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(data); a.download = filename; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000); return { status: 'saved' };
