@@ -2051,7 +2051,7 @@ function sheetMsg(tipo,ctx={}){
   openSheet(titulo,`<div class="row between" style="margin-bottom:6px"><span class="sub">✎ Toque no texto para editar do seu jeito</span><button class="btn sm" data-act="msg-reset">Restaurar texto</button></div>
     <textarea id="msg-text" rows="14" class="num" aria-label="Texto da mensagem, editável">${esc(text)}</textarea>
     ${tipo==='prestacao'?`<button class="btn warn block" style="margin-top:10px" data-act="prest-pdf" data-m="${ctx.mes||mesAtual()}">📄 Baixar em PDF</button>`:''}
-    ${tipo==='campeonato'&&ctx.pel?`<button class="btn warn block" style="margin-top:10px" data-act="camp-pdf" data-d="${ctx.pel.data}">📄 Baixar em PDF</button>`:''}
+    ${tipo==='campeonato'&&ctx.pel?`<button class="btn warn block" style="margin-top:10px" data-act="camp-pdf" data-d="${ctx.pel.data}" data-p="${pidOf(ctx.pel)}">📄 Baixar em PDF</button>`:''}
     ${tipo==='convocacao'&&atual()?`<button class="btn warn block" style="margin-top:10px" data-act="convoc-arte" data-p="${atual()[0]}">🎨 Gerar arte de convocação</button>`:''}
     <div class="stack" style="margin-top:12px">
       ${ADM()?`<button class="btn primary block" data-act="enviar-app" data-titulo="${esc(titulo)}">Enviar no app para todos</button>`:''}
@@ -2375,7 +2375,7 @@ document.addEventListener('click',e=>{
         if(!calmo){app.classList.add('entrando');setTimeout(()=>app.classList.remove('entrando'),600)}};
       if(calmo)fim();else{app.classList.add('saindo');setTimeout(fim,260)}break}
     case'fechar-enc':UI.recemEnc=null;render();break;
-    case'camp-pdf':{const t=(document.getElementById('msg-text')||{}).value||'',blob=pdfPrestacao(t),fn='campeonato-'+(d.d||'pelada')+'.pdf';
+    case'camp-pdf':{const blob=pdfCampeonato(d.p),fn='campeonato-'+(d.d||'pelada')+'.pdf';
       const salvar=dl&&dl.save?dl.save({filename:fn,data:blob,type:'application/pdf'}):Promise.resolve((()=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;document.body.appendChild(a);a.click();a.remove();return{status:'saved'}})());
       salvar.then(r=>{if(r&&r.status==='saved')toast('PDF pronto.')},e=>{if(e&&e.name!=='AbortError')toast('Não deu para gerar o PDF.')});break}
     case'prest-pdf':{const t=(document.getElementById('msg-text')||{}).value||msg('prestacao',{mes:d.m}),blob=pdfPrestacao(t),fn='prestacao-'+d.m+'.pdf';
@@ -2764,9 +2764,9 @@ window.abrirDemo=function(){window.pararPelada();S={config:null,jog:{},pel:{},ca
 /* ---------- PDF da prestação de contas (gerador próprio, sem biblioteca) ---------- */
 const PDF_W={r:[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584],
   b:[278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584]};
-function pdfTxt(s){return String(s).replace(/\*/g,'').replace(/[−–]/g,'-').replace(/[\u{1F000}-\u{1FFFF}☀-➿️‍⬀-⯿]/gu,'').replace(/[^\x20-\xFF•]/g,'').replace(/^\s+/,'').replace(/ {2,}/g,' ')}
-function pdfLarg(s,neg,sz){let w=0;for(const ch of s){const b=ch.normalize('NFD')[0],c=b.charCodeAt(0);w+=ch==='•'?350:c>=32&&c<=126?PDF_W[neg?'b':'r'][c-32]:556}return w*sz/1000}
-function pdfEsc(s){let o='';for(const ch of s){const c=ch==='•'?0x95:ch.charCodeAt(0);o+=c===40||c===41||c===92?'\\'+ch:c>126?'\\'+c.toString(8).padStart(3,'0'):ch}return o}
+function pdfTxt(s){return String(s).replace(/\*/g,'').replace(/[−–]/g,'-').replace(/[\u{1F000}-\u{1FFFF}☀-➿️‍⬀-⯿]/gu,'').replace(/[^\x20-\xFF•\u2026]/g,'').replace(/^\s+/,'').replace(/ {2,}/g,' ')}
+function pdfLarg(s,neg,sz){let w=0;for(const ch of s){const b=ch.normalize('NFD')[0],c=b.charCodeAt(0);w+=ch==='•'?350:ch==='\u2026'?1000:c>=32&&c<=126?PDF_W[neg?'b':'r'][c-32]:556}return w*sz/1000}
+function pdfEsc(s){let o='';for(const ch of s){const c=ch==='•'?0x95:ch==='\u2026'?0x85:ch.charCodeAt(0);o+=c===40||c===41||c===92?'\\'+ch:c>126?'\\'+c.toString(8).padStart(3,'0'):ch}return o}
 function pdfPrestacao(texto){
   const W=595,H=842,M=42,pages=[];let ops=[],y=0;
   const VERDE='0.09 0.37 0.2',CINZA='0.42 0.45 0.43',PRETO='0.1 0.12 0.11',VERM='0.75 0.2 0.15';
@@ -2800,3 +2800,83 @@ function pdfPrestacao(texto){
   const xs=out.length;out+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`+xref.map(x=>String(x).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xs}\n%%EOF`;
   const bytes=new Uint8Array(out.length);for(let i=0;i<out.length;i++)bytes[i]=out.charCodeAt(i)&255;
   return new Blob([bytes],{type:'application/pdf'})}
+/* ---------- PDF do campeonato: tabelas alinhadas (classificação, rodadas lado a lado, artilharia) ---------- */
+function pdfNovo(){const W=595,H=842,M=36,pages=[];let ops=null;const rgb=h=>{h=String(h||'#000').replace('#','');if(h.length===3)h=h.split('').map(x=>x+x).join('');return[0,2,4].map(i=>(parseInt(h.substr(i,2),16)/255).toFixed(3)).join(' ')};
+  const lim=(s,max,b,sz)=>{s=pdfTxt(s);if(!max||pdfLarg(s,b,sz)<=max)return s;while(s.length>1&&pdfLarg(s+'…',b,sz)>max)s=s.slice(0,-1);return s.trimEnd()+'…'};
+  const P={W,H,M,y:0,
+    pagina(){if(ops)pages.push(ops.join('\n'));ops=[];P.y=M;P.ret(0,0,W,6,{fill:'#1B6B3A'})},
+    ret(x,y,w,h,o={}){if(o.fill)ops.push(`${rgb(o.fill)} rg ${x.toFixed(1)} ${(H-y-h).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)} re f`);if(o.stroke)ops.push(`${rgb(o.stroke)} RG ${o.lw||.6} w ${x.toFixed(1)} ${(H-y-h).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)} re S`)},
+    lin(x1,y1,x2,y2,cor='#D5DBD7',lw=.6){ops.push(`${rgb(cor)} RG ${lw} w ${x1.toFixed(1)} ${(H-y1).toFixed(1)} m ${x2.toFixed(1)} ${(H-y2).toFixed(1)} l S`)},
+    txt(s,x,y,o={}){const sz=o.sz||9,b=!!o.b,t=lim(s,o.w,b,sz);if(!t)return;const lw=pdfLarg(t,b,sz),xx=o.al==='r'?x-lw:o.al==='c'?x-lw/2:x;
+      ops.push(`BT /${b?'F2':'F1'} ${sz} Tf ${rgb(o.cor||'#1A1F1C')} rg ${xx.toFixed(1)} ${(H-y).toFixed(1)} Td (${pdfEsc(t)}) Tj ET`)},
+    cabe(h){if(P.y+h>H-M-14){P.pagina();return false}return true},
+    fim(){pages.push(ops.join('\n'));const n=pages.length,objs=[];const add=x=>{objs.push(x);return objs.length};
+      add('<< /Type /Catalog /Pages 2 0 R >>');add('');add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+      const kids=[];pages.forEach((c,i)=>{const st=c+`\nBT /F1 7.5 Tf ${rgb('#7A847E')} rg ${M} 20 Td (${pdfEsc('Gerado pelo app Pelada FC · página '+(i+1)+' de '+n)}) Tj ET`;const ci=add(`<< /Length ${st.length} >>\nstream\n${st}\nendstream`);kids.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${ci} 0 R >>`))});
+      objs[1]=`<< /Type /Pages /Kids [${kids.map(k=>k+' 0 R').join(' ')}] /Count ${n} >>`;let out='%PDF-1.4\n';const xr=[];objs.forEach((o,i)=>{xr.push(out.length);out+=`${i+1} 0 obj\n${o}\nendobj\n`});
+      const xs=out.length;out+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`+xr.map(x=>String(x).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xs}\n%%EOF`;
+      const by=new Uint8Array(out.length);for(let i=0;i<out.length;i++)by[i]=out.charCodeAt(i)&255;return new Blob([by],{type:'application/pdf'})}};
+  return P}
+function pdfCampeonato(pid){const p=S.pel[pid];if(!p)return null;const c=cfg(),T=p.times||[],f=formatoDe(p),J=p.jogos||[],st=p.stats||{},pr=premiosDe(p,pid);
+  const P=pdfNovo(),W=P.W,M=P.M,LW=W-2*M,VERDE='#1B6B3A',CLARO='#EEF3EF',LINHA='#D5DBD7',CINZA='#6B746F';
+  const corT=i=>(CORES[(T[i]||{}).cor]||{}).c||'#999',nT=i=>T[i]?nomeTime(T[i].cor):'—';
+  const ponto=(x,y,i,s=7)=>{P.ret(x,y-s+1,s,s,{fill:corT(i),stroke:'#9AA09A',lw:.4})};
+  const secao=(t)=>{P.cabe(80);P.y+=24;P.ret(M,P.y-11,3,14,{fill:VERDE});P.txt(t,M+9,P.y,{sz:11.5,b:true,cor:VERDE});P.y+=8};
+  P.pagina();
+  // cabeçalho
+  P.ret(M,P.y,LW,56,{fill:VERDE});P.txt('RELATÓRIO DO CAMPEONATO',M+14,P.y+24,{sz:17,b:true,cor:'#FFFFFF'});
+  P.txt(`${c.nome} · ${dLong(p.data)} · ${FORMATOS[f]}${f!=='mm'&&f!=='conv'&&idaVoltaDe(p)?' (ida e volta)':''}`,M+14,P.y+42,{sz:9.5,cor:'#DDEEE2',w:LW-28});P.y+=68;
+  // campeão / vice
+  const cp=T.length?campeaoDe(p):null,fin=J.find(g=>g.fase==='fin'&&!g.bye),vi=fin&&vencedor(fin)!=null?(vencedor(fin)===fin.a?fin.b:fin.a):null;
+  P.ret(M,P.y,LW,34,{fill:'#FFF7DB',stroke:'#E9C84A'});
+  if(cp!=null){P.txt('CAMPEÃO',M+12,P.y+14,{sz:7.5,b:true,cor:'#8A6A00'});ponto(M+12,P.y+27,cp,9);P.txt(nT(cp),M+26,P.y+27,{sz:13,b:true});
+    if(vi!=null){P.txt('VICE',M+LW/2,P.y+14,{sz:7.5,b:true,cor:'#8A6A00'});ponto(M+LW/2,P.y+27,vi,9);P.txt(nT(vi),M+LW/2+14,P.y+27,{sz:12})}}
+  else P.txt('Campeonato em andamento',M+12,P.y+21,{sz:11,b:true,cor:'#8A6A00'});
+  P.y+=34;
+  // classificação
+  const liga=J.some(g=>g.fase==='liga');
+  if(liga||f==='conv'){secao(liga?'CLASSIFICAÇÃO':'VITÓRIAS');
+    const cols=liga?[['#',22,'c'],['Time',0,'l'],['P',34,'c'],['J',34,'c'],['V',34,'c'],['E',34,'c'],['D',34,'c'],['GP',34,'c'],['GC',34,'c'],['SG',38,'c']]:[['#',22,'c'],['Time',0,'l'],['Vitórias',70,'c']];
+    const fixo=sum(cols.map(x=>x[1])),xs=[];let x=M;cols.forEach(cl=>{const w=cl[1]||LW-fixo;xs.push([x,w]);x+=w});
+    const RH=18;P.ret(M,P.y,LW,RH,{fill:VERDE});cols.forEach((cl,k)=>{const[x0,w]=xs[k];P.txt(cl[0],cl[2]==='c'?x0+w/2:x0+6,P.y+12.5,{sz:8.5,b:true,cor:'#FFFFFF',al:cl[2]==='c'?'c':'l'})});P.y+=RH;
+    const rows=liga?classificacao(p).map((r,k)=>[k+1,r.t,r.pts,r.j,r.v,r.e,r.d,r.gp,r.gc,(r.gp-r.gc>0?'+':'')+(r.gp-r.gc)]):(()=>{const vv=vitDe(p);return T.map((t,i)=>[0,i,vv[i]||0]).sort((a,b)=>b[2]-a[2]).map((r,k)=>[k+1,r[1],r[2]])})();
+    rows.forEach((r,k)=>{P.cabe(RH);P.ret(M,P.y,LW,RH,{fill:k===0?'#FFF7DB':k%2?CLARO:'#FFFFFF'});
+      r.forEach((v,ci)=>{const[x0,w]=xs[ci];if(ci===1){ponto(x0+6,P.y+12.5,v);P.txt(nT(v),x0+17,P.y+12.5,{sz:9,b:k===0,w:w-20})}else P.txt(String(v)+(ci===0?'º':''),x0+w/2,P.y+12.5,{sz:9,b:ci===2,al:'c'})});P.y+=RH});
+    P.lin(M,P.y,M+LW,P.y,LINHA)}
+  // jogos por rodada/fase, 3 por linha
+  if(J.length){secao('JOGOS');const grupos=[];let atual=null;
+    for(const g of J){const cab=g.fase==='liga'&&g.rd?g.rd+'ª rodada':(FASE_N[g.fase]||g.fase);if(!atual||atual.cab!==cab){atual={cab,jogos:[]};grupos.push(atual)}atual.jogos.push(g)}
+    const GAP=8,CW=(LW-2*GAP)/3,LH=15;
+    const altura=gr=>20+sum(gr.jogos.map(g=>LH+(feito(g)&&g.pa!=null&&(g.ga||0)===(g.gb||0)?8:0)))+4;
+    for(let i=0;i<grupos.length;i+=3){const lin=grupos.slice(i,i+3),h=Math.max(...lin.map(altura));P.cabe(h+GAP);
+      lin.forEach((gr,k)=>{const x0=M+k*(CW+GAP);let y=P.y;P.ret(x0,y,CW,h,{fill:'#FFFFFF',stroke:LINHA});P.ret(x0,y,CW,17,{fill:CLARO});P.txt(gr.cab.toUpperCase(),x0+7,y+12,{sz:8,b:true,cor:VERDE});y+=20;
+        for(const g of gr.jogos){const meio=x0+CW/2,tw=CW/2-24;
+          if(g.bye){ponto(x0+7,y+10.5,g.a,6);P.txt(nT(g.a)+' passa direto',x0+16,y+10.5,{sz:8,cor:CINZA,w:CW-22});y+=LH;continue}
+          const fz=feito(g),ga=fz?String(g.ga||0):'-',gb=fz?String(g.gb||0):'-',wv=fz?vencedor(g):null;
+          ponto(x0+7,y+10.5,g.a,6);P.txt(nT(g.a),x0+16,y+10.5,{sz:8.5,b:wv===g.a,w:tw-12});
+          P.txt(`${ga}  ×  ${gb}`,meio,y+10.5,{sz:9,b:true,al:'c',cor:fz?'#1A1F1C':CINZA});
+          P.txt(nT(g.b),x0+CW-16,y+10.5,{sz:8.5,b:wv===g.b,al:'r',w:tw-12});ponto(x0+CW-13,y+10.5,g.b,6);
+          y+=LH;if(fz&&g.pa!=null&&(g.ga||0)===(g.gb||0)){P.txt(`pênaltis ${g.pa} × ${g.pb}`,meio,y+2,{sz:6.5,al:'c',cor:CINZA});y+=8}
+          if(g!==gr.jogos[gr.jogos.length-1])P.lin(x0+6,y-2,x0+CW-6,y-2,'#EEF0EE',.4)}});
+      P.y+=h+GAP}}
+  // artilharia e assistências lado a lado
+  const ids=Object.keys(st).filter(id=>S.jog[id]),art=ids.filter(id=>(st[id].g||0)>0).sort((a,b)=>st[b].g-st[a].g||nm(a).localeCompare(nm(b))),gar=ids.filter(id=>(st[id].a||0)>0).sort((a,b)=>st[b].a-st[a].a||nm(a).localeCompare(nm(b)));
+  const timeDe=id=>T.findIndex(t=>t.gk===id||(t.ids||[]).includes(id));
+  if(art.length||gar.length){secao('ARTILHARIA E ASSISTÊNCIAS');const GAP=12,TW=(LW-GAP)/2,RH=16;
+    const cab=(x0,t2)=>{P.ret(x0,P.y,TW,RH,{fill:VERDE});P.txt('#',x0+11,P.y+11.5,{sz:8,b:true,cor:'#FFFFFF',al:'c'});P.txt('Jogador',x0+24,P.y+11.5,{sz:8,b:true,cor:'#FFFFFF'});P.txt(t2,x0+TW-8,P.y+11.5,{sz:8,b:true,cor:'#FFFFFF',al:'r'})};
+    cab(M,'Gols');cab(M+TW+GAP,'Assist.');P.y+=RH;
+    const n=Math.max(art.length,gar.length);for(let i=0;i<n;i++){P.cabe(RH);
+      [[art,'g',M],[gar,'a',M+TW+GAP]].forEach(([L,k,x0])=>{const id=L[i];if(!id)return;P.ret(x0,P.y,TW,RH,{fill:i%2?CLARO:'#FFFFFF'});P.txt(String(i+1),x0+11,P.y+11.5,{sz:8.5,al:'c',cor:CINZA});
+        const ti=timeDe(id);if(ti>=0)ponto(x0+24,P.y+11.5,ti,6);P.txt(nm(id),x0+(ti>=0?34:24),P.y+11.5,{sz:9,w:TW-80});P.txt(String(st[id][k]),x0+TW-8,P.y+11.5,{sz:9,b:true,al:'r'})});P.y+=RH}}
+  // times
+  if(T.length){secao('TIMES');const GAP=8,COLS=Math.min(4,T.length),CW=(LW-(COLS-1)*GAP)/COLS,LH=12;
+    for(let i=0;i<T.length;i+=COLS){const lin=T.slice(i,i+COLS),h=20+Math.max(...lin.map(t=>[t.gk,...t.ids].filter(id=>id&&S.jog[id]).length))*LH+6;P.cabe(h+GAP);
+      lin.forEach((t,k)=>{const ti=i+k,x0=M+k*(CW+GAP);let y=P.y;P.ret(x0,y,CW,h,{stroke:LINHA});P.ret(x0,y,CW,17,{fill:CLARO});ponto(x0+7,y+12,ti,7);P.txt(nT(ti),x0+18,y+12,{sz:9,b:true,w:CW-24});y+=20;
+        [t.gk,...t.ids].filter(id=>id&&S.jog[id]).forEach(id=>{P.txt(nm(id)+(id===t.gk?' (G)':''),x0+8,y+9,{sz:8.5,w:CW-14});y+=LH})});P.y+=h+GAP}}
+  // destaques e resumo
+  const dq=[['mvp','Craque'],['art','Artilheiro'],['gar','Garçom'],['def','Xerife'],['gol','Melhor goleiro']].filter(([k])=>pr[k]).map(([k,n])=>[n,nm(pr[k])]);
+  const fe=J.filter(g=>!g.bye&&feito(g)),gols=sum(fe.map(g=>(g.ga||0)+(g.gb||0)));
+  const res=[['Jogos disputados',`${fe.length} de ${J.filter(g=>!g.bye).length}`],['Gols',String(gols)],['Média por jogo',fe.length?(gols/fe.length).toFixed(1).replace('.',','):'-']];
+  secao(dq.length?'DESTAQUES E RESUMO':'RESUMO');{const GAP=12,TW=dq.length?(LW-GAP)/2:LW,RH=16,n=Math.max(dq.length,res.length);
+    for(let i=0;i<n;i++){P.cabe(RH);[[dq,M],[res,dq.length?M+TW+GAP:M]].forEach(([L,x0],q)=>{if(!dq.length&&q===0)return;const r=L[i];if(!r)return;P.ret(x0,P.y,TW,RH,{fill:i%2?CLARO:'#FFFFFF'});P.txt(r[0],x0+8,P.y+11.5,{sz:8.5,cor:CINZA});P.txt(r[1],x0+TW-8,P.y+11.5,{sz:9,b:true,al:'r',w:TW/2})});P.y+=RH}}
+  return P.fim()}
