@@ -1243,9 +1243,9 @@ function subPresenca(pid,p,l,A){
   const resp=respDe(p,pid);
   const wait=new Set(l.espera);
   // ordem fixa: mensalistas e depois diaristas, cada grupo em ordem alfabética (não muda ao marcar ✓/✕)
-  const abc=(a,b)=>nm(a).localeCompare(nm(b)),mensL=ativos().filter(id=>!ehDiarista(id)).sort(abc),diaS=ativos().filter(id=>ehDiarista(id)),pediu=id=>resp[id]?.s==='sim',
+  const abc=(a,b)=>nm(a).localeCompare(nm(b)),gol=id=>J(id).pos==='GOL',golL=ativos().filter(gol).sort(abc),mensL=ativos().filter(id=>!gol(id)&&!ehDiarista(id)).sort(abc),diaS=ativos().filter(id=>!gol(id)&&ehDiarista(id)),pediu=id=>resp[id]?.s==='sim',
     // diaristas: quem pediu vaga sobe para o topo do bloco, por ordem de pedido (continua assim depois de liberado); o resto em ordem alfabética
-    diaL=[...diaS.filter(pediu).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0)||abc(a,b)),...diaS.filter(id=>!pediu(id)).sort(abc)],order=[...mensL,...diaL];
+    diaL=[...diaS.filter(pediu).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0)||abc(a,b)),...diaS.filter(id=>!pediu(id)).sort(abc)],order=[...golL,...mensL,...diaL],grupos=[[golL,'Goleiros','não ocupam vaga'],[mensL,'Mensalistas',''],[diaL,'Diaristas','']].filter(g=>g[0].length);
   // prioridade de quem ficou fora da lista (espera, pediu vaga, perdeu o prazo): só o administrador vê
   const ordPed={};l.espera.forEach((id,i)=>ordPed[id]=i+1);
   let h=`<div class="panel"><div class="panel-h"><h3>Quem vai?</h3>${A?'<div class="row"><button class="btn sm" data-act="msg" data-v="convocacao">Convocar</button><button class="btn sm" data-act="msg" data-v="cobrar">Cobrar</button><button class="btn sm primary" data-act="msg" data-v="lista">Lista</button></div>':''}</div>`;
@@ -1254,7 +1254,7 @@ function subPresenca(pid,p,l,A){
   if(!order.length)h+=`<div class="empty">Ninguém no elenco ainda.${A?' <button class="btn sm" data-act="add-jog">Adicionar jogador</button>':''}</div>`;
   h+='<div class="list lista-pres">';
   for(const id of order){const s=resp[id]?.s;
-    if(mensL.length&&diaL.length&&(id===mensL[0]||id===diaL[0]))h+=`<div class="lista-grupo">${id===mensL[0]?'Mensalistas':'Diaristas'} <span class="num">${id===mensL[0]?mensL.length:diaL.length}</span></div>`;
+    {const g=grupos.length>1&&grupos.find(g=>g[0][0]===id);if(g)h+=`<div class="lista-grupo">${g[1]} <span class="num">${g[0].length}</span>${g[2]?` <span class="lg-nota">· ${g[2]}</span>`:''}</div>`}
     const ag=l.aguardando.includes(id),hp=resp[id]?.t?horaPedido(resp[id].t).slice(-5):'';
     // fora da lista: uma linha curta no lugar de "Mensalista/Diarista" (o número da fila só o administrador vê)
     const naFila=ag||wait.has(id),tagFila=naFila?`<span class="chip tag-espera">${A&&ordPed[id]?ordPed[id]+'º na fila':ag?'Pediu vaga':'Espera'}</span>`:'',fila=naFila?`<span>${tipoTxt(id)}</span>${A&&hp?`<span class="pediu-as">pediu vaga às ${hp}</span>`:''}`:null;
