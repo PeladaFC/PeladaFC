@@ -25,6 +25,8 @@ const URL_APP = 'https://peladafc.github.io/PeladaFC/';
 
 /* Pix automático (Mercado Pago) */
 Object.assign(exports, require('./pagamentos')(db));
+/* Excluir a própria conta (pedido das lojas) */
+Object.assign(exports, require('./conta')(db));
 const MAX_DESTINOS = 300;
 
 /* ---------- chaves VAPID ---------- */

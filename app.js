@@ -215,7 +215,7 @@ function render() {
       <button class="btn primary block" type="submit">Criar conta</button></form>
     <div class="ob-div">ou</div>
     <button class="btn block ob-google" data-sh="google">Continuar com o Google</button>
-    <p class="sub" style="text-align:center;margin:0">Seus dados ficam guardados no Firebase (Google) e são usados só para organizar as peladas.</p>`;
+    <p class="sub" style="text-align:center;margin:0">Ao criar a conta, você aceita os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>`;
   if (t === 'perfil') { const p = PERFIL || {}; const pos = UIp.pos || p.pos || 'MEI';
     h = (p.apelido ? topo('minhas') : '') + `<h2>${p.apelido ? 'Meu perfil' : 'Seu perfil de jogador'}</h2><p class="lead">É assim que a galera vai te ver.</p>
     <form id="f-perfil" class="stack" novalidate>
@@ -228,7 +228,20 @@ function render() {
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
       <button class="btn primary block" type="submit">Salvar</button></form>
-    ${p.apelido ? `<button class="btn block" data-sh="sair">Sair da conta</button><p class="sub" style="text-align:center">${escH(EU.email || '')}</p>` : ''}`; }
+    ${p.apelido ? `<button class="btn block" data-sh="sair">Sair da conta</button><p class="sub" style="text-align:center">${escH(EU.email || '')}</p>
+      <p class="sub" style="text-align:center;margin:0"><a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
+      <button class="btn sm danger" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
+  if (t === 'excluir') { const X = UIp.exc || {}, lista = (n, L) => L && L.length ? `<li><b>${n}:</b> ${L.map(escH).join(', ')}</li>` : '';
+    h = topo('perfil') + `<h2>Excluir minha conta</h2>
+    ${X.carregando ? '<p class="lead">Verificando seus grupos…</p>' : X.bloqueia && X.bloqueia.length ? `<div class="banner" style="border-color:var(--red)"><b>Ainda não dá para excluir.</b> Você é o único administrador de: <b>${X.bloqueia.map(escH).join(', ')}</b>. Abra o grupo, vá em Ajustes e coloque outra pessoa como administradora (ou apague o grupo). Depois volte aqui.</div>` : `
+    <p class="lead">Isto apaga sua conta de vez. Não dá para desfazer.</p>
+    <ul class="sub" style="line-height:1.6">
+      <li>Seu login, seu perfil, sua foto e as notificações deste e de outros celulares são apagados.</li>
+      ${lista('Você sai dos grupos', X.sai)}${lista('A administração passa para os outros administradores', X.passa)}${lista('Grupos só seus, que serão apagados', X.apaga)}
+      <li>O que o grupo registrou (nome no elenco, gols, notas e pagamentos) continua com o grupo, sem ligação com a sua conta.</li></ul>
+    <label class="field"><span>Para confirmar, escreva EXCLUIR</span><input type="text" id="x-conf" autocomplete="off" autocapitalize="characters"></label>
+    <button class="btn danger block" data-sh="excluir-ok">Excluir minha conta</button>`}
+    <button class="btn block" data-sh="ir" data-v="perfil">Voltar</button>`; }
   const avOk = rid => { try { return !!localStorage.getItem('pelada.avok.' + rid); } catch (e) { return false; } };
   const avAb = g => { const a = GRUPOS[g] && GRUPOS[g].avAberta; return a && a.v === 2 && a.fim > Date.now() && !avOk(a.rid) ? a : null; };
   if (t === 'minhas') { const ids = Object.keys(GRUPOS); const adm = ids.filter(g => (GRUPOS[g].admins || []).includes(EU.uid)), jog = ids.filter(g => !adm.includes(g));
@@ -458,6 +471,18 @@ const URL_CHAVE = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net
 /* ---------- Pix automático (Mercado Pago) ---------- */
 const URL_PIX = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/criarPix';
 const URL_MPCONTA = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/mpConectar';
+const URL_CONTA = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/excluirConta';
+// excluir a própria conta: 'verificar' (o que vai acontecer) ou 'excluir'
+async function contaServidor(acao) {
+  if (MOCK) { if (acao === 'verificar') return { sai: Object.keys(GRUPOS).filter(g => !(GRUPOS[g].admins || []).includes(EU.uid)).map(g => GRUPOS[g].nome), passa: [], apaga: Object.keys(GRUPOS).filter(g => (GRUPOS[g].admins || []).includes(EU.uid)).map(g => GRUPOS[g].nome), bloqueia: [] }; return { ok: true }; }
+  let t = null; try { t = await B.token(); } catch (e) { }
+  if (!t) throw new Error('Entre na sua conta de novo.');
+  let r; try { r = await fetch(URL_CONTA, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify({ acao }) }); }
+  catch (e) { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.erro || 'Não deu certo agora. Tente de novo.'), { bloqueia: j.bloqueia });
+  return j;
+}
 // conectar (vai para o Mercado Pago autorizar) ou desconectar a conta do grupo
 window.mpConta = async acao => {
   if (!ABERTO) throw new Error('Abra a pelada de novo.');
@@ -572,6 +597,11 @@ document.addEventListener('click', async e => {
   if (a === 'google') { try { await B.google(); } catch (err) { aviso(msgErro(err) + ' Se não abrir, use e-mail e senha.'); } }
   if (a === 'reset') { const em = ($('l-email') || {}).value || ''; if (!em) { aviso('Digite seu e-mail acima e toque de novo em "Esqueci minha senha".'); return; } try { await B.reset(em.trim()); aviso('Mandamos um link para criar uma nova senha no seu e-mail.'); } catch (err) { aviso(msgErro(err)); } }
   if (a === 'sair') { ls.set('pelada.ultimo', null); await B.sair(); }
+  if (a === 'excluir-ver') { UIp.exc = { carregando: true }; ir('excluir'); try { UIp.exc = await contaServidor('verificar'); } catch (e) { UIp.exc = {}; aviso(e.message); } if (TELA === 'excluir') render(); }
+  if (a === 'excluir-ok') { if ((($('x-conf') || {}).value || '').trim().toUpperCase() !== 'EXCLUIR') { aviso('Escreva EXCLUIR para confirmar.'); return; }
+    b.disabled = true; b.textContent = 'Excluindo…';
+    try { await contaServidor('excluir'); ls.set('pelada.ultimo', null); UIp.exc = null; try { await B.sair(); } catch (e) { } aviso('Sua conta foi excluída.'); ir('boas'); }
+    catch (e) { b.disabled = false; b.textContent = 'Excluir minha conta'; aviso(e.message); if (e.bloqueia) { UIp.exc = { bloqueia: e.bloqueia }; render(); } } }
   if (a === 'abrir') abrirGrupo(v);
   if (a === 'avaliar') { window.__abrirAval = true; abrirGrupo(v); }
   if (a === 'tipo-pel') { const ev = v === 'evento'; UIp.tipoPel = v;
