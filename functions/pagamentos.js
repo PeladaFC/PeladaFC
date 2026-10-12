@@ -91,7 +91,7 @@ module.exports = db => {
       const base = p.precoDiaria != null ? Number(p.precoDiaria) : cx.precoDiaria != null ? Number(cx.precoDiaria) : Number(cfg.diaria) || 0;
       // desconto, isenção ou valor combinado deste atleta (o administrador define)
       const dsc = (p.descontos || {})[jid] || null;
-      const v = dsc && dsc.isento ? 0 : dsc && dsc.v != null ? Number(dsc.v) : Math.round(base * (1 - (Number(dsc && dsc.pct) || 0)) * 100) / 100;
+      const v = dsc && dsc.isento ? 0 : dsc && Number(dsc.v) > 0 ? Number(dsc.v) : Math.round(base * (1 - (Number(dsc && dsc.pct) || 0)) * 100) / 100;
       const [, mm, dd] = String(p.data).split('-');
       return { v, cfg, desc: `Diária da pelada de ${dd}/${mm}` };
     }

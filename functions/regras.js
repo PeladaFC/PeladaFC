@@ -33,7 +33,7 @@ function quandoMs(ms) { const d = new Date(ms - 3 * 36e5); return `${DIAS3[d.get
 const horaMs = ms => { const d = new Date(ms - 3 * 36e5); return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; };
 const ehPA = (p, cfg) => !!((cfg && cfg.evento) || (p && p.extra)); // cobrança por atleta (evento livre ou evento extra)
 function precoPel(p, cfg) { if (p.precoDiaria != null) return Number(p.precoDiaria) || 0; return ehPA(p, cfg) ? 0 : Number((cfg || {}).diaria) || 0; }
-function valorJog(p, cfg, jid) { const d = (p.descontos || {})[jid]; if (d && d.isento) return 0; if (d && d.v != null) return Number(d.v); return Math.round(precoPel(p, cfg) * (1 - (Number(d && d.pct) || 0)) * 100) / 100; }
+function valorJog(p, cfg, jid) { const d = (p.descontos || {})[jid]; if (d && d.isento) return 0; if (d && Number(d.v) > 0) return Number(d.v); return Math.round(precoPel(p, cfg) * (1 - (Number(d && d.pct) || 0)) * 100) / 100; }
 const tipoDe = (ctx, uid) => { const j = (ctx.pres || {})[uid] && (ctx.jog || {})[ctx.pres[uid].jogador]; return j ? (j.tipo || 'mensalista') : null; };
 function respDe(p, pid, ctx, jid) { let r = (p.resp || {})[jid] || null; for (const d of Object.values(ctx.pres || {})) { const x = d && d.jogador === jid && d.pel && d.pel[pid]; if (x && (!r || (x.t || 0) > (r.t || 0))) r = x; } return r; }
 
