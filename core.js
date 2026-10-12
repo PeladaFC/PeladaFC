@@ -1387,7 +1387,7 @@ function subTimes(pid,p,l,A){
   sec.formato=painelFormato(pid,p);
   // 3. sortear
   sec.sortear=`<div class="panel stack"><div class="row between"><div><b>${l.escalados.length} na linha · ${l.gks.length} goleiro(s)</b><div class="sub">${c.golSorteio?'Goleiros entram no sorteio':'Goleiros ficam fora do sorteio (extra)'} · equilibra por nota e posição${(c.restr||[]).length?' · respeita '+c.restr.length+' regra(s)':''}</div></div>
-    <div class="row"><select id="nt" aria-label="Número de times" style="width:auto">${[2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
+    <div class="row"><select id="nt" data-p="${pid}" aria-label="Número de times" style="width:auto">${[2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
     <button class="btn primary" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div>
     <button class="btn block" data-act="montar" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>✋ ${p.times?'Ajustar os times na mão':'Montar os times na mão'}</button>
     ${p.times?`<button class="btn sm danger" style="align-self:flex-start" data-act="apagar-sorteio" data-p="${pid}">Apagar sorteio</button><div class="sub" style="margin-top:-4px">Com o sorteio feito, os jogadores não podem trocar de posição. Apagando, a troca abre de novo.</div>`:'<div class="sub" style="margin-top:-4px">Até o sorteio, cada jogador pode trocar a própria posição.</div>'}</div>`;
@@ -2506,6 +2506,7 @@ document.addEventListener('click',e=>{
       document.getElementById('gol-txt').textContent=F.golSorteio?'Um goleiro fixo por time. Goleiro não ocupa vaga de linha.':'Os goleiros ficam fora do sorteio e jogam como extras.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
       const ev=g('c-tipo')==='evento',dataEv=null,diaEv=Number(g('c-dia'));
+      {const nt=Number(g('c-times'));if(nt&&nt!==Number(cfg().times))for(const[pid,p] of Object.entries(S.pel))if(!p.times&&p.status!=='encerrada'&&p.nTimes)patch('peladas/'+pid,{nTimes:null})}
       put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),usarCaixa:!!document.getElementById('c-caixa')?.checked,...(document.getElementById('c-mpdono')?{mpDonoJid:g('c-mpdono')||null}:{}),convAuto:g('c-convauto')==='1',vencMens:Math.min(28,Math.max(1,Number(g('c-vencmens'))||10)),pixRepassa:!!document.getElementById('c-pixrepassa')?.checked,formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',evento:ev,data:dataEv});
       closeSheet();toast('Ajustes salvos.');break}
@@ -2557,6 +2558,8 @@ document.addEventListener('change',e=>{
     if(v==='cheio')delete m[j];else if(v==='isento')m[j]={isento:true};else if(v==='v'){const p=!form&&UI.dsc&&S.pel[UI.dsc.pid];m[j]={v:form?(Number(String(document.getElementById('np-valor')?.value||'').replace(',','.'))||0):precoDP(p)}}else m[j]={pct:Number(v)/100};
     if(form){UI.npDesc=m;npQpAtualiza()}else{const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetDescontos();const s2=document.querySelector('.sheet');if(s2)s2.scrollTop=sc}return}
   if(t.id==='aj-saldo'){ajDif();return}
+  // nº de times desta pelada: grava e refaz a conta de jogos do formato
+  if(t.id==='nt'&&t.dataset.p){const p=S.pel[t.dataset.p];if(p&&!p.times)patch('peladas/'+t.dataset.p,{nTimes:Number(t.value)});return}
   if(t.dataset.act==='npd-v'){const m={...(UI.npDesc||{})},v=Number(String(t.value).replace(',','.'));if(t.value===''||isNaN(v))delete m[t.dataset.j];else m[t.dataset.j]={v:Math.max(0,Math.round(v*100)/100)};UI.npDesc=m;npQpAtualiza();return}
 
   if(t.dataset.act==='ds-v'&&UI.dsc){const v=Number(String(t.value).replace(',','.'));if(t.value===''||isNaN(v))delete UI.dsc.map[t.dataset.j];else UI.dsc.map[t.dataset.j]={v:Math.max(0,Math.round(v*100)/100)};const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetDescontos();const s2=document.querySelector('.sheet');if(s2)s2.scrollTop=sc;return}
