@@ -169,14 +169,16 @@ function lista(p,pid){
   // precisa de liberação: diarista que confirmou pelo app, ou quem confirmou com a lista cheia
   const precisa=id=>resp[id].esp||(ehDiarista(id)&&resp[id].app);
   const conv=p.conv||{},ok=id=>!precisa(id)||lib(id)||!!conv[id];
-  const gks=sim.filter(id=>J(id).pos==='GOL'&&ok(id)).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0));
+  // goleiro no sorteio: só entram tantos goleiros quanto times; o excedente vai para a espera (por ordem de confirmação)
+  const golMax=c.golSorteio?Math.max(1,Number(p.nTimes)||Number(c.times)||2):Infinity;
+  const gksOk=sim.filter(id=>J(id).pos==='GOL'&&ok(id)).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0)),gks=gksOk.slice(0,golMax),gkExc=gksOk.slice(gks.length);
   const gkAguard=sim.filter(id=>J(id).pos==='GOL'&&!ok(id));
   const line=sim.filter(id=>J(id).pos!=='GOL');
   const key=id=>lib(id)?Math.max(aprov[id],resp[id].t||0):(resp[id].t||0);
   const elig=line.filter(ok).sort((a,b)=>{const ma=lib(a)?1:0,mb=lib(b)?1:0;return ma-mb||key(a)-key(b)});
   const aguard=line.filter(id=>!ok(id)).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0));
   // na espera, mensalista sempre vem antes de diarista (mantendo a ordem de chegada dentro de cada grupo)
-  const esp=elig.slice(vagas).concat(aguard),ehD=id=>ehDiarista(id)?1:0;
+  const esp=elig.slice(vagas).concat(gkExc,aguard),ehD=id=>ehDiarista(id)?1:0;
   const espera=esp.map((id,i)=>[id,i]).sort((a,b)=>ehD(a[0])-ehD(b[0])||a[1]-b[1]).map(x=>x[0]);
   return{vagas,gks,escalados:elig.slice(0,vagas),espera,aguardando:aguard.concat(gkAguard),
     nao:ativos().filter(id=>resp[id]?.s==='nao'),
@@ -189,9 +191,9 @@ function posLinha(id){const j=J(id);if(j.pos!=='GOL')return j.pos;return j.pos2&
 function sortear(p,T){
   const{escalados,gks}=lista(p),N=notaAtual,noSorteio=!!cfg().golSorteio;
   // padrão: goleiro é extra e não entra no sorteio; o time é formado só pelos jogadores de linha
-  const gk=noSorteio?gks.slice().sort((a,b)=>N(b)-N(a)):[];
-  const teamsGk=Array.from({length:T},(_,i)=>gk[i]||null);
-  const line=escalados.concat(gk.slice(T));
+  // goleiro no sorteio: o time é sorteado só com a linha; depois o melhor goleiro vai para o time mais fraco e o pior para o mais forte
+  const gk=noSorteio?gks.slice(0,T).sort((a,b)=>N(b)-N(a)):[];
+  const line=escalados.slice();
   const L=Array.from({length:T},()=>[]);
   for(const pos of LINHA){
     const ps=line.filter(id=>posLinha(id)===pos).map(id=>({id,k:N(id)+(Math.random()-.5)*1.2})).sort((a,b)=>b.k-a.k);
@@ -200,9 +202,8 @@ function sortear(p,T){
       L[best].push(x.id)}
   }
   const restr=cfg().restr||[];
-  const gkAvg=gk.length?sum(gk.slice(0,T).map(N))/Math.min(T,gk.length):0;
   const cost=()=>{
-    const means=L.map((arr,i)=>(arr.length?sum(arr.map(N))/arr.length:0)+(teamsGk[i]?(N(teamsGk[i])-gkAvg)*.3:0));
+    const means=L.map(arr=>arr.length?sum(arr.map(N))/arr.length:0);
     const m=sum(means)/T;let c=sum(means.map(x=>(x-m)**2))*10;
     const sz=L.map(a=>a.length);c+=Math.max(0,Math.max(...sz)-Math.min(...sz)-1)*50;
     for(const pos of LINHA){const n=L.map(a=>a.filter(id=>posLinha(id)===pos).length);c+=Math.max(0,Math.max(...n)-Math.min(...n)-1)*2}
@@ -229,6 +230,8 @@ function sortear(p,T){
     [L[i][a],L[j][b]]=[L[j][b],L[i][a]];
     const c2=cost();if(c2<=c)c=c2;else[L[i][a],L[j][b]]=[L[j][b],L[i][a]];
   }
+  const teamsGk=Array(T).fill(null),media=arr=>arr.length?sum(arr.map(N))/arr.length:0;
+  L.map((arr,i)=>[i,media(arr)]).sort((a,b)=>a[1]-b[1]).forEach(([i],k)=>{teamsGk[i]=gk[k]||null});
   const ord={ZAG:0,LAT:1,VOL:2,MEI:3,ATA:4};
   return L.map((arr,i)=>({cor:i,gk:teamsGk[i],ids:arr.sort((a,b)=>ord[posLinha(a)]-ord[posLinha(b)])}));
 }
@@ -1245,7 +1248,7 @@ function subPresenca(pid,p,l,A){
   // ordem fixa: mensalistas e depois diaristas, cada grupo em ordem alfabética (não muda ao marcar ✓/✕)
   const abc=(a,b)=>nm(a).localeCompare(nm(b)),gol=id=>J(id).pos==='GOL',golL=ativos().filter(gol).sort(abc),mensL=ativos().filter(id=>!gol(id)&&!ehDiarista(id)).sort(abc),diaS=ativos().filter(id=>!gol(id)&&ehDiarista(id)),pediu=id=>resp[id]?.s==='sim',
     // diaristas: quem pediu vaga sobe para o topo do bloco, por ordem de pedido (continua assim depois de liberado); o resto em ordem alfabética
-    diaL=[...diaS.filter(pediu).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0)||abc(a,b)),...diaS.filter(id=>!pediu(id)).sort(abc)],order=[...golL,...mensL,...diaL],grupos=[[golL,'Goleiros','não ocupam vaga'],[mensL,'Mensalistas',''],[diaL,'Diaristas','']].filter(g=>g[0].length);
+    diaL=[...diaS.filter(pediu).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0)||abc(a,b)),...diaS.filter(id=>!pediu(id)).sort(abc)],order=[...golL,...mensL,...diaL],grupos=[[golL,'Goleiros',cfg().golSorteio?'1 por time · não ocupam vaga da linha':'não ocupam vaga'],[mensL,'Mensalistas',''],[diaL,'Diaristas','']].filter(g=>g[0].length);
   // prioridade de quem ficou fora da lista (espera, pediu vaga, perdeu o prazo): só o administrador vê
   const ordPed={};l.espera.forEach((id,i)=>ordPed[id]=i+1);
   let h=`<div class="panel"><div class="panel-h"><h3>Quem vai?</h3>${A?'<div class="row"><button class="btn sm" data-act="msg" data-v="convocacao">Convocar</button><button class="btn sm" data-act="msg" data-v="cobrar">Cobrar</button><button class="btn sm primary" data-act="msg" data-v="lista">Lista</button></div>':''}</div>`;
@@ -2063,7 +2066,7 @@ function sheetCfg(){
         <div class="sub" style="margin-top:6px">Conta a partir do término da pelada. Até 7 dias (168 horas).</div></div></div>
     <div class="panel"><h3 style="margin-bottom:4px">Goleiros</h3><div class="sub" style="margin-bottom:8px">O time é formado pelos jogadores de linha. Escolha se o goleiro entra no sorteio.</div>
       <div class="pick" id="gol-pick"><button type="button" data-act="gol-sorteio" data-v="0" aria-pressed="${!c.golSorteio}">Goleiro extra</button><button type="button" data-act="gol-sorteio" data-v="1" aria-pressed="${!!c.golSorteio}">Goleiro no sorteio</button></div>
-      <div class="sub" id="gol-txt" style="margin-top:6px">${c.golSorteio?'Cada time recebe um goleiro no sorteio. O goleiro não ocupa vaga: as vagas da lista são só para jogadores de linha.':'Os goleiros ficam fora do sorteio e jogam como extras. O goleiro não ocupa vaga: as vagas da lista são só para jogadores de linha.'}</div></div>
+      <div class="sub" id="gol-txt" style="margin-top:6px">${c.golSorteio?'Um goleiro por time: entram tantos goleiros quanto times, e o excedente vai para a espera. No sorteio, o melhor goleiro vai para o time mais fraco e o pior para o mais forte. Goleiro não ocupa vaga da linha.':'Os goleiros ficam fora do sorteio e jogam como extras. O goleiro não ocupa vaga: as vagas da lista são só para jogadores de linha.'}</div></div>
     <div class="panel"><h3 style="margin-bottom:4px">Regras do sorteio</h3><div class="sub" style="margin-bottom:8px">Ex.: dois irmãos que não podem cair juntos.</div><div id="restr"></div>
       <div class="grid2" style="margin-top:8px"><select id="r-a"><option value="">Jogador</option>${Object.keys(S.jog).map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('')}</select>
       <select id="r-b"><option value="">Jogador</option>${Object.keys(S.jog).map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('')}</select></div>
@@ -2305,7 +2308,7 @@ document.addEventListener('click',e=>{
     case'salvar-arte':{const a=ARTS[Number(d.i)];if(!a||!dl)return;
       dl.save({filename:a.nome,data:a.blob}).then(r=>{if(r&&r.status==='saved')toast('Imagem pronta.')},e=>{if(e&&e.name!=='AbortError')toast('Não deu para salvar. Toque e segure a imagem.')});break}
     case'sortear':{const T=Number(document.getElementById('nt').value)||cfg().times;const times=sortear(S.pel[d.p],T);UI.sel=null;
-      const goleiros=cfg().golSorteio?[]:lista(S.pel[d.p],d.p).gks;
+      const goleiros=cfg().golSorteio?lista(S.pel[d.p],d.p).gks.filter(g=>!times.some(t=>t.gk===g)):lista(S.pel[d.p],d.p).gks;
       patch('peladas/'+d.p,{times,goleiros,nTimes:T,vit:times.map(()=>0),sorteadoEm:Date.now(),publicado:false});toast('Times sorteados. Só os administradores estão vendo.');break}
     case'pub-times':{const on=d.v==='1';patch('peladas/'+d.p,{publicado:on,publicadoEm:on?Date.now():null});toast(on?'Times publicados! A galera já pode ver.':'Times escondidos da galera.');break}
     case'swap':{const p=S.pel[d.p],ti=Number(d.t);
@@ -2495,7 +2498,7 @@ document.addEventListener('click',e=>{
       patch('peladas/'+d.p,{stats:{[doc.jogador]:{g:L.g||0,a:L.a||0}},lancOk:{[d.u]:L.t}});toast(`Números de ${nm(doc.jogador)} aprovados.`);break}
     case'lanc-rec':{const doc=S.pres[d.u],L=doc&&doc.lanc&&doc.lanc[d.p];if(!L)return;patch('peladas/'+d.p,{lancRec:{[d.u]:L.t}});toast('Lançamento recusado.');break}
     case'gol-sorteio':{F.golSorteio=d.v==='1';document.querySelectorAll('#gol-pick button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===d.v)));
-      document.getElementById('gol-txt').textContent=F.golSorteio?'Cada time recebe um goleiro no sorteio. O goleiro não ocupa vaga: as vagas da lista são só para jogadores de linha.':'Os goleiros ficam fora do sorteio e jogam como extras. O goleiro não ocupa vaga: as vagas da lista são só para jogadores de linha.';break}
+      document.getElementById('gol-txt').textContent=F.golSorteio?'Um goleiro por time: entram tantos goleiros quanto times, e o excedente vai para a espera. No sorteio, o melhor goleiro vai para o time mais fraco e o pior para o mais forte. Goleiro não ocupa vaga da linha.':'Os goleiros ficam fora do sorteio e jogam como extras. O goleiro não ocupa vaga: as vagas da lista são só para jogadores de linha.';break}
     case'save-cfg':{const g=id=>document.getElementById(id).value;
       const ev=g('c-tipo')==='evento',dataEv=null,diaEv=Number(g('c-dia'));
       put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),usarCaixa:!!document.getElementById('c-caixa')?.checked,...(document.getElementById('c-mpdono')?{mpDonoJid:g('c-mpdono')||null}:{}),convAuto:g('c-convauto')==='1',vencMens:Math.min(28,Math.max(1,Number(g('c-vencmens'))||10)),pixRepassa:!!document.getElementById('c-pixrepassa')?.checked,formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
