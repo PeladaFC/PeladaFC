@@ -1241,8 +1241,8 @@ function subPresenca(pid,p,l,A){
   const wait=new Set(l.espera);
   // ordem fixa: mensalistas e depois diaristas, cada grupo em ordem alfabética (não muda ao marcar ✓/✕)
   const abc=(a,b)=>nm(a).localeCompare(nm(b)),mensL=ativos().filter(id=>!ehDiarista(id)).sort(abc),diaL=ativos().filter(id=>ehDiarista(id)).sort(abc),order=[...mensL,...diaL];
-  // ordem de pedido (só o administrador vê): quem confirmou primeiro
-  const ordPed={};ativos().filter(id=>resp[id]?.s==='sim').sort((a,b)=>(resp[a].t||0)-(resp[b].t||0)).forEach((id,i)=>ordPed[id]=i+1);
+  // prioridade de quem ficou fora da lista (espera, pediu vaga, perdeu o prazo): só o administrador vê
+  const ordPed={};l.espera.forEach((id,i)=>ordPed[id]=i+1);
   let h=`<div class="panel"><div class="panel-h"><h3>Quem vai?</h3>${A?'<div class="row"><button class="btn sm" data-act="msg" data-v="convocacao">Convocar</button><button class="btn sm" data-act="msg" data-v="cobrar">Cobrar</button><button class="btn sm primary" data-act="msg" data-v="lista">Lista</button></div>':''}</div>`;
   if(!PA(p)&&p.mensAte)h+=`<div class="sub" style="margin:-4px 0 8px">⏳ Mensalistas confirmam até <b>${prazoMensTxt(p)}</b>${Date.now()<p.mensAte?'':' · prazo encerrado'}.</div>`;
   if(A&&!PA(p)&&ativos().some(id=>J(id).tipo==='diarista')){const np=l.aguardando.filter(id=>ehDiarista(id)).length;h+=`<button class="btn block${p.mensAte&&Date.now()>=p.mensAte&&np?' primary':''}" style="margin-bottom:10px" data-act="cv-abrir" data-p="${pid}">📣 Convocar diaristas${np?` · ${np} pediram vaga`:''}</button>`}
@@ -1250,7 +1250,7 @@ function subPresenca(pid,p,l,A){
   h+='<div class="list">';
   for(const id of order){const s=resp[id]?.s;
     if(mensL.length&&diaL.length&&(id===mensL[0]||id===diaL[0]))h+=`<div class="lista-grupo">${id===mensL[0]?'Mensalistas':'Diaristas'} <span class="num">${id===mensL[0]?mensL.length:diaL.length}</span></div>`;
-    const ag=l.aguardando.includes(id);const extra=(A&&ordPed[id]?`<span class="chip ord-ped">${ordPed[id]}º da lista</span>`:'')+(ag?`<span class="chip tag-espera">PEDIU VAGA${A&&resp[id]?.t?' · '+horaPedido(resp[id].t):''}</span>`:wait.has(id)?'<span class="chip tag-espera">ESPERA</span>':'')+(resp[id]?.app?'<span class="chip solid">PELO APP</span>':'')+((p.expirou||{})[id]&&!(p.conv||{})[id]?'<span class="chip tag-espera">⌛ PERDEU A VAGA</span>':(p.conv||{})[id]?(stPag((p.diarias||{})[id])?'<span class="chip solid">✅ PAGO</span>':prazoPag(p,pid,id)?`<span class="chip tag-espera">PAGAR ATÉ ${horaPedido(prazoPag(p,pid,id)).slice(-5)}</span>`:'<span class="chip solid">CONVOCADO</span>'):'');
+    const ag=l.aguardando.includes(id);const extra=(A&&ordPed[id]?`<span class="chip ord-ped">${ordPed[id]}º na fila</span>`:'')+(ag?`<span class="chip tag-espera">PEDIU VAGA${A&&resp[id]?.t?' · '+horaPedido(resp[id].t):''}</span>`:wait.has(id)?'<span class="chip tag-espera">ESPERA</span>':'')+(resp[id]?.app?'<span class="chip solid">PELO APP</span>':'')+((p.expirou||{})[id]&&!(p.conv||{})[id]?'<span class="chip tag-espera">⌛ PERDEU A VAGA</span>':(p.conv||{})[id]?(stPag((p.diarias||{})[id])?'<span class="chip solid">✅ PAGO</span>':prazoPag(p,pid,id)?`<span class="chip tag-espera">PAGAR ATÉ ${horaPedido(prazoPag(p,pid,id)).slice(-5)}</span>`:'<span class="chip solid">CONVOCADO</span>'):'');
     const libBtn=A&&ag?`<button class="btn sm primary" data-act="liberar" data-p="${pid}" data-j="${id}" ${J(id).pos!=='GOL'&&l.escalados.length>=l.vagas?'disabled title="Lista cheia"':''}>Liberar</button>`:'';
     const right=A?`${libBtn}<div class="rsvp"><button aria-label="Vai" class="${s==='sim'?'on-sim':''}" data-act="rsvp" data-p="${pid}" data-j="${id}" data-v="sim">✓</button><button aria-label="Não vai" class="${s==='nao'?'on-nao':''}" data-act="rsvp" data-p="${pid}" data-j="${id}" data-v="nao">✕</button></div>`
       :`<span class="chip solid">${s==='sim'?'VAI':s==='nao'?'NÃO VAI':'—'}</span>`;
