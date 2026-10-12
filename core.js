@@ -725,7 +725,7 @@ function quandoTxt(t){const d=new Date(t),hoje=new Date();const h=pad(d.getHours
 function sheetNotif(){
   document.getElementById('push').hidden=true;
   if(!ADM()){const v=vistoLocal(),its=itensJogador().slice(0,40);
-    openSheet('Notificações',`<div class="stack"><div class="panel"><div class="list">${its.length?its.map(i=>`<div class="item" style="align-items:flex-start"><div class="grow"><div class="name">${i.t>v?'<span class="dot-new"></span>':''}${esc(i.titulo||'')}</div>${i.longo?`<div class="recado">${esc(i.texto)}</div>`:`<div>${esc(i.texto)}</div>`}<div class="sub">${quandoTxt(i.t)}</div></div></div>`).join(''):`<div class="empty">${meuJogador()?'Nada novo por aqui.':'Escolha seu nome na aba Jogo para receber as notificações da pelada.'}</div>`}</div></div>
+    openSheet('Notificações',`<div class="stack"><div class="panel"><div class="list">${its.length?its.map(i=>`<div class="item" style="align-items:flex-start"><div class="grow"><div class="name">${i.t>v?'<span class="dot-new"></span>':''}${esc(i.titulo||'')}</div>${i.longo?`<div class="recado">${esc(i.texto).replace(/\*([^*\n]+)\*/g,'<b>$1</b>')}</div>`:`<div>${esc(i.texto)}</div>`}<div class="sub">${quandoTxt(i.t)}</div></div></div>`).join(''):`<div class="empty">${meuJogador()?'Nada novo por aqui.':'Escolha seu nome na aba Jogo para receber as notificações da pelada.'}</div>`}</div></div>
       <p class="sub" style="margin:0">Por enquanto, as notificações aparecem quando o app está aberto.</p></div>`);
     marcarVisto();render();return}
   const f=S.feed||{},visto=f.visto||0,pr=prefs(),A=ADM();
