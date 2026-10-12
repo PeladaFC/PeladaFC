@@ -1218,9 +1218,9 @@ function tJogo(A){
   else h+=subPos(pid,p,A);
   return h+renderHist(A);
 }
-function rowPlayer(id,right,extra=''){
+function rowPlayer(id,right,extra='',tipo){
   const j=J(id);
-  return`<div class="item">${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${j.pos}">${j.pos}</span><span>${tipoTxt(id)}</span>${extra}</div></div>${right}</div>`;
+  return`<div class="item">${avHTML(id)}<div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${j.pos}">${j.pos}</span>${tipo!=null?tipo:`<span>${tipoTxt(id)}</span>`}${extra}</div></div>${right}</div>`;
 }
 /* diarista convocado e confirmado: 30 minutos para pagar (com Mercado Pago conectado) */
 function convOk(p,pid,jid){return!!(p&&(p.conv||{})[jid]&&!(p.expirou||{})[jid]&&respDe(p,pid)[jid]?.s==='sim')}
@@ -1250,11 +1250,14 @@ function subPresenca(pid,p,l,A){
   h+='<div class="list">';
   for(const id of order){const s=resp[id]?.s;
     if(mensL.length&&diaL.length&&(id===mensL[0]||id===diaL[0]))h+=`<div class="lista-grupo">${id===mensL[0]?'Mensalistas':'Diaristas'} <span class="num">${id===mensL[0]?mensL.length:diaL.length}</span></div>`;
-    const ag=l.aguardando.includes(id);const extra=(A&&ordPed[id]?`<span class="chip ord-ped">${ordPed[id]}º na fila</span>`:'')+(ag?`<span class="chip tag-espera">PEDIU VAGA${A&&resp[id]?.t?' · '+horaPedido(resp[id].t):''}</span>`:wait.has(id)?'<span class="chip tag-espera">ESPERA</span>':'')+(resp[id]?.app?'<span class="chip solid">PELO APP</span>':'')+((p.expirou||{})[id]&&!(p.conv||{})[id]?'<span class="chip tag-espera">⌛ PERDEU A VAGA</span>':(p.conv||{})[id]?(stPag((p.diarias||{})[id])?'<span class="chip solid">✅ PAGO</span>':prazoPag(p,pid,id)?`<span class="chip tag-espera">PAGAR ATÉ ${horaPedido(prazoPag(p,pid,id)).slice(-5)}</span>`:'<span class="chip solid">CONVOCADO</span>'):'');
-    const libBtn=A&&ag?`<button class="btn sm primary" data-act="liberar" data-p="${pid}" data-j="${id}" ${J(id).pos!=='GOL'&&l.escalados.length>=l.vagas?'disabled title="Lista cheia"':''}>Liberar</button>`:'';
-    const right=A?`${libBtn}<div class="rsvp"><button aria-label="Vai" class="${s==='sim'?'on-sim':''}" data-act="rsvp" data-p="${pid}" data-j="${id}" data-v="sim">✓</button><button aria-label="Não vai" class="${s==='nao'?'on-nao':''}" data-act="rsvp" data-p="${pid}" data-j="${id}" data-v="nao">✕</button></div>`
+    const ag=l.aguardando.includes(id),hp=resp[id]?.t?horaPedido(resp[id].t).slice(-5):'';
+    // fora da lista: uma linha curta no lugar de "Mensalista/Diarista" (o número da fila só o administrador vê)
+    const fila=ag||wait.has(id)?`<span class="fila-txt">${A&&ordPed[id]?`<b>${ordPed[id]}º na fila</b>`:ag?'<b>Pediu vaga</b>':'<b>Espera</b>'}${A&&hp?' · '+hp:''}</span>`:null;
+    const extra=((p.expirou||{})[id]&&!(p.conv||{})[id]?'<span class="chip tag-espera">⌛ PERDEU A VAGA</span>':(p.conv||{})[id]?(stPag((p.diarias||{})[id])?'<span class="chip solid">✅ PAGO</span>':prazoPag(p,pid,id)?`<span class="chip tag-espera">PAGAR ATÉ ${horaPedido(prazoPag(p,pid,id)).slice(-5)}</span>`:'<span class="chip solid">CONVOCADO</span>'):'');
+    const libBtn=A&&ag?`<button class="btn sm primary lib-mini" data-act="liberar" data-p="${pid}" data-j="${id}" ${J(id).pos!=='GOL'&&l.escalados.length>=l.vagas?'disabled title="Lista cheia"':''}>Liberar</button>`:'';
+    const right=A?`<div class="rsvp">${libBtn||`<button aria-label="Vai" class="${s==='sim'?'on-sim':''}" data-act="rsvp" data-p="${pid}" data-j="${id}" data-v="sim">✓</button>`}<button aria-label="Não vai" class="${s==='nao'?'on-nao':''}" data-act="rsvp" data-p="${pid}" data-j="${id}" data-v="nao">✕</button></div>`
       :`<span class="chip solid">${s==='sim'?'VAI':s==='nao'?'NÃO VAI':'—'}</span>`;
-    h+=rowPlayer(id,right,extra)}
+    h+=rowPlayer(id,right,extra,fila)}
   h+='</div></div>';
   if(A)h+=`<div class="row" style="margin-top:12px"><button class="btn danger sm" data-act="cancel-pel" data-p="${pid}">Cancelar esta pelada</button></div>`;
   return h;
