@@ -553,8 +553,8 @@ function msg0(tipo,ctx={}){
     const gols=Object.entries(st).filter(([,s])=>s.g>0).sort((a,b)=>b[1].g-a[1].g);
     if(gols.length){out.push('','⚽ GOLS');gols.forEach(([id,s])=>out.push(`• ${nm(id)} ${s.g}`))}
     out.push('','Valeu, rapaziada! Até a próxima 💪');return out.join('\n').replace(/\*/g,'')}
-  if(tipo==='prestacao'){const m=ctx.mes||mesAtual(),[y,mm]=m.split('-').map(Number),{mov,ent,sai,aj,saldo}=caixaMes(m);
-    const out=[`📊 PRESTAÇÃO DE CONTAS · ${MESES[mm-1].toUpperCase()}/${y}`,'',`💰 Entradas: ${BRL(ent)}`,`💸 Saídas: ${BRL(sai)}`,...(aj?[`⚖️ Ajustes: ${sinal(aj)}`]:[]),`🟰 Saldo do mês: ${BRL(saldo)}`];
+  if(tipo==='prestacao'){const m=ctx.mes||mesAtual(),[y,mm]=m.split('-').map(Number),{mov,ent,sai,aj,saldo}=caixaMes(m),ant=saldoAnterior(m),fim=Math.round((ant+saldo)*100)/100;
+    const out=[`📊 PRESTAÇÃO DE CONTAS · ${MESES[mm-1].toUpperCase()}/${y}`,'',`🏦 Saldo anterior (${nomeMes(mesAnt(m))}): ${BRL(ant)}`,`💰 Entradas: ${BRL(ent)}`,`💸 Saídas: ${BRL(sai)}`,...(aj?[`⚖️ Ajustes: ${sinal(aj)}`]:[]),`🟰 Resultado do mês: ${sinal(saldo)}`,`🏦 Saldo em conta (vai para ${nomeMes(mesProx(m))}): ${BRL(fim)}`];
     const E=mov.filter(x=>x.tipo==='ent'),Sx=mov.filter(x=>x.tipo==='sai'),I=mov.filter(x=>x.tipo==='isento');
     if(E.length){out.push('','ENTRADAS');E.forEach(x=>out.push(`${dBR(x.d)||'--/--'} · ${x.quem?nm(x.quem)+' · '+x.cat:x.cat} · ${BRL(x.v)}`))}
     if(Sx.length){out.push('','SAÍDAS');Sx.forEach(x=>out.push(`${dBR(x.d)||'--/--'} · ${x.cat} · ${BRL(x.v)}`))}
@@ -1765,7 +1765,12 @@ function caixaMes(m){const c=cfg(),cx=S.caixa[m]||{},mov=[];
   mov.sort((a,b)=>(a.d||'9').localeCompare(b.d||'9'));
   const ent=sum(mov.filter(x=>x.tipo==='ent').map(x=>x.v)),sai=sum(mov.filter(x=>x.tipo==='sai').map(x=>x.v)),aj=Math.round(sum(mov.filter(x=>x.tipo==='aj').map(x=>x.v))*100)/100;
   return{mov,ent,sai,aj,saldo:Math.round((ent-sai+aj)*100)/100,isentos:mov.filter(x=>x.tipo==='isento').length,mensal,pels}}
-const sinal=v=>(v<0?'− ':'+ ')+BRL(Math.abs(v));
+const sinal=v=>v?(v<0?'− ':'+ ')+BRL(Math.abs(v)):BRL(0);
+/* saldo que vem dos meses anteriores (soma do resultado de cada mês desde o primeiro com movimento) */
+function mesAnt(m){let[y,mm]=m.split('-').map(Number);mm--;if(!mm){mm=12;y--}return y+'-'+pad(mm)}
+function mesProx(m){let[y,mm]=m.split('-').map(Number);mm++;if(mm>12){mm=1;y++}return y+'-'+pad(mm)}
+function nomeMes(m){return MESES[Number(m.slice(5))-1].toLowerCase()}
+function saldoAnterior(m){const ks=[...Object.keys(S.caixa),...Object.values(S.pel).map(p=>(p.data||'').slice(0,7))].filter(k=>/^\d{4}-\d{2}$/.test(k)&&k<m).sort();if(!ks.length)return 0;let t=0;for(let k=ks[0];k<m;k=mesProx(k))t+=caixaMes(k).saldo;return Math.round(t*100)/100}
 function ajDif(){const A0=UI.aj,i=document.getElementById('aj-saldo'),o=document.getElementById('aj-dif');if(!A0||!i||!o)return;const v=Math.round(((Number(String(i.value).replace(',','.'))||0)-A0.base)*100)/100;o.innerHTML='Ajuste: <b class="num" style="color:'+(v<0?'var(--red)':'var(--pitch)')+'">'+(v?sinal(v):BRL(0))+'</b>'}
 function botaoPag(x,act,attrs,A){const st=stPag(x),cls=!st?'':st.s==='isento'?'isento':'on',txt=!st?'DEVE':st.s==='isento'?'ISENTO':'PAGO'+(st.d?' '+dBR(st.d):'');
   return A?`<div class="row" style="gap:4px;flex-wrap:nowrap"><button class="paid ${cls}" data-act="${act}" ${attrs}>${txt}</button><button class="btn sm pag-mais" data-act="${act}-mais" ${attrs} aria-label="Mais opções">⋯</button></div>`:`<span class="paid ${cls}">${txt}</span>`}
@@ -1774,8 +1779,11 @@ function tCaixa(A){
   const{mov,ent,sai,aj,saldo,isentos,mensal,pels}=caixaMes(m),dl=dataLanc(m);
   const pagosM=mensal.filter(id=>stPag((cx.mens||{})[id]));
   let h=`<div class="row between" style="margin-bottom:10px"><h2>Caixa</h2><div class="row" style="gap:4px"><button class="iconbtn" data-act="mes" data-d="-1" aria-label="Mês anterior">‹</button><b style="min-width:110px;text-align:center">${MESES[mm-1]} ${y}</b><button class="iconbtn" data-act="mes" data-d="1" aria-label="Próximo mês">›</button></div></div>
-    <div class="money"><div><span>Entradas</span><b class="num">${BRL(ent)}</b></div><div><span>Saídas</span><b class="num">${BRL(sai)}</b></div><div><span>Saldo</span><b class="num" style="color:${saldo<0?'var(--red)':'var(--pitch)'}">${BRL(saldo)}</b></div></div>
-    ${aj||A?`<div class="row between cx-aj"><span class="sub">${aj?`Saldo de ${MESES[mm-1].toLowerCase()} inclui <b class="num">${sinal(aj)}</b> de ajuste.`:`Saldo só de ${MESES[mm-1].toLowerCase()}.`}</span>${A?`<button class="btn sm" data-act="aj-novo" data-m="${m}">⚖️ Ajuste de saldo</button>`:''}</div>`:''}`;
+    <div class="money"><div><span>Entradas</span><b class="num">${BRL(ent)}</b></div><div><span>Saídas</span><b class="num">${BRL(sai)}</b></div><div><span>Do mês</span><b class="num" style="color:${saldo<0?'var(--red)':'var(--pitch)'}">${BRL(saldo)}</b></div></div>
+    ${(()=>{const ant=saldoAnterior(m),fim=Math.round((ant+saldo)*100)/100;return`<div class="panel cx-conta"><div class="cx-l"><span>Saldo anterior <span class="sub">(${nomeMes(mesAnt(m))})</span></span><b class="num">${BRL(ant)}</b></div>
+      <div class="cx-l"><span>Resultado de ${MESES[mm-1].toLowerCase()}${aj?` <span class="sub">(inclui ${sinal(aj)} de ajuste)</span>`:''}</span><b class="num" style="color:${saldo<0?'var(--red)':'var(--pitch)'}">${sinal(saldo)}</b></div>
+      <div class="cx-l cx-fim"><span><b>Saldo em conta</b> <span class="sub">vai para ${nomeMes(mesProx(m))}</span></span><b class="num" style="color:${fim<0?'var(--red)':'var(--pitch)'}">${BRL(fim)}</b></div>
+      ${A?`<button class="btn sm" style="margin-top:8px" data-act="aj-novo" data-m="${m}">⚖️ Ajuste de saldo</button>`:''}</div>`})()}`;
   if(isentos)h+=`<div class="sub" style="margin-top:6px">${isentos} isenç${isentos>1?'ões':'ão'} neste mês (não entram no saldo).</div>`;
   if(A)h+=`<div class="panel cx-data" style="margin-top:12px"><label class="row between" style="gap:10px;flex-wrap:nowrap"><span><b>Data dos lançamentos</b><span class="sub" style="display:block">Tudo que você marcar agora entra com esta data.</span></span><input type="date" id="cx-data" value="${dl}" min="${m}-01" max="${m}-31"></label>
       ${EV()?'':`<div class="cx-precos"><label class="field"><span>Mensalidade de ${MESES[mm-1].toLowerCase()}</span><input type="number" id="cx-pm" data-m="${m}" inputmode="decimal" min="0" step="0.01" value="${precoM(m)}"></label><label class="field"><span>Diária de ${MESES[mm-1].toLowerCase()}</span><input type="number" id="cx-pd" data-m="${m}" inputmode="decimal" min="0" step="0.01" value="${precoD(m)}"></label></div>
@@ -2450,17 +2458,17 @@ document.addEventListener('click',e=>{
     case'add-lanc':{const ds=document.getElementById('desp-d').value.trim(),v=Number(String(document.getElementById('desp-v').value).replace(',','.'));
       if(!ds||!v){toast('Coloque a descrição e o valor.');return}const cx=S.caixa[d.m]||{mens:{},desp:[]},f=d.t==='ent'?'ent':'desp',dt=dataLanc(d.m);
       put('caixa/'+d.m,{...cx,[f]:[...(cx[f]||[]),{id:uid('d'),d:ds,v,dt}]});toast((d.t==='ent'?'Entrada':'Saída')+' lançada em '+dBR(dt)+'.');break}
-    case'aj-novo':{const m=d.m,{saldo}=caixaMes(m),[y,mm]=m.split('-').map(Number);UI.aj={m,base:saldo};
-      openSheet('Ajuste de saldo',`<div class="stack"><p class="sub" style="margin:0">Saldo de ${MESES[mm-1].toLowerCase()}/${y} calculado pelo app: <b class="num">${BRL(saldo)}</b>. Cada mês tem o seu saldo; o ajuste vale só para este mês.</p>
-        <label class="field"><span>Qual deveria ser o saldo do mês? (R$)</span><input type="number" id="aj-saldo" inputmode="decimal" step="0.01" value="${saldo}"></label>
-        <button class="btn block" data-act="aj-zerar">Zerar o saldo deste mês</button>
+    case'aj-novo':{const m=d.m,fim=Math.round((saldoAnterior(m)+caixaMes(m).saldo)*100)/100,[y,mm]=m.split('-').map(Number);UI.aj={m,base:fim};
+      openSheet('Ajuste de saldo',`<div class="stack"><p class="sub" style="margin:0">Saldo em conta no fim de ${MESES[mm-1].toLowerCase()}/${y}, pelas contas do app: <b class="num">${BRL(fim)}</b>. Confira com o extrato do banco. O ajuste fica lançado em ${MESES[mm-1].toLowerCase()} e passa para os meses seguintes.</p>
+        <label class="field"><span>Quanto tem de verdade em conta? (R$)</span><input type="number" id="aj-saldo" inputmode="decimal" step="0.01" value="${fim}"></label>
+        <button class="btn block" data-act="aj-zerar">Zerar o saldo em conta</button>
         <div class="sub" id="aj-dif">Ajuste: ${BRL(0)}</div>
         <label class="field"><span>Motivo (obrigatório)</span><input type="text" id="aj-motivo" maxlength="120" placeholder="Ex.: dinheiro devolvido, troco, erro de lançamento"></label>
         <p class="sub" style="margin:0">O ajuste aparece no extrato e na prestação de contas, com o motivo e quem fez.</p>
         <button class="btn primary block" data-act="aj-ok">Salvar ajuste</button></div>`);break}
     case'aj-zerar':{const i=document.getElementById('aj-saldo');if(i){i.value=0;ajDif()}break}
     case'aj-ok':{const A0=UI.aj;if(!A0)return;const alvo=Number(String(document.getElementById('aj-saldo').value).replace(',','.')),mot=document.getElementById('aj-motivo').value.trim();
-      if(isNaN(alvo)){toast('Coloque o saldo certo do mês.');return}const v=Math.round((alvo-A0.base)*100)/100;if(!v){toast('O saldo já está nesse valor.');return}if(!mot){toast('Escreva o motivo do ajuste.');return}
+      if(isNaN(alvo)){toast('Coloque o saldo certo do mês.');return}const v=Math.round((alvo-A0.base)*100)/100;if(!v){toast('O saldo em conta já está nesse valor.');return}if(!mot){toast('Escreva o motivo do ajuste.');return}
       const cx=S.caixa[A0.m]||{mens:{},desp:[]};put('caixa/'+A0.m,{...cx,ajustes:[...(cx.ajustes||[]),{id:uid('a'),v,motivo:mot,dt:dataLanc(A0.m),por:meuJogador()||'',em:Date.now()}]});UI.aj=null;closeSheet();toast('Ajuste de '+sinal(v)+' salvo.');break}
     case'aj-del':{const cx=S.caixa[d.m];if(!cx||!confirm('Apagar este ajuste de saldo?'))return;put('caixa/'+d.m,{...cx,ajustes:(cx.ajustes||[]).filter(x=>x.id!==d.id)});break}
     case'del-lanc':{const cx=S.caixa[d.m],f=d.t==='ent'?'ent':'desp';put('caixa/'+d.m,{...cx,[f]:(cx[f]||[]).filter(x=>x.id!==d.id)});break}
