@@ -1081,7 +1081,10 @@ function render(){
   const app=document.getElementById('app');
   const ae=document.activeElement,aid=ae&&ae.id,sel=aid&&ae.selectionStart!=null?[ae.selectionStart,ae.selectionEnd]:null;
   renderNav();setTimeout(checarPush,0);
+  const antes={};app.querySelectorAll('.lista-pres [data-fl]').forEach(e=>antes[e.dataset.fl]=e.getBoundingClientRect().top);
   app.innerHTML=renderTop()+(ready?renderTab():'<div class="empty">Carregando a pelada…</div>');
+  // quem mudou de lugar na lista desliza até a nova posição (sem pular)
+  if(Object.keys(antes).length&&!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches))app.querySelectorAll('.lista-pres [data-fl]').forEach(e=>{const t0=antes[e.dataset.fl];if(t0==null||!e.animate)return;const dy=t0-e.getBoundingClientRect().top;if(Math.abs(dy)>2)e.animate([{transform:`translateY(${dy}px)`,position:'relative',zIndex:2},{transform:'none',position:'relative',zIndex:2}],{duration:520,easing:'cubic-bezier(.22,.8,.28,1)'})});
   if(aid&&!document.getElementById('sheet').contains(ae)){const el=document.getElementById(aid);if(el&&el!==ae){el.focus();if(sel)try{el.setSelectionRange(sel[0],sel[1])}catch(e){}}}
   if(ready&&!demo){sincAvisoAval();setTimeout(popupAval,0)}
 }
@@ -1220,7 +1223,7 @@ function tJogo(A){
 }
 function rowPlayer(id,right,extra='',tipo,tag=''){
   const j=J(id);
-  return`<div class="item">${avHTML(id)}<div class="grow"><div class="name${tag?' name-tag':''}">${tag?`<span>${esc(nm(id))}</span>${tag}`:esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${j.pos}">${j.pos}</span>${tipo!=null?tipo:`<span>${tipoTxt(id)}</span>`}${extra}</div></div>${right}</div>`;
+  return`<div class="item" data-fl="${id}">${avHTML(id)}<div class="grow"><div class="name${tag?' name-tag':''}">${tag?`<span>${esc(nm(id))}</span>${tag}`:esc(nm(id))}</div><div class="sub row" style="gap:5px"><span class="chip p-${j.pos}">${j.pos}</span>${tipo!=null?tipo:`<span>${tipoTxt(id)}</span>`}${extra}</div></div>${right}</div>`;
 }
 /* diarista convocado e confirmado: 30 minutos para pagar (com Mercado Pago conectado) */
 function convOk(p,pid,jid){return!!(p&&(p.conv||{})[jid]&&!(p.expirou||{})[jid]&&respDe(p,pid)[jid]?.s==='sim')}
@@ -1240,14 +1243,16 @@ function subPresenca(pid,p,l,A){
   const resp=respDe(p,pid);
   const wait=new Set(l.espera);
   // ordem fixa: mensalistas e depois diaristas, cada grupo em ordem alfabética (não muda ao marcar ✓/✕)
-  const abc=(a,b)=>nm(a).localeCompare(nm(b)),mensL=ativos().filter(id=>!ehDiarista(id)).sort(abc),diaL=ativos().filter(id=>ehDiarista(id)).sort(abc),order=[...mensL,...diaL];
+  const abc=(a,b)=>nm(a).localeCompare(nm(b)),mensL=ativos().filter(id=>!ehDiarista(id)).sort(abc),diaS=ativos().filter(id=>ehDiarista(id)),pediu=id=>resp[id]?.s==='sim',
+    // diaristas: quem pediu vaga sobe para o topo do bloco, por ordem de pedido (continua assim depois de liberado); o resto em ordem alfabética
+    diaL=[...diaS.filter(pediu).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0)||abc(a,b)),...diaS.filter(id=>!pediu(id)).sort(abc)],order=[...mensL,...diaL];
   // prioridade de quem ficou fora da lista (espera, pediu vaga, perdeu o prazo): só o administrador vê
   const ordPed={};l.espera.forEach((id,i)=>ordPed[id]=i+1);
   let h=`<div class="panel"><div class="panel-h"><h3>Quem vai?</h3>${A?'<div class="row"><button class="btn sm" data-act="msg" data-v="convocacao">Convocar</button><button class="btn sm" data-act="msg" data-v="cobrar">Cobrar</button><button class="btn sm primary" data-act="msg" data-v="lista">Lista</button></div>':''}</div>`;
   if(!PA(p)&&p.mensAte)h+=`<div class="sub" style="margin:-4px 0 8px">⏳ Mensalistas confirmam até <b>${prazoMensTxt(p)}</b>${Date.now()<p.mensAte?'':' · prazo encerrado'}.</div>`;
   if(A&&!PA(p)&&ativos().some(id=>J(id).tipo==='diarista')){const np=l.aguardando.filter(id=>ehDiarista(id)).length;h+=`<button class="btn block${p.mensAte&&Date.now()>=p.mensAte&&np?' primary':''}" style="margin-bottom:10px" data-act="cv-abrir" data-p="${pid}">📣 Convocar diaristas${np?` · ${np} pediram vaga`:''}</button>`}
   if(!order.length)h+=`<div class="empty">Ninguém no elenco ainda.${A?' <button class="btn sm" data-act="add-jog">Adicionar jogador</button>':''}</div>`;
-  h+='<div class="list">';
+  h+='<div class="list lista-pres">';
   for(const id of order){const s=resp[id]?.s;
     if(mensL.length&&diaL.length&&(id===mensL[0]||id===diaL[0]))h+=`<div class="lista-grupo">${id===mensL[0]?'Mensalistas':'Diaristas'} <span class="num">${id===mensL[0]?mensL.length:diaL.length}</span></div>`;
     const ag=l.aguardando.includes(id),hp=resp[id]?.t?horaPedido(resp[id].t).slice(-5):'';
