@@ -466,6 +466,17 @@ nav.tabs button:active svg{transform:scale(.9)}
 .clas-r:nth-child(2){background:rgba(242,193,46,.15);border-radius:6px}
 .campeao-b{background:linear-gradient(90deg,rgba(242,193,46,.35),transparent);border-radius:10px;padding:10px 12px;margin-bottom:8px}
 .mt-cont{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px}.mt-cont .sw{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px;border:1px solid var(--line)}
+.mt-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px}
+.mt-tab{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 10px;border:2px solid var(--line);border-radius:10px;background:var(--surface);text-align:left;cursor:pointer;min-width:0}
+.mt-tab b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.mt-tab .num{font-size:11px;color:var(--muted)}
+.mt-tab.on{border-color:var(--cor);box-shadow:inset 0 -4px 0 var(--cor)}
+.mt-tab .sw,.mt-th .sw{display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--fill);border:1px solid var(--line);margin-right:6px;vertical-align:-1px}
+.mt-time{border:2px solid var(--cor);border-radius:12px;padding:10px 12px;background:var(--surface)}
+.mt-th{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px}.mt-th b{font-size:16px}
+.mt-p{display:flex;align-items:center;gap:8px;width:100%;padding:9px 0;border:0;border-top:1px solid var(--line);background:none;text-align:left;cursor:pointer;color:inherit;font:inherit}
+.mt-time .mt-p:first-of-type,.panel-h+.mt-p{border-top:0}
+.mt-x{color:var(--muted);font-size:13px;width:22px;text-align:center}
+.mt-mais{width:26px;height:26px;border-radius:50%;background:var(--fill);color:var(--ink);display:grid;place-items:center;font-weight:700;border:1px solid var(--line);flex:none}
 .mt-l{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap}.mt-l:first-of-type{border-top:0}.mt-l .name{min-width:80px}
 .mt-cores{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}.mt-c{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);padding:0;cursor:pointer}.mt-c.on{outline:3px solid var(--pitch);outline-offset:1px;border-color:#fff}
 .jg-ev{grid-column:1/-1;border-top:1px dashed var(--line);padding-top:6px;margin-top:2px}
@@ -561,9 +572,9 @@ label.btn{position:relative;cursor:pointer}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261012r"></script>
-<script src="br.js?v=20261012r"></script>
-<script src="core.js?v=20261012r"></script>
-<script type="module" src="app.js?v=20261012r"></script>
+<script src="qrcode.js?v=20261012s"></script>
+<script src="br.js?v=20261012s"></script>
+<script src="core.js?v=20261012s"></script>
+<script type="module" src="app.js?v=20261012s"></script>
 </body>
 </html>

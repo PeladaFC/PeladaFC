@@ -1335,14 +1335,21 @@ function painelFormato(pid,p){const f=formatoDe(p),T=(p.times||[]).length||Numbe
     <div class="sub">${f==='conv'?'Conta só as vitórias de cada time (quem ganha fica ou rodízio).':`${nj} jogo${nj>1?'s':''} em ${min} min · uns ${Math.max(1,Math.floor(min/Math.max(1,nj)))} min por jogo.${min/Math.max(1,nj)<6?' <b>Pouco tempo:</b> pense no mata-mata.':''} A tabela e o placar ficam no Pós-jogo.`}</div></div>`}
 /* montar os times na mão */
 function sheetMontar(pid){const p=S.pel[pid];if(!p)return;const l=lista(p,pid),gente=[...l.escalados,...l.gks].filter(id=>S.jog[id]);
-  if(!UI.mt||UI.mt.pid!==pid){const asg={};(p.times||[]).forEach((t,i)=>[t.gk,...t.ids].filter(Boolean).forEach(id=>asg[id]=i));UI.mt={pid,T:(p.times||[]).length||Number(cfg().times)||3,asg}}
-  const M=UI.mt;for(const k in M.asg)if(M.asg[k]>=M.T)delete M.asg[k];
-  const sem=gente.filter(id=>M.asg[id]==null).length,cont=[...Array(M.T).keys()].map(i=>gente.filter(id=>M.asg[id]===i).length);
+  if(!UI.mt||UI.mt.pid!==pid){const asg={},ord=[];(p.times||[]).forEach((t,i)=>[t.gk,...t.ids].filter(Boolean).forEach(id=>{asg[id]=i;ord.push(id)}));UI.mt={pid,T:(p.times||[]).length||Number(cfg().times)||3,asg,ord,at:0}}
+  const M=UI.mt;for(const k in M.asg)if(M.asg[k]>=M.T)delete M.asg[k];if(!(M.at<M.T))M.at=0;M.ord=(M.ord||[]).filter(id=>M.asg[id]!=null);
+  const pos=id=>J(id).pos==='GOL'?'GOL':posLinha(id),chip=id=>`<span class="chip p-${pos(id)}">${pos(id)}</span>`;
+  const doTime=i=>M.ord.filter(id=>M.asg[id]===i&&gente.includes(id)),media=ids=>ids.length?ovr(sum(ids.map(notaAtual))/ids.length):'–';
+  const livres=gente.filter(id=>M.asg[id]==null).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  const at=M.at,cAt=CORES[at],claro=i=>[2,6].includes(i),vc=i=>`--cor:${claro(i)&&i===2?'#9AA09A':CORES[i].c};--fill:${CORES[i].c};--ink:${claro(i)?'#1a1a1a':'#fff'}`;
   openSheet('Montar os times',`<div class="stack"><label class="field"><span>Número de times</span><select data-act="mt-n">${[...Array(MAX_TIMES-1)].map((_,k)=>k+2).map(n=>`<option value="${n}" ${n===M.T?'selected':''}>${n} times</option>`).join('')}</select></label>
-    <div class="mt-cont">${cont.map((n,i)=>`<span><i class="sw" style="background:${CORES[i].c}"></i>${esc(nomeTime(i))} <b class="num">${n}</b></span>`).join('')}${sem?`<span class="sub">Sem time: <b>${sem}</b></span>`:''}</div>
-    <div class="panel"><div class="sub" style="margin-bottom:6px">Toque na cor do time de cada jogador.</div>${gente.sort((a,b)=>nm(a).localeCompare(nm(b))).map(id=>`<div class="mt-l"><span class="chip p-${J(id).pos==='GOL'?'GOL':posLinha(id)}">${J(id).pos==='GOL'?'GOL':posLinha(id)}</span><span class="grow name">${esc(nm(id))}</span><span class="mt-cores">${[...Array(M.T).keys()].map(i=>`<button class="mt-c${M.asg[id]===i?' on':''}" style="background:${CORES[i].c}" data-act="mt-set" data-j="${id}" data-i="${i}" aria-label="${esc(nomeTime(i))}"></button>`).join('')}</span></div>`).join('')}</div>
+    <div class="mt-tabs">${[...Array(M.T).keys()].map(i=>{const ids=doTime(i);return`<button class="mt-tab${i===at?' on':''}" data-act="mt-time" data-i="${i}" style="${vc(i)}"><i class="sw"></i><b>${esc(nomeTime(i))}</b><span class="num">${ids.length} · média ${media(ids)}</span></button>`}).join('')}</div>
+    <div class="mt-time" style="${vc(at)}"><div class="mt-th"><span><i class="sw"></i><b>${esc(nomeTime(at))}</b></span><span class="sub num">${doTime(at).length} jogador(es) · média <b>${media(doTime(at))}</b></span></div>
+      ${doTime(at).map(id=>`<button class="mt-p" data-act="mt-tirar" data-j="${id}">${chip(id)}<span class="grow name">${esc(nm(id))}</span><span class="num sub">${ovr(notaAtual(id))}</span><span class="mt-x" aria-hidden="true">✕</span></button>`).join('')||`<div class="empty">Toque nos jogadores disponíveis para colocar no ${esc(nomeTime(at))}.</div>`}
+      ${doTime(at).length?'<div class="sub" style="margin-top:4px">Toque em um jogador do time para tirar.</div>':''}</div>
+    <div class="panel"><div class="panel-h"><h3>Disponíveis <span class="muted num">${livres.length}</span></h3><span class="sub">tocando, entra no <b>${esc(nomeTime(at))}</b></span></div>
+      ${livres.map(id=>`<button class="mt-p" data-act="mt-por" data-j="${id}">${chip(id)}<span class="grow name">${esc(nm(id))}</span><span class="num sub">${ovr(notaAtual(id))}</span><span class="mt-mais" style="${vc(at)}">+</span></button>`).join('')||'<div class="empty">Todos já estão em um time.</div>'}</div>
     <div class="lado notas-acoes"><button class="btn" data-act="mt-cancelar">Cancelar</button><button class="btn primary" data-act="mt-salvar" data-p="${pid}">Salvar times</button></div>
-    <p class="sub" style="margin:0">${sem?'Quem ficar sem time não entra na pelada. ':''}Depois de salvar, os times ficam como rascunho até você publicar.</p></div>`)}
+    <p class="sub" style="margin:0">${livres.length?'Quem ficar sem time não entra na pelada. ':''}Depois de salvar, os times ficam como rascunho até você publicar.</p></div>`)}
 function subTimes(pid,p,l,A){
   const c=cfg(),M='margin-top:12px';const sec={};
   if(!A){if(!timesPub(p))return`<div class="empty">🔒 Os times aparecem aqui quando o administrador divulgar.</div>`;return blocoTimes(pid,p,false)}
@@ -2433,6 +2440,8 @@ document.addEventListener('click',e=>{
     case'jg-prox':{const p=S.pel[d.p],nx=proximaFase(p);if(nx)patch('peladas/'+d.p,{jogos:[...(p.jogos||[]),...nx]});break}
     case'jg-zerar':if(b.dataset.sure){patch('peladas/'+d.p,{jogos:null});toast('Tabela apagada.')}else{b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar tabela de jogos'}},3500)}break;
     case'montar':UI.mt=null;sheetMontar(d.p);break;
+    case'mt-time':case'mt-por':case'mt-tirar':{const M=UI.mt;if(!M)return;if(d.act==='mt-time')M.at=Number(d.i);else if(d.act==='mt-por'){M.asg[d.j]=M.at;M.ord=[...(M.ord||[]).filter(x=>x!==d.j),d.j]}else{delete M.asg[d.j];M.ord=(M.ord||[]).filter(x=>x!==d.j)}
+      const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetMontar(M.pid);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc;break}
     case'mt-set':{const M=UI.mt;if(!M)return;const i=Number(d.i);M.asg[d.j]=M.asg[d.j]===i?null:i;if(M.asg[d.j]==null)delete M.asg[d.j];const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetMontar(M.pid);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc;break}
     case'mt-cancelar':UI.mt=null;closeSheet();break;
     case'mt-salvar':{const M=UI.mt;if(!M)return;const p=S.pel[d.p],l=lista(p,d.p),gol=!!cfg().golSorteio,ord={ZAG:0,LAT:1,VOL:2,MEI:3,ATA:4};
