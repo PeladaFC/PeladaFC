@@ -230,7 +230,7 @@ function render() {
       <button class="btn primary block" type="submit">Salvar</button></form>
     ${EU ? `<button class="btn block" data-sh="sair">Sair da conta</button><p class="sub" style="text-align:center">${escH(EU.email || '')}</p>
       <p class="sub" style="text-align:center;margin:0"><a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
-      <button class="btn sm danger" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
+      <button class="btn sm" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
   if (t === 'excluir') { const X = UIp.exc || {}, lista = (n, L) => L && L.length ? `<li><b>${n}:</b> ${L.map(escH).join(', ')}</li>` : '';
     h = topo('perfil') + `<h2>Excluir minha conta</h2>
     ${X.carregando ? '<p class="lead">Verificando seus grupos…</p>' : X.bloqueia && X.bloqueia.length ? `<div class="banner" style="border-color:var(--red)"><b>Ainda não dá para excluir.</b> Você é o único administrador de: <b>${X.bloqueia.map(escH).join(', ')}</b>. Abra o grupo, vá em Ajustes e coloque outra pessoa como administradora (ou apague o grupo). Depois volte aqui.</div>` : `
