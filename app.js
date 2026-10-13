@@ -216,8 +216,8 @@ function render() {
     <div class="ob-div">ou</div>
     <button class="btn block ob-google" data-sh="google">Continuar com o Google</button>
     <p class="sub" style="text-align:center;margin:0">Ao criar a conta, você aceita os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>`;
-  if (t === 'perfil') { const p = PERFIL || {}; const pos = UIp.pos || p.pos || 'MEI';
-    h = (p.apelido ? topo('minhas') : '') + `<h2>${p.apelido ? 'Meu perfil' : 'Seu perfil de jogador'}</h2><p class="lead">É assim que a galera vai te ver.</p>
+  if (t === 'perfil') { const p = PERFIL || {}; const pos = UIp.pos || p.pos || 'MEI'; const pronto = !!(p.apelido || p.pos);
+    h = (pronto ? topo('minhas') : '') + `<h2>${pronto ? 'Meu perfil' : 'Seu perfil de jogador'}</h2><p class="lead">É assim que a galera vai te ver.</p>
     <form id="f-perfil" class="stack" novalidate>
       <div class="row" style="gap:14px;flex-wrap:nowrap"><div class="av bg-${pos}" style="width:84px;height:84px;font-size:30px;${(UIp.foto ?? p.foto) ? `background-image:url('${UIp.foto ?? p.foto}');background-size:cover;background-position:center` : ''}">${(UIp.foto ?? p.foto) ? '' : escH(((p.apelido || p.nome || EU.nome || '?').trim()[0] || '?').toUpperCase())}</div>
         <div class="stack" style="gap:6px"><label class="btn sm">${(UIp.foto ?? p.foto) ? 'Trocar foto' : 'Adicionar foto'}<input type="file" accept="image/*" id="p-foto" class="vh"></label>
@@ -228,7 +228,7 @@ function render() {
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
       <button class="btn primary block" type="submit">Salvar</button></form>
-    ${p.apelido ? `<button class="btn block" data-sh="sair">Sair da conta</button><p class="sub" style="text-align:center">${escH(EU.email || '')}</p>
+    ${EU ? `<button class="btn block" data-sh="sair">Sair da conta</button><p class="sub" style="text-align:center">${escH(EU.email || '')}</p>
       <p class="sub" style="text-align:center;margin:0"><a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
       <button class="btn sm danger" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
   if (t === 'excluir') { const X = UIp.exc || {}, lista = (n, L) => L && L.length ? `<li><b>${n}:</b> ${L.map(escH).join(', ')}</li>` : '';
