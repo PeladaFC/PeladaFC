@@ -228,7 +228,7 @@ function render() {
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
       <button class="btn primary block" type="submit">Salvar</button></form>
-    ${EU ? `<button class="btn block" data-sh="sair">Sair da conta</button><p class="sub" style="text-align:center">${escH(EU.email || '')}</p>
+    ${EU ? `<button class="btn block" data-sh="sair">Sair da conta</button>${EU.email ? `<p class="sub" style="text-align:center">Você entrou como: <b>${escH(EU.email)}</b></p>` : ''}
       <p class="sub" style="text-align:center;margin:0"><a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
       <button class="btn sm" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
   if (t === 'excluir') { const X = UIp.exc || {}, lista = (n, L) => L && L.length ? `<li><b>${n}:</b> ${L.map(escH).join(', ')}</li>` : '';
