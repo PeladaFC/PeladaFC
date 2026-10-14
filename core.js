@@ -2000,6 +2000,11 @@ function sheetTrocarMP(){openSheet('Conectar outra conta',`<div class="stack sma
   <a class="btn block" href="https://www.mercadopago.com.br/" target="_blank" rel="noopener">Abrir o Mercado Pago</a>
   <button class="btn primary block" data-act="mp-conectar">Conectar outra conta</button>
   <button class="btn block" data-act="cfg">Voltar aos ajustes</button></div>`)}
+function sheetTrocaConta(){const m=cfg().mpConta;openSheet('Trocar de conta',`<div class="stack small">
+  <p style="margin:0">${m&&m.nome?`A conta de <b>${esc(m.nome)}</b> vai ser desconectada`:'A conta atual vai ser desconectada'} e o Mercado Pago vai abrir para entrar com a nova conta que vai receber os pagamentos da pelada.</p>
+  <p style="margin:0" class="sub">Faça isso no celular de quem vai receber. Se o Mercado Pago entrar direto numa conta, na volta o app mostra o nome para você conferir.</p>
+  <button class="btn primary block" data-act="mp-trocar-ja">Trocar agora</button>
+  <button class="btn block" data-act="cfg">Cancelar</button></div>`)}
 function sheetComoMP(){const c=cfg();openSheet('Como funciona o Pix automático',`<div class="stack small">
   <ol style="margin:0;padding-left:20px;display:grid;gap:6px">
   <li>Toque em <b>Conectar Mercado Pago</b>. Vai abrir a página do Mercado Pago.</li>
@@ -2100,7 +2105,7 @@ function sheetCfg(){
     <label class="field"><span>Mensalidade vence todo dia</span><input type="number" id="c-vencmens" min="1" max="28" inputmode="numeric" value="${Number(c.vencMens)||10}"></label>
     <div class="panel stack mp-cfg"><div class="panel-h"><h3>💳 Pix automático</h3><span class="sub">Mercado Pago</span></div>
       <div class="sub">Cada jogador paga pelo app e o Caixa marca <b>PAGO</b> sozinho. O dinheiro cai na conta do Mercado Pago da pelada. Taxa do Pix: ${taxasTxt(c)}.</div>
-      <div class="row between"><span class="small">${c.mpConectadoEm?`✅ Conta conectada em ${new Date(c.mpConectadoEm).toLocaleDateString('pt-BR')}`:'⚪ Nenhuma conta conectada'}</span>${c.mpConectadoEm?`<button type="button" class="btn sm" data-act="mp-desconectar">Desconectar</button>`:`<button type="button" class="btn sm" data-act="mp-como">Como funciona</button>`}</div>
+      <div class="row between"><span class="small">${c.mpConectadoEm?`✅ Conta conectada em ${new Date(c.mpConectadoEm).toLocaleDateString('pt-BR')}`:'⚪ Nenhuma conta conectada'}</span>${c.mpConectadoEm?`<span class="row" style="gap:6px;flex-wrap:nowrap"><button type="button" class="btn sm" data-act="mp-trocar-conta">Trocar de conta</button><button type="button" class="btn sm" data-act="mp-desconectar">Desconectar</button></span>`:`<button type="button" class="btn sm" data-act="mp-como">Como funciona</button>`}</div>
       ${c.mpConectadoEm?`<div class="mp-conta">${c.mpConta?`<div class="small">Conta: <b>${esc(c.mpConta.nome||'—')}</b>${c.mpConta.doc?` · ${c.mpConta.tipoDoc||'CPF'} <span class="num">${esc(c.mpConta.doc)}</span>`:''}</div>`:'<div class="sub">Buscando os dados da conta…</div>'}
       <label class="field" style="margin-top:6px"><span>Quem é o dono desta conta no elenco?</span><select id="c-mpdono" data-act="mp-dono"><option value="">Ninguém do elenco</option>${ativos().sort((a,b)=>nm(a).localeCompare(nm(b))).map(id=>`<option value="${id}" ${(c.mpDonoJid||donoSugerido())===id?'selected':''}>${esc(nm(id))}${J(id).nome&&J(id).nome!==nm(id)?' ('+esc(J(id).nome)+')':''}</option>`).join('')}</select></label>
       <div class="sub">O dono não paga por Pix para a própria conta (o Mercado Pago recusa): ele recebe a cobrança como todo mundo e paga por outra conta ou marca como pago.</div></div>`:`<button type="button" class="btn primary block" data-act="mp-antes">Conectar Mercado Pago</button>`}
@@ -2492,6 +2497,8 @@ document.addEventListener('click',e=>{
     case'pix-demo-pagar':{const x=UI.pixAberto;if(!x)return;const val={s:'pago',d:iso(new Date()),v:x.v,obs:'Pix automático',via:'pix'};if(x.tipo==='x'){const[mx,xid]=x.ref.split('~'),e=((S.caixa[mx]||{}).extras||{})[xid];if(e)gravarExtra(mx,xid,{...e,pag:{...(e.pag||{}),[x.jid]:val}})}else if(x.tipo==='m'){const cx=S.caixa[x.ref]||{mens:{},desp:[]};put('caixa/'+x.ref,{...cx,mens:{...(cx.mens||{}),[x.jid]:val}})}else patch('peladas/'+x.ref,{diarias:{[x.jid]:val}});break}
     case'mp-antes':if(demo){toast('Na demonstração não dá para conectar uma conta.');return}sheetAntesMP();break;
     case'mp-como':sheetComoMP();break;
+    case'mp-trocar-conta':if(demo){toast('Na demonstração não dá para trocar de conta.');return}sheetTrocaConta();break;
+    case'mp-trocar-ja':if(demo)return;b.disabled=true;b.textContent='Abrindo o Mercado Pago…';window.mpConta('desconectar').then(()=>window.mpConta('conectar')).then(r=>{if(r&&!r.url)setTimeout(()=>cfg().mpConectadoEm?sheetConfirmaMP():sheetCfg(),300)}).catch(e=>{b.disabled=false;b.textContent='Trocar agora';toast(e.message||'Não deu certo. Tente de novo.')});break;
     case'mp-ok':closeSheet();toast('Pronto! O Pix da pelada cai nessa conta.');break;
     case'mp-trocar':if(demo)return;b.disabled=true;b.textContent='Desconectando…';window.mpConta('desconectar').then(()=>sheetTrocarMP(),e=>{b.disabled=false;b.textContent='Não, conectar outra conta';toast(e.message||'Não deu certo. Tente de novo.')});break;
     case'mp-conectar':if(demo){toast('Na demonstração não dá para conectar uma conta.');return}b.disabled=true;b.textContent='Abrindo o Mercado Pago…';(window.mpConta?window.mpConta('conectar'):Promise.reject(new Error('Indisponível.'))).then(r=>{if(r&&!r.url)setTimeout(()=>cfg().mpConectadoEm?sheetConfirmaMP():sheetCfg(),300)}).catch(e=>{b.disabled=false;b.textContent='Conectar Mercado Pago';toast(e.message||'Não deu certo. Tente de novo.')});break;
