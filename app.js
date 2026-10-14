@@ -502,7 +502,8 @@ window.mpConta = async acao => {
 };
 { const mpVolta = MP_VOLTA;
   if (mpVolta) { history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : ''));
-    setTimeout(() => aviso(mpVolta === 'ok' ? '✅ Mercado Pago conectado! O Pix pelo app já está ligado.' : 'Não deu para conectar o Mercado Pago. Tente de novo em Ajustes.'), 1800); } }
+    if (mpVolta === 'ok') window.__mpConfirmar = true;
+    setTimeout(() => aviso(mpVolta === 'ok' ? '✅ Mercado Pago conectado! Confira se é a conta certa.' : mpVolta === 'propria' ? 'Essa conta do Mercado Pago é a que recebe a comissão do Pelada FC e não pode receber os pagamentos da pelada. Conecte outra conta.' : 'Não deu para conectar o Mercado Pago. Tente de novo em Ajustes.'), 1800); } }
 window.pixCriar = async ({ tipo, ref, jid }) => {
   if (!ABERTO) throw new Error('Abra a pelada de novo.');
   if (MOCK) {

@@ -1105,7 +1105,7 @@ function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GR
 /* ---------- render ---------- */
 function render(){
   if(!demo&&ADM()&&S.config&&S.config.mpConectadoEm&&!S.config.mpConta&&!UI.mpInfo&&window.mpConta){UI.mpInfo=1;window.mpConta('info').catch(e=>console.warn(e))}
-  if(window.__abrirCfgPix&&S.config&&ADM()){window.__abrirCfgPix=false;setTimeout(()=>{sheetCfg();const e=document.querySelector('.mp-cfg');if(e)e.scrollIntoView({block:'center'})},80)}
+  if(window.__abrirCfgPix&&S.config&&ADM()){window.__abrirCfgPix=false;setTimeout(()=>{if(window.__mpConfirmar&&cfg().mpConectadoEm){window.__mpConfirmar=false;sheetConfirmaMP();return}sheetCfg();const e=document.querySelector('.mp-cfg');if(e)e.scrollIntoView({block:'center'})},80)}
   NOTA_CACHE=null;POS_IDX=null;consolidarAvaliacoes();consolidarRodadas();
   if(UI.pixAberto&&UI.pixDado&&pixPago(UI.pixAberto))setTimeout(pixConfirmado,0);
   const app=document.getElementById('app');
@@ -1981,8 +1981,25 @@ function sheetAntesMP(){openSheet('Antes de conectar',`<div class="stack small">
   <li>Ter a <b>identidade confirmada</b> no Mercado Pago (documento e selfie).</li>
   <li>Ter uma <b>chave Pix cadastrada</b> no Mercado Pago.</li>
   <li>Estar no modo <b>"Uso pessoal e vendas"</b> (o Mercado Pago pergunta ao abrir a conta ou ao cobrar pela primeira vez).</li></ol>
+  <div class="banner" style="display:block;margin:0"><b>Importante:</b> o Mercado Pago entra direto com a conta que já estiver aberta neste aparelho, sem perguntar. Se a conta que vai receber for de outra pessoa, saia do Mercado Pago antes (no site ou no app do Mercado Pago) ou conecte por outro celular. Depois de conectar, o app mostra o nome da conta para você conferir.</div>
   <p style="margin:0"><b>Atenção:</b> o dono da conta não paga por Pix para ela mesma (o Mercado Pago recusa pagamento para o mesmo CPF). A parte dele é marcada como paga no Caixa.</p>
   <button class="btn primary block" data-act="mp-conectar">Entendi, conectar</button><button class="btn block" data-act="cfg">Voltar</button></div>`)}
+/* depois de voltar do Mercado Pago: confirmar se a conta conectada é a certa */
+function sheetConfirmaMP(){const c=cfg(),m=c.mpConta;openSheet('Confira a conta conectada',`<div class="stack small">
+  <p style="margin:0">Os pagamentos por Pix da pelada vão cair nesta conta do Mercado Pago:</p>
+  <div class="panel" style="padding:12px 14px">${m?`<div style="font-size:17px"><b>${esc(m.nome||'—')}</b></div>${m.doc?`<div class="sub">${m.tipoDoc||'CPF'} <span class="num">${esc(m.doc)}</span></div>`:''}`:'<div class="sub">Buscando os dados da conta… Se não aparecer, confira depois em Ajustes.</div>'}</div>
+  <p style="margin:0" class="sub">O Mercado Pago usa a conta que já estava aberta neste aparelho. Se não for a conta certa, troque agora.</p>
+  <button class="btn primary block" data-act="mp-ok">Sim, é essa conta</button>
+  <button class="btn block" data-act="mp-trocar">Não, conectar outra conta</button></div>`)}
+function sheetTrocarMP(){openSheet('Conectar outra conta',`<div class="stack small">
+  <p style="margin:0">A conta foi desconectada. Para conectar outra:</p>
+  <ol style="margin:0;padding-left:20px;display:grid;gap:6px">
+  <li>Abra o <b>Mercado Pago</b> neste aparelho (site ou app) e toque em <b>Sair</b> da conta que entrou.</li>
+  <li>Volte aqui e toque em <b>Conectar outra conta</b>. Agora o Mercado Pago vai pedir e-mail e senha: entre com a conta que vai receber.</li></ol>
+  <p style="margin:0" class="sub">Se ele continuar entrando na conta errada, conecte por outro celular ou por uma janela anônima no computador.</p>
+  <a class="btn block" href="https://www.mercadopago.com.br/" target="_blank" rel="noopener">Abrir o Mercado Pago</a>
+  <button class="btn primary block" data-act="mp-conectar">Conectar outra conta</button>
+  <button class="btn block" data-act="cfg">Voltar aos ajustes</button></div>`)}
 function sheetComoMP(){const c=cfg();openSheet('Como funciona o Pix automático',`<div class="stack small">
   <ol style="margin:0;padding-left:20px;display:grid;gap:6px">
   <li>Toque em <b>Conectar Mercado Pago</b>. Vai abrir a página do Mercado Pago.</li>
@@ -2475,7 +2492,9 @@ document.addEventListener('click',e=>{
     case'pix-demo-pagar':{const x=UI.pixAberto;if(!x)return;const val={s:'pago',d:iso(new Date()),v:x.v,obs:'Pix automático',via:'pix'};if(x.tipo==='x'){const[mx,xid]=x.ref.split('~'),e=((S.caixa[mx]||{}).extras||{})[xid];if(e)gravarExtra(mx,xid,{...e,pag:{...(e.pag||{}),[x.jid]:val}})}else if(x.tipo==='m'){const cx=S.caixa[x.ref]||{mens:{},desp:[]};put('caixa/'+x.ref,{...cx,mens:{...(cx.mens||{}),[x.jid]:val}})}else patch('peladas/'+x.ref,{diarias:{[x.jid]:val}});break}
     case'mp-antes':if(demo){toast('Na demonstração não dá para conectar uma conta.');return}sheetAntesMP();break;
     case'mp-como':sheetComoMP();break;
-    case'mp-conectar':if(demo){toast('Na demonstração não dá para conectar uma conta.');return}b.disabled=true;b.textContent='Abrindo o Mercado Pago…';(window.mpConta?window.mpConta('conectar'):Promise.reject(new Error('Indisponível.'))).then(r=>{if(r&&!r.url)setTimeout(sheetCfg,300)}).catch(e=>{b.disabled=false;b.textContent='Conectar Mercado Pago';toast(e.message||'Não deu certo. Tente de novo.')});break;
+    case'mp-ok':closeSheet();toast('Pronto! O Pix da pelada cai nessa conta.');break;
+    case'mp-trocar':if(demo)return;b.disabled=true;b.textContent='Desconectando…';window.mpConta('desconectar').then(()=>sheetTrocarMP(),e=>{b.disabled=false;b.textContent='Não, conectar outra conta';toast(e.message||'Não deu certo. Tente de novo.')});break;
+    case'mp-conectar':if(demo){toast('Na demonstração não dá para conectar uma conta.');return}b.disabled=true;b.textContent='Abrindo o Mercado Pago…';(window.mpConta?window.mpConta('conectar'):Promise.reject(new Error('Indisponível.'))).then(r=>{if(r&&!r.url)setTimeout(()=>cfg().mpConectadoEm?sheetConfirmaMP():sheetCfg(),300)}).catch(e=>{b.disabled=false;b.textContent='Conectar Mercado Pago';toast(e.message||'Não deu certo. Tente de novo.')});break;
     case'mp-desconectar':if(demo){toast('Na demonstração não dá para desconectar.');return}if(!b.dataset.sure){b.dataset.sure=1;b.textContent='Toque de novo';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Desconectar'}},3500);return}
       b.disabled=true;window.mpConta('desconectar').then(()=>{toast('Conta do Mercado Pago desconectada. O Pix automático foi desligado.');closeSheet()},e=>{b.disabled=false;toast(e.message||'Não deu certo. Tente de novo.')});break;
     case'pagou-x':{const e=((S.caixa[d.m]||{}).extras||{})[d.x];if(!e)return;const st=stPag((e.pag||{})[d.j]);if(st){sheetPag('x',d.m+'~'+d.x,d.j,d.m);break}
