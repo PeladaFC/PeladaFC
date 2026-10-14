@@ -42,18 +42,6 @@ module.exports = db => {
     if (!r.ok || !j.access_token) { logger.error('mp oauth', r.status, j.message || j.error); throw erro('O Mercado Pago não liberou a conta.', 502); }
     return { token: j.access_token, refresh: j.refresh_token || null, expira: Date.now() + (Number(j.expires_in) || 15552000) * 1000, mpUser: j.user_id != null ? String(j.user_id) : null };
   }
-  // conta do Mercado Pago dona da aplicação (a que recebe a comissão). Guardada junto com o clientId
-  // para saber quando a aplicação foi trocada. Se não der para descobrir, devolve null (não bloqueia).
-  async function donoPlataforma(P) {
-    try {
-      const ref = db.doc('servidor/mp'), d = (await ref.get()).data() || {};
-      if (d.donoDe === P.id && d.donoId) return String(d.donoId);
-      const n = await trocaOAuth({ client_id: P.id, client_secret: P.segredo, grant_type: 'client_credentials' });
-      if (!n.mpUser) return null;
-      await ref.set({ donoId: n.mpUser, donoDe: P.id }, { merge: true });
-      return n.mpUser;
-    } catch (e) { logger.warn('dono da plataforma', e.message); return null; }
-  }
   // chave da conta do grupo; renova sozinha quando está perto de vencer (vale ~6 meses)
   async function contaMP(gid) {
     const ref = db.doc(`grupos/${gid}/segredos/mp`), s = await ref.get();
@@ -233,9 +221,6 @@ module.exports = db => {
       if (!e || Date.now() - e.criadoEm > 30 * 60e3) return volta('erro');
       const P = await plataforma();
       const n = await trocaOAuth({ client_id: P.id, client_secret: P.segredo, grant_type: 'authorization_code', code, redirect_uri: URL_RETORNO });
-      // a conta que recebe a comissão do app não pode ser a conta da pelada
-      const dono = await donoPlataforma(P);
-      if (dono && n.mpUser && n.mpUser === dono) { logger.warn('tentou conectar a conta da plataforma', e.gid); return volta('propria'); }
       await db.doc(`grupos/${e.gid}/segredos/mp`).set({ ...n, via: 'oauth', em: Date.now(), por: e.uid });
       const conta = await dadosConta(n.token);
       await db.doc(`grupos/${e.gid}/config/geral`).set({ mpConectadoEm: Date.now(), mpTaxaApp: P.comissao, mpTeste: false, mpDono: null, mpDonoJid: null, mpConta: conta || null }, { merge: true });
