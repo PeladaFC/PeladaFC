@@ -24,7 +24,11 @@ setGlobalOptions({ region: 'southamerica-east1', maxInstances: 5, memory: '256Mi
 const URL_APP = 'https://peladafc.github.io/PeladaFC/';
 
 /* Pix automático (Mercado Pago) */
-Object.assign(exports, require('./pagamentos')(db));
+const { interno: PAG, ...pagamentos } = require('./pagamentos')(db);
+Object.assign(exports, pagamentos);
+/* Notas fiscais da comissão: relatório, emissão automática no Emissor Nacional e PDF para o organizador */
+const { interno: NFSE, ...notas } = require('./nfse')(db, PAG);
+Object.assign(exports, notas);
 /* Excluir a própria conta (pedido das lojas) */
 Object.assign(exports, require('./conta')(db));
 const MAX_DESTINOS = 300;
@@ -178,9 +182,11 @@ exports.pushPrazoMensalistas = onSchedule({ schedule: 'every 15 minutes', timeZo
   }
 });
 
-// Todo dia às 10h: mensalidade nova (dia 1º), vence hoje e 5 dias de atraso
-exports.pushCobrancas = onSchedule({ schedule: '0 10 * * *', timeZone: 'America/Recife', maxInstances: 1 }, async () => {
+// Todo dia às 10h: mensalidade nova (dia 1º), vence hoje e 5 dias de atraso,
+// e, na mesma rotina (sem custo de agendamento extra), a nota fiscal da comissão: dia 1º emite o mês anterior
+exports.pushCobrancas = onSchedule({ schedule: '0 10 * * *', timeZone: 'America/Recife', maxInstances: 1, memory: '512MiB', timeoutSeconds: 540 }, async () => {
   const hoje = new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 10);
+  try { await NFSE.tarefaDiaria(hoje); } catch (e) { logger.error('nota fiscal', e.message); }
   const grupos = await db.collection('grupos').select().get();
   for (const g of grupos.docs) {
     try { const ctx = await contexto(g.id, { pres: true, jog: true, pel: true, caixa: true }); await enviarTodos(R.avisosCobranca(ctx, hoje)); }

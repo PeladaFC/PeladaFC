@@ -236,6 +236,16 @@ function render() {
   if (t === 'notas') { const N = UIp.nf || {}, [ano, mm] = (N.mes || '2026-01').split('-'), D = N.dados, L = (D && D.linhas) || [];
     const rs = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fdoc = d => d && d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d && d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : '';
+    const situacao = l => { const n = l.nota; if (!n) return '<div class="sub">Nota ainda não emitida.</div>';
+      if (n.status === 'ok') return `<div class="small" style="color:var(--pitch)"><b>✓ Nota emitida</b>${n.ambiente !== 'producao' ? ' (teste, sem valor fiscal)' : ''}</div>`;
+      if (n.status === 'pendente' || n.status === 'emitindo') return '<div class="sub">Enviando ao Emissor Nacional… o app tenta de novo sozinho.</div>';
+      if (n.status === 'erro') return `<div class="banner" style="margin:0"><b>A nota foi recusada.</b> ${escH(n.motivo || '')}</div>`;
+      return ''; };
+    const F = (D && D.nfse) || null;
+    const auto = !F ? '' : F.falta && F.falta.length ? `<div class="banner" style="margin:0"><b>Emissão automática ainda não ligada.</b> Falta: ${escH(F.falta.join(', '))}. Enquanto isso, dá para emitir à mão (no fim da tela).</div>`
+      : `<div class="panel" style="padding:12px 14px;display:grid;gap:8px"><div class="small"><b>${F.ligado ? 'Emissão automática ligada' : 'Emissão automática desligada'}</b>${F.ligado ? ': todo dia 1º, o app emite a nota do mês anterior para cada organizador.' : '.'}${F.ambiente !== 'producao' ? ' <b>Modo de teste</b>: as notas não têm valor fiscal.' : ''}</div>
+        ${F.validade ? `<div class="sub">Certificado digital vale até ${new Date(F.validade).toLocaleDateString('pt-BR')}.${F.validade - Date.now() < 30 * 864e5 ? ' <b>Renove logo!</b>' : ''}</div>` : ''}
+        ${L.length && L.some(l => l.doc && (!l.nota || l.nota.status === 'erro')) ? '<button class="btn sm primary" data-sh="nf-emitir" style="justify-self:start">Emitir as notas deste mês agora</button>' : ''}</div>`;
     const card = (l, i) => N.editar === l.gid ? `<form id="f-tomador" class="panel stack" style="padding:12px 14px" data-gid="${escH(l.gid)}">
         <b>${escH(l.grupo)}</b><span class="sub">Dados de quem recebe os Pix desta pelada (o organizador).</span>
         <label class="field"><span>Nome completo</span><input id="t-nome" value="${escH(l.nome)}" required></label>
@@ -247,15 +257,17 @@ function render() {
         <div class="sub">${l.qtd} ${l.qtd === 1 ? 'Pix aprovado' : 'Pix aprovados'} no mês</div>
         <div class="small">Tomador: <b>${escH(l.nome || '—')}</b>${l.doc ? ` · <span style="white-space:nowrap">${l.tipoDoc || 'CPF'} <span class="num">${fdoc(l.doc)}</span></span>` : ''}${l.email ? `<br>${escH(l.email)}` : ''}</div>
         ${l.doc ? '' : '<div class="banner" style="margin:0">O Mercado Pago não informou o CPF deste organizador. Peça a ele e preencha para emitir a nota.</div>'}
-        <div class="row" style="gap:8px">${l.doc ? `<button class="btn sm primary" data-sh="nf-copiar" data-v="${i}">Copiar dados da nota</button>` : ''}<button class="btn sm" data-sh="nf-editar" data-v="${escH(l.gid)}">${l.doc ? 'Corrigir dados' : 'Preencher dados'}</button></div></div>`;
-    h = topo('perfil') + `<h2>Notas fiscais</h2><p class="lead">Comissão de 1% dos Pix, separada por organizador. Emita uma nota para cada um, uma vez por mês.</p>
+        ${situacao(l)}
+        <div class="row" style="gap:8px;flex-wrap:wrap">${l.nota && l.nota.status === 'ok' ? `<button class="btn sm primary" data-sh="nf-pdf" data-v="${escH(l.gid)}">Baixar PDF</button>` : l.doc ? `<button class="btn sm" data-sh="nf-copiar" data-v="${i}">Copiar dados da nota</button>` : ''}<button class="btn sm" data-sh="nf-editar" data-v="${escH(l.gid)}">${l.doc ? 'Corrigir dados' : 'Preencher dados'}</button></div></div>`;
+    h = topo('perfil') + `<h2>Notas fiscais</h2><p class="lead">Comissão de 1% dos Pix, separada por organizador. Uma nota para cada um, uma vez por mês.</p>
     <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:nowrap"><button class="btn sm" data-sh="nf-mes" data-v="-1" aria-label="Mês anterior">‹</button><b style="font-size:18px">${MESES[Number(mm) - 1]} de ${ano}</b><button class="btn sm" data-sh="nf-mes" data-v="1" aria-label="Próximo mês">›</button></div>
     ${N.carregando ? '<p class="lead">Somando as comissões…</p>' : N.erro ? `<div class="banner">${escH(N.erro)}</div>` : !L.length ? '<p class="sub">Nenhuma comissão neste mês. Não precisa emitir nota.</p>' : `
+    ${auto}
     <div class="panel" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center"><span>Total do mês · ${L.length} ${L.length === 1 ? 'nota' : 'notas'}</span><b class="num" style="font-size:20px">${rs(D.total)}</b></div>
     <div class="stack" style="gap:10px">${L.map(card).join('')}</div>
     <button class="btn block" data-sh="nf-planilha">Baixar planilha do mês</button>`}
-    <a class="btn block primary" href="https://www.nfse.gov.br/EmissorNacional/" target="_blank" rel="noopener">Abrir o Emissor Nacional (gratuito)</a>
-    <details class="panel" style="padding:12px 14px"><summary><b>Como emitir cada nota</b></summary><ol class="small" style="padding-left:20px;line-height:1.6;margin:8px 0 0">
+    <details class="panel" style="padding:12px 14px"><summary><b>Emitir à mão (se precisar)</b></summary>
+      <a class="btn block" style="margin-top:10px" href="https://www.nfse.gov.br/EmissorNacional/" target="_blank" rel="noopener">Abrir o Emissor Nacional (gratuito)</a><ol class="small" style="padding-left:20px;line-height:1.6;margin:8px 0 0">
       <li>Entre no Emissor Nacional com o gov.br da Kathy ou com o certificado da empresa.</li>
       <li>Toque em <b>Emitir NFS-e</b> e informe o CPF ou CNPJ e o nome do tomador (o organizador).</li>
       <li>Serviço: use o código de <b>agenciamento e intermediação</b> que a contadora indicar.</li>
@@ -519,9 +531,11 @@ const URL_NOTAS = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net
 async function notasServidor(acao, extra) {
   if (MOCK) {
     if (acao === 'acesso') return { ok: true };
+    if (acao === 'emitir') { (UIp.nfMock || []).forEach(l => { if (l.doc) l.nota = { status: 'ok', chave: '26116062211222333000181000000000000126091234567890', ambiente: 'restrita' }; }); return { ok: 1 }; }
+    if (acao === 'pdf') throw new Error('Na demonstração não há PDF.');
     if (acao === 'tomador') { const l = (UIp.nfMock || []).find(x => x.gid === extra.gid); if (l) Object.assign(l, { nome: extra.nome, doc: extra.doc.replace(/\D/g, ''), email: extra.email, tipoDoc: extra.doc.replace(/\D/g, '').length === 14 ? 'CNPJ' : 'CPF' }); return { ok: true }; }
     UIp.nfMock = UIp.nfMock || [{ gid: 'g1', grupo: 'Pelada de Quinta', qtd: 46, total: 37.62, nome: 'Maria Teste da Silva', doc: '12345678909', tipoDoc: 'CPF', email: 'maria@exemplo.com' }, { gid: 'g2', grupo: 'Fut do Pina', qtd: 18, total: 12.4, nome: 'João Exemplo', doc: '', tipoDoc: '', email: '' }];
-    return { mes: extra.mes, linhas: UIp.nfMock, total: UIp.nfMock.reduce((s, l) => s + l.total, 0) };
+    return { mes: extra.mes, linhas: UIp.nfMock, total: UIp.nfMock.reduce((s, l) => s + l.total, 0), nfse: { ligado: true, ambiente: 'restrita', falta: [], validade: Date.now() + 300 * 864e5 } };
   }
   let t = null; try { t = await B.token(); } catch (e) { }
   if (!t) throw new Error('Entre na sua conta de novo.');
@@ -531,6 +545,21 @@ async function notasServidor(acao, extra) {
   if (!r.ok) throw new Error(j.erro || 'Não deu certo agora. Tente de novo.');
   return j;
 }
+function baixarPdf(r) { const b = atob(r.pdf), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
+  const u = URL.createObjectURL(new Blob([u8], { type: 'application/pdf' })), el = document.createElement('a'); el.href = u; el.download = r.nome || 'nota.pdf'; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); }
+// notas da comissão do organizador (administrador do grupo aberto): 'listar' ou 'pdf' {mes}
+const URL_NOTA_ORG = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/notaComissao';
+window.notasComissao = async (acao, mes) => {
+  if (MOCK) { if (acao === 'pdf') throw new Error('Na demonstração não há PDF.'); return { notas: [{ mes: '2026-09', valor: 37.62, chave: '26116062211222333000181000000000000126091234567890', teste: true }] }; }
+  let t = null; try { t = await B.token(); } catch (e) { }
+  if (!t) throw new Error('Entre na sua conta de novo.');
+  let r; try { r = await fetch(URL_NOTA_ORG, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify({ gid: ABERTO, acao, mes }) }); }
+  catch (e) { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.erro || 'Não deu certo agora. Tente de novo.');
+  if (acao === 'pdf') baixarPdf(j);
+  return j;
+};
 async function carregarNotas() { const N = UIp.nf; N.carregando = true; N.erro = null; N.editar = null; render();
   try { N.dados = await notasServidor('relatorio', { mes: N.mes }); } catch (e) { N.erro = e.message; N.dados = null; }
   N.carregando = false; if (TELA === 'notas') render(); }
@@ -665,6 +694,8 @@ document.addEventListener('click', async e => {
   if (a === 'push-ativar') ativarPush();
   if (a === 'notas') { const d = new Date(Date.now() - 3 * 36e5); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); UIp.nf = { mes: d.toISOString().slice(0, 7) }; ir('notas'); carregarNotas(); }
   if (a === 'nf-mes') { const [y, m] = UIp.nf.mes.split('-').map(Number), d = new Date(Date.UTC(y, m - 1 + Number(v), 1)); UIp.nf.mes = d.toISOString().slice(0, 7); carregarNotas(); }
+  if (a === 'nf-emitir') { b.disabled = true; b.textContent = 'Emitindo… (pode levar um minuto)'; try { const r = await notasServidor('emitir', { mes: UIp.nf.mes }); aviso(r.ok ? `${r.ok} nota${r.ok === 1 ? '' : 's'} emitida${r.ok === 1 ? '' : 's'}.` : 'Nenhuma nota nova emitida. Veja a situação de cada uma.'); } catch (err) { aviso(err.message); } carregarNotas(); }
+  if (a === 'nf-pdf') { b.disabled = true; try { baixarPdf(await notasServidor('pdf', { mes: UIp.nf.mes, gid: v })); } catch (err) { aviso(err.message); } b.disabled = false; }
   if (a === 'nf-editar') { UIp.nf.editar = v || null; render(); }
   if (a === 'nf-copiar') { const l = UIp.nf.dados.linhas[Number(v)], txt = textoNota(l, UIp.nf.mes); try { await navigator.clipboard.writeText(txt); aviso('Dados da nota copiados.'); } catch (err) { aviso(txt); } }
   if (a === 'nf-planilha') { const D = UIp.nf.dados, q = x => '"' + String(x ?? '').replace(/"/g, '""') + '"';

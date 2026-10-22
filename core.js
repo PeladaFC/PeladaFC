@@ -1991,6 +1991,15 @@ function sheetConfirmaMP(){const c=cfg(),m=c.mpConta;openSheet('Confira a conta 
   <p style="margin:0" class="sub">O Mercado Pago usa a conta que já estava aberta neste aparelho. Se não for a conta certa, troque agora.</p>
   <button class="btn primary block" data-act="mp-ok">Sim, é essa conta</button>
   <button class="btn block" data-act="mp-trocar">Não, conectar outra conta</button></div>`)}
+/* notas fiscais da comissão de 1% (emitidas pela empresa do app no CPF/CNPJ de quem recebe) */
+function sheetNotasMP(){const R=UI.notasMP;const rs=v=>'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  openSheet('Notas fiscais da comissão',`<div class="stack small">
+  <p style="margin:0">O Pelada FC fica com <b>1% de cada Pix</b> que cai na conta do Mercado Pago da pelada. Todo mês, a empresa do app emite uma nota fiscal desse valor no CPF ou CNPJ do dono da conta. Ela aparece aqui para você baixar.</p>
+  ${!R||R.carregando?'<p class="sub" style="margin:0">Buscando as notas…</p>':R.erro?`<div class="banner" style="margin:0">${esc(R.erro)}</div>`:!R.notas.length?'<p class="sub" style="margin:0">Nenhuma nota ainda. A primeira sai no dia 1º do mês seguinte ao primeiro Pix pelo app.</p>':
+  `<div class="stack" style="gap:8px">${R.notas.map(n=>{const[a,m]=n.mes.split('-');return`<div class="panel row between" style="padding:10px 12px;flex-wrap:nowrap"><div><b>${MESES[Number(m)-1]} de ${a}</b><div class="sub">${rs(n.valor)}${n.teste?' · teste, sem valor fiscal':''}</div></div><button type="button" class="btn sm primary" data-act="mp-nota-pdf" data-v="${esc(n.mes)}">Baixar PDF</button></div>`}).join('')}</div>`}
+  <p class="sub" style="margin:0">Cada nota tem uma chave de acesso e um QR Code no PDF para conferir no site oficial (nfse.gov.br).</p>
+  <button class="btn block" data-act="cfg">Voltar</button></div>`)}
+function abrirNotasMP(){UI.notasMP={carregando:true};sheetNotasMP();(window.notasComissao?window.notasComissao('listar'):Promise.reject(new Error('Indisponível.'))).then(r=>{UI.notasMP={notas:r.notas||[]}},e=>{UI.notasMP={erro:e.message||'Não deu certo.'}}).then(()=>{if(document.querySelector('[data-act="mp-nota-pdf"]')||document.getElementById('sheet-body'))sheetNotasMP()})}
 function sheetTrocarMP(){openSheet('Conectar outra conta',`<div class="stack small">
   <p style="margin:0">A conta foi desconectada. Para conectar outra:</p>
   <ol style="margin:0;padding-left:20px;display:grid;gap:6px">
@@ -2108,7 +2117,8 @@ function sheetCfg(){
       <div class="row between"><span class="small">${c.mpConectadoEm?`✅ Conta conectada em ${new Date(c.mpConectadoEm).toLocaleDateString('pt-BR')}`:'⚪ Nenhuma conta conectada'}</span>${c.mpConectadoEm?`<span class="row" style="gap:6px;flex-wrap:nowrap"><button type="button" class="btn sm" data-act="mp-trocar-conta">Trocar de conta</button><button type="button" class="btn sm" data-act="mp-desconectar">Desconectar</button></span>`:`<button type="button" class="btn sm" data-act="mp-como">Como funciona</button>`}</div>
       ${c.mpConectadoEm?`<div class="mp-conta">${c.mpConta?`<div class="small">Conta: <b>${esc(c.mpConta.nome||'—')}</b>${c.mpConta.doc?` · ${c.mpConta.tipoDoc||'CPF'} <span class="num">${esc(c.mpConta.doc)}</span>`:''}</div>`:'<div class="sub">Buscando os dados da conta…</div>'}
       <label class="field" style="margin-top:6px"><span>Quem é o dono desta conta no elenco?</span><select id="c-mpdono" data-act="mp-dono"><option value="">Ninguém do elenco</option>${ativos().sort((a,b)=>nm(a).localeCompare(nm(b))).map(id=>`<option value="${id}" ${(c.mpDonoJid||donoSugerido())===id?'selected':''}>${esc(nm(id))}${J(id).nome&&J(id).nome!==nm(id)?' ('+esc(J(id).nome)+')':''}</option>`).join('')}</select></label>
-      <div class="sub">O dono não paga por Pix para a própria conta (o Mercado Pago recusa): ele recebe a cobrança como todo mundo e paga por outra conta ou marca como pago.</div></div>`:`<button type="button" class="btn primary block" data-act="mp-antes">Conectar Mercado Pago</button>`}
+      <div class="sub">O dono não paga por Pix para a própria conta (o Mercado Pago recusa): ele recebe a cobrança como todo mundo e paga por outra conta ou marca como pago.</div>
+      <button type="button" class="btn sm" data-act="mp-notas" style="margin-top:8px">Notas fiscais da comissão</button></div>`:`<button type="button" class="btn primary block" data-act="mp-antes">Conectar Mercado Pago</button>`}
       <label class="row"><input type="checkbox" id="c-pixrepassa" ${c.pixRepassa!==false?'checked':''}> Quem paga cobre a taxa (${pct(taxaTotal(c))})</label></div>
     <label class="row"><input type="checkbox" id="c-nivelpub" ${c.nivelPublico?'checked':''}> Mostrar o nível da pelada (estrelas) para os jogadores</label>
     <label class="row"><input type="checkbox" id="c-mostraval" ${c.mostrarAval===false?'':'checked'}> Mostrar as avaliações dos jogadores (0 a 100) para todos. Mesmo ligado, só aparece depois da avaliação da galera.</label>
@@ -2499,6 +2509,8 @@ document.addEventListener('click',e=>{
     case'mp-como':sheetComoMP();break;
     case'mp-trocar-conta':if(demo){toast('Na demonstração não dá para trocar de conta.');return}sheetTrocaConta();break;
     case'mp-trocar-ja':if(demo)return;b.disabled=true;b.textContent='Abrindo o Mercado Pago…';window.mpConta('desconectar').then(()=>window.mpConta('conectar')).then(r=>{if(r&&!r.url)setTimeout(()=>cfg().mpConectadoEm?sheetConfirmaMP():sheetCfg(),300)}).catch(e=>{b.disabled=false;b.textContent='Trocar agora';toast(e.message||'Não deu certo. Tente de novo.')});break;
+    case'mp-notas':if(demo){toast('Na demonstração não há notas.');return}abrirNotasMP();break;
+    case'mp-nota-pdf':{b.disabled=true;const t0=b.textContent;b.textContent='Gerando…';window.notasComissao('pdf',d.v).catch(e=>toast(e.message||'Não deu certo.')).finally(()=>{b.disabled=false;b.textContent=t0});break}
     case'mp-ok':closeSheet();toast('Pronto! O Pix da pelada cai nessa conta.');break;
     case'mp-trocar':if(demo)return;b.disabled=true;b.textContent='Desconectando…';window.mpConta('desconectar').then(()=>sheetTrocarMP(),e=>{b.disabled=false;b.textContent='Não, conectar outra conta';toast(e.message||'Não deu certo. Tente de novo.')});break;
     case'mp-conectar':if(demo){toast('Na demonstração não dá para conectar uma conta.');return}b.disabled=true;b.textContent='Abrindo o Mercado Pago…';(window.mpConta?window.mpConta('conectar'):Promise.reject(new Error('Indisponível.'))).then(r=>{if(r&&!r.url)setTimeout(()=>cfg().mpConectadoEm?sheetConfirmaMP():sheetCfg(),300)}).catch(e=>{b.disabled=false;b.textContent='Conectar Mercado Pago';toast(e.message||'Não deu certo. Tente de novo.')});break;
