@@ -216,6 +216,7 @@ function render() {
     <div class="ob-div">ou</div>
     <button class="btn block ob-google" data-sh="google">Continuar com o Google</button>
     <p class="sub" style="text-align:center;margin:0">Ao criar a conta, você aceita os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>`;
+  if (t === 'perfil' && EU && UIp.notasOk === undefined) { UIp.notasOk = null; notasServidor('acesso').then(() => { UIp.notasOk = true; if (TELA === 'perfil') render(); }, () => { UIp.notasOk = false; }); }
   if (t === 'perfil') { const p = PERFIL || {}; const pos = UIp.pos || p.pos || 'MEI'; const pronto = !!(p.apelido || p.pos);
     h = (pronto ? topo('minhas') : '') + `<h2>${pronto ? 'Meu perfil' : 'Seu perfil de jogador'}</h2><p class="lead">É assim que a galera vai te ver.</p>
     <form id="f-perfil" class="stack" novalidate>
@@ -228,9 +229,39 @@ function render() {
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
       <button class="btn primary block" type="submit">Salvar</button></form>
+    ${EU && UIp.notasOk ? `<button class="btn block" data-sh="notas">Notas fiscais da comissão</button>` : ''}
     ${EU ? `<button class="btn block" data-sh="sair">Sair da conta</button>${EU.email ? `<p class="sub" style="text-align:center">Você entrou como: <b>${escH(EU.email)}</b></p>` : ''}
       <p class="sub" style="text-align:center;margin:0"><a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
       <button class="btn sm" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
+  if (t === 'notas') { const N = UIp.nf || {}, [ano, mm] = (N.mes || '2026-01').split('-'), D = N.dados, L = (D && D.linhas) || [];
+    const rs = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fdoc = d => d && d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d && d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : '';
+    const card = (l, i) => N.editar === l.gid ? `<form id="f-tomador" class="panel stack" style="padding:12px 14px" data-gid="${escH(l.gid)}">
+        <b>${escH(l.grupo)}</b><span class="sub">Dados de quem recebe os Pix desta pelada (o organizador).</span>
+        <label class="field"><span>Nome completo</span><input id="t-nome" value="${escH(l.nome)}" required></label>
+        <label class="field"><span>CPF ou CNPJ</span><input id="t-doc" inputmode="numeric" value="${escH(fdoc(l.doc))}" required></label>
+        <label class="field"><span>E-mail (para mandar a nota)</span><input id="t-email" type="email" value="${escH(l.email)}"></label>
+        <div class="row" style="gap:8px"><button class="btn primary" type="submit">Salvar</button><button class="btn" type="button" data-sh="nf-editar" data-v="">Cancelar</button></div></form>`
+      : `<div class="panel" style="padding:12px 14px;display:grid;gap:6px">
+        <div class="row" style="justify-content:space-between;gap:10px;flex-wrap:nowrap"><b>${escH(l.grupo)}</b><b class="num">${rs(l.total)}</b></div>
+        <div class="sub">${l.qtd} ${l.qtd === 1 ? 'Pix aprovado' : 'Pix aprovados'} no mês</div>
+        <div class="small">Tomador: <b>${escH(l.nome || '—')}</b>${l.doc ? ` · <span style="white-space:nowrap">${l.tipoDoc || 'CPF'} <span class="num">${fdoc(l.doc)}</span></span>` : ''}${l.email ? `<br>${escH(l.email)}` : ''}</div>
+        ${l.doc ? '' : '<div class="banner" style="margin:0">O Mercado Pago não informou o CPF deste organizador. Peça a ele e preencha para emitir a nota.</div>'}
+        <div class="row" style="gap:8px">${l.doc ? `<button class="btn sm primary" data-sh="nf-copiar" data-v="${i}">Copiar dados da nota</button>` : ''}<button class="btn sm" data-sh="nf-editar" data-v="${escH(l.gid)}">${l.doc ? 'Corrigir dados' : 'Preencher dados'}</button></div></div>`;
+    h = topo('perfil') + `<h2>Notas fiscais</h2><p class="lead">Comissão de 1% dos Pix, separada por organizador. Emita uma nota para cada um, uma vez por mês.</p>
+    <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:nowrap"><button class="btn sm" data-sh="nf-mes" data-v="-1" aria-label="Mês anterior">‹</button><b style="font-size:18px">${MESES[Number(mm) - 1]} de ${ano}</b><button class="btn sm" data-sh="nf-mes" data-v="1" aria-label="Próximo mês">›</button></div>
+    ${N.carregando ? '<p class="lead">Somando as comissões…</p>' : N.erro ? `<div class="banner">${escH(N.erro)}</div>` : !L.length ? '<p class="sub">Nenhuma comissão neste mês. Não precisa emitir nota.</p>' : `
+    <div class="panel" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center"><span>Total do mês · ${L.length} ${L.length === 1 ? 'nota' : 'notas'}</span><b class="num" style="font-size:20px">${rs(D.total)}</b></div>
+    <div class="stack" style="gap:10px">${L.map(card).join('')}</div>
+    <button class="btn block" data-sh="nf-planilha">Baixar planilha do mês</button>`}
+    <a class="btn block primary" href="https://www.nfse.gov.br/EmissorNacional/" target="_blank" rel="noopener">Abrir o Emissor Nacional (gratuito)</a>
+    <details class="panel" style="padding:12px 14px"><summary><b>Como emitir cada nota</b></summary><ol class="small" style="padding-left:20px;line-height:1.6;margin:8px 0 0">
+      <li>Entre no Emissor Nacional com o gov.br da Kathy ou com o certificado da empresa.</li>
+      <li>Toque em <b>Emitir NFS-e</b> e informe o CPF ou CNPJ e o nome do tomador (o organizador).</li>
+      <li>Serviço: use o código de <b>agenciamento e intermediação</b> que a contadora indicar.</li>
+      <li>Valor e descrição: toque em <b>Copiar dados da nota</b> aqui e cole.</li>
+      <li>Emita e mande a nota para o e-mail do organizador.</li></ol>
+      <p class="sub" style="margin:8px 0 0">Conta como comissão o Pix aprovado dentro do mês, pelo horário do Recife.</p></details>`; }
   if (t === 'excluir') { const X = UIp.exc || {}, lista = (n, L) => L && L.length ? `<li><b>${n}:</b> ${L.map(escH).join(', ')}</li>` : '';
     h = topo('perfil') + `<h2>Excluir minha conta</h2>
     ${X.carregando ? '<p class="lead">Verificando seus grupos…</p>' : X.bloqueia && X.bloqueia.length ? `<div class="banner" style="border-color:var(--red)"><b>Ainda não dá para excluir.</b> Você é o único administrador de: <b>${X.bloqueia.map(escH).join(', ')}</b>. Abra o grupo, vá em Ajustes e coloque outra pessoa como administradora (ou apague o grupo). Depois volte aqui.</div>` : `
@@ -483,6 +514,28 @@ async function contaServidor(acao) {
   if (!r.ok) throw Object.assign(new Error(j.erro || 'Não deu certo agora. Tente de novo.'), { bloqueia: j.bloqueia });
   return j;
 }
+const URL_NOTAS = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/notasPlataforma';
+// notas fiscais da comissão (só a empresa): 'acesso', 'relatorio' {mes} ou 'tomador' {gid, nome, doc, email}
+async function notasServidor(acao, extra) {
+  if (MOCK) {
+    if (acao === 'acesso') return { ok: true };
+    if (acao === 'tomador') { const l = (UIp.nfMock || []).find(x => x.gid === extra.gid); if (l) Object.assign(l, { nome: extra.nome, doc: extra.doc.replace(/\D/g, ''), email: extra.email, tipoDoc: extra.doc.replace(/\D/g, '').length === 14 ? 'CNPJ' : 'CPF' }); return { ok: true }; }
+    UIp.nfMock = UIp.nfMock || [{ gid: 'g1', grupo: 'Pelada de Quinta', qtd: 46, total: 37.62, nome: 'Maria Teste da Silva', doc: '12345678909', tipoDoc: 'CPF', email: 'maria@exemplo.com' }, { gid: 'g2', grupo: 'Fut do Pina', qtd: 18, total: 12.4, nome: 'João Exemplo', doc: '', tipoDoc: '', email: '' }];
+    return { mes: extra.mes, linhas: UIp.nfMock, total: UIp.nfMock.reduce((s, l) => s + l.total, 0) };
+  }
+  let t = null; try { t = await B.token(); } catch (e) { }
+  if (!t) throw new Error('Entre na sua conta de novo.');
+  let r; try { r = await fetch(URL_NOTAS, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify({ acao, ...(extra || {}) }) }); }
+  catch (e) { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.erro || 'Não deu certo agora. Tente de novo.');
+  return j;
+}
+async function carregarNotas() { const N = UIp.nf; N.carregando = true; N.erro = null; N.editar = null; render();
+  try { N.dados = await notasServidor('relatorio', { mes: N.mes }); } catch (e) { N.erro = e.message; N.dados = null; }
+  N.carregando = false; if (TELA === 'notas') render(); }
+function textoNota(l, mes) { const [a, m] = mes.split('-');
+  return `Tomador: ${l.nome}\n${l.tipoDoc || 'CPF'}: ${l.doc}\n${l.email ? 'E-mail: ' + l.email + '\n' : ''}Valor: ${Number(l.total).toFixed(2).replace('.', ',')}\nDescrição: Comissão de intermediação de pagamentos via aplicativo Pelada FC (grupo ${l.grupo}), competência ${m}/${a}. ${l.qtd} pagamentos por Pix.`; }
 // conectar (vai para o Mercado Pago autorizar) ou desconectar a conta do grupo
 window.mpConta = async acao => {
   if (!ABERTO) throw new Error('Abra a pelada de novo.');
@@ -610,6 +663,15 @@ document.addEventListener('click', async e => {
     $('n-dia-box').hidden = ev; $('n-fixa-box').hidden = ev;
     $('n-tipo-txt').textContent = ev ? 'Sem cobrança e sem dia fixo: o administrador marca cada pelada na data que quiser, e o grupo continua para os próximos eventos. Ninguém entra como mensalista nem diarista: quem confirma primeiro garante a vaga.' : 'Tem mensalistas e diaristas, e acontece toda semana no mesmo dia.'; }
   if (a === 'push-ativar') ativarPush();
+  if (a === 'notas') { const d = new Date(Date.now() - 3 * 36e5); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); UIp.nf = { mes: d.toISOString().slice(0, 7) }; ir('notas'); carregarNotas(); }
+  if (a === 'nf-mes') { const [y, m] = UIp.nf.mes.split('-').map(Number), d = new Date(Date.UTC(y, m - 1 + Number(v), 1)); UIp.nf.mes = d.toISOString().slice(0, 7); carregarNotas(); }
+  if (a === 'nf-editar') { UIp.nf.editar = v || null; render(); }
+  if (a === 'nf-copiar') { const l = UIp.nf.dados.linhas[Number(v)], txt = textoNota(l, UIp.nf.mes); try { await navigator.clipboard.writeText(txt); aviso('Dados da nota copiados.'); } catch (err) { aviso(txt); } }
+  if (a === 'nf-planilha') { const D = UIp.nf.dados, q = x => '"' + String(x ?? '').replace(/"/g, '""') + '"';
+    const linhas = [['Grupo', 'Tomador', 'Tipo', 'CPF/CNPJ', 'E-mail', 'Pix aprovados', 'Comissão (R$)', 'Descrição'].map(q).join(';')]
+      .concat(D.linhas.map(l => [l.grupo, l.nome, l.tipoDoc, l.doc, l.email, l.qtd, Number(l.total).toFixed(2).replace('.', ','), textoNota(l, D.mes).split('Descrição: ')[1]].map(q).join(';')));
+    const blob = new Blob(['\ufeff' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' }), u = URL.createObjectURL(blob), el = document.createElement('a');
+    el.href = u; el.download = `PeladaFC_notas_${D.mes}.csv`; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 2000); }
   if (a === 'ler-qr') abrirLeitor();
   if (a === 'fechar-leitor') fecharLeitor();
   if (a === 'qr-grupo') { UIp.qrg = v; ir('qr-grupo'); }
@@ -632,6 +694,9 @@ document.addEventListener('submit', async e => {
   const val = id => ($(id).value || '').trim();
   if (f.id === 'f-login') { if (!val('l-email') || !val('l-senha')) { aviso('Preencha e-mail e senha.'); return; } OCUPADO = true; try { await B.login(val('l-email'), $('l-senha').value); } catch (err) { aviso(msgErro(err)); } OCUPADO = false; }
   if (f.id === 'f-criar') { if (!val('c-nome2') || !val('c-email') || !$('c-senha').value) { aviso('Preencha nome, e-mail e senha.'); return; } OCUPADO = true; try { await B.cadastrar(val('c-nome2'), val('c-email'), $('c-senha').value); } catch (err) { aviso(msgErro(err)); } OCUPADO = false; }
+  if (f.id === 'f-tomador') { const doc = val('t-doc').replace(/\D/g, '');
+    if (!val('t-nome')) { aviso('Coloque o nome completo.'); return; } if (doc.length !== 11 && doc.length !== 14) { aviso('CPF ou CNPJ incompleto.'); return; }
+    OCUPADO = true; try { await notasServidor('tomador', { gid: f.dataset.gid, nome: val('t-nome'), doc, email: val('t-email') }); aviso('Dados salvos.'); OCUPADO = false; carregarNotas(); } catch (err) { OCUPADO = false; aviso(err.message); } return; }
   if (f.id === 'f-perfil') {
     if (!val('p-nome')) { aviso('Coloque seu nome.'); return; }
     const pos = UIp.pos || (PERFIL && PERFIL.pos) || 'MEI';

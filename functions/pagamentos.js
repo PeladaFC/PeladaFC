@@ -53,13 +53,16 @@ module.exports = db => {
     }
     return d;
   }
-  // nome e CPF (mascarado) do dono da conta do Mercado Pago conectada
-  async function dadosConta(token) {
+  // nome e CPF (mascarado) do dono da conta do Mercado Pago conectada (o grupo vê)
+  // e, à parte, os dados completos para a nota fiscal da comissão (só o servidor vê: segredos/nota)
+  async function dadosConta(token, gid) {
     try {
       const r = await fetch(MP + '/users/me', { headers: { Authorization: 'Bearer ' + token } }); if (!r.ok) return null;
       const u = await r.json(), id = u.identification || {}, n = String(id.number || '').replace(/\D/g, '');
       const doc = n.length === 11 ? `***.${n.slice(3, 6)}.${n.slice(6, 9)}-**` : n.length === 14 ? `**.***.${n.slice(5, 8)}/${n.slice(8, 12)}-**` : '';
-      return { nome: [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || u.nickname || '', doc, tipoDoc: id.type || '' };
+      const nome = [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || u.nickname || '';
+      if (gid) await db.doc(`grupos/${gid}/segredos/nota`).set({ nome, doc: n, tipoDoc: id.type || (n.length === 14 ? 'CNPJ' : n.length === 11 ? 'CPF' : ''), email: u.email || '', mpUser: u.id != null ? String(u.id) : null, origem: 'mp', em: Date.now() }, { merge: true }).catch(e => logger.warn('nota tomador', gid, e.message));
+      return { nome, doc, tipoDoc: id.type || '' };
     } catch (e) { return null; }
   }
   async function tokenMP(gid) { const d = await contaMP(gid); return d ? d.token : null; }
@@ -170,7 +173,8 @@ module.exports = db => {
       if (g2 !== gid || !tipo || !ref || !jid) return res.status(200).send('ok');
       const chave = `${tipo}_${ref}_${jid}`, cobRef = db.doc(`grupos/${gid}/cobrancas/${chave}`);
       const cob = (await cobRef.get()).data() || {};
-      await cobRef.set({ status: p.status, atualizadoEm: Date.now() }, { merge: true });
+      const feeMP = ((p.fee_details || []).find(f => f && f.type === 'application_fee') || {}).amount;
+      await cobRef.set({ status: p.status, atualizadoEm: Date.now(), ...(p.status === 'approved' && !cob.pagoEm ? { pagoEm: p.date_approved ? Date.parse(p.date_approved) || Date.now() : Date.now() } : {}), ...(feeMP != null ? { feeMP: Number(feeMP) } : {}) }, { merge: true });
       if (p.status === 'approved') {
         const val = { s: 'pago', d: hojeRecife(), v: Number(cob.base != null ? cob.base : p.transaction_amount), obs: 'Pix automático', via: 'pix', mp: String(p.id) };
         if (tipo === 'm') await db.doc(`grupos/${gid}/caixa/${ref}`).set({ mens: { [jid]: val } }, { merge: true });
@@ -193,7 +197,7 @@ module.exports = db => {
       if (!grupo || !(grupo.admins || []).includes(u.uid)) return res.status(403).json({ erro: 'Só o administrador pode fazer isso.' });
       if (acao === 'info') {
         const c = await contaMP(gid); if (!c || !c.token) return res.status(404).json({ erro: 'Nenhuma conta conectada.' });
-        const conta = await dadosConta(c.token); if (conta) await db.doc(`grupos/${gid}/config/geral`).set({ mpConta: conta }, { merge: true });
+        const conta = await dadosConta(c.token, gid); if (conta) await db.doc(`grupos/${gid}/config/geral`).set({ mpConta: conta }, { merge: true });
         return res.json({ conta });
       }
       if (acao === 'desconectar') {
@@ -222,12 +226,56 @@ module.exports = db => {
       const P = await plataforma();
       const n = await trocaOAuth({ client_id: P.id, client_secret: P.segredo, grant_type: 'authorization_code', code, redirect_uri: URL_RETORNO });
       await db.doc(`grupos/${e.gid}/segredos/mp`).set({ ...n, via: 'oauth', em: Date.now(), por: e.uid });
-      const conta = await dadosConta(n.token);
+      const conta = await dadosConta(n.token, e.gid);
       await db.doc(`grupos/${e.gid}/config/geral`).set({ mpConectadoEm: Date.now(), mpTaxaApp: P.comissao, mpTeste: false, mpDono: null, mpDonoJid: null, mpConta: conta || null }, { merge: true });
       logger.info('mp conectado', e.gid, n.mpUser);
       volta('ok');
     } catch (err) { logger.error(err); volta('erro'); }
   });
 
-  return { criarPix, mpWebhook, mpConectar, mpRetorno };
+  /* Notas fiscais da comissão (só para a empresa dona da plataforma).
+     Quem pode ver: os e-mails em servidor/plataforma.emails (gravados pelo configurar-notas.sh).
+     - acesso: diz se a pessoa logada pode ver
+     - relatorio {mes:'AAAA-MM'}: soma a comissão (1%) de cada grupo nos Pix aprovados no mês, com os dados do organizador
+     - tomador {gid, nome, doc, email}: corrige à mão os dados do organizador quando o Mercado Pago não informou */
+  async function daPlataforma(req) {
+    const u = await usuario(req), em = String(u.email || '').toLowerCase();
+    const d = (await ler('servidor/plataforma')) || {}, lista = (d.emails || []).map(x => String(x).toLowerCase().trim());
+    if (!em || !lista.includes(em)) throw erro('Acesso só para a empresa do Pelada FC.', 403);
+    return u;
+  }
+  const mesDe = ms => new Date(ms - 3 * 3600e3).toISOString().slice(0, 7);
+  const notasPlataforma = onRequest({ cors: true, maxInstances: 2, timeoutSeconds: 120 }, async (req, res) => {
+    try {
+      if (req.method !== 'POST') return res.status(405).json({ erro: 'Use POST.' });
+      await daPlataforma(req);
+      const b = req.body || {};
+      if (b.acao === 'acesso') return res.json({ ok: true });
+      if (b.acao === 'tomador') {
+        const gid = String(b.gid || ''), doc = String(b.doc || '').replace(/\D/g, '');
+        if (!gid || gid.includes('/') || !(await ler(`grupos/${gid}`))) return res.status(404).json({ erro: 'Grupo não encontrado.' });
+        if (doc.length !== 11 && doc.length !== 14) return res.status(400).json({ erro: 'CPF ou CNPJ inválido.' });
+        const nome = String(b.nome || '').trim().slice(0, 120); if (!nome) return res.status(400).json({ erro: 'Falta o nome.' });
+        await db.doc(`grupos/${gid}/segredos/nota`).set({ nome, doc, tipoDoc: doc.length === 14 ? 'CNPJ' : 'CPF', email: String(b.email || '').trim().slice(0, 120), origem: 'manual', em: Date.now() }, { merge: true });
+        return res.json({ ok: true });
+      }
+      if (b.acao !== 'relatorio' || !/^\d{4}-\d{2}$/.test(b.mes || '')) return res.status(400).json({ erro: 'Pedido inválido.' });
+      const linhas = [];
+      const grupos = await db.collection('grupos').get();
+      for (const g of grupos.docs) {
+        const cobs = await g.ref.collection('cobrancas').where('status', '==', 'approved').get();
+        let total = 0, qtd = 0;
+        cobs.forEach(c => { const x = c.data(), quando = x.pagoEm || x.atualizadoEm || x.criadoEm || 0; if (mesDe(quando) !== b.mes) return;
+          const f = Number(x.feeMP != null ? x.feeMP : x.fee) || 0; if (f > 0) { total += f; qtd++; } });
+        if (!qtd) continue;
+        const t = (await ler(`grupos/${g.id}/segredos/nota`)) || {}, cfg = (await ler(`grupos/${g.id}/config/geral`)) || {};
+        linhas.push({ gid: g.id, grupo: g.data().nome || 'Pelada', qtd, total: Math.round(total * 100) / 100,
+          nome: t.nome || (cfg.mpConta && cfg.mpConta.nome) || '', doc: t.doc || '', tipoDoc: t.tipoDoc || '', email: t.email || '', origem: t.origem || '' });
+      }
+      linhas.sort((a, c) => c.total - a.total);
+      res.json({ mes: b.mes, linhas, total: Math.round(linhas.reduce((s, l) => s + l.total, 0) * 100) / 100 });
+    } catch (e) { logger.error(e); res.status(e.http || 500).json({ erro: e.http ? e.message : 'Algo deu errado. Tente de novo.' }); }
+  });
+
+  return { criarPix, mpWebhook, mpConectar, mpRetorno, notasPlataforma };
 };
