@@ -268,7 +268,9 @@ module.exports = db => {
         cobs.forEach(c => { const x = c.data(), quando = x.pagoEm || x.atualizadoEm || x.criadoEm || 0; if (mesDe(quando) !== b.mes) return;
           const f = Number(x.feeMP != null ? x.feeMP : x.fee) || 0; if (f > 0) { total += f; qtd++; } });
         if (!qtd) continue;
-        const t = (await ler(`grupos/${g.id}/segredos/nota`)) || {}, cfg = (await ler(`grupos/${g.id}/config/geral`)) || {};
+        let t = await ler(`grupos/${g.id}/segredos/nota`);
+        if (!t || !t.doc) { const c = await contaMP(g.id); if (c && c.token) { await dadosConta(c.token, g.id); t = await ler(`grupos/${g.id}/segredos/nota`); } }
+        t = t || {}; const cfg = (await ler(`grupos/${g.id}/config/geral`)) || {};
         linhas.push({ gid: g.id, grupo: g.data().nome || 'Pelada', qtd, total: Math.round(total * 100) / 100,
           nome: t.nome || (cfg.mpConta && cfg.mpConta.nome) || '', doc: t.doc || '', tipoDoc: t.tipoDoc || '', email: t.email || '', origem: t.origem || '' });
       }
