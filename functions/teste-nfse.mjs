@@ -1,4 +1,4 @@
-// Pelada FC · teste da nota fiscal (roda sem certificado e sem enviar nada ao governo).
+// Pelota FC · teste da nota fiscal (roda sem certificado e sem enviar nada ao governo).
 // 1) monta a DPS com os mesmos dados que o servidor usa e valida no esquema oficial (XSD) da NFS-e Nacional
 // 2) simula a emissão com o emissor de mentira da biblioteca e gera o PDF da nota
 // Uso: node functions/teste-nfse.mjs   (o instalar.sh roda sozinho)

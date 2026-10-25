@@ -1,4 +1,4 @@
-/* Pelada FC · nota fiscal (NFS-e) da comissão do app, direto no Emissor Nacional (nfse.gov.br).
+/* Pelota FC · nota fiscal (NFS-e) da comissão do app, direto no Emissor Nacional (nfse.gov.br).
    Sem serviço pago no meio: o único requisito é o certificado digital A1 da empresa.
    Usa a biblioteca aberta open-nfse (MIT), que monta a DPS, valida no esquema oficial, assina e envia.
 
@@ -18,7 +18,7 @@ const { onRequest } = require('firebase-functions/v2/https');
 const logger = require('firebase-functions/logger');
 
 const COD_RECIFE = '2611606';
-const VER_APLIC = 'PeladaFC-1';
+const VER_APLIC = 'PelotaFC-1';
 
 module.exports = (db, PAG) => {
   const erro = (m, http) => Object.assign(new Error(m), { http });
@@ -28,7 +28,7 @@ module.exports = (db, PAG) => {
   const idNota = (mes, gid) => `${mes}_${gid}`;
   const mesAnterior = agora => { const d = new Date((agora || Date.now()) - 3 * 3600e3); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 7); };
   const descricao = (l, mes) => { const [a, m] = mes.split('-');
-    return `Comissão de intermediação de pagamentos via aplicativo Pelada FC (grupo ${l.grupo}), competência ${m}/${a}. ${l.qtd} pagamento${l.qtd === 1 ? '' : 's'} por Pix.`.slice(0, 1000); };
+    return `Comissão de intermediação de pagamentos via aplicativo Pelota FC (grupo ${l.grupo}), competência ${m}/${a}. ${l.qtd} pagamento${l.qtd === 1 ? '' : 's'} por Pix.`.slice(0, 1000); };
 
   /* ---------- configuração ---------- */
   const config = async () => (await ler('servidor/nfse')) || {};
@@ -156,14 +156,14 @@ module.exports = (db, PAG) => {
     if (!n || n.status !== 'ok' || !n.xml) throw erro('Nota não encontrada.', 404);
     const L = await lib();
     const buf = await L.gerarDanfse(L.parseNfseXml(n.xml), { ambiente: n.ambiente === 'producao' ? L.Ambiente.Producao : L.Ambiente.ProducaoRestrita });
-    return { pdf: Buffer.from(buf).toString('base64'), nome: `PeladaFC_nota_${mes}.pdf`, chave: n.chave };
+    return { pdf: Buffer.from(buf).toString('base64'), nome: `PelotaFC_nota_${mes}.pdf`, chave: n.chave };
   }
 
   /* ---------- relatório e ações da empresa ---------- */
   async function daPlataforma(req) {
     const u = await PAG.usuario(req), em = String(u.email || '').toLowerCase();
     const d = (await ler('servidor/plataforma')) || {}, lista = (d.emails || []).map(x => String(x).toLowerCase().trim());
-    if (!em || !lista.includes(em)) throw erro('Acesso só para a empresa do Pelada FC.', 403);
+    if (!em || !lista.includes(em)) throw erro('Acesso só para a empresa do Pelota FC.', 403);
     return u;
   }
   const mesOk = m => /^\d{4}-(0[1-9]|1[0-2])$/.test(m || '');

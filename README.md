@@ -1,4 +1,4 @@
-# Pelada FC
+# Pelota FC
 
 App para organizar pelada: elenco com notas, presença (mensalistas e diaristas), sorteio de times equilibrados, pós-jogo com prêmios e artes, ranking, caixa, locais avaliados e avisos.
 

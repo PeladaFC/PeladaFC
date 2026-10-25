@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Pelada FC · grava as credenciais da aplicação do Mercado Pago da plataforma (para o split/comissão).
+# Pelota FC · grava as credenciais da aplicação do Mercado Pago da plataforma (para o split/comissão).
 # Rodar no Cloud Shell, logado com a conta dona do projeto:
 #   curl -sL https://raw.githubusercontent.com/PeladaFC/PeladaFC/main/configurar-mp.sh | bash
 # Os dados vão direto para o banco (servidor/mp), que o app não consegue ler.
 set -euo pipefail
 PROJ=pelada-fc-990d6
-echo "==> Credenciais da aplicação do Mercado Pago (Suas integrações → Pelada FC → Credenciais de produção)"
+echo "==> Credenciais da aplicação do Mercado Pago (Suas integrações → Pelota FC → Credenciais de produção)"
 read -r -p "Client ID (só números): " CID </dev/tty
 read -r -s -p "Client Secret (não aparece enquanto digita/cola): " CSEC </dev/tty; echo
 read -r -p "Comissão do app em % [1]: " COM </dev/tty; COM=${COM:-1}

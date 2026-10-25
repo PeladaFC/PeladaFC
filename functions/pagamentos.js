@@ -1,4 +1,4 @@
-/* Pelada FC · Pix automático pelo Mercado Pago, com comissão da plataforma (split).
+/* Pelota FC · Pix automático pelo Mercado Pago, com comissão da plataforma (split).
    - mpConectar: o administrador do grupo toca em "Conectar Mercado Pago"; o servidor devolve o
      endereço de autorização do Mercado Pago (OAuth) ou desconecta a conta.
    - mpRetorno: o Mercado Pago volta para cá com um código; o servidor troca pela chave da conta

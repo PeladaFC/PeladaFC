@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pelada FC · liga a emissão automática da nota fiscal da comissão (Emissor Nacional de NFS-e).
+# Pelota FC · liga a emissão automática da nota fiscal da comissão (Emissor Nacional de NFS-e).
 # Antes de rodar:
 #   1. Tenha o certificado digital A1 da empresa (arquivo .pfx ou .p12) e a senha dele.
 #   2. No Cloud Shell, clique nos três pontinhos (⋮) → "Fazer upload" e envie o arquivo do certificado.

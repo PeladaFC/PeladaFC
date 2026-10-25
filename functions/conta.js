@@ -1,4 +1,4 @@
-/* Pelada FC · excluir a própria conta (exigência das lojas).
+/* Pelota FC · excluir a própria conta (exigência das lojas).
    Apaga o perfil, as inscrições de notificação e a participação em cada grupo; depois apaga o login.
    Grupos: se a pessoa for a única administradora e houver outras pessoas no grupo, a exclusão é bloqueada
    até ela passar a administração para alguém. Se for a única pessoa do grupo, o grupo é apagado junto.

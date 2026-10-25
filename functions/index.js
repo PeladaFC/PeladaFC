@@ -1,4 +1,4 @@
-/* Pelada FC · servidor de notificações (Firebase Cloud Functions, 2ª geração)
+/* Pelota FC · servidor de notificações (Firebase Cloud Functions, 2ª geração)
    Usa o padrão aberto Web Push (VAPID). As chaves e as inscrições ficam no próprio Firestore,
    então dá para levar tudo para outro servidor (ex.: Cloudflare) sem ninguém precisar reativar nada.
 

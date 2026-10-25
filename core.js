@@ -622,7 +622,7 @@ function msg0(tipo,ctx={}){
     if(d.mens.length){out.push(`*Mensalidade* (${BRL(precoM(m))})`);d.mens.forEach(id=>out.push('• '+nm(id)))}
     if(d.dia.length){out.push('',EV()?'*Eventos*':`*Diárias*`);d.dia.forEach(x=>out.push(`• ${nm(x.id)} · ${dShort(x.data)} · ${BRL(x.pid&&S.pel[x.pid]?valorDe(S.pel[x.pid],x.id):precoD(m))}`))}
     d.ext.forEach(x=>{out.push('',`*${x.nome}* (${BRL(x.v)})`);x.ids.forEach(id=>out.push('• '+nm(id)))});
-    if(mpOn())out.push('','Pague pelo app Pelada FC: o Pix é confirmado na hora. 📲');return out.join('\n')}
+    if(mpOn())out.push('','Pague pelo app Pelota FC: o Pix é confirmado na hora. 📲');return out.join('\n')}
   if(tipo==='convite'){const j=ctx.jid?J(ctx.jid):null;
     return[`Fala${j?', '+(j.apelido||j.nome.split(' ')[0]):''}! 👋`,`Você está convidado pra *${c.nome}*.`,(()=>{const pe2=atual();return pe2?`📅 Próxima: *${dLong(pe2[1].data)}* às *${pe2[1].hora||c.hora}*`:EV()?'📅 Datas livres: o administrador avisa cada pelada no app':`📅 ${[0,6].includes(Number(c.dia))?'Todo':'Toda'} ${DIAS[c.dia].toLowerCase()} às ${c.hora}`})(),(()=>{const pe2=atual(),LL=localDe(pe2&&pe2[1]);return LL?'📍 '+LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):''})(),linkConvite()?'\nEntre na pelada pelo app: '+linkConvite():'',INSTALAR,'\nConfirma por aqui se topa!'].filter(Boolean).join('\n')}
   return'';
@@ -1961,7 +1961,7 @@ function sheetNaHora(){const m=mesAtual(),ids=ativos().sort((a,b)=>nm(a).localeC
     <div class="list">${L.map(([id,x])=>x.map(y=>`<button class="item" style="width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line)" data-act="nahora" data-t="${y.tipo}" data-r="${esc(y.ref)}" data-j="${id}"><div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub">${esc(y.desc)}</div></div><b class="num">${BRL(y.v)}</b></button>`).join('')).join('')||'<div class="empty">Ninguém devendo agora. 🙌</div>'}</div></div>`)}
 function pixPago(x){if(!x)return false;if(x.tipo==='x'){const[mx,xid]=x.ref.split('~'),e=((S.caixa[mx]||{}).extras||{})[xid];return!!(e&&stPag((e.pag||{})[x.jid]))}if(x.tipo==='m')return!!stPag(((S.caixa[x.ref]||{}).mens||{})[x.jid]);const p=S.pel[x.ref];return!!(p&&stPag((p.diarias||{})[x.jid]))}
 async function sheetPix(x){UI.pixAberto=x;openSheet('Pagar com Pix','<div class="empty">Gerando o Pix…</div>');
-  let d;try{d=demo?{valor:cfg().pixRepassa!==false?Math.ceil(x.v/(1-taxaTotal())*100)/100:x.v,base:x.v,qr:'00020126580014br.gov.bcb.pix0136demo-pelada-fc5204000053039865802BR5925PELADA FC DEMO6009RECIFE62070503***6304ABCD',qr64:'',link:'',demo:true}:await window.pixCriar({tipo:x.tipo,ref:x.ref,jid:x.jid})}
+  let d;try{d=demo?{valor:cfg().pixRepassa!==false?Math.ceil(x.v/(1-taxaTotal())*100)/100:x.v,base:x.v,qr:'00020126580014br.gov.bcb.pix0136demo-pelada-fc5204000053039865802BR5925PELOTA FC DEMO6009RECIFE62070503***6304ABCD',qr64:'',link:'',demo:true}:await window.pixCriar({tipo:x.tipo,ref:x.ref,jid:x.jid})}
   catch(e){const b=document.getElementById('sheet-body');if(b)b.innerHTML=`<div class="stack"><div class="banner due" style="display:block">${esc(e.message||'Não deu para gerar o Pix agora.')}</div><button class="btn block" data-act="close">Fechar</button></div>`;return}
   UI.pixDado=d;const b=document.getElementById('sheet-body');if(!b||UI.pixAberto!==x)return;
   const outro=x.jid!==meuJogador();
@@ -1994,7 +1994,7 @@ function sheetConfirmaMP(){const c=cfg(),m=c.mpConta;openSheet('Confira a conta 
 /* notas fiscais da comissão de 1% (emitidas pela empresa do app no CPF/CNPJ de quem recebe) */
 function sheetNotasMP(){const R=UI.notasMP;const rs=v=>'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
   openSheet('Notas fiscais da comissão',`<div class="stack small">
-  <p style="margin:0">O Pelada FC fica com <b>1% de cada Pix</b> que cai na conta do Mercado Pago da pelada. Todo mês, a empresa do app emite uma nota fiscal desse valor no CPF ou CNPJ do dono da conta. Ela aparece aqui para você baixar.</p>
+  <p style="margin:0">O Pelota FC fica com <b>1% de cada Pix</b> que cai na conta do Mercado Pago da pelada. Todo mês, a empresa do app emite uma nota fiscal desse valor no CPF ou CNPJ do dono da conta. Ela aparece aqui para você baixar.</p>
   ${!R||R.carregando?'<p class="sub" style="margin:0">Buscando as notas…</p>':R.erro?`<div class="banner" style="margin:0">${esc(R.erro)}</div>`:!R.notas.length?'<p class="sub" style="margin:0">Nenhuma nota ainda. A primeira sai no dia 1º do mês seguinte ao primeiro Pix pelo app.</p>':
   `<div class="stack" style="gap:8px">${R.notas.map(n=>{const[a,m]=n.mes.split('-');return`<div class="panel row between" style="padding:10px 12px;flex-wrap:nowrap"><div><b>${MESES[Number(m)-1]} de ${a}</b><div class="sub">${rs(n.valor)}${n.teste?' · teste, sem valor fiscal':''}</div></div><button type="button" class="btn sm primary" data-act="mp-nota-pdf" data-v="${esc(n.mes)}">Baixar PDF</button></div>`}).join('')}</div>`}
   <p class="sub" style="margin:0">Cada nota tem uma chave de acesso e um QR Code no PDF para conferir no site oficial (nfse.gov.br).</p>
@@ -2685,7 +2685,7 @@ function obRender(){
   const top=(back)=>`<div class="ob-top">${back?`<button class="btn sm" data-act="ob" data-v="${back}">‹ Voltar</button>`:'<span></span>'}<span class="ob-sim">Simulação</span><button class="btn sm" data-act="ob-sair">Sair</button></div>`;
   const prog=(n,t)=>`<div class="ob-prog">${Array.from({length:t},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')}</div>`;
   let h='';
-  if(st==='boas')h=top()+`<div class="ob-hero"><div class="ob-logo">Pelada<br><span>FC</span></div><p>Organize a pelada, sorteie times equilibrados e acompanhe quem é o craque da galera.</p></div>
+  if(st==='boas')h=top()+`<div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Organize a pelada, sorteie times equilibrados e acompanhe quem é o craque da galera.</p></div>
     <button class="btn primary block" data-act="ob" data-v="criar">Criar conta</button>
     <button class="btn block" data-act="ob" data-v="login">Já tenho conta</button>
     <div class="ob-div">ou</div>
@@ -2733,7 +2733,7 @@ function obRender(){
     <div class="grid2"><label class="field"><span>Mensalidade (R$)</span><input type="number" id="ob-pm" value="80"></label><label class="field"><span>Diária (R$)</span><input type="number" id="ob-pdi" value="20"></label></div>
     <button class="btn primary block" data-act="ob" data-v="convidar">Criar pelada</button>`;
   if(st==='convidar')h=top('nova')+`<h2>Chame a galera</h2><p class="lead">Mande o link no grupo. Cada um cria a conta e entra direto na sua pelada.</p>
-    <div class="ob-inv"><div class="h"><b>Pelada do Sábado</b></div><div class="b"><div class="sub">Link de convite</div><div class="num" style="font-weight:700;word-break:break-all">peladafc.app/c/SAB8H2</div><div class="sub">Código: <b>SAB8H2</b></div></div></div>
+    <div class="ob-inv"><div class="h"><b>Pelada do Sábado</b></div><div class="b"><div class="sub">Link de convite</div><div class="num" style="font-weight:700;word-break:break-all">pelotafc.app/c/SAB8H2</div><div class="sub">Código: <b>SAB8H2</b></div></div></div>
     <button class="btn block" data-act="ob-toast" data-v="Abriria o WhatsApp com o convite pronto.">Enviar convite no WhatsApp</button>
     <button class="btn block" data-act="ob-toast" data-v="Link copiado (simulação).">Copiar link</button>
     <button class="btn primary block" data-act="ob" data-v="minhas">Ir para minhas peladas</button>`;
@@ -2831,7 +2831,7 @@ function pdfPrestacao(texto){
   // monta o arquivo
   const objs=[],n=pages.length,add=s=>{objs.push(s);return objs.length};
   add('<< /Type /Catalog /Pages 2 0 R >>');add('');add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
-  const kids=[];pages.forEach((c,i)=>{const rodape=`BT /F1 8 Tf ${CINZA} rg ${M} 24 Td (${pdfEsc('Gerado pelo app Pelada FC · página '+(i+1)+' de '+n)}) Tj ET`,st=c+'\n'+rodape;
+  const kids=[];pages.forEach((c,i)=>{const rodape=`BT /F1 8 Tf ${CINZA} rg ${M} 24 Td (${pdfEsc('Gerado pelo app Pelota FC · página '+(i+1)+' de '+n)}) Tj ET`,st=c+'\n'+rodape;
     const ci=add(`<< /Length ${st.length} >>\nstream\n${st}\nendstream`);kids.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${ci} 0 R >>`))});
   objs[1]=`<< /Type /Pages /Kids [${kids.map(k=>k+' 0 R').join(' ')}] /Count ${n} >>`;
   let out='%PDF-1.4\n',xref=[];objs.forEach((o,i)=>{xref.push(out.length);out+=`${i+1} 0 obj\n${o}\nendobj\n`});
@@ -2850,7 +2850,7 @@ function pdfNovo(){const W=595,H=842,M=36,pages=[];let ops=null;const rgb=h=>{h=
     cabe(h){if(P.y+h>H-M-14){P.pagina();return false}return true},
     fim(){pages.push(ops.join('\n'));const n=pages.length,objs=[];const add=x=>{objs.push(x);return objs.length};
       add('<< /Type /Catalog /Pages 2 0 R >>');add('');add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
-      const kids=[];pages.forEach((c,i)=>{const st=c+`\nBT /F1 7.5 Tf ${rgb('#7A847E')} rg ${M} 20 Td (${pdfEsc('Gerado pelo app Pelada FC · página '+(i+1)+' de '+n)}) Tj ET`;const ci=add(`<< /Length ${st.length} >>\nstream\n${st}\nendstream`);kids.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${ci} 0 R >>`))});
+      const kids=[];pages.forEach((c,i)=>{const st=c+`\nBT /F1 7.5 Tf ${rgb('#7A847E')} rg ${M} 20 Td (${pdfEsc('Gerado pelo app Pelota FC · página '+(i+1)+' de '+n)}) Tj ET`;const ci=add(`<< /Length ${st.length} >>\nstream\n${st}\nendstream`);kids.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${ci} 0 R >>`))});
       objs[1]=`<< /Type /Pages /Kids [${kids.map(k=>k+' 0 R').join(' ')}] /Count ${n} >>`;let out='%PDF-1.4\n';const xr=[];objs.forEach((o,i)=>{xr.push(out.length);out+=`${i+1} 0 obj\n${o}\nendobj\n`});
       const xs=out.length;out+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`+xr.map(x=>String(x).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xs}\n%%EOF`;
       const by=new Uint8Array(out.length);for(let i=0;i<out.length;i++)by[i]=out.charCodeAt(i)&255;return new Blob([by],{type:'application/pdf'})}};

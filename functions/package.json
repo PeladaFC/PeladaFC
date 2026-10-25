@@ -1,7 +1,7 @@
 {
   "name": "pelada-fc-servidor",
   "private": true,
-  "description": "Servidor do Pelada FC: notificações, Pix e nota fiscal da comissão (Firebase Cloud Functions)",
+  "description": "Servidor do Pelota FC: notificações, Pix e nota fiscal da comissão (Firebase Cloud Functions)",
   "main": "index.js",
   "engines": { "node": "22" },
   "scripts": { "test": "node teste.js" },

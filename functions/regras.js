@@ -1,4 +1,4 @@
-/* Pelada FC · regras das notificações (sem dependências, testável com node teste.js)
+/* Pelota FC · regras das notificações (sem dependências, testável com node teste.js)
    Recebe os dados como estão no banco e devolve a lista de avisos a mandar:
    [{ para: [uid, ...], titulo, texto, tag }] */
 'use strict';

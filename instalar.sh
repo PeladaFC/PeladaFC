@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Pelada FC · instala/atualiza o servidor de notificações e as regras de segurança.
+# Pelota FC · instala/atualiza o servidor de notificações e as regras de segurança.
 # Rodar no Cloud Shell do Google (shell.cloud.google.com), logado com a conta dona do projeto:
 #   curl -sL https://raw.githubusercontent.com/PeladaFC/PeladaFC/main/instalar.sh | bash
 set -euo pipefail
 PROJ=pelada-fc-990d6
 DIR="$HOME/PeladaFC"
-echo "==> Baixando a versão mais nova do Pelada FC"
+echo "==> Baixando a versão mais nova do Pelota FC"
 if [ -d "$DIR/.git" ]; then git -C "$DIR" fetch -q origin main && git -C "$DIR" reset -q --hard origin/main; else git clone -q https://github.com/PeladaFC/PeladaFC.git "$DIR"; fi
 cd "$DIR"
 echo "==> Testando as regras das notificações"
@@ -57,4 +57,4 @@ echo "==> Limpando cópias antigas do servidor (evita custo de armazenamento)"
 $FB functions:artifacts:setpolicy --project "$PROJ" --location southamerica-east1 --days 1 --force >/dev/null 2>&1 || true
 echo
 echo "✅ Pronto! Servidor (notificações e Pix automático) publicado e regras atualizadas."
-echo "   Agora abra o Pelada FC pelo ícone e toque em 'Ativar notificações'."
+echo "   Agora abra o Pelota FC pelo ícone e toque em 'Ativar notificações'."

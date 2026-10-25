@@ -1,4 +1,4 @@
-/* Pelada FC · casca do app: login, Minhas peladas, criar e entrar por convite.
+/* Pelota FC · casca do app: login, Minhas peladas, criar e entrar por convite.
    Liga o núcleo (core.js) ao Firebase. Com ?mock=1 usa um banco de teste na memória. */
 
 const firebaseConfig = {
@@ -126,7 +126,7 @@ window.qrSVG = texto => {
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) d += `M${x + m} ${y + m}h1v1h-1z`;
   return `<svg viewBox="0 0 ${t} ${t}" width="100%" role="img" aria-label="QR Code" shape-rendering="crispEdges" style="display:block"><rect width="${t}" height="${t}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
 };
-const MSG_APP = `⚽ *Pelada FC*\nOrganize sua pelada: lista de presença, sorteio de times equilibrados, notas, artilharia e ranking.\n\n👉 ${LINK_APP}\n\n📲 *Para ter o app no celular:*\niPhone: abra o link no Safari → Compartilhar → Adicionar à Tela de Início\nAndroid: abra no Chrome → menu ⋮ → Instalar app`;
+const MSG_APP = `⚽ *Pelota FC*\nOrganize sua pelada: lista de presença, sorteio de times equilibrados, notas, artilharia e ranking.\n\n👉 ${LINK_APP}\n\n📲 *Para ter o app no celular:*\niPhone: abra o link no Safari → Compartilhar → Adicionar à Tela de Início\nAndroid: abra no Chrome → menu ⋮ → Instalar app`;
 
 /* ================= Leitor de QR Code ================= */
 let LEITOR = null;
@@ -179,7 +179,7 @@ if (pend) { ls.set('pelada.convite', pend.toUpperCase()); history.replaceState(n
 
 function mostrarCasca(on) {
   $('shell').hidden = !on; $('app').hidden = on; $('nav').hidden = on;
-  if (on) { $('push').hidden = true; document.title = 'Pelada FC'; }
+  if (on) { $('push').hidden = true; document.title = 'Pelota FC'; }
 }
 function ir(t) { TELA = t; mostrarCasca(true); render(); }
 
@@ -190,8 +190,8 @@ function topo(voltar) {
 function render() {
   const el = $('shell'); let h = '';
   const t = TELA;
-  if (t === 'carregando') h = `<div class="ob-hero"><div class="ob-logo">Pelada<br><span>FC</span></div><p>Carregando…</p></div>`;
-  if (t === 'boas') h = `<div class="ob-hero"><div class="ob-logo">Pelada<br><span>FC</span></div><p>Organize a pelada, sorteie times equilibrados e acompanhe quem é o craque da galera.</p></div>
+  if (t === 'carregando') h = `<div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Carregando…</p></div>`;
+  if (t === 'boas') h = `<div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Organize a pelada, sorteie times equilibrados e acompanhe quem é o craque da galera.</p></div>
     ${ls.get('pelada.convite') ? `<div class="banner due"><span><b>Você recebeu um convite!</b><br>Crie sua conta ou entre para participar.</span></div>` : ''}
     <button class="btn primary block" data-sh="ir" data-v="criar">Criar conta</button>
     <button class="btn block" data-sh="ir" data-v="login">Já tenho conta</button>
@@ -297,7 +297,7 @@ function render() {
     const nomeEu = (PERFIL?.apelido || PERFIL?.nome || '').split(/\s+/)[0];
     const hr = new Date().getHours(), ola = hr < 5 ? 'Boa noite' : hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
     const eu = PERFIL || {};
-    h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELADA FC</span><button class="eu-av" data-sh="ir" data-v="perfil" aria-label="Meu perfil" style="${eu.foto ? `background-image:url('${eu.foto}')` : ''}">${eu.foto ? '' : ini(eu.apelido || eu.nome)}</button></div>
+    h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELOTA FC</span><button class="eu-av" data-sh="ir" data-v="perfil" aria-label="Meu perfil" style="${eu.foto ? `background-image:url('${eu.foto}')` : ''}">${eu.foto ? '' : ini(eu.apelido || eu.nome)}</button></div>
     ${prox ? `<button class="home-hero" data-sh="abrir" data-v="${prox.g}"><span class="hh-ola">${ola}${nomeEu ? ', ' + escH(nomeEu) : ''}.</span><span class="hh-q">${escH(falta(prox.d, true))}</span><span class="hh-n">${escH(GRUPOS[prox.g].nome || 'Pelada')}</span><span class="hh-ir">Abrir pelada</span></button>`
       : `<div class="home-hero"><span class="hh-ola">${ola}${nomeEu ? ', ' + escH(nomeEu) : ''}.</span><span class="hh-q">${ids.length ? 'Sem jogo marcado' : 'Bora jogar?'}</span><span class="hh-n">${ids.length ? 'Quando marcarem a próxima, ela aparece aqui.' : 'Crie sua pelada ou entre com o código de um convite.'}</span></div>`}
     ${ids.filter(avAb).map(g => `<button class="alerta-av" data-sh="avaliar" data-v="${g}"><span class="ic">⭐</span><span><b>Avaliação da galera aberta!</b>${escH(GRUPOS[g].nome || 'Pelada')} · dê sua nota para o elenco</span><span class="ir">Avaliar</span></button>`).join('')}
@@ -564,7 +564,7 @@ async function carregarNotas() { const N = UIp.nf; N.carregando = true; N.erro =
   try { N.dados = await notasServidor('relatorio', { mes: N.mes }); } catch (e) { N.erro = e.message; N.dados = null; }
   N.carregando = false; if (TELA === 'notas') render(); }
 function textoNota(l, mes) { const [a, m] = mes.split('-');
-  return `Tomador: ${l.nome}\n${l.tipoDoc || 'CPF'}: ${l.doc}\n${l.email ? 'E-mail: ' + l.email + '\n' : ''}Valor: ${Number(l.total).toFixed(2).replace('.', ',')}\nDescrição: Comissão de intermediação de pagamentos via aplicativo Pelada FC (grupo ${l.grupo}), competência ${m}/${a}. ${l.qtd} pagamentos por Pix.`; }
+  return `Tomador: ${l.nome}\n${l.tipoDoc || 'CPF'}: ${l.doc}\n${l.email ? 'E-mail: ' + l.email + '\n' : ''}Valor: ${Number(l.total).toFixed(2).replace('.', ',')}\nDescrição: Comissão de intermediação de pagamentos via aplicativo Pelota FC (grupo ${l.grupo}), competência ${m}/${a}. ${l.qtd} pagamentos por Pix.`; }
 // conectar (vai para o Mercado Pago autorizar) ou desconectar a conta do grupo
 window.mpConta = async acao => {
   if (!ABERTO) throw new Error('Abra a pelada de novo.');
@@ -589,7 +589,7 @@ window.mpConta = async acao => {
 window.pixCriar = async ({ tipo, ref, jid }) => {
   if (!ABERTO) throw new Error('Abra a pelada de novo.');
   if (MOCK) {
-    const d = { mpId: 'mock' + Date.now(), valor: 80, base: 80, status: 'pending', qr: '00020126580014br.gov.bcb.pix0136teste-mock5204000053039865802BR5925PELADA FC TESTE6009RECIFE62070503***6304ABCD', qr64: '', link: '', criadoEm: Date.now(), tipo, ref, jid };
+    const d = { mpId: 'mock' + Date.now(), valor: 80, base: 80, status: 'pending', qr: '00020126580014br.gov.bcb.pix0136teste-mock5204000053039865802BR5925PELOTA FC TESTE6009RECIFE62070503***6304ABCD', qr64: '', link: '', criadoEm: Date.now(), tipo, ref, jid };
     await B.set(`grupos/${ABERTO}/cobrancas/${tipo}_${ref}_${jid}`, d); window.__ultimaCobranca = { gid: ABERTO, tipo, ref, jid }; return d;
   }
   let t = null; try { t = await B.token(); } catch (e) { }
@@ -664,9 +664,9 @@ function cartaoPush() {
   if (e === 'carregando' || e === 'indisponivel') return '';
   if (e === 'ativo') return `<div class="sub" style="text-align:center">🔔 Notificações ativadas neste celular</div>`;
   const box = (ic, tit, txt, btn) => `<div class="ob-opt" style="padding:12px 14px;cursor:default"><span class="ic" style="background:var(--pitch-soft)">${ic}</span><span class="grow"><b>${tit}</b><span class="sub">${txt}</span>${btn || ''}</span></div>`;
-  if (e === 'abrir-icone') return box('📲', 'Receba os avisos da pelada', 'Para ativar as notificações, abra o Pelada FC pelo ícone na tela de início do iPhone.');
+  if (e === 'abrir-icone') return box('📲', 'Receba os avisos da pelada', 'Para ativar as notificações, abra o Pelota FC pelo ícone na tela de início do iPhone.');
   if (e === 'sem-suporte') return box('📵', 'Notificações indisponíveis', 'Este celular não aceita notificações de app da web. No iPhone, precisa do iOS 16.4 ou mais novo.');
-  if (e === 'bloqueado') return box('🔕', 'Notificações bloqueadas', 'Para liberar: Ajustes do celular → Notificações → Pelada FC → Permitir.');
+  if (e === 'bloqueado') return box('🔕', 'Notificações bloqueadas', 'Para liberar: Ajustes do celular → Notificações → Pelota FC → Permitir.');
   return box('🔔', 'Receba os avisos da pelada', 'Pelada marcada, times, vaga liberada e notas chegam no celular, mesmo com o app fechado.', '<button class="btn primary sm" data-sh="push-ativar" style="margin-top:8px">Ativar notificações</button>');
 }
 
@@ -702,14 +702,14 @@ document.addEventListener('click', async e => {
     const linhas = [['Grupo', 'Tomador', 'Tipo', 'CPF/CNPJ', 'E-mail', 'Pix aprovados', 'Comissão (R$)', 'Descrição'].map(q).join(';')]
       .concat(D.linhas.map(l => [l.grupo, l.nome, l.tipoDoc, l.doc, l.email, l.qtd, Number(l.total).toFixed(2).replace('.', ','), textoNota(l, D.mes).split('Descrição: ')[1]].map(q).join(';')));
     const blob = new Blob(['\ufeff' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' }), u = URL.createObjectURL(blob), el = document.createElement('a');
-    el.href = u; el.download = `PeladaFC_notas_${D.mes}.csv`; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 2000); }
+    el.href = u; el.download = `PelotaFC_notas_${D.mes}.csv`; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 2000); }
   if (a === 'ler-qr') abrirLeitor();
   if (a === 'fechar-leitor') fecharLeitor();
   if (a === 'qr-grupo') { UIp.qrg = v; ir('qr-grupo'); }
   if (a === 'copiar-qrg') { try { await navigator.clipboard.writeText(UIp.qrLink); aviso('Link da pelada copiado.'); } catch (err) { aviso(UIp.qrLink); } }
-  if (a === 'share-qrg') { try { await navigator.share({ title: 'Pelada FC', text: UIp.qrTxt }); } catch (err) { } }
+  if (a === 'share-qrg') { try { await navigator.share({ title: 'Pelota FC', text: UIp.qrTxt }); } catch (err) { } }
   if (a === 'copiar-app') { try { await navigator.clipboard.writeText(LINK_APP); aviso('Link do app copiado.'); } catch (err) { aviso(LINK_APP); } }
-  if (a === 'share-app') { try { await navigator.share({ title: 'Pelada FC', text: MSG_APP }); } catch (err) { } }
+  if (a === 'share-app') { try { await navigator.share({ title: 'Pelota FC', text: MSG_APP }); } catch (err) { } }
   if (a === 'aceitar') aceitarConvite();
   if (a === 'demo') { mostrarCasca(false); window.abrirDemo(); }
 });
@@ -749,7 +749,7 @@ document.addEventListener('submit', async e => {
 (async () => {
   mostrarCasca(true); render();
   try { B = MOCK ? backendMock() : await backendReal(); }
-  catch (e) { console.error(e); $('shell').innerHTML = `<div class="ob-in"><div class="ob-hero"><div class="ob-logo">Pelada<br><span>FC</span></div><p>Não foi possível conectar. Verifique a internet e abra o app de novo.</p></div></div>`; return; }
+  catch (e) { console.error(e); $('shell').innerHTML = `<div class="ob-in"><div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Não foi possível conectar. Verifique a internet e abra o app de novo.</p></div></div>`; return; }
   B.onAuth(async u => {
     const antes = EU && EU.uid;
     EU = u;
