@@ -319,8 +319,15 @@ module.exports = (db, PAG) => {
       // fase 2: o servidor grava em segredos/assinatura (o organizador não mexe): ativa, repEncerradoEm (cancelou: a comissão se encerra) e repValorMes
       const [cfg, ass] = await Promise.all([ler(`grupos/${d.id}/config/geral`), ler(`grupos/${d.id}/segredos/assinatura`)]), C = cfg || {}, A = ass || {};
       (lista[c] = lista[c] || []).push({ nome: d.get('nome') || C.nome || 'Pelada', cidade: C.cidade || '', uf: C.uf || '', criadoEm: d.get('criadoEm') || null,
-        assina: ass ? !!A.ativa : null, repEncerradoEm: A.repEncerradoEm || null, valorMes: A.repValorMes || 0 }); }
+        assina: A.ativa != null ? !!A.ativa : null, repEncerradoEm: A.repEncerradoEm || null, valorMes: A.repValorMes || 0, cond: A.repCond || null, ligadoEm: A.repLigadoEm || null }); }
     return { por, lista };
+  }
+  // grupo novo ligado a um parceiro: guarda as condições do dia (% e prazo). Mudanças futuras valem só para grupos novos.
+  async function congelarRep(gid, codigo) {
+    const r = (await db.collection('servidor/plataforma/representantes').where('codigo', '==', String(codigo || '')).limit(1).get()).docs[0];
+    const ref = db.doc(`grupos/${gid}/segredos/assinatura`);
+    await db.runTransaction(async tx => { const s = await tx.get(ref); if (s.exists && s.get('repCond')) return;
+      tx.set(ref, { repCond: r ? { codigo: r.get('codigo'), pct: Number(r.get('pct')) || 0, meses: Number(r.get('meses')) || 0 } : { codigo, pct: null, meses: null }, repLigadoEm: Date.now() }, { merge: true }); });
   }
   // o aceite vale enquanto código, %, prazo e dia do pagamento forem os mesmos que a pessoa aceitou
   const condicoes = r => ({ codigo: r.codigo, pct: Number(r.pct), meses: Number(r.meses) || 0, dia: Number(r.dia) || 10 });
@@ -364,5 +371,5 @@ module.exports = (db, PAG) => {
     } catch (e) { logger.error(e); res.status(e.http || 500).json({ erro: e.http ? e.message : 'Algo deu errado. Tente de novo.' }); }
   });
 
-  return { notasPlataforma, notaComissao, parceiro, interno: { ondeFica, tarefaDiaria, emitirMes, parametros, mesAnterior, store, contador } };
+  return { notasPlataforma, notaComissao, parceiro, interno: { congelarRep, ondeFica, tarefaDiaria, emitirMes, parametros, mesAnterior, store, contador } };
 };
