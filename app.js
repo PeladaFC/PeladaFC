@@ -640,7 +640,7 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
   const card = x => `<div class="panel" style="padding:12px 14px;display:grid;gap:4px;${x.ativo === false ? 'opacity:.6' : ''}"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b>${escH(x.nome)}</b><span class="num" style="flex:none;font-size:12px;font-weight:700;letter-spacing:.06em;padding:3px 8px;border-radius:6px;background:var(--surface2,#e3e9df)">${escH(x.codigo)}</span></div>
     <span class="small">${pctBR(x.pct)} da assinatura, ${prazo(x)}${x.ativo === false ? ' · <b>inativo</b>' : ''}</span>
     <span class="sub">Por grupo assinante: ${rsBR(contaSim(S, Number(x.pct)).c)} por mês · Grupos trazidos: ${x.grupos || 0}</span>
-    <span class="sub">Vale enquanto o grupo paga sem interromper. Se cancelar, a comissão daquele grupo acaba de vez, mesmo que ele volte depois.</span>
+    <span class="sub">Regra: a comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra.</span>
     ${x.pix || x.contato ? `<div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><span class="sub" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pix: <b>${escH(x.pix || x.contato)}</b></span><button class="btn sm" style="flex:none" data-sh="rep-copiar-pix" data-v="${escH(x.id)}">Copiar Pix</button></div>` : ''}
     ${x.whats ? `<span class="sub">WhatsApp: ${escH(foneBR(x.whats))}</span>` : ''}${x.obs ? `<span class="sub">${escH(x.obs)}</span>` : ''}
     <div class="row" style="gap:8px;margin-top:4px"><button class="btn sm" data-sh="rep-editar" data-v="${escH(x.id)}">Editar</button><button class="btn sm" data-sh="rep-qr" data-v="${escH(x.id)}">QR Code e pôster</button>${x.whats ? `<button class="btn sm" data-sh="rep-relatorio" data-v="${escH(x.id)}">📲 Relatório no WhatsApp</button>` : ''}</div></div>`;
@@ -667,7 +667,7 @@ function relatorioRep(x) { const hoje = new Date(Date.now() - 3 * 36e5), mes = M
   return [`*Pelota FC · Relatório do parceiro*`, `Olá, ${String(x.nome).split(' ')[0]}!`, '', `Mês: ${mes}`, `Seu código: ${x.codigo}`, `Sua comissão: ${pctBR(x.pct)} da assinatura, ${prazo}`, '',
     `*Grupos que você trouxe: ${L.length || x.grupos || 0}*`, ...L.slice(0, 30).map((g, i) => `• ${g.nome}${g.cidade ? ` (${g.cidade}${g.uf ? '/' + g.uf : ''})` : ''}\n   ${S[i].txt}`), ...(L.length > 30 ? [`• e mais ${L.length - 30}`] : []), '',
     `Grupos que contam neste mês: ${contam}`, `*Valor a receber: ${rsBR(valor)}*`, '',
-    '_Regra: a comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo acaba de vez, mesmo que ele volte a assinar depois._',
+    '_Regra: a comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra._',
     '', L.some(g => g.assina != null) ? 'O pagamento é feito por Pix na chave cadastrada.' : 'A assinatura Pro começa quando o app chegar às lojas. A partir daí, este relatório mostra o valor de cada mês.'].join('\n'); }
 const linkRep = c => c ? LINK_APP + '?rep=' + encodeURIComponent(c) : LINK_APP;
 const repDoQr = () => UIp.repqr === '_geral' ? { id: '_geral', nome: '', codigo: '' } : ((UIp.reps || {}).lista || []).find(r => r.id === UIp.repqr);
