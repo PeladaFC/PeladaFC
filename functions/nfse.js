@@ -253,6 +253,26 @@ module.exports = (db, PAG) => {
       const b = req.body || {};
       if (b.acao === 'acesso') return res.json({ ok: true });
       if (b.acao === 'painel') return res.json(await painel());
+      // representantes: cadastro do dono (comissão e prazo editáveis). Os grupos ligam na fase 2, pelo código da loja.
+      if (b.acao === 'reps') {
+        const q = await db.collection('servidor/plataforma/representantes').get();
+        return res.json({ reps: q.docs.map(d => ({ id: d.id, ...d.data() })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
+      }
+      if (b.acao === 'rep-salvar') {
+        const nome = String(b.nome || '').trim().slice(0, 80), codigo = String(b.codigo || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
+        const pct = Math.round(Number(b.pct) * 100) / 100, meses = Math.round(Number(b.meses));
+        if (!nome) return res.status(400).json({ erro: 'Falta o nome.' });
+        if (codigo.length < 4) return res.status(400).json({ erro: 'O código precisa de pelo menos 4 letras ou números.' });
+        if (!(pct >= 0 && pct <= 100)) return res.status(400).json({ erro: 'A comissão vai de 0 a 100%.' });
+        if (!(meses >= 0 && meses <= 120)) return res.status(400).json({ erro: 'O prazo vai de 0 a 120 meses (0 = sem prazo).' });
+        const col = db.collection('servidor/plataforma/representantes'), id = String(b.id || '');
+        if (id && (id.includes('/') || id.length > 60)) return res.status(400).json({ erro: 'Pedido inválido.' });
+        const igual = await col.where('codigo', '==', codigo).get();
+        if (igual.docs.some(d => d.id !== id)) return res.status(409).json({ erro: 'Esse código já é de outro representante.' });
+        const dados = { nome, codigo, pct, meses, contato: String(b.contato || '').trim().slice(0, 120), obs: String(b.obs || '').trim().slice(0, 300), ativo: b.ativo !== false, atualizadoEm: Date.now() };
+        if (id) { if (!(await col.doc(id).get()).exists) return res.status(404).json({ erro: 'Representante não encontrado.' }); await col.doc(id).set(dados, { merge: true }); return res.json({ ok: true, id }); }
+        const ref = await col.add({ ...dados, criadoEm: Date.now() }); return res.json({ ok: true, id: ref.id });
+      }
       if (b.acao === 'tomador') {
         const gid = String(b.gid || ''), doc = String(b.doc || '').replace(/\D/g, '');
         if (!gid || gid.includes('/') || !(await ler(`grupos/${gid}`))) return res.status(404).json({ erro: 'Grupo não encontrado.' });
