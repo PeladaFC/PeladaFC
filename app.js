@@ -242,14 +242,15 @@ function render() {
   if (t === 'dono') h = topo('perfil') + abasDono('dono') + telaDono();
   if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + telaGruposDono();
   if (t === 'donoreps') h = topo('perfil') + abasDono('reps') + telaRepsDono();
-  if (t === 'donorepqr') { const x = ((UIp.reps || {}).lista || []).find(r => r.id === UIp.repqr);
-    h = topo('donoreps') + (x ? `<h2>QR Code de ${escH(x.nome)}</h2><p class="lead">Quem ler este código abre o Pelota FC. As peladas que essa pessoa criar ficam marcadas como trazidas por <b>${escH(x.codigo)}</b>.</p>
-    <img id="rep-cartao" alt="Cartão com QR Code do representante ${escH(x.nome)}" style="width:min(100%,360px);margin:0 auto;display:block;border-radius:10px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.08)">
+  if (t === 'donorepqr') { const x = repDoQr(), A4 = UIp.repFmt === 'a4';
+    h = topo('donoreps') + (x ? `<h2>${x.codigo ? 'QR Code de ' + escH(x.nome) : 'Pôster do Pelota FC'}</h2><p class="lead">${x.codigo ? `Quem ler este código abre o Pelota FC. As peladas que essa pessoa criar ficam marcadas como trazidas por <b>${escH(x.codigo)}</b>.` : 'Pôster sem representante: o QR Code abre o Pelota FC.'}</p>
+    <div class="pick">${x.codigo ? `<button type="button" data-sh="rep-fmt" data-v="a6" aria-pressed="${!A4}">Cartão pequeno</button>` : ''}<button type="button" data-sh="rep-fmt" data-v="a4" aria-pressed="${A4}">Pôster A4</button></div>
+    <img id="rep-cartao" alt="${A4 ? 'Pôster A4' : 'Cartão'} com QR Code${x.codigo ? ' do representante ' + escH(x.nome) : ''}" style="width:min(100%,${A4 ? 420 : 360}px);margin:0 auto;display:block;border-radius:${A4 ? 4 : 10}px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.08)">
     <div class="num" style="font-weight:700;text-align:center;word-break:break-all">${escH(linkRep(x.codigo))}</div>
-    <button class="btn primary block" data-sh="rep-baixar">Baixar para imprimir (PNG)</button>
+    ${A4 ? '<button class="btn primary block" data-sh="rep-pdf">Baixar PDF para imprimir (A4)</button><button class="btn block" data-sh="rep-baixar">Baixar imagem (PNG)</button>' : '<button class="btn primary block" data-sh="rep-baixar">Baixar para imprimir (PNG)</button>'}
     ${navigator.share ? '<button class="btn block" data-sh="rep-compartilhar">Compartilhar…</button>' : ''}
     <button class="btn block" data-sh="rep-copiar">Copiar link</button>
-    <p class="sub" style="margin:0">Tamanho A6 (10,5 × 14,8 cm) em alta resolução. Imprime bem também em A4 ou como adesivo.</p>` : '<p class="lead">Representante não encontrado.</p>'); }
+    <p class="sub" style="margin:0">${A4 ? 'Folha A4 (21 × 29,7 cm) em alta resolução. Leve o PDF para qualquer gráfica ou imprima em casa.' : 'Tamanho A6 (10,5 × 14,8 cm) em alta resolução. Imprime bem também como adesivo.'}</p>` : '<p class="lead">Representante não encontrado.</p>'); }
   if (t === 'notas') { const N = UIp.nf || {}, [ano, mm] = (N.mes || '2026-01').split('-'), D = N.dados, L = (D && D.linhas) || [];
     const rs = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fdoc = d => d && d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d && d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : '';
@@ -638,7 +639,7 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
     <span class="small">${pctBR(x.pct)} da assinatura, ${prazo(x)}${x.ativo === false ? ' · <b>inativo</b>' : ''}</span>
     <span class="sub">Por grupo assinante: ${rsBR(contaSim(S, Number(x.pct)).c)} por mês · Grupos trazidos: ${x.grupos || 0}</span>
     ${x.contato ? `<span class="sub">Pix/contato: ${escH(x.contato)}</span>` : ''}${x.obs ? `<span class="sub">${escH(x.obs)}</span>` : ''}
-    <div class="row" style="gap:8px;margin-top:4px"><button class="btn sm" data-sh="rep-editar" data-v="${escH(x.id)}">Editar</button><button class="btn sm" data-sh="rep-qr" data-v="${escH(x.id)}">QR Code para imprimir</button></div></div>`;
+    <div class="row" style="gap:8px;margin-top:4px"><button class="btn sm" data-sh="rep-editar" data-v="${escH(x.id)}">Editar</button><button class="btn sm" data-sh="rep-qr" data-v="${escH(x.id)}">QR Code e pôster</button></div></div>`;
   return `<h2>Representantes</h2><p class="lead">Quem traz grupos para o app. Você decide quanto cada um ganha e por quanto tempo.</p>
   <div class="panel" style="padding:14px;display:grid;gap:12px"><b style="font-size:18px">Quanto chega líquido</b>
     <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">${campo('preco', 'Preço (R$/mês)')}${campo('loja', 'Taxa da loja (%)')}${campo('imp', 'Imposto (%)')}${campo('com', 'Comissão (%)')}</div>
@@ -647,11 +648,65 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
     <p class="sub" style="margin:0">${R.simSalvo ? `Salvo em ${new Date(R.simSalvo.em).toLocaleDateString('pt-BR')}: ${escH((REGIMES.find(r => r[0] === R.simSalvo.regime) || REGIMES[0])[1])}, imposto de ${pctBR(R.simSalvo.imp)}.` : 'Ainda não salvo: o imposto de 6% é só um exemplo.'} O app não descobre sozinho o regime nem a alíquota da empresa. Quem passa é a contadora; quando mudar, troque aqui e toque em Salvar.</p>
     <div id="sim-res" style="display:grid;gap:6px">${simResultadoHTML()}</div>
     <p class="sub" style="margin:0">Conta feita sobre o que a loja repassa. Apple e Google ficam com 15% no plano de pequena empresa. No Simples Nacional a alíquota sobe conforme o faturamento dos últimos 12 meses, então peça o número atualizado à contadora de tempos em tempos.</p></div>
-  ${form || `<button class="btn primary block" data-sh="rep-editar" data-v="novo">+ Novo representante</button>`}
+  ${form || `<button class="btn primary block" data-sh="rep-editar" data-v="novo">+ Novo representante</button><button class="btn block" data-sh="rep-qr" data-v="_geral">Pôster A4 sem representante</button>`}
   ${R.erro ? `<div class="banner">${escH(R.erro)}</div>` : ''}
   <div class="stack" style="gap:10px">${R.carregando && !R.lista ? '<p class="lead">Carregando…</p>' : L.length ? L.map(card).join('') : '<p class="sub">Nenhum representante ainda.</p>'}</div>
   <p class="sub" style="margin:0">Quem lê o QR Code do representante e cria uma pelada já fica ligado a ele (vale por 90 dias depois da leitura). O cálculo automático do que pagar chega na fase 2, junto com a assinatura nas lojas.</p>`; }
-const linkRep = c => LINK_APP + '?rep=' + encodeURIComponent(c);
+const linkRep = c => c ? LINK_APP + '?rep=' + encodeURIComponent(c) : LINK_APP;
+const repDoQr = () => UIp.repqr === '_geral' ? { id: '_geral', nome: '', codigo: '' } : ((UIp.reps || {}).lista || []).find(r => r.id === UIp.repqr);
+function desenhaQR(g, texto, x, y, lado) { const q = window.qrcode(0, 'M'); q.addData(texto); q.make(); const n = q.getModuleCount(), cel = Math.floor(lado / (n + 4)), tam = cel * (n + 4), ox = x + (lado - tam) / 2, oy = y + (lado - tam) / 2;
+  g.fillStyle = '#fff'; g.fillRect(ox, oy, tam, tam); g.fillStyle = '#000'; for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) g.fillRect(ox + (c + 2) * cel, oy + (r + 2) * cel, cel, cel); }
+function quebra(g, txt, larg) { const L = []; let l = ''; for (const w of String(txt).split(' ')) { const t = l ? l + ' ' + w : w; if (g.measureText(t).width > larg && l) { L.push(l); l = w; } else l = t; } if (l) L.push(l); return L; }
+const POSTER_ITENS = [['Lista de presença', 'Cada um confirma pelo app. Mensalistas, diaristas e fila de espera, sem lista no grupo.'],
+  ['Times equilibrados', 'Sorteio pela posição e pela nota de cada jogador. Chega de time do dono.'],
+  ['Pix automático', 'Mensalidade e diária pelo app, direto na conta do organizador. Marca pago sozinho.'],
+  ['Caixa em dia', 'Entradas e saídas anotadas, com prestação de contas pronta para a galera.'],
+  ['Notas e ranking', 'A galera dá as notas depois do jogo. No fim do mês sai o craque.'],
+  ['Avisos no celular', 'Aviso quando a lista abre, antes do prazo e na hora de pagar. Ninguém precisa cobrar.']];
+function posterRep(x) { // A4 em 300 dpi: 2480 x 3508
+  const W = 2480, H = 3508, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+  const fd = "'Saira Condensed','Arial Narrow',Impact,sans-serif", ft = "Figtree,Arial,sans-serif", M = 170;
+  g.fillStyle = '#EEF2EB'; g.fillRect(0, 0, W, H);
+  const gr = g.createLinearGradient(0, 0, W, 900); gr.addColorStop(0, '#1B6A36'); gr.addColorStop(1, '#0F4D27'); g.fillStyle = gr;
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(W, 0); g.lineTo(W, 760); g.lineTo(0, 900); g.closePath(); g.fill();
+  g.save(); g.globalAlpha = .07; g.fillStyle = '#fff'; for (let i = -900; i < W + 900; i += 70) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 10, 0); g.lineTo(i + 10 - 640, 900); g.lineTo(i - 640, 900); g.closePath(); g.fill(); } g.restore();
+  g.textBaseline = 'alphabetic'; g.font = `italic 800 360px ${fd}`; const w1 = g.measureText('PELOTA ').width, w2 = g.measureText('FC').width, x0 = (W - w1 - w2) / 2;
+  g.textAlign = 'left'; g.fillStyle = 'rgba(0,0,0,.22)'; g.fillText('PELOTA ', x0 + 10, 470); g.fillText('FC', x0 + w1 + 10, 470);
+  g.fillStyle = '#fff'; g.fillText('PELOTA ', x0, 460); g.fillStyle = '#F2C12E'; g.fillText('FC', x0 + w1, 460);
+  g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = `600 96px ${ft}`; g.fillText('ORGANIZE SUA PELADA', W / 2, 620);
+  g.fillStyle = '#0F4D27'; g.font = `italic 800 170px ${fd}`; g.fillText('A PELADA INTEIRA NO CELULAR', W / 2, 1060);
+  g.fillStyle = '#3F5245'; g.font = `500 64px ${ft}`; g.fillText('Menos trabalho para quem organiza. Mais jogo para todo mundo.', W / 2, 1175);
+  const colW = (W - 2 * M - 80) / 2, rowH = 440, y0 = 1290;
+  POSTER_ITENS.forEach(([tit, txt], i) => { const cx = M + (i % 2) * (colW + 80), cy = y0 + Math.floor(i / 2) * rowH;
+    g.fillStyle = '#fff'; g.beginPath(); g.roundRect(cx, cy, colW, rowH - 50, 28); g.fill(); g.strokeStyle = '#D2DBCE'; g.lineWidth = 3; g.stroke();
+    g.fillStyle = i % 2 ? '#F0662A' : '#F2C12E'; g.beginPath(); g.arc(cx + 110, cy + 110, 62, 0, Math.PI * 2); g.fill();
+    g.fillStyle = i % 2 ? '#fff' : '#0F4D27'; g.textAlign = 'center'; g.font = `italic 800 96px ${fd}`; g.fillText(String(i + 1), cx + 106, cy + 142);
+    g.textAlign = 'left'; g.fillStyle = '#132018'; g.font = `700 64px ${ft}`; let tl = tit; while (g.measureText(tl).width > colW - 240 && tl.length > 4) tl = tl.slice(0, -2) + '…'; g.fillText(tl, cx + 200, cy + 132);
+    g.fillStyle = '#3F5245'; g.font = `500 50px ${ft}`; quebra(g, txt, colW - 90).slice(0, 3).forEach((l, k) => g.fillText(l, cx + 50, cy + 230 + k * 62)); });
+  const by = y0 + 3 * rowH + 20, bh = H - by - 190;
+  const gb = g.createLinearGradient(0, by, W, by + bh); gb.addColorStop(0, '#1B6A36'); gb.addColorStop(1, '#0F4D27'); g.fillStyle = gb; g.beginPath(); g.roundRect(M, by, W - 2 * M, bh, 36); g.fill();
+  const lado = bh - 120; g.fillStyle = '#fff'; g.beginPath(); g.roundRect(M + 60, by + 60, lado, lado, 20); g.fill(); desenhaQR(g, linkRep(x.codigo), M + 60, by + 60, lado);
+  const tx = M + 60 + lado + 80, tw = W - M - 60 - tx; let ty = x.codigo ? by + 200 : by + bh / 2 - 60; g.textAlign = 'left';
+  g.fillStyle = '#F2C12E'; g.font = `700 58px ${ft}`; g.fillText('APONTE A CÂMERA DO CELULAR', tx, ty);
+  g.fillStyle = '#fff'; g.font = `italic 800 150px ${fd}`; quebra(g, 'CRIE SUA PELADA AGORA', tw).forEach(l => { ty += 150; g.fillText(l, tx, ty); });
+  if (x.codigo) { ty += 120; g.fillStyle = 'rgba(255,255,255,.75)'; g.font = `600 50px ${ft}`; g.fillText('SEU REPRESENTANTE', tx, ty);
+    ty += 90; g.fillStyle = '#fff'; g.font = `700 76px ${ft}`; let nm = x.nome; while (g.measureText(nm).width > tw && nm.length > 3) nm = nm.slice(0, -2) + '…'; g.fillText(nm, tx, ty);
+    ty += 86; g.fillStyle = '#F2C12E'; g.font = `700 62px ${ft}`; g.fillText('Código ' + x.codigo, tx, ty); }
+  g.textAlign = 'center'; g.fillStyle = '#3F5245'; g.font = `600 54px ${ft}`; g.fillText('Funciona no celular, iPhone ou Android.', W / 2, H - 100);
+  g.fillStyle = '#F2C12E'; g.fillRect(0, H - 40, W * .64, 40); g.fillStyle = '#F0662A'; g.fillRect(W * .64, H - 40, W * .36, 40);
+  return cv; }
+function pdfA4(cv) { // PDF de uma página A4 com a imagem em JPEG
+  const b64 = cv.toDataURL('image/jpeg', .92).split(',')[1], bin = atob(b64), img = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) img[i] = bin.charCodeAt(i);
+  const enc = new TextEncoder(), partes = [], offs = []; let tam = 0; const add = p => { const u = typeof p === 'string' ? enc.encode(p) : p; partes.push(u); tam += u.length; };
+  const cont = 'q 595.28 0 0 841.89 0 0 cm /Im0 Do Q';
+  add('%PDF-1.4\n');
+  offs[1] = tam; add('1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n');
+  offs[2] = tam; add('2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n');
+  offs[3] = tam; add('3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595.28 841.89]/Resources<</XObject<</Im0 4 0 R>>>>/Contents 5 0 R>>endobj\n');
+  offs[4] = tam; add(`4 0 obj<</Type/XObject/Subtype/Image/Width ${cv.width}/Height ${cv.height}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${img.length}>>stream\n`); add(img); add('\nendstream endobj\n');
+  offs[5] = tam; add(`5 0 obj<</Length ${cont.length}>>stream\n${cont}\nendstream endobj\n`);
+  const xref = tam; add('xref\n0 6\n0000000000 65535 f \n' + offs.slice(1).map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('') + `trailer<</Size 6/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`);
+  return new Blob(partes, { type: 'application/pdf' }); }
 function cartaoRep(x) { // cartão para imprimir: 1240 x 1748 px (A6 em 300 dpi)
   const W = 1240, H = 1748, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
   const fd = "'Saira Condensed','Arial Narrow',Impact,sans-serif", ft = "Figtree,Arial,sans-serif";
@@ -877,12 +932,14 @@ document.addEventListener('click', async e => {
   if (a === 'dono-atualizar') carregarPainel();
   if (a === 'dono-grupos') { ir('donogrupos'); if (!UIp.painel || !UIp.painel.dados) carregarPainel(); }
   if (a === 'dono-reps') { ir('donoreps'); carregarReps(); }
-  if (a === 'rep-qr') { UIp.repqr = v; ir('donorepqr'); await (document.fonts ? document.fonts.ready : null); const x = UIp.reps.lista.find(r => r.id === v), im = $('rep-cartao'); if (x && im) { UIp.repCv = cartaoRep(x); im.src = UIp.repCv.toDataURL('image/png'); } }
-  if (a === 'rep-baixar' || a === 'rep-compartilhar') { const x = UIp.reps.lista.find(r => r.id === UIp.repqr), cv = UIp.repCv; if (!x || !cv) return; const nomeArq = `PelotaFC_QR_${x.codigo}.png`;
-    const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+  if (a === 'rep-qr' || a === 'rep-fmt') { if (a === 'rep-qr') { UIp.repqr = v; UIp.repFmt = v === '_geral' ? 'a4' : (UIp.repFmt || 'a6'); ir('donorepqr'); } else { UIp.repFmt = v; render(); }
+    await (document.fonts ? document.fonts.ready : null); const x = repDoQr(), im = $('rep-cartao'); if (x && im) { UIp.repCv = UIp.repFmt === 'a4' ? posterRep(x) : cartaoRep(x); im.src = UIp.repCv.toDataURL('image/jpeg', .85); } }
+  if (a === 'rep-baixar' || a === 'rep-compartilhar' || a === 'rep-pdf') { const x = repDoQr(), cv = UIp.repCv; if (!x || !cv) return;
+    const pdf = a === 'rep-pdf', nomeArq = `PelotaFC_${UIp.repFmt === 'a4' ? 'poster' : 'QR'}${x.codigo ? '_' + x.codigo : ''}.${pdf ? 'pdf' : 'png'}`;
+    const blob = pdf ? pdfA4(cv) : await new Promise(r => cv.toBlob(r, 'image/png'));
     if (a === 'rep-compartilhar') { try { await navigator.share({ files: [new File([blob], nomeArq, { type: 'image/png' })], title: 'Pelota FC' }); return; } catch (err) { if (err && err.name === 'AbortError') return; } }
-    const u = URL.createObjectURL(blob), el = document.createElement('a'); el.href = u; el.download = nomeArq; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000); aviso('Imagem baixada: ' + nomeArq); }
-  if (a === 'rep-copiar') { const x = UIp.reps.lista.find(r => r.id === UIp.repqr); if (x) { try { await navigator.clipboard.writeText(linkRep(x.codigo)); aviso('Link copiado.'); } catch (err) { aviso(linkRep(x.codigo)); } } }
+    const u = URL.createObjectURL(blob), el = document.createElement('a'); el.href = u; el.download = nomeArq; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000); aviso('Arquivo baixado: ' + nomeArq); }
+  if (a === 'rep-copiar') { const x = repDoQr(); if (x) { try { await navigator.clipboard.writeText(linkRep(x.codigo)); aviso('Link copiado.'); } catch (err) { aviso(linkRep(x.codigo)); } } }
   if (a === 'sim-salvar') { const S = UIp.sim, d = { preco: numBR(S.preco), loja: numBR(S.loja), imp: numBR(S.imp), regime: S.regime || 'simples' };
     if (!(d.preco > 0) || !(d.loja >= 0 && d.loja <= 100) || !(d.imp >= 0 && d.imp <= 100)) { aviso('Confira os números.'); return; }
     b.disabled = true; try { if (MOCK) UIp.simMock = { ...d, em: Date.now() }; else await notasServidor('sim-salvar', d); UIp.simMexido = false; aviso('Valores salvos.'); await carregarReps(); } catch (err) { aviso(err.message); b.disabled = false; } }
