@@ -256,10 +256,11 @@ module.exports = (db, PAG) => {
       // representantes: cadastro do dono (comissão e prazo editáveis). Os grupos ligam na fase 2, pelo código da loja.
       if (b.acao === 'reps') {
         const q = await db.collection('servidor/plataforma/representantes').get();
-        const gq = await db.collection('grupos').select('rep').get(), por = {};
-        gq.docs.forEach(d => { const c = d.get('rep'); if (c) por[c] = (por[c] || 0) + 1; });
+        const gq = await db.collection('grupos').where('rep', '>', '').select('rep', 'nome', 'criadoEm').get(), por = {}, lista = {};
+        for (const d of gq.docs) { const c = d.get('rep'); if (!c) continue; por[c] = (por[c] || 0) + 1;
+          const cfg = (await ler(`grupos/${d.id}/config/geral`)) || {}; (lista[c] = lista[c] || []).push({ nome: d.get('nome') || cfg.nome || 'Pelada', cidade: cfg.cidade || '', uf: cfg.uf || '', criadoEm: d.get('criadoEm') || null }); }
         const plat = (await ler('servidor/plataforma')) || {};
-        return res.json({ simulador: plat.simulador || null, reps: q.docs.map(d => ({ id: d.id, ...d.data(), grupos: por[d.get('codigo')] || 0 })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
+        return res.json({ simulador: plat.simulador || null, reps: q.docs.map(d => ({ id: d.id, ...d.data(), grupos: por[d.get('codigo')] || 0, gruposLista: lista[d.get('codigo')] || [] })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
       }
       if (b.acao === 'sim-salvar') {
         const n = v => { const x = Number(String(v ?? '').replace(',', '.')); return isFinite(x) ? Math.round(x * 100) / 100 : NaN; };
@@ -278,7 +279,7 @@ module.exports = (db, PAG) => {
         if (id && (id.includes('/') || id.length > 60)) return res.status(400).json({ erro: 'Pedido inválido.' });
         const igual = await col.where('codigo', '==', codigo).get();
         if (igual.docs.some(d => d.id !== id)) return res.status(409).json({ erro: 'Esse código já é de outro representante.' });
-        const dados = { nome, codigo, pct, meses, contato: String(b.contato || '').trim().slice(0, 120), obs: String(b.obs || '').trim().slice(0, 300), ativo: b.ativo !== false, atualizadoEm: Date.now() };
+        const dados = { nome, codigo, pct, meses, contato: String(b.contato || '').trim().slice(0, 120), pix: String(b.pix || '').trim().slice(0, 120), whats: String(b.whats || '').replace(/\D/g, '').slice(0, 13), obs: String(b.obs || '').trim().slice(0, 300), ativo: b.ativo !== false, atualizadoEm: Date.now() };
         if (id) { const atual = await col.doc(id).get(); if (!atual.exists) return res.status(404).json({ erro: 'Representante não encontrado.' });
           dados.codigo = atual.get('codigo') || codigo; // o código não muda: QR Codes impressos continuam valendo
           await col.doc(id).set(dados, { merge: true }); return res.json({ ok: true, id }); }

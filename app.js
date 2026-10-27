@@ -630,7 +630,9 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
       <label class="field" style="margin:0"><span>Comissão (%)</span><input type="text" inputmode="decimal" id="r-pct" value="${escH(String(e.pct ?? '').replace('.', ','))}"></label>
       <label class="field" style="margin:0"><span>Por quantos meses</span><input type="number" inputmode="numeric" min="0" max="120" id="r-meses" value="${escH(String(e.meses ?? 0))}"></label></div>
     <p class="sub" style="margin:-4px 0 0">Prazo contado a partir da 1ª mensalidade de cada grupo. Coloque 0 para pagar enquanto o grupo for assinante.</p>
-    <label class="field" style="margin:0"><span>Chave Pix ou telefone (opcional)</span><input type="text" id="r-contato" value="${escH(e.contato || '')}" placeholder="Para você pagar a comissão"></label>
+    <label class="field" style="margin:0"><span>Chave Pix (opcional)</span><input type="text" id="r-pix" value="${escH(e.pix || e.contato || '')}" placeholder="CPF, e-mail, telefone ou chave aleatória" autocomplete="off"></label>
+    <label class="field" style="margin:0"><span>WhatsApp com DDD (opcional)</span><input type="tel" id="r-whats" inputmode="tel" value="${escH(foneBR(e.whats || ''))}" placeholder="(81) 9 9999-9999"></label>
+    <p class="sub" style="margin:-4px 0 0">Com o WhatsApp, você manda o relatório do mês para o parceiro com um toque.</p>
     <label class="field" style="margin:0"><span>Anotação (opcional)</span><input type="text" id="r-obs" value="${escH(e.obs || '')}" placeholder="Ex.: cuida da Zona Norte do Recife"></label>
     <label class="row" style="gap:8px;align-items:center"><input type="checkbox" id="r-ativo" ${e.ativo !== false ? 'checked' : ''}> <span>Ativo</span></label>
     <div class="row" style="gap:8px"><button class="btn primary" type="submit" style="flex:1">Salvar</button><button class="btn" type="button" data-sh="rep-editar" data-v="">Cancelar</button></div></form>` : '';
@@ -638,8 +640,9 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
   const card = x => `<div class="panel" style="padding:12px 14px;display:grid;gap:4px;${x.ativo === false ? 'opacity:.6' : ''}"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b>${escH(x.nome)}</b><span class="num" style="flex:none;font-size:12px;font-weight:700;letter-spacing:.06em;padding:3px 8px;border-radius:6px;background:var(--surface2,#e3e9df)">${escH(x.codigo)}</span></div>
     <span class="small">${pctBR(x.pct)} da assinatura, ${prazo(x)}${x.ativo === false ? ' · <b>inativo</b>' : ''}</span>
     <span class="sub">Por grupo assinante: ${rsBR(contaSim(S, Number(x.pct)).c)} por mês · Grupos trazidos: ${x.grupos || 0}</span>
-    ${x.contato ? `<span class="sub">Pix/contato: ${escH(x.contato)}</span>` : ''}${x.obs ? `<span class="sub">${escH(x.obs)}</span>` : ''}
-    <div class="row" style="gap:8px;margin-top:4px"><button class="btn sm" data-sh="rep-editar" data-v="${escH(x.id)}">Editar</button><button class="btn sm" data-sh="rep-qr" data-v="${escH(x.id)}">QR Code e pôster</button></div></div>`;
+    ${x.pix || x.contato ? `<div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><span class="sub" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pix: <b>${escH(x.pix || x.contato)}</b></span><button class="btn sm" style="flex:none" data-sh="rep-copiar-pix" data-v="${escH(x.id)}">Copiar Pix</button></div>` : ''}
+    ${x.whats ? `<span class="sub">WhatsApp: ${escH(foneBR(x.whats))}</span>` : ''}${x.obs ? `<span class="sub">${escH(x.obs)}</span>` : ''}
+    <div class="row" style="gap:8px;margin-top:4px"><button class="btn sm" data-sh="rep-editar" data-v="${escH(x.id)}">Editar</button><button class="btn sm" data-sh="rep-qr" data-v="${escH(x.id)}">QR Code e pôster</button>${x.whats ? `<button class="btn sm" data-sh="rep-relatorio" data-v="${escH(x.id)}">📲 Relatório no WhatsApp</button>` : ''}</div></div>`;
   return `<h2>Representantes</h2><p class="lead">Quem traz grupos para o app. Você decide quanto cada um ganha e por quanto tempo.</p>
   <div class="panel" style="padding:14px;display:grid;gap:12px"><b style="font-size:18px">Quanto chega líquido</b>
     <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">${campo('preco', 'Preço (R$/mês)')}${campo('loja', 'Taxa da loja (%)')}${campo('imp', 'Imposto (%)')}${campo('com', 'Comissão (%)')}</div>
@@ -652,6 +655,13 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
   ${R.erro ? `<div class="banner">${escH(R.erro)}</div>` : ''}
   <div class="stack" style="gap:10px">${R.carregando && !R.lista ? '<p class="lead">Carregando…</p>' : L.length ? L.map(card).join('') : '<p class="sub">Nenhum representante ainda.</p>'}</div>
   <p class="sub" style="margin:0">Quem lê o QR Code do representante e cria uma pelada já fica ligado a ele (vale por 90 dias depois da leitura). O cálculo automático do que pagar chega na fase 2, junto com a assinatura nas lojas.</p>`; }
+const foneBR = d => { d = String(d || '').replace(/\D/g, ''); if (d.length > 11 && d.startsWith('55')) d = d.slice(2); return d.length === 11 ? `(${d.slice(0, 2)}) ${d[2]} ${d.slice(3, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d; };
+function relatorioRep(x) { const hoje = new Date(Date.now() - 3 * 36e5), mes = MESES[hoje.getUTCMonth()].toLowerCase() + ' de ' + hoje.getUTCFullYear();
+  const L = x.gruposLista || [], pag = Number(x.pagantes || 0), valor = Number(x.aReceber || 0), prazo = Number(x.meses) ? `por ${x.meses} ${Number(x.meses) === 1 ? 'mês' : 'meses'} de cada grupo` : 'enquanto o grupo for assinante';
+  return [`*Pelota FC · Relatório do parceiro*`, `Olá, ${String(x.nome).split(' ')[0]}!`, '', `Mês: ${mes}`, `Seu código: ${x.codigo}`, `Sua comissão: ${pctBR(x.pct)} da assinatura, ${prazo}`, '',
+    `*Grupos que você trouxe: ${L.length || x.grupos || 0}*`, ...L.slice(0, 30).map(g => `• ${g.nome}${g.cidade ? ` (${g.cidade}${g.uf ? '/' + g.uf : ''})` : ''}`), ...(L.length > 30 ? [`• e mais ${L.length - 30}`] : []), '',
+    `Grupos assinantes neste mês: ${pag}`, `*Valor a receber: ${rsBR(valor)}*`, '',
+    x.aReceber == null ? 'A assinatura Pro começa quando o app chegar às lojas. A partir daí, este relatório mostra o valor de cada mês.' : 'O pagamento é feito por Pix na chave cadastrada.'].join('\n'); }
 const linkRep = c => c ? LINK_APP + '?rep=' + encodeURIComponent(c) : LINK_APP;
 const repDoQr = () => UIp.repqr === '_geral' ? { id: '_geral', nome: '', codigo: '' } : ((UIp.reps || {}).lista || []).find(r => r.id === UIp.repqr);
 function desenhaQR(g, texto, x, y, lado) { const q = window.qrcode(0, 'M'); q.addData(texto); q.make(); const n = q.getModuleCount(), cel = Math.floor(lado / (n + 4)), tam = cel * (n + 4), ox = x + (lado - tam) / 2, oy = y + (lado - tam) / 2;
@@ -772,7 +782,7 @@ function cartaoRep(x) { // cartão para imprimir: 1240 x 1748 px (A6 em 300 dpi)
   g.fillStyle = '#F2C12E'; g.fillRect(0, H - 40, W * .64, 40); g.fillStyle = '#F0662A'; g.fillRect(W * .64, H - 40, W * .36, 40);
   return cv; }
 async function carregarReps() { const R = UIp.reps = UIp.reps || {}; R.carregando = true; R.erro = null; if (TELA === 'donoreps') render();
-  try { const j = MOCK ? { reps: (UIp.repsMock = UIp.repsMock || [{ id: 'r1', nome: 'João Representante', codigo: 'JOAO10', pct: 10, meses: 12, contato: '(81) 9 9999-0000', obs: 'Zona Norte do Recife', ativo: true, grupos: 2 }]).slice(), simulador: UIp.simMock || null } : await notasServidor('reps');
+  try { const j = MOCK ? { reps: (UIp.repsMock = UIp.repsMock || [{ id: 'r1', nome: 'João Representante', codigo: 'JOAO10', pct: 10, meses: 12, pix: 'joao@exemplo.com', whats: '81999990000', obs: 'Zona Norte do Recife', ativo: true, grupos: 2, gruposLista: [{ nome: 'Pelada do Sábado', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 20 * 864e5 }, { nome: 'Racha da Quinta', cidade: 'Olinda', uf: 'PE', criadoEm: Date.now() - 5 * 864e5 }] }]).slice(), simulador: UIp.simMock || null } : await notasServidor('reps');
     R.lista = j.reps; R.simSalvo = j.simulador || null;
     if (R.simSalvo && !UIp.simMexido) { const f = v => String(v).replace('.', ','); UIp.sim = { ...(UIp.sim || SIM0), preco: f(R.simSalvo.preco.toFixed(2)), loja: f(R.simSalvo.loja), imp: f(R.simSalvo.imp), regime: R.simSalvo.regime }; } } catch (e) { R.erro = e.message; }
   R.carregando = false; if (TELA === 'donoreps') render(); }
@@ -987,6 +997,9 @@ document.addEventListener('click', async e => {
   if (a === 'sim-salvar') { const S = UIp.sim, d = { preco: numBR(S.preco), loja: numBR(S.loja), imp: numBR(S.imp), regime: S.regime || 'simples' };
     if (!(d.preco > 0) || !(d.loja >= 0 && d.loja <= 100) || !(d.imp >= 0 && d.imp <= 100)) { aviso('Confira os números.'); return; }
     b.disabled = true; try { if (MOCK) UIp.simMock = { ...d, em: Date.now() }; else await notasServidor('sim-salvar', d); UIp.simMexido = false; aviso('Valores salvos.'); await carregarReps(); } catch (err) { aviso(err.message); b.disabled = false; } }
+  if (a === 'rep-copiar-pix') { const x = ((UIp.reps || {}).lista || []).find(r => r.id === v); if (x) { const k = x.pix || x.contato; try { await navigator.clipboard.writeText(k); aviso('Chave Pix copiada.'); } catch (err) { aviso(k); } } }
+  if (a === 'rep-relatorio') { const x = ((UIp.reps || {}).lista || []).find(r => r.id === v); if (!x || !x.whats) return; let n = x.whats.replace(/\D/g, ''); if (n.length <= 11) n = '55' + n;
+    window.open('https://wa.me/' + n + '?text=' + encodeURIComponent(relatorioRep(x)), '_blank', 'noopener'); }
   if (a === 'rep-editar') { UIp.reps = UIp.reps || {}; UIp.reps.editar = v || null; render(); }
   if (a === 'gf-sit') { UIp.gf.sit = v; render(); }
   if (a === 'gf-limpar') { UIp.gf = { ...GF0 }; render(); }
@@ -1037,8 +1050,9 @@ document.addEventListener('submit', async e => {
   if (f.id === 'f-login') { if (!val('l-email') || !val('l-senha')) { aviso('Preencha e-mail e senha.'); return; } OCUPADO = true; try { await B.login(val('l-email'), $('l-senha').value); } catch (err) { aviso(msgErro(err)); } OCUPADO = false; }
   if (f.id === 'f-criar') { if (!val('c-nome2') || !val('c-email') || !$('c-senha').value) { aviso('Preencha nome, e-mail e senha.'); return; } OCUPADO = true; try { await B.cadastrar(val('c-nome2'), val('c-email'), $('c-senha').value); } catch (err) { aviso(msgErro(err)); } OCUPADO = false; }
   if (f.id === 'f-rep') { const nome = val('r-nome'), codigo = (val('r-codigo') || nome.split(' ')[0] + numBR(val('r-pct'))).toUpperCase().normalize('NFD').replace(/[^A-Z0-9]/g, '');
-    const dados = { id: f.dataset.id || '', nome, codigo, pct: numBR(val('r-pct')), meses: Number(val('r-meses') || 0), contato: val('r-contato'), obs: val('r-obs'), ativo: $('r-ativo').checked };
+    const dados = { id: f.dataset.id || '', nome, codigo, pct: numBR(val('r-pct')), meses: Number(val('r-meses') || 0), pix: val('r-pix'), whats: val('r-whats').replace(/\D/g, ''), contato: '', obs: val('r-obs'), ativo: $('r-ativo').checked };
     if (!nome) { aviso('Coloque o nome.'); return; } if (codigo.length < 4) { aviso('O código precisa de pelo menos 4 letras ou números.'); return; }
+    if (dados.whats && (dados.whats.length < 10 || dados.whats.length > 13)) { aviso('Confira o WhatsApp: DDD e número.'); return; }
     if (!(dados.pct >= 0 && dados.pct <= 100)) { aviso('A comissão vai de 0 a 100%.'); return; } if (!(dados.meses >= 0 && dados.meses <= 120)) { aviso('O prazo vai de 0 a 120 meses.'); return; }
     OCUPADO = true;
     try { if (MOCK) { const M = UIp.repsMock; if (M.some(x => x.codigo === codigo && x.id !== dados.id)) throw new Error('Esse código já é de outro representante.');
