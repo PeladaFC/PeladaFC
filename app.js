@@ -242,15 +242,15 @@ function render() {
   if (t === 'dono') h = topo('perfil') + abasDono('dono') + telaDono();
   if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + telaGruposDono();
   if (t === 'donoreps') h = topo('perfil') + abasDono('reps') + telaRepsDono();
-  if (t === 'donorepqr') { const x = repDoQr(), A4 = UIp.repFmt === 'a4';
+  if (t === 'donorepqr') { const x = repDoQr(), A3 = UIp.repFmt === 'a3', A4 = UIp.repFmt === 'a4' || A3;
     h = topo('donoreps') + (x ? `<h2>${x.codigo ? 'QR Code de ' + escH(x.nome) : 'Pôster do Pelota FC'}</h2><p class="lead">${x.codigo ? `Quem ler este código abre o Pelota FC. As peladas que essa pessoa criar ficam marcadas como trazidas por <b>${escH(x.codigo)}</b>.` : 'Pôster sem representante: o QR Code abre o Pelota FC.'}</p>
-    <div class="pick">${x.codigo ? `<button type="button" data-sh="rep-fmt" data-v="a6" aria-pressed="${!A4}">Cartão pequeno</button>` : ''}<button type="button" data-sh="rep-fmt" data-v="a4" aria-pressed="${A4}">Pôster A4</button></div>
-    <img id="rep-cartao" alt="${A4 ? 'Pôster A4' : 'Cartão'} com QR Code${x.codigo ? ' do representante ' + escH(x.nome) : ''}" style="width:min(100%,${A4 ? 420 : 360}px);margin:0 auto;display:block;border-radius:${A4 ? 4 : 10}px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.08)">
+    <div class="pick">${x.codigo ? `<button type="button" data-sh="rep-fmt" data-v="a6" aria-pressed="${!A4}">Cartão pequeno</button>` : ''}<button type="button" data-sh="rep-fmt" data-v="a4" aria-pressed="${UIp.repFmt === 'a4'}">Pôster A4</button><button type="button" data-sh="rep-fmt" data-v="a3" aria-pressed="${UIp.repFmt === 'a3'}">Pôster grande (A3)</button></div>
+    <p id="rep-gerando" class="sub" style="text-align:center;margin:0">Montando a arte…</p><img id="rep-cartao" alt="${A3 ? 'Pôster A3' : A4 ? 'Pôster A4' : 'Cartão'} com QR Code${x.codigo ? ' do representante ' + escH(x.nome) : ''}" style="width:min(100%,${A4 ? 420 : 360}px);margin:0 auto;display:block;border-radius:${A4 ? 4 : 10}px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.08)">
     <div class="num" style="font-weight:700;text-align:center;word-break:break-all">${escH(linkRep(x.codigo))}</div>
-    ${A4 ? '<button class="btn primary block" data-sh="rep-pdf">Baixar PDF para imprimir (A4)</button><button class="btn block" data-sh="rep-baixar">Baixar imagem (PNG)</button>' : '<button class="btn primary block" data-sh="rep-baixar">Baixar para imprimir (PNG)</button>'}
+    ${A4 ? '<button class="btn primary block" data-sh="rep-pdf">Baixar PDF para imprimir (' + (A3 ? 'A3' : 'A4') + ')</button><button class="btn block" data-sh="rep-baixar">Baixar imagem (PNG)</button>' : '<button class="btn primary block" data-sh="rep-baixar">Baixar para imprimir (PNG)</button>'}
     ${navigator.share ? '<button class="btn block" data-sh="rep-compartilhar">Compartilhar…</button>' : ''}
     <button class="btn block" data-sh="rep-copiar">Copiar link</button>
-    <p class="sub" style="margin:0">${A4 ? 'Folha A4 (21 × 29,7 cm) em alta resolução. Leve o PDF para qualquer gráfica ou imprima em casa.' : 'Tamanho A6 (10,5 × 14,8 cm) em alta resolução. Imprime bem também como adesivo.'}</p>` : '<p class="lead">Representante não encontrado.</p>'); }
+    <p class="sub" style="margin:0">${A3 ? 'Pôster A3 (29,7 × 42 cm) com as telas do app. O mesmo arquivo amplia bem para A2 ou banner na gráfica.' : A4 ? 'Folha A4 (21 × 29,7 cm) em alta resolução. Leve o PDF para qualquer gráfica ou imprima em casa.' : 'Tamanho A6 (10,5 × 14,8 cm) em alta resolução. Imprime bem também como adesivo.'}</p>` : '<p class="lead">Representante não encontrado.</p>'); }
   if (t === 'notas') { const N = UIp.nf || {}, [ano, mm] = (N.mes || '2026-01').split('-'), D = N.dados, L = (D && D.linhas) || [];
     const rs = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fdoc = d => d && d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d && d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : '';
@@ -695,14 +695,57 @@ function posterRep(x) { // A4 em 300 dpi: 2480 x 3508
   g.textAlign = 'center'; g.fillStyle = '#3F5245'; g.font = `600 54px ${ft}`; g.fillText('Funciona no celular, iPhone ou Android.', W / 2, H - 100);
   g.fillStyle = '#F2C12E'; g.fillRect(0, H - 40, W * .64, 40); g.fillStyle = '#F0662A'; g.fillRect(W * .64, H - 40, W * .36, 40);
   return cv; }
-function pdfA4(cv) { // PDF de uma página A4 com a imagem em JPEG
+const TELAS_POSTER = ['poster/tela-lista.jpg', 'poster/tela-jogo.jpg', 'poster/tela-craque.jpg'];
+function carregaTelas() { return UIp.telasPoster = UIp.telasPoster || Promise.all(TELAS_POSTER.map(src => new Promise((ok, erro) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => { UIp.telasPoster = null; erro(new Error('tela')); }; im.src = src + '?v=2'; }))); }
+function celular(g, img, cx, cy, w, ang) { const i = w * .035, sw = w - 2 * i, sh = sw * img.height / img.width, h = sh + 2 * i;
+  g.save(); g.translate(cx, cy); g.rotate(ang * Math.PI / 180);
+  g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = 80; g.shadowOffsetY = 40; g.fillStyle = '#0d0f0e'; g.beginPath(); g.roundRect(-w / 2, -h / 2, w, h, w * .14); g.fill();
+  g.shadowColor = 'transparent'; g.strokeStyle = '#3a3f3c'; g.lineWidth = w * .008; g.stroke();
+  g.beginPath(); g.roundRect(-sw / 2, -sh / 2, sw, sh, w * .11); g.save(); g.clip(); g.drawImage(img, -sw / 2, -sh / 2, sw, sh); g.restore();
+  g.restore(); return h; }
+async function posterGrande(x) { // A3 em ~250 dpi; desenho em unidades de 2480 x 3508
+  const tel = await carregaTelas(), k = 2894 / 2480, W = 2480, H = 3508, cv = document.createElement('canvas'); cv.width = 2894; cv.height = Math.round(H * k);
+  const g = cv.getContext('2d'); g.scale(k, k); const fd = "'Saira Condensed','Arial Narrow',Impact,sans-serif", ft = "Figtree,Arial,sans-serif", M = 170;
+  const bg = g.createLinearGradient(0, 0, W * .4, H); bg.addColorStop(0, '#1F7A3F'); bg.addColorStop(.55, '#135A2D'); bg.addColorStop(1, '#0B3A1E'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.save(); g.globalAlpha = .05; g.fillStyle = '#fff'; for (let i = -H; i < W + H; i += 90) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 14, 0); g.lineTo(i + 14 - H * .6, H); g.lineTo(i - H * .6, H); g.closePath(); g.fill(); } g.restore();
+  g.save(); g.strokeStyle = 'rgba(255,255,255,.10)'; g.lineWidth = 14; g.beginPath(); g.arc(W / 2, 1830, 820, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.moveTo(0, 1830); g.lineTo(W, 1830); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,.10)'; g.beginPath(); g.arc(W / 2, 1830, 30, 0, Math.PI * 2); g.fill(); g.restore();
+  const glow = g.createRadialGradient(W / 2, 1800, 50, W / 2, 1800, 1100); glow.addColorStop(0, 'rgba(242,193,46,.22)'); glow.addColorStop(1, 'rgba(242,193,46,0)'); g.fillStyle = glow; g.fillRect(0, 700, W, 2300);
+  g.textBaseline = 'alphabetic'; g.font = `italic 800 210px ${fd}`; const w1 = g.measureText('PELOTA ').width, w2 = g.measureText('FC').width, x0 = (W - w1 - w2) / 2;
+  g.textAlign = 'left'; g.fillStyle = 'rgba(0,0,0,.25)'; g.fillText('PELOTA ', x0 + 8, 318); g.fillText('FC', x0 + w1 + 8, 318);
+  g.fillStyle = '#fff'; g.fillText('PELOTA ', x0, 310); g.fillStyle = '#F2C12E'; g.fillText('FC', x0 + w1, 310);
+  g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.85)'; g.font = `600 64px ${ft}`; g.fillText('ORGANIZE SUA PELADA', W / 2, 410);
+  g.font = `italic 800 270px ${fd}`; g.fillStyle = 'rgba(0,0,0,.25)'; g.fillText('CHEGA DE LISTA', W / 2 + 10, 700); g.fillText('NO GRUPO!', W / 2 + 10, 955);
+  g.fillStyle = '#fff'; g.fillText('CHEGA DE LISTA', W / 2, 690); g.fillStyle = '#F2C12E'; g.fillText('NO GRUPO!', W / 2, 945);
+  celular(g, tel[0], 600, 1880, 560, -9); celular(g, tel[2], W - 600, 1880, 560, 9);
+  const hc = celular(g, tel[1], W / 2, 1840, 700, 0);
+  const etiqueta = (txt, cx, cy, cor, ang) => { g.save(); g.translate(cx, cy); g.rotate(ang * Math.PI / 180); g.font = `italic 800 74px ${fd}`; const tw = g.measureText(txt).width + 80;
+    g.fillStyle = cor; g.beginPath(); g.roundRect(-tw / 2, -62, tw, 112, 16); g.fill(); g.fillStyle = cor === '#F2C12E' ? '#0F4D27' : '#fff'; g.textAlign = 'center'; g.fillText(txt, 0, 22); g.restore(); };
+  etiqueta('QUEM VAI?', 470, 1220, '#F2C12E', -9); etiqueta('O CRAQUE', W - 470, 1220, '#F0662A', 9);
+  const itens = ['Lista de presença', 'Times equilibrados', 'Pix automático', 'Caixa em dia', 'Notas e ranking', 'Avisos no celular'], pw = (W - 2 * M - 60) / 3;
+  itens.forEach((t, i) => { const px = M + (i % 3) * (pw + 30), py = 2700 + Math.floor(i / 3) * 140;
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.beginPath(); g.roundRect(px, py, pw, 110, 55); g.fill();
+    g.fillStyle = '#F2C12E'; g.beginPath(); g.arc(px + 58, py + 55, 34, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#0F4D27'; g.lineWidth = 9; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(px + 42, py + 56); g.lineTo(px + 54, py + 68); g.lineTo(px + 75, py + 43); g.stroke();
+    g.fillStyle = '#fff'; g.textAlign = 'left'; g.font = `700 52px ${ft}`; g.fillText(t, px + 112, py + 73); });
+  const by = 2990, bh = 400; g.fillStyle = '#fff'; g.beginPath(); g.roundRect(M, by, W - 2 * M, bh, 36); g.fill();
+  g.fillStyle = '#F2C12E'; g.beginPath(); g.roundRect(M, by + bh - 18, W - 2 * M, 18, [0, 0, 36, 36]); g.fill();
+  desenhaQR(g, linkRep(x.codigo), M + 25, by + 25, bh - 60);
+  const tx = M + bh + 30; let ty = x.codigo ? by + 110 : by + 170; g.textAlign = 'left';
+  g.fillStyle = '#F0662A'; g.font = `700 52px ${ft}`; g.fillText('APONTE A CÂMERA DO CELULAR', tx, ty);
+  ty += 140; g.fillStyle = '#0F4D27'; g.font = `italic 800 150px ${fd}`; g.fillText('CRIE SUA PELADA AGORA', tx, ty);
+  if (x.codigo) { ty += 90; g.fillStyle = '#3F5245'; g.font = `600 50px ${ft}`; let lin = 'Representante: ' + x.nome; while (g.measureText(lin + ' · código ' + x.codigo).width > W - M - 40 - tx && lin.length > 20) lin = lin.slice(0, -2) + '…';
+    g.fillText(lin + ' · código ', tx, ty); const wl = g.measureText(lin + ' · código ').width; g.fillStyle = '#F0662A'; g.font = `800 50px ${ft}`; g.fillText(x.codigo, tx + wl, ty); }
+  g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.85)'; g.font = `600 48px ${ft}`; g.fillText('Funciona no celular, iPhone ou Android.', W / 2, 3470);
+  return cv; }
+function pdfPagina(cv, PW, PH) { // PDF de uma página (A4 ou A3) com a imagem em JPEG
   const b64 = cv.toDataURL('image/jpeg', .92).split(',')[1], bin = atob(b64), img = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) img[i] = bin.charCodeAt(i);
   const enc = new TextEncoder(), partes = [], offs = []; let tam = 0; const add = p => { const u = typeof p === 'string' ? enc.encode(p) : p; partes.push(u); tam += u.length; };
-  const cont = 'q 595.28 0 0 841.89 0 0 cm /Im0 Do Q';
+  const cont = `q ${PW} 0 0 ${PH} 0 0 cm /Im0 Do Q`;
   add('%PDF-1.4\n');
   offs[1] = tam; add('1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n');
   offs[2] = tam; add('2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n');
-  offs[3] = tam; add('3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595.28 841.89]/Resources<</XObject<</Im0 4 0 R>>>>/Contents 5 0 R>>endobj\n');
+  offs[3] = tam; add(`3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${PW} ${PH}]/Resources<</XObject<</Im0 4 0 R>>>>/Contents 5 0 R>>endobj\n`);
   offs[4] = tam; add(`4 0 obj<</Type/XObject/Subtype/Image/Width ${cv.width}/Height ${cv.height}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${img.length}>>stream\n`); add(img); add('\nendstream endobj\n');
   offs[5] = tam; add(`5 0 obj<</Length ${cont.length}>>stream\n${cont}\nendstream endobj\n`);
   const xref = tam; add('xref\n0 6\n0000000000 65535 f \n' + offs.slice(1).map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('') + `trailer<</Size 6/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`);
@@ -932,11 +975,11 @@ document.addEventListener('click', async e => {
   if (a === 'dono-atualizar') carregarPainel();
   if (a === 'dono-grupos') { ir('donogrupos'); if (!UIp.painel || !UIp.painel.dados) carregarPainel(); }
   if (a === 'dono-reps') { ir('donoreps'); carregarReps(); }
-  if (a === 'rep-qr' || a === 'rep-fmt') { if (a === 'rep-qr') { UIp.repqr = v; UIp.repFmt = v === '_geral' ? 'a4' : (UIp.repFmt || 'a6'); ir('donorepqr'); } else { UIp.repFmt = v; render(); }
-    await (document.fonts ? document.fonts.ready : null); const x = repDoQr(), im = $('rep-cartao'); if (x && im) { UIp.repCv = UIp.repFmt === 'a4' ? posterRep(x) : cartaoRep(x); im.src = UIp.repCv.toDataURL('image/jpeg', .85); } }
+  if (a === 'rep-qr' || a === 'rep-fmt') { if (a === 'rep-qr') { UIp.repqr = v; UIp.repFmt = v === '_geral' ? (UIp.repFmt === 'a6' || !UIp.repFmt ? 'a3' : UIp.repFmt) : (UIp.repFmt || 'a6'); ir('donorepqr'); } else { UIp.repFmt = v; render(); }
+    await (document.fonts ? document.fonts.ready : null); const x = repDoQr(), im = $('rep-cartao'); if (x && im) { try { UIp.repCv = UIp.repFmt === 'a3' ? await posterGrande(x) : UIp.repFmt === 'a4' ? posterRep(x) : cartaoRep(x); im.src = UIp.repCv.toDataURL('image/jpeg', .85); } catch (err) { aviso('Não consegui montar a arte. Tente de novo.'); } const gm = $('rep-gerando'); if (gm) gm.remove(); } }
   if (a === 'rep-baixar' || a === 'rep-compartilhar' || a === 'rep-pdf') { const x = repDoQr(), cv = UIp.repCv; if (!x || !cv) return;
-    const pdf = a === 'rep-pdf', nomeArq = `PelotaFC_${UIp.repFmt === 'a4' ? 'poster' : 'QR'}${x.codigo ? '_' + x.codigo : ''}.${pdf ? 'pdf' : 'png'}`;
-    const blob = pdf ? pdfA4(cv) : await new Promise(r => cv.toBlob(r, 'image/png'));
+    const pdf = a === 'rep-pdf', nomeArq = `PelotaFC_${UIp.repFmt === 'a3' ? 'poster_A3' : UIp.repFmt === 'a4' ? 'poster_A4' : 'QR'}${x.codigo ? '_' + x.codigo : ''}.${pdf ? 'pdf' : 'png'}`;
+    const blob = pdf ? (UIp.repFmt === 'a3' ? pdfPagina(cv, 841.89, 1190.55) : pdfPagina(cv, 595.28, 841.89)) : await new Promise(r => cv.toBlob(r, 'image/png'));
     if (a === 'rep-compartilhar') { try { await navigator.share({ files: [new File([blob], nomeArq, { type: 'image/png' })], title: 'Pelota FC' }); return; } catch (err) { if (err && err.name === 'AbortError') return; } }
     const u = URL.createObjectURL(blob), el = document.createElement('a'); el.href = u; el.download = nomeArq; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000); aviso('Arquivo baixado: ' + nomeArq); }
   if (a === 'rep-copiar') { const x = repDoQr(); if (x) { try { await navigator.clipboard.writeText(linkRep(x.codigo)); aviso('Link copiado.'); } catch (err) { aviso(linkRep(x.codigo)); } } }
