@@ -176,7 +176,8 @@ module.exports = (db, PAG) => {
   const mesRecife = ms => new Date(ms - 3 * 3600e3).toISOString().slice(0, 7);
   const diaRecife = ms => new Date(ms - 3 * 3600e3).toISOString().slice(0, 10);
   // cidade/UF do grupo: o que o administrador informou nos Ajustes; senão, tenta tirar do endereço do local mais usado
-  function ondeFica(cfg, locais) {
+  const ANTIGAS_ATE = Date.UTC(2026, 9, 28, 3); // peladas criadas até 27/10/2026 sem cidade: Recife/PE (decisão do dono)
+  function ondeFica(cfg, locais, criadoEm) {
     let uf = String(cfg.uf || '').toUpperCase(), cidade = String(cfg.cidade || '').trim(), origem = uf ? 'ajustes' : '';
     if (!uf) {
       const L = locais.slice().sort((a, b) => (b.usadoEm || 0) - (a.usadoEm || 0));
@@ -186,6 +187,7 @@ module.exports = (db, PAG) => {
         if (UF_REGIAO[u2]) { uf = u2; const partes = String(l.end).split(/[,\-\/]/).map(x => x.trim()).filter(Boolean); cidade = cidade || (partes.length > 1 ? partes[partes.length - 2] : ''); origem = 'endereco'; break; }
       }
     }
+    if (!UF_REGIAO[uf] && (!criadoEm || criadoEm < ANTIGAS_ATE)) { uf = 'PE'; cidade = cidade || 'Recife'; origem = 'padrao'; }
     return { uf: UF_REGIAO[uf] ? uf : '', cidade, regiao: UF_REGIAO[uf] || 'Sem cidade informada', origem };
   }
   async function painel() {
@@ -198,7 +200,7 @@ module.exports = (db, PAG) => {
       tok = r.pageToken;
     } while (tok);
     const tot = { grupos: 0, ativos: 0, jogadores: 0, membros: 0, comPix: 0, pagantes: 0, pixMes: 0, volumeMes: 0, comissaoMes: 0, semCidade: 0 };
-    const reg = {}, ufs = {}, cids = {}, todosMembros = new Set();
+    const reg = {}, ufs = {}, cids = {}, todosMembros = new Set(), grupoOnde = {};
     const soma = (map, k, g, membrosIds) => { const o = map[k] = map[k] || { nome: k, grupos: 0, ativos: 0, jogadores: 0, pagantes: 0, comissaoMes: 0, _m: new Set() };
       o.grupos++; if (g.ativo) o.ativos++; o.jogadores += g.jogadores; if (g.pagante) o.pagantes++; o.comissaoMes += g.comissao; membrosIds.forEach(id => o._m.add(id)); };
     const grupos = await db.collection('grupos').get();
@@ -209,17 +211,32 @@ module.exports = (db, PAG) => {
         ref.collection('membros').select().get(), ref.collection('peladas').where('data', '>=', desde).select().get(),
         ref.collection('cobrancas').where('status', '==', 'approved').get()]);
       const cfg = cfgS.exists ? cfgS.data() : {};
-      const onde = ondeFica(cfg, locS.docs.map(d => d.data()));
+      const onde = ondeFica(cfg, locS.docs.map(d => d.data()), gd.data().criadoEm);
       let pix = 0, volume = 0, comissao = 0;
       cobS.forEach(c => { const x = c.data(); if (mesRecife(x.pagoEm || x.atualizadoEm || x.criadoEm || 0) !== mes) return; pix++; volume += Number(x.valor) || 0; comissao += Number(x.feeMP != null ? x.feeMP : x.fee) || 0; });
       const g = { ativo: pelS.size > 0, jogadores: jogC.data().count || 0, pagante: comissao > 0, comissao };
       const ids = memS.docs.map(d => d.id); ids.forEach(id => todosMembros.add(id));
       tot.grupos++; if (g.ativo) tot.ativos++; tot.jogadores += g.jogadores; if (cfg.mpConectadoEm) tot.comPix++; if (g.pagante) tot.pagantes++;
       tot.pixMes += pix; tot.volumeMes += volume; tot.comissaoMes += comissao; if (!onde.uf) tot.semCidade++;
+      grupoOnde[gd.id] = onde.uf ? onde : null;
       soma(reg, onde.regiao, g, ids);
       if (onde.uf) { soma(ufs, onde.uf, g, ids); soma(cids, (onde.cidade || 'Cidade não informada') + ' · ' + onde.uf, g, ids); }
     }
     tot.membros = todosMembros.size;
+    // contas por região: vale a cidade do cadastro da pessoa; sem ela, a cidade da primeira pelada dela
+    Object.values(reg).concat(Object.values(ufs), Object.values(cids)).forEach(o => { o._m = new Set(); });
+    const usuarios = await db.collection('users').select('cidade', 'uf', 'grupos').get();
+    let cadastroComCidade = 0;
+    for (const u of usuarios.docs) {
+      const x = u.data(); let uf = String(x.uf || '').toUpperCase(), cidade = String(x.cidade || '').trim();
+      if (UF_REGIAO[uf]) cadastroComCidade++;
+      else { const g0 = Object.keys(x.grupos || {}).map(id => grupoOnde[id]).find(Boolean); if (g0) { uf = g0.uf; cidade = g0.cidade; } }
+      const r = UF_REGIAO[uf] || 'Sem cidade informada';
+      (reg[r] = reg[r] || { nome: r, grupos: 0, ativos: 0, jogadores: 0, pagantes: 0, comissaoMes: 0, _m: new Set() })._m.add(u.id);
+      if (UF_REGIAO[uf]) { (ufs[uf] = ufs[uf] || { nome: uf, grupos: 0, ativos: 0, jogadores: 0, pagantes: 0, comissaoMes: 0, _m: new Set() })._m.add(u.id);
+        const ck = (cidade || 'Cidade não informada') + ' · ' + uf; (cids[ck] = cids[ck] || { nome: ck, grupos: 0, ativos: 0, jogadores: 0, pagantes: 0, comissaoMes: 0, _m: new Set() })._m.add(u.id); }
+    }
+    contas.comCidade = cadastroComCidade;
     const lista = m => Object.values(m).map(({ _m, ...o }) => ({ ...o, contas: _m.size, comissaoMes: Math.round(o.comissaoMes * 100) / 100 })).sort((a, b) => b.grupos - a.grupos || b.jogadores - a.jogadores);
     tot.volumeMes = Math.round(tot.volumeMes * 100) / 100; tot.comissaoMes = Math.round(tot.comissaoMes * 100) / 100;
     return { em: agora, mes, contas, totais: tot, regioes: lista(reg), estados: lista(ufs), cidades: lista(cids).slice(0, 30) };

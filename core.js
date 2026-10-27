@@ -2096,7 +2096,7 @@ function sheetCfg(){
   const c=cfg();F={restr:(c.restr||[]).slice(),golSorteio:!!c.golSorteio};
   openSheet('Ajustes da pelada',`<div class="stack">
     <label class="field"><span>Nome da pelada</span><input type="text" id="c-nome" value="${esc(c.nome)}"></label>
-    <div class="grid2"><label class="field"><span>Cidade</span><input type="text" id="c-cidade" value="${esc(c.cidade||'')}" placeholder="Recife" autocomplete="address-level2"></label><label class="field"><span>Estado</span><select id="c-uf"><option value="">Escolha</option>${UFS.map(u=>`<option ${c.uf===u?'selected':''}>${u}</option>`).join('')}</select></label></div>
+    <div class="grid2"><label class="field"><span>Cidade</span><input type="text" id="c-cidade" value="${esc(c.cidade||(c.uf?'':'Recife'))}" placeholder="Recife" autocomplete="address-level2"></label><label class="field"><span>Estado</span><select id="c-uf"><option value="">Escolha</option>${UFS.map(u=>`<option ${(c.uf||'PE')===u?'selected':''}>${u}</option>`).join('')}</select></label></div>
     <div class="grid2"><label class="field"><span>Dia fixo</span><select id="c-dia">${DIAS.map((d,i)=>`<option value="${i}" ${c.dia==i?'selected':''}>${d}</option>`).join('')}</select></label>
     <label class="field"><span>Início</span><input type="time" id="c-hora" value="${esc(c.hora)}"></label></div>
     <label class="field"><span>Término</span><input type="time" id="c-fim" value="${esc(horaFimDe(null))}"></label>

@@ -226,6 +226,8 @@ function render() {
       <div class="dica-foto"><b>📸 Para a foto ficar boa</b><ul><li>De rosto, olhando para a câmera</li><li>Rosto no centro, do peito para cima</li><li>Lugar claro, sem luz atrás de você</li><li>Sem boné ou óculos escuros cobrindo o rosto</li></ul></div>
       <label class="field"><span>Nome</span><input type="text" id="p-nome" value="${escH(p.nome || EU.nome || '')}" required></label>
       <label class="field"><span>Apelido</span><input type="text" id="p-ap" value="${escH(p.apelido || '')}" placeholder="Como te chamam no campo"></label>
+      <div class="grid2"><label class="field"><span>Cidade</span><input type="text" id="p-cidade" value="${escH(UIp.pcid ?? p.cidade ?? '')}" placeholder="Recife" autocomplete="address-level2"></label>
+      <label class="field"><span>Estado</span><select id="p-uf"><option value="">Escolha</option>${UFS.map(u => `<option ${(UIp.puf ?? p.uf) === u ? 'selected' : ''}>${u}</option>`).join('')}</select></label></div>
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
       <button class="btn primary block" type="submit">Salvar</button></form>
@@ -573,6 +575,7 @@ function telaDono() { const P = UIp.painel || {}, D = P.dados;
     ${tile('Pix no mês', n(T.pixMes), rs(T.volumeMes) + ' movimentados')}
     ${tile('Comissão no mês', rs(T.comissaoMes), '1% dos Pix aprovados')}
   </div>
+  <p class="sub" style="margin:2px 0 0">${n(C.comCidade)} de ${n(C.total)} contas já têm cidade no cadastro. As outras entram pela cidade da pelada.</p>
   <p class="sub" style="margin:2px 0 0">"Pagantes" conta quem gerou comissão no Pix. Quando a assinatura Pro existir, ela entra aqui também.</p>
   <div class="panel" style="padding:14px;display:grid;gap:12px"><b style="font-size:18px">Uso por região</b>
     <div class="pick">${Object.entries(MET).map(([k, v]) => `<button type="button" data-sh="dono-met" data-v="${k}" aria-pressed="${met === k}">${v}</button>`).join('')}</div>
@@ -588,7 +591,7 @@ async function carregarPainel() { const P = UIp.painel = UIp.painel || {}; P.car
   try { P.dados = MOCK ? painelMock() : await notasServidor('painel'); } catch (e) { P.erro = e.message; }
   P.carregando = false; if (TELA === 'dono') render(); }
 function painelMock() { const r = (nome, grupos, ativos, jogadores, contas, pagantes) => ({ nome, grupos, ativos, jogadores, contas, pagantes, comissaoMes: pagantes * 9.4 });
-  return { em: Date.now(), mes: new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 7), contas: { total: 412, novas30: 58, ativas30: 296 },
+  return { em: Date.now(), mes: new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 7), contas: { total: 412, novas30: 58, ativas30: 296, comCidade: 187 },
     totais: { grupos: 23, ativos: 19, jogadores: 486, membros: 351, comPix: 9, pagantes: 7, pixMes: 214, volumeMes: 5180.5, comissaoMes: 51.81, semCidade: 2 },
     regioes: [r('Nordeste', 17, 15, 372, 268, 6), r('Sudeste', 3, 2, 61, 44, 1), r('Sul', 1, 1, 18, 12, 0), r('Sem cidade informada', 2, 1, 35, 27, 0)],
     estados: [r('PE', 14, 12, 310, 221, 5), r('PB', 2, 2, 41, 30, 1), r('SP', 2, 1, 40, 29, 1), r('RN', 1, 1, 21, 17, 0), r('RJ', 1, 1, 21, 15, 0), r('RS', 1, 1, 18, 12, 0)],
@@ -723,7 +726,7 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-sh]'); if (!b || !($('shell').contains(b) || $('leitor').contains(b))) return;
   const a = b.dataset.sh, v = b.dataset.v;
   if (a === 'ir') { if (v === 'perfil') { UIp.pos = null; UIp.foto = undefined; } ir(v); }
-  if (a === 'pos') { UIp.pos = v; const keep = { nome: $('p-nome').value, ap: $('p-ap').value, tel: $('p-tel').value }; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }
+  if (a === 'pos') { UIp.pos = v; const keep = { nome: $('p-nome').value, ap: $('p-ap').value, tel: $('p-tel').value }; UIp.pcid = $('p-cidade').value; UIp.puf = $('p-uf').value; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }
   if (a === 'pref') { UIp.prefere = v; render(); }
   if (a === 'google') { try { await B.google(); } catch (err) { aviso(msgErro(err) + ' Se não abrir, use e-mail e senha.'); } }
   if (a === 'reset') { const em = ($('l-email') || {}).value || ''; if (!em) { aviso('Digite seu e-mail acima e toque de novo em "Esqueci minha senha".'); return; } try { await B.reset(em.trim()); aviso('Mandamos um link para criar uma nova senha no seu e-mail.'); } catch (err) { aviso(msgErro(err)); } }
@@ -781,10 +784,11 @@ document.addEventListener('submit', async e => {
     OCUPADO = true; try { await notasServidor('tomador', { gid: f.dataset.gid, nome: val('t-nome'), doc, email: val('t-email') }); aviso('Dados salvos.'); OCUPADO = false; carregarNotas(); } catch (err) { OCUPADO = false; aviso(err.message); } return; }
   if (f.id === 'f-perfil') {
     if (!val('p-nome')) { aviso('Coloque seu nome.'); return; }
+    if (!val('p-cidade') || !$('p-uf').value) { aviso('Diga sua cidade e seu estado.'); return; }
     const pos = UIp.pos || (PERFIL && PERFIL.pos) || 'MEI';
     OCUPADO = true;
     const foto = UIp.foto !== undefined ? UIp.foto : ((PERFIL && PERFIL.foto) || null);
-    try { await B.set('users/' + EU.uid, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, email: EU.email || '' }, { merge: true }); PERFIL = { ...(PERFIL || {}), nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto };
+    try { await B.set('users/' + EU.uid, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value, email: EU.email || '' }, { merge: true }); PERFIL = { ...(PERFIL || {}), nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value }; UIp.pcid = UIp.puf = undefined;
       await Promise.all(Object.keys(GRUPOS).map(g => B.set(`grupos/${g}/membros/${EU.uid}`, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto }, { merge: true }).catch(e => console.warn(e))));
       UIp.foto = undefined; OCUPADO = false; await depoisDoLogin(); }
     catch (err) { aviso(msgErro(err)); OCUPADO = false; }
