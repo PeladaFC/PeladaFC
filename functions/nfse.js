@@ -221,7 +221,7 @@ module.exports = (db, PAG) => {
       tot.pixMes += pix; tot.volumeMes += volume; tot.comissaoMes += comissao; if (!onde.uf) tot.semCidade++;
       grupoOnde[gd.id] = onde.uf ? onde : null;
       const G = gd.data();
-      listaGrupos.push({ gid: gd.id, nome: G.nome || cfg.nome || 'Pelada', codigo: G.codigo || '', cidade: onde.cidade || '', uf: onde.uf || '', regiao: onde.regiao,
+      listaGrupos.push({ gid: gd.id, nome: G.nome || cfg.nome || 'Pelada', codigo: G.codigo || '', rep: G.rep || '', cidade: onde.cidade || '', uf: onde.uf || '', regiao: onde.regiao,
         criadoEm: G.criadoEm || null, ultima: ultS.empty ? null : String(ultS.docs[0].data().data || '') || null, ativo: g.ativo, jogadores: g.jogadores, contas: ids.length,
         pix: !!cfg.mpConectadoEm, pixMes: pix, comissaoMes: Math.round(comissao * 100) / 100, evento: !!(G.evento || cfg.evento), dia: G.dia != null ? Number(G.dia) : (cfg.dia != null ? Number(cfg.dia) : null) });
       soma(reg, onde.regiao, g, ids);
@@ -256,7 +256,16 @@ module.exports = (db, PAG) => {
       // representantes: cadastro do dono (comissão e prazo editáveis). Os grupos ligam na fase 2, pelo código da loja.
       if (b.acao === 'reps') {
         const q = await db.collection('servidor/plataforma/representantes').get();
-        return res.json({ reps: q.docs.map(d => ({ id: d.id, ...d.data() })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
+        const gq = await db.collection('grupos').select('rep').get(), por = {};
+        gq.docs.forEach(d => { const c = d.get('rep'); if (c) por[c] = (por[c] || 0) + 1; });
+        const plat = (await ler('servidor/plataforma')) || {};
+        return res.json({ simulador: plat.simulador || null, reps: q.docs.map(d => ({ id: d.id, ...d.data(), grupos: por[d.get('codigo')] || 0 })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
+      }
+      if (b.acao === 'sim-salvar') {
+        const n = v => { const x = Number(String(v ?? '').replace(',', '.')); return isFinite(x) ? Math.round(x * 100) / 100 : NaN; };
+        const sim = { preco: n(b.preco), loja: n(b.loja), imp: n(b.imp), regime: ['simples', 'presumido', 'real', 'outro'].includes(b.regime) ? b.regime : 'simples', em: Date.now() };
+        if (!(sim.preco > 0 && sim.preco < 10000) || !(sim.loja >= 0 && sim.loja <= 100) || !(sim.imp >= 0 && sim.imp <= 100)) return res.status(400).json({ erro: 'Confira os números.' });
+        await db.doc('servidor/plataforma').set({ simulador: sim }, { merge: true }); return res.json({ ok: true, simulador: sim });
       }
       if (b.acao === 'rep-salvar') {
         const nome = String(b.nome || '').trim().slice(0, 80), codigo = String(b.codigo || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);

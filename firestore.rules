@@ -42,7 +42,9 @@ service cloud.firestore {
       allow update: if admin(gid)
         && request.resource.data.dono == resource.data.dono
         && request.resource.data.dono in request.resource.data.admins
-        && request.resource.data.admins.size() > 0;
+        && request.resource.data.admins.size() > 0
+        // o representante que trouxe o grupo não muda depois de criado
+        && request.resource.data.get('rep', null) == resource.data.get('rep', null);
       allow delete: if logado() && resource.data.dono == eu();
 
       // Quem entrou na pelada. A pessoa entra sozinha se souber o código.

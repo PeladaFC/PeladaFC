@@ -175,6 +175,9 @@ function codigoLido(cod) {
 /* ================= Estado da casca ================= */
 let EU = null, PERFIL = null, TELA = 'carregando', GRUPOS = {}, ABERTO = null, unsubGrupo = null, unsubPerfil = null, CONVITE = null, OCUPADO = false;
 const pend = new URLSearchParams(location.search).get('c');
+const repUrl = (new URLSearchParams(location.search).get('rep') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
+if (repUrl.length >= 4) { ls.set('pelota.rep', JSON.stringify({ c: repUrl, t: Date.now() })); if (!pend) history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); }
+function repGuardado() { try { const r = JSON.parse(ls.get('pelota.rep') || 'null'); return r && r.c && Date.now() - r.t < 90 * 864e5 ? r.c : ''; } catch (e) { return ''; } }
 if (pend) { ls.set('pelada.convite', pend.toUpperCase()); history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); }
 
 function mostrarCasca(on) {
@@ -239,6 +242,14 @@ function render() {
   if (t === 'dono') h = topo('perfil') + abasDono('dono') + telaDono();
   if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + telaGruposDono();
   if (t === 'donoreps') h = topo('perfil') + abasDono('reps') + telaRepsDono();
+  if (t === 'donorepqr') { const x = ((UIp.reps || {}).lista || []).find(r => r.id === UIp.repqr);
+    h = topo('donoreps') + (x ? `<h2>QR Code de ${escH(x.nome)}</h2><p class="lead">Quem ler este código abre o Pelota FC. As peladas que essa pessoa criar ficam marcadas como trazidas por <b>${escH(x.codigo)}</b>.</p>
+    <img id="rep-cartao" alt="Cartão com QR Code do representante ${escH(x.nome)}" style="width:min(100%,360px);margin:0 auto;display:block;border-radius:10px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.08)">
+    <div class="num" style="font-weight:700;text-align:center;word-break:break-all">${escH(linkRep(x.codigo))}</div>
+    <button class="btn primary block" data-sh="rep-baixar">Baixar para imprimir (PNG)</button>
+    ${navigator.share ? '<button class="btn block" data-sh="rep-compartilhar">Compartilhar…</button>' : ''}
+    <button class="btn block" data-sh="rep-copiar">Copiar link</button>
+    <p class="sub" style="margin:0">Tamanho A6 (10,5 × 14,8 cm) em alta resolução. Imprime bem também em A4 ou como adesivo.</p>` : '<p class="lead">Representante não encontrado.</p>'); }
   if (t === 'notas') { const N = UIp.nf || {}, [ano, mm] = (N.mes || '2026-01').split('-'), D = N.dados, L = (D && D.linhas) || [];
     const rs = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fdoc = d => d && d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d && d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : '';
@@ -430,7 +441,7 @@ async function criarGrupo(f) {
   const cfg = { nome: f.nome, cidade: f.cidade || '', uf: f.uf || '', dia: f.dia, hora: f.hora, horaFim: f.fim, golSorteio: false, local: '', times: f.times, porTime: f.por, mensal: f.evento ? 0 : f.mens, diaria: f.evento ? 0 : f.diaria, pix: '', restr: [], nivelPublico: false, evento: !!f.evento, dataEvento: f.data || null };
   try {
     await B.batch([
-      { op: 'set', path: 'grupos/' + gid, data: { nome: f.nome, dia: f.dia, hora: f.hora, evento: !!f.evento, data: f.data || null, dono: EU.uid, admins: [EU.uid], codigo, criadoEm: now } },
+      { op: 'set', path: 'grupos/' + gid, data: { nome: f.nome, dia: f.dia, hora: f.hora, evento: !!f.evento, data: f.data || null, dono: EU.uid, admins: [EU.uid], codigo, criadoEm: now, ...(repGuardado() ? { rep: repGuardado() } : {}) } },
       { op: 'set', path: 'codigos/' + codigo, data: { gid } },
       { op: 'set', path: `grupos/${gid}/config/geral`, data: cfg },
       { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: f.evento ? null : 'mensalista', codigo, t: now } },
@@ -572,7 +583,7 @@ function listaGruposHTML() { const L = gruposFiltrados(), n = v => Number(v || 0
     <div class="row" style="justify-content:space-between;gap:10px;flex-wrap:nowrap;align-items:flex-start"><div><b style="font-size:17px">${escH(g.nome)}</b><div class="sub">${escH([g.cidade, g.uf].filter(Boolean).join(' · ') || 'Sem cidade')}${g.evento ? ' · evento' : g.dia != null ? ' · ' + DIAS_CURTO[g.dia] : ''}</div></div>
       <span class="small" style="flex:none;padding:3px 10px;border-radius:999px;font-weight:700;background:${g.ativo ? '#d8eedd' : '#e6e8e4'};color:${g.ativo ? '#0F4D27' : '#56665B'}">${g.ativo ? 'Ativo' : 'Parado'}</span></div>
     <div class="small" style="display:flex;flex-wrap:wrap;gap:4px 14px"><span>👥 ${n(g.jogadores)} no elenco · ${n(g.contas)} com conta</span><span>📅 Última pelada: ${dt(g.ultima)}</span>
-      <span>${g.pix ? '💳 Pix conectado' : '💳 Sem Pix'}${g.comissaoMes > 0 ? ' · ' + rs(g.comissaoMes) + ' de comissão no mês' : ''}</span><span>🔑 Código ${escH(g.codigo || '—')}</span><span>🗓️ Criado em ${dc(g.criadoEm)}</span></div></div>`).join('')
+      <span>${g.pix ? '💳 Pix conectado' : '💳 Sem Pix'}${g.comissaoMes > 0 ? ' · ' + rs(g.comissaoMes) + ' de comissão no mês' : ''}</span><span>🔑 Código ${escH(g.codigo || '—')}</span>${g.rep ? `<span>🤝 Representante ${escH(g.rep)}</span>` : ''}<span>🗓️ Criado em ${dc(g.criadoEm)}</span></div></div>`).join('')
     : '<p class="sub">Nenhum grupo com esses filtros.</p>'); }
 function telaGruposDono() { const P = UIp.painel || {}, D = P.dados;
   if (!D) return '<h2>Grupos</h2>' + (P.erro ? `<div class="banner">${escH(P.erro)}</div>` : '<p class="lead">Carregando os grupos…</p>');
@@ -595,7 +606,8 @@ function telaGruposDono() { const P = UIp.painel || {}, D = P.dados;
     <button class="btn sm" data-sh="gf-limpar" style="flex:none">Limpar filtros</button></div>
   <div id="gf-lista" class="stack" style="gap:10px">${listaGruposHTML()}</div>`; }
 /* representantes + simulador do líquido (fase 1: só cadastro; os grupos ligam na fase 2 pelo código da loja) */
-const SIM0 = { preco: '19,90', loja: '15', imp: '6', com: '10' };
+const SIM0 = { preco: '19,90', loja: '15', imp: '6', com: '10', regime: 'simples' };
+const REGIMES = [['simples', 'Simples Nacional'], ['presumido', 'Lucro Presumido'], ['real', 'Lucro Real'], ['outro', 'Outro']];
 const numBR = v => { const x = Number(String(v ?? '').replace(/\./g, '').replace(',', '.')); return isFinite(x) ? x : 0; };
 const rsBR = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pctBR = v => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
@@ -607,7 +619,7 @@ function simResultadoHTML() { const S = UIp.sim, r = contaSim(S), lin = (t, v, f
   <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:4px"><thead><tr style="text-align:left"><th style="padding:6px 4px">Comissão</th><th style="padding:6px 4px;text-align:right;white-space:nowrap">Representante</th><th style="padding:6px 4px;text-align:right;white-space:nowrap">Líquido</th><th style="padding:6px 4px;text-align:right;white-space:nowrap">% do bruto</th></tr></thead>
   <tbody>${[0, 10, 20, 30].map(c => { const x = contaSim(S, c); return `<tr style="border-top:1px solid var(--line)"><td style="padding:6px 4px">${c ? c + '%' : 'Sem representante'}</td><td class="num" style="padding:6px 4px;text-align:right;white-space:nowrap">${rsBR(x.c)}</td><td class="num" style="padding:6px 4px;text-align:right;white-space:nowrap">${rsBR(x.liq)}</td><td class="num" style="padding:6px 4px;text-align:right;white-space:nowrap">${pctBR(x.pct)}</td></tr>`; }).join('')}</tbody></table></div>`; }
 function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { ...SIM0 }, L = R.lista || [];
-  const campo = (k, rot, suf) => `<label class="field" style="margin:0"><span>${rot}</span><div class="row" style="gap:6px;flex-wrap:nowrap;align-items:center"><input type="text" inputmode="decimal" data-sim="${k}" value="${escH(S[k])}" style="min-width:0">${suf ? `<span class="sub">${suf}</span>` : ''}</div></label>`;
+  const campo = (k, rot) => `<label class="field" style="margin:0;min-width:0"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${rot}</span><input type="text" inputmode="decimal" data-sim="${k}" value="${escH(S[k])}" style="width:100%;min-width:0"></label>`;
   const ed = R.editar, e = ed === 'novo' ? { ativo: true, pct: 10, meses: 12 } : L.find(x => x.id === ed);
   const form = e ? `<form id="f-rep" class="panel stack" style="padding:14px" data-id="${escH(e.id || '')}"><b style="font-size:18px">${e.id ? 'Editar representante' : 'Novo representante'}</b>
     <label class="field" style="margin:0"><span>Nome</span><input type="text" id="r-nome" value="${escH(e.nome || '')}" placeholder="Nome do representante" required></label>
@@ -626,18 +638,44 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
     <span class="small">${pctBR(x.pct)} da assinatura, ${prazo(x)}${x.ativo === false ? ' · <b>inativo</b>' : ''}</span>
     <span class="sub">Por grupo assinante: ${rsBR(contaSim(S, Number(x.pct)).c)} por mês · Grupos trazidos: ${x.grupos || 0}</span>
     ${x.contato ? `<span class="sub">Pix/contato: ${escH(x.contato)}</span>` : ''}${x.obs ? `<span class="sub">${escH(x.obs)}</span>` : ''}
-    <button class="btn sm" style="justify-self:start;margin-top:4px" data-sh="rep-editar" data-v="${escH(x.id)}">Editar</button></div>`;
+    <div class="row" style="gap:8px;margin-top:4px"><button class="btn sm" data-sh="rep-editar" data-v="${escH(x.id)}">Editar</button><button class="btn sm" data-sh="rep-qr" data-v="${escH(x.id)}">QR Code para imprimir</button></div></div>`;
   return `<h2>Representantes</h2><p class="lead">Quem traz grupos para o app. Você decide quanto cada um ganha e por quanto tempo.</p>
   <div class="panel" style="padding:14px;display:grid;gap:12px"><b style="font-size:18px">Quanto chega líquido</b>
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">${campo('preco', 'Preço da assinatura', 'R$/mês')}${campo('loja', 'Taxa da loja', '%')}${campo('imp', 'Imposto (Simples)', '%')}${campo('com', 'Comissão do representante', '%')}</div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">${campo('preco', 'Preço (R$/mês)')}${campo('loja', 'Taxa da loja (%)')}${campo('imp', 'Imposto (%)')}${campo('com', 'Comissão (%)')}</div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end"><label class="field" style="margin:0;min-width:0"><span>Regime da empresa</span><select data-sim="regime" style="width:100%">${REGIMES.map(([v, t]) => `<option value="${v}" ${S.regime === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <button class="btn" type="button" data-sh="sim-salvar" style="height:48px">Salvar</button></div>
+    <p class="sub" style="margin:0">${R.simSalvo ? `Salvo em ${new Date(R.simSalvo.em).toLocaleDateString('pt-BR')}: ${escH((REGIMES.find(r => r[0] === R.simSalvo.regime) || REGIMES[0])[1])}, imposto de ${pctBR(R.simSalvo.imp)}.` : 'Ainda não salvo: o imposto de 6% é só um exemplo.'} O app não descobre sozinho o regime nem a alíquota da empresa. Quem passa é a contadora; quando mudar, troque aqui e toque em Salvar.</p>
     <div id="sim-res" style="display:grid;gap:6px">${simResultadoHTML()}</div>
-    <p class="sub" style="margin:0">Conta feita sobre o que a loja repassa. Apple e Google ficam com 15% no plano de pequena empresa. O imposto e a forma de pagar o representante ainda serão confirmados com a contadora.</p></div>
+    <p class="sub" style="margin:0">Conta feita sobre o que a loja repassa. Apple e Google ficam com 15% no plano de pequena empresa. No Simples Nacional a alíquota sobe conforme o faturamento dos últimos 12 meses, então peça o número atualizado à contadora de tempos em tempos.</p></div>
   ${form || `<button class="btn primary block" data-sh="rep-editar" data-v="novo">+ Novo representante</button>`}
   ${R.erro ? `<div class="banner">${escH(R.erro)}</div>` : ''}
   <div class="stack" style="gap:10px">${R.carregando && !R.lista ? '<p class="lead">Carregando…</p>' : L.length ? L.map(card).join('') : '<p class="sub">Nenhum representante ainda.</p>'}</div>
-  <p class="sub" style="margin:0">A ligação de cada grupo com o representante e o cálculo automático do que pagar chegam na fase 2, junto com a assinatura nas lojas.</p>`; }
+  <p class="sub" style="margin:0">Quem lê o QR Code do representante e cria uma pelada já fica ligado a ele (vale por 90 dias depois da leitura). O cálculo automático do que pagar chega na fase 2, junto com a assinatura nas lojas.</p>`; }
+const linkRep = c => LINK_APP + '?rep=' + encodeURIComponent(c);
+function cartaoRep(x) { // cartão para imprimir: 1240 x 1748 px (A6 em 300 dpi)
+  const W = 1240, H = 1748, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+  const fd = "'Saira Condensed','Arial Narrow',Impact,sans-serif", ft = "Figtree,Arial,sans-serif";
+  g.fillStyle = '#EEF2EB'; g.fillRect(0, 0, W, H);
+  const gr = g.createLinearGradient(0, 0, W, 520); gr.addColorStop(0, '#1B6A36'); gr.addColorStop(1, '#0F4D27'); g.fillStyle = gr;
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(W, 0); g.lineTo(W, 440); g.lineTo(0, 520); g.closePath(); g.fill();
+  g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  g.font = `italic 800 190px ${fd}`; const w1 = g.measureText('PELOTA ').width, w2 = g.measureText('FC').width, x0 = (W - w1 - w2) / 2;
+  g.textAlign = 'left'; g.fillStyle = 'rgba(0,0,0,.2)'; g.fillText('PELOTA ', x0 + 6, 266); g.fillText('FC', x0 + w1 + 6, 266);
+  g.fillStyle = '#fff'; g.fillText('PELOTA ', x0, 260); g.fillStyle = '#F2C12E'; g.fillText('FC', x0 + w1, 260);
+  g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = `600 52px ${ft}`; g.fillText('ORGANIZE SUA PELADA', W / 2, 350);
+  const q = window.qrcode(0, 'M'); q.addData(linkRep(x.codigo)); q.make(); const n = q.getModuleCount(), lado = 700, cel = Math.floor(lado / (n + 4)), tam = cel * (n + 4), qx = (W - tam) / 2, qy = 540;
+  g.fillStyle = '#fff'; g.fillRect(qx - 20, qy - 20, tam + 40, tam + 40); g.strokeStyle = '#D2DBCE'; g.lineWidth = 4; g.strokeRect(qx - 20, qy - 20, tam + 40, tam + 40);
+  g.fillStyle = '#000'; for (let y = 0; y < n; y++) for (let z = 0; z < n; z++) if (q.isDark(y, z)) g.fillRect(qx + (z + 2) * cel, qy + (y + 2) * cel, cel, cel);
+  let y = qy + tam + 100; g.fillStyle = '#132018'; g.font = `700 54px ${ft}`; g.fillText('Aponte a câmera do celular', W / 2, y);
+  y += 100; g.fillStyle = '#3F5245'; g.font = `600 40px ${ft}`; g.fillText('REPRESENTANTE', W / 2, y);
+  y += 88; g.fillStyle = '#0F4D27'; g.font = `italic 800 96px ${fd}`; let nome = String(x.nome || '').toUpperCase(); while (g.measureText(nome).width > W - 160 && nome.length > 3) nome = nome.slice(0, -2) + '…'; g.fillText(nome, W / 2, y);
+  y += 86; g.fillStyle = '#F0662A'; g.font = `700 54px ${ft}`; g.fillText('Código ' + x.codigo, W / 2, y);
+  g.fillStyle = '#F2C12E'; g.fillRect(0, H - 40, W * .64, 40); g.fillStyle = '#F0662A'; g.fillRect(W * .64, H - 40, W * .36, 40);
+  return cv; }
 async function carregarReps() { const R = UIp.reps = UIp.reps || {}; R.carregando = true; R.erro = null; if (TELA === 'donoreps') render();
-  try { R.lista = MOCK ? (UIp.repsMock = UIp.repsMock || [{ id: 'r1', nome: 'João Representante', codigo: 'JOAO10', pct: 10, meses: 12, contato: '(81) 9 9999-0000', obs: 'Zona Norte do Recife', ativo: true, grupos: 0 }]).slice() : (await notasServidor('reps')).reps; } catch (e) { R.erro = e.message; }
+  try { const j = MOCK ? { reps: (UIp.repsMock = UIp.repsMock || [{ id: 'r1', nome: 'João Representante', codigo: 'JOAO10', pct: 10, meses: 12, contato: '(81) 9 9999-0000', obs: 'Zona Norte do Recife', ativo: true, grupos: 2 }]).slice(), simulador: UIp.simMock || null } : await notasServidor('reps');
+    R.lista = j.reps; R.simSalvo = j.simulador || null;
+    if (R.simSalvo && !UIp.simMexido) { const f = v => String(v).replace('.', ','); UIp.sim = { ...(UIp.sim || SIM0), preco: f(R.simSalvo.preco.toFixed(2)), loja: f(R.simSalvo.loja), imp: f(R.simSalvo.imp), regime: R.simSalvo.regime }; } } catch (e) { R.erro = e.message; }
   R.carregando = false; if (TELA === 'donoreps') render(); }
 const REG_ORDEM = ['Nordeste', 'Sudeste', 'Sul', 'Centro-Oeste', 'Norte', 'Sem cidade informada'];
 function telaDono() { const P = UIp.painel || {}, D = P.dados;
@@ -839,6 +877,15 @@ document.addEventListener('click', async e => {
   if (a === 'dono-atualizar') carregarPainel();
   if (a === 'dono-grupos') { ir('donogrupos'); if (!UIp.painel || !UIp.painel.dados) carregarPainel(); }
   if (a === 'dono-reps') { ir('donoreps'); carregarReps(); }
+  if (a === 'rep-qr') { UIp.repqr = v; ir('donorepqr'); await (document.fonts ? document.fonts.ready : null); const x = UIp.reps.lista.find(r => r.id === v), im = $('rep-cartao'); if (x && im) { UIp.repCv = cartaoRep(x); im.src = UIp.repCv.toDataURL('image/png'); } }
+  if (a === 'rep-baixar' || a === 'rep-compartilhar') { const x = UIp.reps.lista.find(r => r.id === UIp.repqr), cv = UIp.repCv; if (!x || !cv) return; const nomeArq = `PelotaFC_QR_${x.codigo}.png`;
+    const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    if (a === 'rep-compartilhar') { try { await navigator.share({ files: [new File([blob], nomeArq, { type: 'image/png' })], title: 'Pelota FC' }); return; } catch (err) { if (err && err.name === 'AbortError') return; } }
+    const u = URL.createObjectURL(blob), el = document.createElement('a'); el.href = u; el.download = nomeArq; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000); aviso('Imagem baixada: ' + nomeArq); }
+  if (a === 'rep-copiar') { const x = UIp.reps.lista.find(r => r.id === UIp.repqr); if (x) { try { await navigator.clipboard.writeText(linkRep(x.codigo)); aviso('Link copiado.'); } catch (err) { aviso(linkRep(x.codigo)); } } }
+  if (a === 'sim-salvar') { const S = UIp.sim, d = { preco: numBR(S.preco), loja: numBR(S.loja), imp: numBR(S.imp), regime: S.regime || 'simples' };
+    if (!(d.preco > 0) || !(d.loja >= 0 && d.loja <= 100) || !(d.imp >= 0 && d.imp <= 100)) { aviso('Confira os números.'); return; }
+    b.disabled = true; try { if (MOCK) UIp.simMock = { ...d, em: Date.now() }; else await notasServidor('sim-salvar', d); UIp.simMexido = false; aviso('Valores salvos.'); await carregarReps(); } catch (err) { aviso(err.message); b.disabled = false; } }
   if (a === 'rep-editar') { UIp.reps = UIp.reps || {}; UIp.reps.editar = v || null; render(); }
   if (a === 'gf-sit') { UIp.gf.sit = v; render(); }
   if (a === 'gf-limpar') { UIp.gf = { ...GF0 }; render(); }
@@ -880,7 +927,7 @@ document.addEventListener('change', e => {
 }));
 document.addEventListener('input', e => {
   const el = e.target.closest && e.target.closest('[data-sim]'); if (!el || TELA !== 'donoreps') return;
-  UIp.sim = UIp.sim || { ...SIM0 }; UIp.sim[el.dataset.sim] = el.value; const box = $('sim-res'); if (box) box.innerHTML = simResultadoHTML();
+  UIp.sim = UIp.sim || { ...SIM0 }; UIp.sim[el.dataset.sim] = el.value; UIp.simMexido = true; const box = $('sim-res'); if (box) box.innerHTML = simResultadoHTML();
 });
 document.addEventListener('submit', async e => {
   const f = e.target; if (!$('shell').contains(f)) return; e.preventDefault();
