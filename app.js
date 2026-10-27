@@ -633,6 +633,9 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
     <label class="field" style="margin:0"><span>Chave Pix (opcional)</span><input type="text" id="r-pix" value="${escH(e.pix || e.contato || '')}" placeholder="CPF, e-mail, telefone ou chave aleatória" autocomplete="off"></label>
     <label class="field" style="margin:0"><span>WhatsApp com DDD (opcional)</span><input type="tel" id="r-whats" inputmode="tel" value="${escH(foneBR(e.whats || ''))}" placeholder="(81) 9 9999-9999"></label>
     <p class="sub" style="margin:-4px 0 0">Com o WhatsApp, você manda o relatório do mês para o parceiro com um toque.</p>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+      <label class="field" style="margin:0;min-width:0"><span>CPF ou CNPJ (opcional)</span><input type="text" inputmode="numeric" id="r-doc" value="${escH(docBR(e.doc || ''))}" placeholder="Para o termo"></label>
+      <label class="field" style="margin:0;min-width:0"><span>Dia do pagamento</span><select id="r-dia" style="width:100%">${[5, 10, 15, 20, 25].map(d => `<option value="${d}" ${Number(e.dia || 10) === d ? 'selected' : ''}>Todo dia ${d}</option>`).join('')}</select></label></div>
     <label class="field" style="margin:0"><span>Anotação (opcional)</span><input type="text" id="r-obs" value="${escH(e.obs || '')}" placeholder="Ex.: cuida da Zona Norte do Recife"></label>
     <label class="row" style="gap:8px;align-items:center"><input type="checkbox" id="r-ativo" ${e.ativo !== false ? 'checked' : ''}> <span>Ativo</span></label>
     <div class="row" style="gap:8px"><button class="btn primary" type="submit" style="flex:1">Salvar</button><button class="btn" type="button" data-sh="rep-editar" data-v="">Cancelar</button></div></form>` : '';
@@ -643,7 +646,9 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
     <span class="sub">Regra: a comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra.</span>
     ${x.pix || x.contato ? `<div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><span class="sub" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pix: <b>${escH(x.pix || x.contato)}</b></span><button class="btn sm" style="flex:none" data-sh="rep-copiar-pix" data-v="${escH(x.id)}">Copiar Pix</button></div>` : ''}
     ${x.whats ? `<span class="sub">WhatsApp: ${escH(foneBR(x.whats))}</span>` : ''}${x.obs ? `<span class="sub">${escH(x.obs)}</span>` : ''}
-    <div class="row" style="gap:8px;margin-top:4px"><button class="btn sm" data-sh="rep-editar" data-v="${escH(x.id)}">Editar</button><button class="btn sm" data-sh="rep-qr" data-v="${escH(x.id)}">QR Code e pôster</button>${x.whats ? `<button class="btn sm" data-sh="rep-relatorio" data-v="${escH(x.id)}">📲 Relatório no WhatsApp</button>` : ''}</div></div>`;
+    <div class="row" style="gap:8px;margin-top:4px"><button class="btn sm" data-sh="rep-editar" data-v="${escH(x.id)}">Editar</button><button class="btn sm" data-sh="rep-qr" data-v="${escH(x.id)}">QR Code e pôster</button></div>
+    <div class="row" style="gap:8px"><button class="btn sm" data-sh="rep-termo" data-v="${escH(x.id)}">📄 Termo de parceria</button><button class="btn sm" data-sh="rep-relpdf" data-v="${escH(x.id)}">📄 Relatório do mês</button></div>
+    <span class="sub">Pagamento todo dia ${x.dia || 10}. Os PDFs abrem o compartilhar do celular: escolha o WhatsApp e o contato.</span></div>`;
   return `<h2>Representantes</h2><p class="lead">Quem traz grupos para o app. Você decide quanto cada um ganha e por quanto tempo.</p>
   <div class="panel" style="padding:14px;display:grid;gap:12px"><b style="font-size:18px">Quanto chega líquido</b>
     <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">${campo('preco', 'Preço (R$/mês)')}${campo('loja', 'Taxa da loja (%)')}${campo('imp', 'Imposto (%)')}${campo('com', 'Comissão (%)')}</div>
@@ -652,6 +657,13 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
     <p class="sub" style="margin:0">${R.simSalvo ? `Salvo em ${new Date(R.simSalvo.em).toLocaleDateString('pt-BR')}: ${escH((REGIMES.find(r => r[0] === R.simSalvo.regime) || REGIMES[0])[1])}, imposto de ${pctBR(R.simSalvo.imp)}.` : 'Ainda não salvo: o imposto de 6% é só um exemplo.'} O app não descobre sozinho o regime nem a alíquota da empresa. Quem passa é a contadora; quando mudar, troque aqui e toque em Salvar.</p>
     <div id="sim-res" style="display:grid;gap:6px">${simResultadoHTML()}</div>
     <p class="sub" style="margin:0">Conta feita sobre o que a loja repassa. Apple e Google ficam com 15% no plano de pequena empresa. No Simples Nacional a alíquota sobe conforme o faturamento dos últimos 12 meses, então peça o número atualizado à contadora de tempos em tempos.</p></div>
+  <details class="panel" style="padding:10px 14px" ${R.empresa ? '' : 'open'}><summary><b>Dados da empresa nos documentos</b>${R.empresa ? ` <span class="sub">· ${escH(R.empresa.nome)}</span>` : ''}</summary>
+    <div class="stack" style="gap:10px;margin-top:10px">
+    <label class="field" style="margin:0"><span>Razão social</span><input type="text" id="e-nome" value="${escH((R.empresa || {}).nome || '')}" placeholder="Nome da empresa que opera o Pelota FC"></label>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px"><label class="field" style="margin:0;min-width:0"><span>CNPJ</span><input type="text" inputmode="numeric" id="e-cnpj" value="${escH(docBR((R.empresa || {}).cnpj || ''))}"></label>
+    <label class="field" style="margin:0;min-width:0"><span>Cidade</span><input type="text" id="e-cidade" value="${escH((R.empresa || {}).cidade || '')}" placeholder="Recife"></label></div>
+    <button class="btn" type="button" data-sh="empresa-salvar">Salvar dados da empresa</button>
+    <p class="sub" style="margin:0">Vão no termo de parceria e no relatório em PDF.</p></div></details>
   ${form || `<button class="btn primary block" data-sh="rep-editar" data-v="novo">+ Novo representante</button><button class="btn block" data-sh="rep-qr" data-v="_geral">Pôster A4 sem representante</button>`}
   ${R.erro ? `<div class="banner">${escH(R.erro)}</div>` : ''}
   <div class="stack" style="gap:10px">${R.carregando && !R.lista ? '<p class="lead">Carregando…</p>' : L.length ? L.map(card).join('') : '<p class="sub">Nenhum representante ainda.</p>'}</div>
@@ -756,18 +768,77 @@ async function posterGrande(x) { // A3 em ~250 dpi; desenho em unidades de 2480 
     g.fillText(lin + ' · código ', tx, ty); const wl = g.measureText(lin + ' · código ').width; g.fillStyle = '#F0662A'; g.font = `800 50px ${ft}`; g.fillText(x.codigo, tx + wl, ty); }
   g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.85)'; g.font = `600 48px ${ft}`; g.fillText('Funciona no celular, iPhone ou Android.', W / 2, 3470);
   return cv; }
-function pdfPagina(cv, PW, PH) { // PDF de uma página (A4 ou A3) com a imagem em JPEG
-  const b64 = cv.toDataURL('image/jpeg', .92).split(',')[1], bin = atob(b64), img = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) img[i] = bin.charCodeAt(i);
+function pdfPagina(cv, PW, PH) { return pdfPaginas([cv], PW, PH); }
+function pdfPaginas(cvs, PW, PH) { // PDF com uma imagem JPEG por página
   const enc = new TextEncoder(), partes = [], offs = []; let tam = 0; const add = p => { const u = typeof p === 'string' ? enc.encode(p) : p; partes.push(u); tam += u.length; };
-  const cont = `q ${PW} 0 0 ${PH} 0 0 cm /Im0 Do Q`;
-  add('%PDF-1.4\n');
+  const n = cvs.length, cont = `q ${PW} 0 0 ${PH} 0 0 cm /Im0 Do Q`, pg = i => 3 + i * 3; add('%PDF-1.4\n');
   offs[1] = tam; add('1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n');
-  offs[2] = tam; add('2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n');
-  offs[3] = tam; add(`3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${PW} ${PH}]/Resources<</XObject<</Im0 4 0 R>>>>/Contents 5 0 R>>endobj\n`);
-  offs[4] = tam; add(`4 0 obj<</Type/XObject/Subtype/Image/Width ${cv.width}/Height ${cv.height}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${img.length}>>stream\n`); add(img); add('\nendstream endobj\n');
-  offs[5] = tam; add(`5 0 obj<</Length ${cont.length}>>stream\n${cont}\nendstream endobj\n`);
-  const xref = tam; add('xref\n0 6\n0000000000 65535 f \n' + offs.slice(1).map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('') + `trailer<</Size 6/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`);
+  offs[2] = tam; add(`2 0 obj<</Type/Pages/Kids[${cvs.map((_, i) => pg(i) + ' 0 R').join(' ')}]/Count ${n}>>endobj\n`);
+  cvs.forEach((cv, i) => { const b64 = cv.toDataURL('image/jpeg', .9).split(',')[1], bin = atob(b64), img = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) img[k] = bin.charCodeAt(k);
+    const p = pg(i); offs[p] = tam; add(`${p} 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${PW} ${PH}]/Resources<</XObject<</Im0 ${p + 1} 0 R>>>>/Contents ${p + 2} 0 R>>endobj\n`);
+    offs[p + 1] = tam; add(`${p + 1} 0 obj<</Type/XObject/Subtype/Image/Width ${cv.width}/Height ${cv.height}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${img.length}>>stream\n`); add(img); add('\nendstream endobj\n');
+    offs[p + 2] = tam; add(`${p + 2} 0 obj<</Length ${cont.length}>>stream\n${cont}\nendstream endobj\n`); });
+  const tot = 3 + n * 3, xref = tam; add(`xref\n0 ${tot}\n0000000000 65535 f \n` + offs.slice(1, tot).map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('') + `trailer<</Size ${tot}/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`);
   return new Blob(partes, { type: 'application/pdf' }); }
+async function enviarPDF(blob, nome, titulo) { const f = new File([blob], nome, { type: 'application/pdf' });
+  if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f], title: titulo }); return; } catch (err) { if (err && err.name === 'AbortError') return; } }
+  const u = URL.createObjectURL(blob), el = document.createElement('a'); el.href = u; el.download = nome; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000);
+  aviso('PDF baixado: ' + nome + '. Mande pelo WhatsApp como documento.'); }
+const docBR = d => { d = String(d || '').replace(/\D/g, ''); return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : d; };
+const MESES_MIN = () => MESES.map(m => m.toLowerCase());
+function mesRef() { const h = new Date(Date.now() - 3 * 36e5), y = h.getUTCFullYear(), m = h.getUTCMonth(), n = new Date(Date.UTC(y, m + 1, 1));
+  return { id: `${y}-${String(m + 1).padStart(2, '0')}`, nome: `${MESES_MIN()[m]} de ${y}`, prox: `${MESES_MIN()[n.getUTCMonth()]} de ${n.getUTCFullYear()}` }; }
+function dataExtenso() { const h = new Date(Date.now() - 3 * 36e5); return `${h.getUTCDate()} de ${MESES_MIN()[h.getUTCMonth()]} de ${h.getUTCFullYear()}`; }
+// documento A4 (200 dpi) com cabeçalho da marca; quebra de página automática
+function docPDF(titulo, sub, blocos) { const W = 1654, H = 2339, M = 150, LW = W - 2 * M, pags = [], ft = "Figtree,Arial,sans-serif", fd = "'Saira Condensed','Arial Narrow',Impact,sans-serif"; let g, y;
+  const nova = () => { const cv = document.createElement('canvas'); cv.width = W; cv.height = H; g = cv.getContext('2d'); pags.push(cv);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); const gr = g.createLinearGradient(0, 0, W, 200); gr.addColorStop(0, '#1B6A36'); gr.addColorStop(1, '#0F4D27'); g.fillStyle = gr; g.fillRect(0, 0, W, 190);
+    g.textBaseline = 'alphabetic'; g.textAlign = 'left'; g.font = `italic 800 96px ${fd}`; const w1 = g.measureText('PELOTA ').width; g.fillStyle = '#fff'; g.fillText('PELOTA ', M, 128); g.fillStyle = '#F2C12E'; g.fillText('FC', M + w1, 128);
+    g.textAlign = 'right'; g.fillStyle = 'rgba(255,255,255,.85)'; g.font = `600 30px ${ft}`; g.fillText('ORGANIZE SUA PELADA', W - M, 120);
+    g.fillStyle = '#F2C12E'; g.fillRect(0, H - 22, W * .64, 22); g.fillStyle = '#F0662A'; g.fillRect(W * .64, H - 22, W * .36, 22); y = 300; g.textAlign = 'left'; };
+  const cabe = h => { if (y + h > H - 170) nova(); };
+  const linhas = (txt, font, larg) => { g.font = font; return String(txt).split('\n').flatMap(p => quebra(g, p, larg)); };
+  nova(); g.textAlign = 'left'; g.fillStyle = '#0F4D27'; g.font = `800 62px ${ft}`; g.fillText(titulo, M, y); y += 56;
+  if (sub) { g.fillStyle = '#56665B'; g.font = `500 32px ${ft}`; g.fillText(sub, M, y); y += 30; } y += 30; g.fillStyle = '#F2C12E'; g.fillRect(M, y, 160, 8); y += 70;
+  for (const b of blocos) { g.textAlign = 'left';
+    if (b.h) { cabe(120); y += 14; g.fillStyle = '#0F4D27'; g.font = `800 40px ${ft}`; g.fillText(b.h, M, y); y += 58; }
+    if (b.p || b.nota) { const f = b.nota ? `500 28px ${ft}` : `500 34px ${ft}`, L = linhas(b.p || b.nota, f, LW), lh = b.nota ? 42 : 50; if (L.length <= 6) cabe(lh * L.length); for (const l of L) { cabe(lh); g.font = f; g.fillStyle = b.nota ? '#56665B' : '#132018'; g.fillText(l, M, y); y += lh; } y += 22; }
+    if (b.li) for (const it of b.li) { const L = linhas(it, `500 34px ${ft}`, LW - 50); cabe(50 * L.length); g.fillStyle = '#1B6A36'; g.beginPath(); g.arc(M + 12, y - 11, 8, 0, Math.PI * 2); g.fill();
+      L.forEach(l => { g.font = `500 34px ${ft}`; g.fillStyle = '#132018'; g.fillText(l, M + 46, y); y += 50; }); y += 10; }
+    if (b.kv) { for (const [k, v, forte] of b.kv) { const L = linhas(v, `${forte ? 800 : 600} 34px ${ft}`, LW * .58); const h = Math.max(1, L.length) * 46 + 30; cabe(h);
+        g.fillStyle = forte ? '#EEF6EF' : '#F6F8F4'; g.fillRect(M, y - 44, LW, h); g.fillStyle = '#3F5245'; g.font = `600 30px ${ft}`; g.fillText(k, M + 24, y);
+        L.forEach((l, i) => { g.font = `${forte ? 800 : 600} 34px ${ft}`; g.fillStyle = forte ? '#0F4D27' : '#132018'; g.textAlign = 'right'; g.fillText(l, M + LW - 24, y + i * 46); g.textAlign = 'left'; }); y += h + 8; } y += 24; }
+    if (b.tab) { const [cab, ...rows] = b.tab, cw = b.cw, X = cw.reduce((a, w, i) => (a.push(i ? a[i - 1] + cw[i - 1] * LW : M), a), []);
+      const linha = (r, head) => { const Ls = r.map((c, i) => linhas(c, `${head ? 700 : 500} 28px ${ft}`, cw[i] * LW - 24)), h = Math.max(...Ls.map(l => l.length)) * 40 + 24; cabe(h);
+        if (head) { g.fillStyle = '#0F4D27'; g.fillRect(M, y - 36, LW, h); } else { g.strokeStyle = '#D2DBCE'; g.lineWidth = 2; g.beginPath(); g.moveTo(M, y - 36 + h); g.lineTo(M + LW, y - 36 + h); g.stroke(); }
+        Ls.forEach((L, i) => L.forEach((l, k) => { g.font = `${head ? 700 : 500} 28px ${ft}`; g.fillStyle = head ? '#fff' : '#132018'; g.fillText(l, X[i] + 12, y + k * 40); })); y += h; };
+      linha(cab, true); rows.forEach(r => linha(r)); y += 40; }
+    if (b.assin) { cabe(300); y += 150; const cw = (LW - 120) / 2; b.assin.forEach(([nome, papel], i) => { const x0 = M + i * (cw + 120); g.strokeStyle = '#132018'; g.lineWidth = 2; g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + cw, y); g.stroke();
+        g.fillStyle = '#132018'; g.font = `700 30px ${ft}`; linhas(nome, `700 30px ${ft}`, cw).slice(0, 2).forEach((l, k) => g.fillText(l, x0, y + 46 + k * 40)); g.fillStyle = '#56665B'; g.font = `500 26px ${ft}`; g.fillText(papel, x0, y + 46 + Math.min(2, linhas(nome, `700 30px ${ft}`, cw).length) * 40); }); y += 200; } }
+  pags.forEach((cv, i) => { const c = cv.getContext('2d'); c.textAlign = 'right'; c.fillStyle = '#8A9A8E'; c.font = `500 24px ${ft}`; c.fillText(`Página ${i + 1} de ${pags.length}`, W - M, H - 60); c.textAlign = 'left'; c.fillText(titulo, M, H - 60); });
+  return pags; }
+function termoRep(x) { const E = UIp.reps.empresa || {}, S = UIp.sim || SIM0, r = contaSim(S, Number(x.pct)), M = Number(x.meses) || 0, dia = x.dia || 10;
+  const parte = `${E.nome}${E.cnpj ? ', CNPJ ' + docBR(E.cnpj) : ''}`, parc = `${x.nome}${x.doc ? (String(x.doc).length === 14 ? ', CNPJ ' : ', CPF ') + docBR(x.doc) : ''}`;
+  return docPDF('Termo de parceria', `Código do parceiro: ${x.codigo}`, [
+    { p: `De um lado, ${parte}, responsável pelo aplicativo Pelota FC (EMPRESA). De outro, ${parc} (PARCEIRO). As partes registram aqui as condições da parceria de indicação de grupos.` },
+    { h: '1. O que o parceiro faz' }, { p: `O PARCEIRO divulga o Pelota FC e indica grupos de pelada usando o seu código ${x.codigo} e o seu QR Code. Os grupos criados a partir desse QR Code ficam ligados ao PARCEIRO.` },
+    { h: '2. Comissão' }, { kv: [['Percentual', `${pctBR(x.pct)} da assinatura Pro`], ['Base de cálculo', 'Valor da assinatura que a Apple ou o Google repassam à EMPRESA'], ['Assinatura hoje', `${rsBR(r.P)} por mês por grupo`], ['Valor por grupo assinante', `${rsBR(r.c)} por mês`, true], ['Duração', M ? `Até ${M} ${M === 1 ? 'mês' : 'meses'} de cada grupo` : 'Enquanto o grupo for assinante']] },
+    { nota: 'O valor por grupo acompanha o preço da assinatura e a taxa da loja. Se algum deles mudar, a EMPRESA avisa o PARCEIRO antes.' },
+    { h: '3. Regra' }, { p: 'A comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra.' },
+    { h: '4. Pagamento' }, { kv: [['Quando', `Todo dia ${dia} do mês seguinte`], ['Como', 'Pix'], ['Chave Pix do parceiro', x.pix || x.contato || 'a informar']] },
+    { p: `Antes de cada pagamento, a EMPRESA envia ao PARCEIRO o relatório do mês, com os grupos que contaram e o valor a receber.` },
+    { h: '5. Condições gerais' }, { li: ['Esta parceria não cria vínculo de emprego nem sociedade entre as partes.', 'Qualquer uma das partes pode encerrar a parceria quando quiser, avisando a outra. As comissões já apuradas até o encerramento são pagas normalmente.', 'O PARCEIRO não pode prometer condições ou descontos em nome do Pelota FC que não estejam combinados por escrito.'] },
+    { p: `${E.cidade || 'Recife'}, ${dataExtenso()}.` },
+    { assin: [[E.nome || 'EMPRESA', 'EMPRESA'], [x.nome, 'PARCEIRO']] }]); }
+function relatorioRepPDF(x) { const E = UIp.reps.empresa || {}, L = x.gruposLista || [], St = L.map(situacaoGrupoRep), contam = St.filter(s => s.conta).length, R0 = mesRef();
+  const valor = L.reduce((t, g, i) => t + (St[i].conta ? Number(g.valorMes || 0) : 0), 0), M = Number(x.meses) || 0, semAss = !L.some(g => g.assina != null);
+  const sit = g => g.repEncerradoEm ? `Cancelou em ${new Date(g.repEncerradoEm).toLocaleDateString('pt-BR')} · encerrada` : g.assina ? 'Assinatura em dia' : 'Ainda não assina';
+  return docPDF('Relatório do parceiro', `${R0.nome[0].toUpperCase() + R0.nome.slice(1)} · ${x.nome} · código ${x.codigo}`, [
+    { kv: [['Comissão', `${pctBR(x.pct)} da assinatura${M ? `, até ${M} ${M === 1 ? 'mês' : 'meses'} de cada grupo` : ''}`], ['Grupos trazidos', String(L.length || x.grupos || 0)], ['Grupos que contam neste mês', String(contam)], ['Valor a receber', rsBR(valor), true], ['Pagamento', `Dia ${x.dia || 10} de ${R0.prox}, por Pix`], ['Chave Pix', x.pix || x.contato || 'a informar']] },
+    { h: 'Grupos' }, L.length ? { tab: [['Grupo', 'Cidade', 'Situação', 'Valor'], ...L.map((g, i) => [g.nome, [g.cidade, g.uf].filter(Boolean).join('/') || '—', sit(g), St[i].conta ? rsBR(g.valorMes || 0) : '—'])], cw: [.32, .2, .33, .15] } : { p: 'Nenhum grupo ligado a este código ainda.' },
+    { h: 'Regra' }, { p: 'A comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra.' },
+    ...(semAss ? [{ nota: 'A assinatura Pro começa quando o app chegar às lojas. A partir daí, este relatório mostra o valor de cada mês.' }] : []),
+    { nota: `Emitido por ${E.nome || 'Pelota FC'} em ${new Date().toLocaleDateString('pt-BR')}.` }]); }
 function cartaoRep(x) { // cartão para imprimir: 1240 x 1748 px (A6 em 300 dpi)
   const W = 1240, H = 1748, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
   const fd = "'Saira Condensed','Arial Narrow',Impact,sans-serif", ft = "Figtree,Arial,sans-serif";
@@ -789,8 +860,8 @@ function cartaoRep(x) { // cartão para imprimir: 1240 x 1748 px (A6 em 300 dpi)
   g.fillStyle = '#F2C12E'; g.fillRect(0, H - 40, W * .64, 40); g.fillStyle = '#F0662A'; g.fillRect(W * .64, H - 40, W * .36, 40);
   return cv; }
 async function carregarReps() { const R = UIp.reps = UIp.reps || {}; R.carregando = true; R.erro = null; if (TELA === 'donoreps') render();
-  try { const j = MOCK ? { reps: (UIp.repsMock = UIp.repsMock || [{ id: 'r1', nome: 'João Representante', codigo: 'JOAO10', pct: 10, meses: 12, pix: 'joao@exemplo.com', whats: '81999990000', obs: 'Zona Norte do Recife', ativo: true, grupos: 2, gruposLista: [{ nome: 'Pelada do Sábado', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 80 * 864e5, assina: true, valorMes: 1.69 }, { nome: 'Racha da Quinta', cidade: 'Olinda', uf: 'PE', criadoEm: Date.now() - 70 * 864e5, assina: true, repEncerradoEm: Date.now() - 12 * 864e5 }, { nome: 'Fut da Firma', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 5 * 864e5, assina: null }] }]).slice(), simulador: UIp.simMock || null } : await notasServidor('reps');
-    R.lista = j.reps; R.simSalvo = j.simulador || null;
+  try { const j = MOCK ? { reps: (UIp.repsMock = UIp.repsMock || [{ id: 'r1', nome: 'João Representante', codigo: 'JOAO10', pct: 10, meses: 12, pix: 'joao@exemplo.com', whats: '81999990000', obs: 'Zona Norte do Recife', ativo: true, grupos: 2, gruposLista: [{ nome: 'Pelada do Sábado', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 80 * 864e5, assina: true, valorMes: 1.69 }, { nome: 'Racha da Quinta', cidade: 'Olinda', uf: 'PE', criadoEm: Date.now() - 70 * 864e5, assina: true, repEncerradoEm: Date.now() - 12 * 864e5 }, { nome: 'Fut da Firma', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 5 * 864e5, assina: null }] }]).slice(), simulador: UIp.simMock || null, empresa: UIp.empMock || null } : await notasServidor('reps');
+    R.lista = j.reps; R.simSalvo = j.simulador || null; R.empresa = j.empresa || null;
     if (R.simSalvo && !UIp.simMexido) { const f = v => String(v).replace('.', ','); UIp.sim = { ...(UIp.sim || SIM0), preco: f(R.simSalvo.preco.toFixed(2)), loja: f(R.simSalvo.loja), imp: f(R.simSalvo.imp), regime: R.simSalvo.regime }; } } catch (e) { R.erro = e.message; }
   R.carregando = false; if (TELA === 'donoreps') render(); }
 const REG_ORDEM = ['Nordeste', 'Sudeste', 'Sul', 'Centro-Oeste', 'Norte', 'Sem cidade informada'];
@@ -1004,6 +1075,15 @@ document.addEventListener('click', async e => {
   if (a === 'sim-salvar') { const S = UIp.sim, d = { preco: numBR(S.preco), loja: numBR(S.loja), imp: numBR(S.imp), regime: S.regime || 'simples' };
     if (!(d.preco > 0) || !(d.loja >= 0 && d.loja <= 100) || !(d.imp >= 0 && d.imp <= 100)) { aviso('Confira os números.'); return; }
     b.disabled = true; try { if (MOCK) UIp.simMock = { ...d, em: Date.now() }; else await notasServidor('sim-salvar', d); UIp.simMexido = false; aviso('Valores salvos.'); await carregarReps(); } catch (err) { aviso(err.message); b.disabled = false; } }
+  if (a === 'empresa-salvar') { const d = { nome: ($('e-nome').value || '').trim(), cnpj: ($('e-cnpj').value || '').replace(/\D/g, ''), cidade: ($('e-cidade').value || '').trim() };
+    if (!d.nome) { aviso('Coloque a razão social.'); return; } if (d.cnpj && d.cnpj.length !== 14) { aviso('CNPJ incompleto.'); return; }
+    b.disabled = true; try { if (MOCK) UIp.empMock = { ...d, em: Date.now() }; else await notasServidor('empresa-salvar', d); aviso('Dados da empresa salvos.'); await carregarReps(); } catch (err) { aviso(err.message); b.disabled = false; } }
+  if (a === 'rep-termo' || a === 'rep-relpdf') { const x = ((UIp.reps || {}).lista || []).find(r => r.id === v); if (!x) return;
+    if (!(UIp.reps || {}).empresa) { aviso('Antes, preencha os dados da empresa (logo acima).'); return; }
+    b.disabled = true; try { await (document.fonts ? document.fonts.ready : null); const termo = a === 'rep-termo', pags = termo ? termoRep(x) : relatorioRepPDF(x);
+      const nome = `PelotaFC_${termo ? 'termo_parceria' : 'relatorio_' + mesRef().id}_${x.codigo}.pdf`;
+      await enviarPDF(pdfPaginas(pags, 595.28, 841.89), nome, termo ? `Termo de parceria Pelota FC · ${x.nome}` : `Relatório Pelota FC · ${x.nome}`); } catch (err) { aviso('Não consegui gerar o PDF. Tente de novo.'); }
+    b.disabled = false; }
   if (a === 'rep-copiar-pix') { const x = ((UIp.reps || {}).lista || []).find(r => r.id === v); if (x) { const k = x.pix || x.contato; try { await navigator.clipboard.writeText(k); aviso('Chave Pix copiada.'); } catch (err) { aviso(k); } } }
   if (a === 'rep-relatorio') { const x = ((UIp.reps || {}).lista || []).find(r => r.id === v); if (!x || !x.whats) return; let n = x.whats.replace(/\D/g, ''); if (n.length <= 11) n = '55' + n;
     window.open('https://wa.me/' + n + '?text=' + encodeURIComponent(relatorioRep(x)), '_blank', 'noopener'); }
@@ -1057,8 +1137,9 @@ document.addEventListener('submit', async e => {
   if (f.id === 'f-login') { if (!val('l-email') || !val('l-senha')) { aviso('Preencha e-mail e senha.'); return; } OCUPADO = true; try { await B.login(val('l-email'), $('l-senha').value); } catch (err) { aviso(msgErro(err)); } OCUPADO = false; }
   if (f.id === 'f-criar') { if (!val('c-nome2') || !val('c-email') || !$('c-senha').value) { aviso('Preencha nome, e-mail e senha.'); return; } OCUPADO = true; try { await B.cadastrar(val('c-nome2'), val('c-email'), $('c-senha').value); } catch (err) { aviso(msgErro(err)); } OCUPADO = false; }
   if (f.id === 'f-rep') { const nome = val('r-nome'), codigo = (val('r-codigo') || nome.split(' ')[0] + numBR(val('r-pct'))).toUpperCase().normalize('NFD').replace(/[^A-Z0-9]/g, '');
-    const dados = { id: f.dataset.id || '', nome, codigo, pct: numBR(val('r-pct')), meses: Number(val('r-meses') || 0), pix: val('r-pix'), whats: val('r-whats').replace(/\D/g, ''), contato: '', obs: val('r-obs'), ativo: $('r-ativo').checked };
+    const dados = { id: f.dataset.id || '', nome, codigo, pct: numBR(val('r-pct')), meses: Number(val('r-meses') || 0), pix: val('r-pix'), doc: val('r-doc').replace(/\D/g, ''), dia: Number(($('r-dia') || {}).value || 10), whats: val('r-whats').replace(/\D/g, ''), contato: '', obs: val('r-obs'), ativo: $('r-ativo').checked };
     if (!nome) { aviso('Coloque o nome.'); return; } if (codigo.length < 4) { aviso('O código precisa de pelo menos 4 letras ou números.'); return; }
+    if (dados.doc && dados.doc.length !== 11 && dados.doc.length !== 14) { aviso('CPF ou CNPJ incompleto.'); return; }
     if (dados.whats && (dados.whats.length < 10 || dados.whats.length > 13)) { aviso('Confira o WhatsApp: DDD e número.'); return; }
     if (!(dados.pct >= 0 && dados.pct <= 100)) { aviso('A comissão vai de 0 a 100%.'); return; } if (!(dados.meses >= 0 && dados.meses <= 120)) { aviso('O prazo vai de 0 a 120 meses.'); return; }
     OCUPADO = true;

@@ -263,7 +263,12 @@ module.exports = (db, PAG) => {
           (lista[c] = lista[c] || []).push({ nome: d.get('nome') || C.nome || 'Pelada', cidade: C.cidade || '', uf: C.uf || '', criadoEm: d.get('criadoEm') || null,
             assina: ass ? !!A.ativa : null, repEncerradoEm: A.repEncerradoEm || null, valorMes: A.repValorMes || 0 }); }
         const plat = (await ler('servidor/plataforma')) || {};
-        return res.json({ simulador: plat.simulador || null, reps: q.docs.map(d => ({ id: d.id, ...d.data(), grupos: por[d.get('codigo')] || 0, gruposLista: lista[d.get('codigo')] || [] })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
+        return res.json({ simulador: plat.simulador || null, empresa: plat.empresa || null, reps: q.docs.map(d => ({ id: d.id, ...d.data(), grupos: por[d.get('codigo')] || 0, gruposLista: lista[d.get('codigo')] || [] })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
+      }
+      if (b.acao === 'empresa-salvar') {
+        const emp = { nome: String(b.nome || '').trim().slice(0, 120), cnpj: String(b.cnpj || '').replace(/\D/g, '').slice(0, 14), cidade: String(b.cidade || '').trim().slice(0, 60), em: Date.now() };
+        if (!emp.nome) return res.status(400).json({ erro: 'Falta o nome da empresa.' }); if (emp.cnpj && emp.cnpj.length !== 14) return res.status(400).json({ erro: 'CNPJ incompleto.' });
+        await db.doc('servidor/plataforma').set({ empresa: emp }, { merge: true }); return res.json({ ok: true, empresa: emp });
       }
       if (b.acao === 'sim-salvar') {
         const n = v => { const x = Number(String(v ?? '').replace(',', '.')); return isFinite(x) ? Math.round(x * 100) / 100 : NaN; };
@@ -282,7 +287,7 @@ module.exports = (db, PAG) => {
         if (id && (id.includes('/') || id.length > 60)) return res.status(400).json({ erro: 'Pedido inválido.' });
         const igual = await col.where('codigo', '==', codigo).get();
         if (igual.docs.some(d => d.id !== id)) return res.status(409).json({ erro: 'Esse código já é de outro representante.' });
-        const dados = { nome, codigo, pct, meses, contato: String(b.contato || '').trim().slice(0, 120), pix: String(b.pix || '').trim().slice(0, 120), whats: String(b.whats || '').replace(/\D/g, '').slice(0, 13), obs: String(b.obs || '').trim().slice(0, 300), ativo: b.ativo !== false, atualizadoEm: Date.now() };
+        const dados = { nome, codigo, pct, meses, contato: String(b.contato || '').trim().slice(0, 120), pix: String(b.pix || '').trim().slice(0, 120), whats: String(b.whats || '').replace(/\D/g, '').slice(0, 13), doc: String(b.doc || '').replace(/\D/g, '').slice(0, 14), dia: [5, 10, 15, 20, 25].includes(Number(b.dia)) ? Number(b.dia) : 10, obs: String(b.obs || '').trim().slice(0, 300), ativo: b.ativo !== false, atualizadoEm: Date.now() };
         if (id) { const atual = await col.doc(id).get(); if (!atual.exists) return res.status(404).json({ erro: 'Representante não encontrado.' });
           dados.codigo = atual.get('codigo') || codigo; // o código não muda: QR Codes impressos continuam valendo
           await col.doc(id).set(dados, { merge: true }); return res.json({ ok: true, id }); }
