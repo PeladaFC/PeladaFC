@@ -200,16 +200,17 @@ module.exports = (db, PAG) => {
       tok = r.pageToken;
     } while (tok);
     const tot = { grupos: 0, ativos: 0, jogadores: 0, membros: 0, comPix: 0, pagantes: 0, pixMes: 0, volumeMes: 0, comissaoMes: 0, semCidade: 0 };
-    const reg = {}, ufs = {}, cids = {}, todosMembros = new Set(), grupoOnde = {};
+    const reg = {}, ufs = {}, cids = {}, todosMembros = new Set(), grupoOnde = {}, listaGrupos = [];
     const soma = (map, k, g, membrosIds) => { const o = map[k] = map[k] || { nome: k, grupos: 0, ativos: 0, jogadores: 0, pagantes: 0, comissaoMes: 0, _m: new Set() };
       o.grupos++; if (g.ativo) o.ativos++; o.jogadores += g.jogadores; if (g.pagante) o.pagantes++; o.comissaoMes += g.comissao; membrosIds.forEach(id => o._m.add(id)); };
     const grupos = await db.collection('grupos').get();
     for (const gd of grupos.docs) {
       const ref = gd.ref;
-      const [cfgS, locS, jogC, memS, pelS, cobS] = await Promise.all([
+      const [cfgS, locS, jogC, memS, pelS, cobS, ultS] = await Promise.all([
         ref.collection('config').doc('geral').get(), ref.collection('locais').get(), ref.collection('jogadores').count().get(),
         ref.collection('membros').select().get(), ref.collection('peladas').where('data', '>=', desde).select().get(),
-        ref.collection('cobrancas').where('status', '==', 'approved').get()]);
+        ref.collection('cobrancas').where('status', '==', 'approved').get(),
+        ref.collection('peladas').orderBy('data', 'desc').limit(1).select('data').get()]);
       const cfg = cfgS.exists ? cfgS.data() : {};
       const onde = ondeFica(cfg, locS.docs.map(d => d.data()), gd.data().criadoEm);
       let pix = 0, volume = 0, comissao = 0;
@@ -219,6 +220,10 @@ module.exports = (db, PAG) => {
       tot.grupos++; if (g.ativo) tot.ativos++; tot.jogadores += g.jogadores; if (cfg.mpConectadoEm) tot.comPix++; if (g.pagante) tot.pagantes++;
       tot.pixMes += pix; tot.volumeMes += volume; tot.comissaoMes += comissao; if (!onde.uf) tot.semCidade++;
       grupoOnde[gd.id] = onde.uf ? onde : null;
+      const G = gd.data();
+      listaGrupos.push({ gid: gd.id, nome: G.nome || cfg.nome || 'Pelada', codigo: G.codigo || '', cidade: onde.cidade || '', uf: onde.uf || '', regiao: onde.regiao,
+        criadoEm: G.criadoEm || null, ultima: ultS.empty ? null : String(ultS.docs[0].data().data || '') || null, ativo: g.ativo, jogadores: g.jogadores, contas: ids.length,
+        pix: !!cfg.mpConectadoEm, pixMes: pix, comissaoMes: Math.round(comissao * 100) / 100, evento: !!(G.evento || cfg.evento), dia: G.dia != null ? Number(G.dia) : (cfg.dia != null ? Number(cfg.dia) : null) });
       soma(reg, onde.regiao, g, ids);
       if (onde.uf) { soma(ufs, onde.uf, g, ids); soma(cids, (onde.cidade || 'Cidade não informada') + ' · ' + onde.uf, g, ids); }
     }
@@ -239,7 +244,7 @@ module.exports = (db, PAG) => {
     contas.comCidade = cadastroComCidade;
     const lista = m => Object.values(m).map(({ _m, ...o }) => ({ ...o, contas: _m.size, comissaoMes: Math.round(o.comissaoMes * 100) / 100 })).sort((a, b) => b.grupos - a.grupos || b.jogadores - a.jogadores);
     tot.volumeMes = Math.round(tot.volumeMes * 100) / 100; tot.comissaoMes = Math.round(tot.comissaoMes * 100) / 100;
-    return { em: agora, mes, contas, totais: tot, regioes: lista(reg), estados: lista(ufs), cidades: lista(cids).slice(0, 30) };
+    return { em: agora, mes, contas, totais: tot, regioes: lista(reg), estados: lista(ufs), cidades: lista(cids).slice(0, 30), grupos: listaGrupos };
   }
   const notasPlataforma = onRequest({ cors: true, maxInstances: 2, memory: '512MiB', timeoutSeconds: 300 }, async (req, res) => {
     try {

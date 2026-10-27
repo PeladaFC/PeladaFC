@@ -151,7 +151,7 @@ async function abrirLeitor() {
     const m = $('leitor-msg'); if (m) m.innerHTML = 'Não consegui abrir a câmera. Permita o acesso à câmera quando o iPhone perguntar e tente de novo.<br><br>Outro jeito: abra a <b>Câmera</b> do celular, aponte para o QR Code e toque no link que aparecer.';
   }
 }
-function fecharLeitor() { if (LEITOR) { LEITOR.on = false; LEITOR.st.getTracks().forEach(t => t.stop()); LEITOR = null; } const ov = $('leitor'); ov.hidden = true; ov.innerHTML = ''; }
+function fecharLeitor() { window.__leitorDono = null; if (LEITOR) { LEITOR.on = false; LEITOR.st.getTracks().forEach(t => t.stop()); LEITOR = null; } const ov = $('leitor'); ov.hidden = true; ov.innerHTML = ''; }
 function loopLeitor() {
   if (!LEITOR || !LEITOR.on) return;
   const { v, c } = LEITOR;
@@ -161,7 +161,7 @@ function loopLeitor() {
     const r = window.jsQR(x.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
     if (r && r.data) {
       const cod = extrairCodigo(r.data);
-      if (cod) { fecharLeitor(); if (navigator.vibrate) navigator.vibrate(80); codigoLido(cod); return; }
+      if (cod) { const dono = window.__leitorDono; window.__leitorDono = null; fecharLeitor(); if (navigator.vibrate) navigator.vibrate(80); if (dono) dono(cod); else codigoLido(cod); return; }
       const m = $('leitor-msg'); if (m) m.textContent = r.data.includes(location.host) ? 'Esse é o QR Code do app, não de uma pelada. Peça o QR Code da pelada.' : 'Esse QR Code não é de uma pelada do app.';
     }
   }
@@ -237,6 +237,7 @@ function render() {
       <p class="sub" style="text-align:center;margin:0"><a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
       <button class="btn sm" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
   if (t === 'dono') h = topo('perfil') + abasDono('dono') + telaDono();
+  if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + telaGruposDono();
   if (t === 'notas') { const N = UIp.nf || {}, [ano, mm] = (N.mes || '2026-01').split('-'), D = N.dados, L = (D && D.linhas) || [];
     const rs = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fdoc = d => d && d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d && d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : '';
@@ -551,7 +552,47 @@ async function notasServidor(acao, extra) {
   if (!r.ok) throw Object.assign(new Error(j.erro || 'Não deu certo agora. Tente de novo.'), { status: r.status });
   return j;
 }
-function abasDono(at) { return `<div class="pick" style="margin:6px 0 4px"><button type="button" data-sh="dono" aria-pressed="${at === 'dono'}">Visão geral</button><button type="button" data-sh="notas" aria-pressed="${at === 'notas'}">Notas fiscais</button></div>`; }
+function abasDono(at) { return `<div class="pick" style="margin:6px 0 4px"><button type="button" data-sh="dono" aria-pressed="${at === 'dono'}">Visão geral</button><button type="button" data-sh="dono-grupos" aria-pressed="${at === 'grupos'}">Grupos</button><button type="button" data-sh="notas" aria-pressed="${at === 'notas'}">Notas fiscais</button></div>`; }
+/* lista de grupos do painel, com várias formas de procurar */
+const GF0 = { q: '', sit: 'todos', uf: '', cidade: '', pix: '', pag: '', tipo: '', dia: '', ord: 'recente' };
+const DIAS_CURTO = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const semAcento = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+function gruposFiltrados() { const G = ((UIp.painel || {}).dados || {}).grupos || [], F = UIp.gf || GF0, q = semAcento(F.q).trim();
+  let L = G.filter(g => (!q || semAcento([g.nome, g.cidade, g.uf, g.codigo].join(' ')).includes(q))
+    && (F.sit === 'todos' || (F.sit === 'ativos' ? g.ativo : !g.ativo)) && (!F.uf || g.uf === F.uf) && (!F.cidade || (g.cidade + ' · ' + g.uf) === F.cidade)
+    && (!F.pix || (F.pix === 'sim') === g.pix) && (!F.pag || (F.pag === 'sim') === (g.comissaoMes > 0)) && (!F.tipo || (F.tipo === 'evento') === g.evento)
+    && (F.dia === '' || g.dia === Number(F.dia)));
+  const ord = { recente: (a, b) => (b.criadoEm || 0) - (a.criadoEm || 0), antigo: (a, b) => (a.criadoEm || 0) - (b.criadoEm || 0), jogadores: (a, b) => b.jogadores - a.jogadores,
+    comissao: (a, b) => b.comissaoMes - a.comissaoMes, ultima: (a, b) => String(b.ultima || '').localeCompare(String(a.ultima || '')), nome: (a, b) => a.nome.localeCompare(b.nome) }[F.ord] || (() => 0);
+  return L.sort(ord); }
+function listaGruposHTML() { const L = gruposFiltrados(), n = v => Number(v || 0).toLocaleString('pt-BR'), rs = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const dt = d => d ? d.split('-').reverse().join('/') : '—', dc = ms => ms && ms > 1e11 ? new Date(ms).toLocaleDateString('pt-BR') : '—';
+  return `<p class="sub" style="margin:0">${L.length} ${L.length === 1 ? 'grupo encontrado' : 'grupos encontrados'}</p>` + (L.length ? L.map(g => `<div class="panel" style="padding:12px 14px;display:grid;gap:6px">
+    <div class="row" style="justify-content:space-between;gap:10px;flex-wrap:nowrap;align-items:flex-start"><div><b style="font-size:17px">${escH(g.nome)}</b><div class="sub">${escH([g.cidade, g.uf].filter(Boolean).join(' · ') || 'Sem cidade')}${g.evento ? ' · evento' : g.dia != null ? ' · ' + DIAS_CURTO[g.dia] : ''}</div></div>
+      <span class="small" style="flex:none;padding:3px 10px;border-radius:999px;font-weight:700;background:${g.ativo ? '#d8eedd' : '#e6e8e4'};color:${g.ativo ? '#0F4D27' : '#56665B'}">${g.ativo ? 'Ativo' : 'Parado'}</span></div>
+    <div class="small" style="display:flex;flex-wrap:wrap;gap:4px 14px"><span>👥 ${n(g.jogadores)} no elenco · ${n(g.contas)} com conta</span><span>📅 Última pelada: ${dt(g.ultima)}</span>
+      <span>${g.pix ? '💳 Pix conectado' : '💳 Sem Pix'}${g.comissaoMes > 0 ? ' · ' + rs(g.comissaoMes) + ' de comissão no mês' : ''}</span><span>🔑 Código ${escH(g.codigo || '—')}</span><span>🗓️ Criado em ${dc(g.criadoEm)}</span></div></div>`).join('')
+    : '<p class="sub">Nenhum grupo com esses filtros.</p>'); }
+function telaGruposDono() { const P = UIp.painel || {}, D = P.dados;
+  if (!D) return '<h2>Grupos</h2>' + (P.erro ? `<div class="banner">${escH(P.erro)}</div>` : '<p class="lead">Carregando os grupos…</p>');
+  const F = UIp.gf = UIp.gf || { ...GF0 }, G = D.grupos || [];
+  const ufs = [...new Set(G.map(g => g.uf).filter(Boolean))].sort(), cids = [...new Set(G.filter(g => g.uf && (!F.uf || g.uf === F.uf)).map(g => g.cidade + ' · ' + g.uf))].sort();
+  const sel = (k, rot, ops) => `<label class="field" style="margin:0"><span>${rot}</span><select data-gf="${k}">${ops.map(([v, t]) => `<option value="${escH(v)}" ${String(F[k]) === String(v) ? 'selected' : ''}>${escH(t)}</option>`).join('')}</select></label>`;
+  return `<h2>Grupos</h2><p class="lead">Todos os grupos do app. Procure pelo nome, cidade, código de convite ou QR Code.</p>
+  <div class="row" style="gap:8px;flex-wrap:nowrap"><label class="field" style="flex:1;min-width:0;margin:0"><input type="search" data-gf="q" value="${escH(F.q)}" placeholder="Nome, cidade ou código" aria-label="Procurar grupo"></label><button class="btn sm" data-sh="dono-qr" aria-label="Ler QR Code do grupo">📷 QR</button></div>
+  <div class="pick">${[['todos', 'Todos'], ['ativos', 'Ativos'], ['parados', 'Parados']].map(([v, t]) => `<button type="button" data-sh="gf-sit" data-v="${v}" aria-pressed="${F.sit === v}">${t}</button>`).join('')}</div>
+  <details class="panel" style="padding:10px 14px" ${UIp.gfAberto ? 'open' : ''}><summary data-sh="gf-abrir"><b>Mais filtros</b></summary>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px">
+    ${sel('uf', 'Estado', [['', 'Todos'], ...ufs.map(u => [u, u])])}
+    ${sel('cidade', 'Cidade', [['', 'Todas'], ...cids.map(c => [c, c])])}
+    ${sel('pix', 'Pix', [['', 'Todos'], ['sim', 'Com Pix'], ['nao', 'Sem Pix']])}
+    ${sel('pag', 'Pagante', [['', 'Todos'], ['sim', 'Gerou comissão'], ['nao', 'Sem comissão']])}
+    ${sel('tipo', 'Tipo', [['', 'Todos'], ['fixa', 'Fixa (toda semana)'], ['evento', 'Evento']])}
+    ${sel('dia', 'Dia da pelada', [['', 'Todos'], ...DIAS_CURTO.map((d, i) => [String(i), d])])}
+    </div></details>
+  <div class="row" style="gap:8px;flex-wrap:nowrap;align-items:flex-end">${sel('ord', 'Ordenar por', [['recente', 'Mais novos'], ['antigo', 'Mais antigos'], ['ultima', 'Pelada mais recente'], ['jogadores', 'Mais jogadores'], ['comissao', 'Mais comissão'], ['nome', 'Nome (A–Z)']])}
+    <button class="btn sm" data-sh="gf-limpar" style="flex:none">Limpar filtros</button></div>
+  <div id="gf-lista" class="stack" style="gap:10px">${listaGruposHTML()}</div>`; }
 const REG_ORDEM = ['Nordeste', 'Sudeste', 'Sul', 'Centro-Oeste', 'Norte', 'Sem cidade informada'];
 function telaDono() { const P = UIp.painel || {}, D = P.dados;
   if (P.carregando && !D) return '<h2>Painel do dono</h2><p class="lead">Contando usuários, grupos e jogadores…</p>';
@@ -588,14 +629,18 @@ function telaDono() { const P = UIp.painel || {}, D = P.dados;
     <tbody>${D.cidades.length ? D.cidades.map(c => `<tr style="border-top:1px solid var(--line,#d2dbce)"><td style="padding:6px 4px">${escH(c.nome)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.grupos)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.jogadores)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.contas)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.pagantes)}</td></tr>`).join('') : '<tr><td colspan="5" class="sub" style="padding:6px 4px">Nenhuma cidade informada ainda.</td></tr>'}</tbody></table></div></div>
   <p class="sub" style="text-align:center;margin:0">Atualizado às ${new Date(D.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${P.carregando ? ' · atualizando…' : ''}</p>
   <button class="btn block" data-sh="dono-atualizar">Atualizar números</button>`; }
-async function carregarPainel() { const P = UIp.painel = UIp.painel || {}; P.carregando = true; P.erro = null; if (TELA === 'dono') render();
+async function carregarPainel() { const P = UIp.painel = UIp.painel || {}; P.carregando = true; P.erro = null; if (TELA === 'dono' || TELA === 'donogrupos') render();
   try { P.dados = MOCK ? painelMock() : await notasServidor('painel'); } catch (e) { P.erro = e.message; }
-  P.carregando = false; if (TELA === 'dono') render(); }
+  P.carregando = false; if (TELA === 'dono' || TELA === 'donogrupos') render(); }
 function painelMock() { const r = (nome, grupos, ativos, jogadores, contas, pagantes) => ({ nome, grupos, ativos, jogadores, contas, pagantes, comissaoMes: pagantes * 9.4 });
   return { em: Date.now(), mes: new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 7), contas: { total: 412, novas30: 58, ativas30: 296, comCidade: 187 },
     totais: { grupos: 23, ativos: 19, jogadores: 486, membros: 351, comPix: 9, pagantes: 7, pixMes: 214, volumeMes: 5180.5, comissaoMes: 51.81, semCidade: 2 },
     regioes: [r('Nordeste', 17, 15, 372, 268, 6), r('Sudeste', 3, 2, 61, 44, 1), r('Sul', 1, 1, 18, 12, 0), r('Sem cidade informada', 2, 1, 35, 27, 0)],
     estados: [r('PE', 14, 12, 310, 221, 5), r('PB', 2, 2, 41, 30, 1), r('SP', 2, 1, 40, 29, 1), r('RN', 1, 1, 21, 17, 0), r('RJ', 1, 1, 21, 15, 0), r('RS', 1, 1, 18, 12, 0)],
+    grupos: [['Pelada do Sábado', 'Recife', 'PE', 'SAB8H2', 6, 1, 22, 18, 1, 37.62], ['Fut do Pina', 'Recife', 'PE', 'PINA42', 3, 1, 16, 9, 1, 12.4], ['Racha da Quinta', 'Olinda', 'PE', 'QNT77A', 4, 1, 14, 11, 0, 0],
+      ['Society dos Amigos', 'João Pessoa', 'PB', 'SOC9KP', 2, 1, 20, 15, 1, 8.1], ['Pelada da Firma', 'São Paulo', 'SP', 'FIRM3X', 5, 0, 12, 4, 0, 0], ['Baba de Domingo', 'Natal', 'RN', 'BABA21', 0, 1, 21, 17, 0, 0],
+      ['Torneio de Natal', 'Recife', 'PE', 'NATAL1', null, 0, 30, 12, 1, 0]].map(([nome, cidade, uf, codigo, dia, ativo, jogadores, contas, pix, comissaoMes], i) => ({ gid: 'g' + i, nome, cidade, uf, codigo, dia: dia == null ? null : dia, evento: dia == null,
+      ativo: !!ativo, jogadores, contas, pix: !!pix, pixMes: comissaoMes ? Math.round(comissaoMes / .2) : 0, comissaoMes, ultima: ativo ? '2026-10-2' + (i % 7) : '2026-08-1' + i, criadoEm: Date.now() - i * 9 * 864e5, regiao: '' })),
     cidades: [r('Recife · PE', 9, 8, 203, 146, 4), r('Olinda · PE', 3, 2, 62, 41, 1), r('Jaboatão dos Guararapes · PE', 2, 2, 45, 34, 0), r('João Pessoa · PB', 2, 2, 41, 30, 1), r('São Paulo · SP', 2, 1, 40, 29, 1), r('Natal · RN', 1, 1, 21, 17, 0), r('Rio de Janeiro · RJ', 1, 1, 21, 15, 0), r('Porto Alegre · RS', 1, 1, 18, 12, 0)] }; }
 function baixarPdf(r) { const b = atob(r.pdf), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
   const u = URL.createObjectURL(new Blob([u8], { type: 'application/pdf' })), el = document.createElement('a'); el.href = u; el.download = r.nome || 'nota.pdf'; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); }
@@ -746,6 +791,11 @@ document.addEventListener('click', async e => {
   if (a === 'push-ativar') ativarPush();
   if (a === 'dono') { ir('dono'); if (!UIp.painel || !UIp.painel.dados) carregarPainel(); }
   if (a === 'dono-atualizar') carregarPainel();
+  if (a === 'dono-grupos') { ir('donogrupos'); if (!UIp.painel || !UIp.painel.dados) carregarPainel(); }
+  if (a === 'gf-sit') { UIp.gf.sit = v; render(); }
+  if (a === 'gf-limpar') { UIp.gf = { ...GF0 }; render(); }
+  if (a === 'gf-abrir') { UIp.gfAberto = !UIp.gfAberto; }
+  if (a === 'dono-qr') { window.__leitorDono = cod => { UIp.gf = { ...GF0, q: cod }; ir('donogrupos'); }; abrirLeitor(); }
   if (a === 'dono-verificar') { UIp.notasOk = undefined; UIp.notasErro = null; render(); }
   if (a === 'dono-met') { UIp.painel.met = v; render(); }
   if (a === 'notas') { const d = new Date(Date.now() - 3 * 36e5); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); UIp.nf = { mes: d.toISOString().slice(0, 7) }; ir('notas'); carregarNotas(); }
@@ -775,6 +825,11 @@ document.addEventListener('change', e => {
   aviso('Preparando a foto…');
   window.redimFoto(t.files[0]).then(d => { UIp.foto = d; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }, () => aviso('Não consegui abrir essa foto. Tente outra.'));
 });
+['input', 'change'].forEach(tipo => document.addEventListener(tipo, e => {
+  const el = e.target.closest && e.target.closest('[data-gf]'); if (!el || TELA !== 'donogrupos') return;
+  UIp.gf = UIp.gf || { ...GF0 }; UIp.gf[el.dataset.gf] = el.value; if (el.dataset.gf === 'uf') UIp.gf.cidade = '';
+  if (el.dataset.gf === 'q') { const box = $('gf-lista'); if (box) box.innerHTML = listaGruposHTML(); } else if (tipo === 'change') render();
+}));
 document.addEventListener('submit', async e => {
   const f = e.target; if (!$('shell').contains(f)) return; e.preventDefault();
   if (OCUPADO) return;
