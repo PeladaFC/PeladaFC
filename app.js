@@ -632,7 +632,7 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
     <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
       <label class="field" style="margin:0"><span>Comissão (%)</span><input type="text" inputmode="decimal" id="r-pct" value="${escH(String(e.pct ?? '').replace('.', ','))}"></label>
       <label class="field" style="margin:0"><span>Por quantos meses</span><input type="number" inputmode="numeric" min="0" max="120" id="r-meses" value="${escH(String(e.meses ?? 0))}"></label></div>
-    <p class="sub" style="margin:-4px 0 0">Mudou a % ou o prazo? Só vale para os grupos novos: os que já estão ligados continuam com a condição antiga. Prazo contado a partir da 1ª mensalidade de cada grupo. Coloque 0 para pagar enquanto o grupo for assinante.</p>
+    <p class="sub" style="margin:-4px 0 0">A % só você vê: no termo e na área do parceiro aparece só o valor em reais por grupo. Mudou a % ou o prazo? Só vale para os grupos que pagarem a primeira vez depois da mudança. Prazo contado a partir da 1ª mensalidade de cada grupo. Coloque 0 para pagar enquanto o grupo for assinante.</p>
     <label class="field" style="margin:0"><span>E-mail da conta do parceiro no app (opcional)</span><input type="email" id="r-email" inputmode="email" autocomplete="off" value="${escH(e.email || '')}" placeholder="O mesmo e-mail que ele usa para entrar no Pelota FC"></label>
     <p class="sub" style="margin:-4px 0 0">Com o e-mail, ele ganha a Área do parceiro no perfil dele: vê os grupos, baixa o QR Code e aceita o termo dentro do app.</p>
     <label class="field" style="margin:0"><span>Chave Pix (opcional)</span><input type="text" id="r-pix" value="${escH(e.pix || e.contato || '')}" placeholder="CPF, e-mail, telefone ou chave aleatória" autocomplete="off"></label>
@@ -646,7 +646,8 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
     <div class="row" style="gap:8px"><button class="btn primary" type="submit" style="flex:1">Salvar</button><button class="btn" type="button" data-sh="rep-editar" data-v="">Cancelar</button></div></form>` : '';
   const prazo = x => Number(x.meses) ? `por ${x.meses} ${Number(x.meses) === 1 ? 'mês' : 'meses'}` : 'enquanto o grupo pagar';
   const card = x => `<div class="panel" style="padding:12px 14px;display:grid;gap:4px;${x.ativo === false ? 'opacity:.6' : ''}"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b>${escH(x.nome)}</b><span class="num" style="flex:none;font-size:12px;font-weight:700;letter-spacing:.06em;padding:3px 8px;border-radius:6px;background:var(--surface2,#e3e9df)">${escH(x.codigo)}</span></div>
-    <span class="small">${pctBR(x.pct)} da assinatura, ${prazo(x)}${x.ativo === false ? ' · <b>inativo</b>' : ''}</span>
+    <span class="small">${pctBR(x.pct)} da assinatura → <b>${rsBR(valorDe(x))} por grupo/mês</b>, ${prazo(x)}${x.ativo === false ? ' · <b>inativo</b>' : ''}</span>
+    <span class="sub">O parceiro só vê o valor em reais, nunca a %.</span>
     <span class="sub">Por grupo assinante: ${rsBR(contaSim(S, Number(x.pct)).c)} por mês · Grupos trazidos: ${x.grupos || 0}</span>
     <span class="sub">Regra: a comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra.</span>
     ${x.pix || x.contato ? `<div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><span class="sub" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pix: <b>${escH(x.pix || x.contato)}</b></span><button class="btn sm" style="flex:none" data-sh="rep-copiar-pix" data-v="${escH(x.id)}">Copiar Pix</button></div>` : ''}
@@ -675,7 +676,7 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
   <div class="stack" style="gap:10px">${R.carregando && !R.lista ? '<p class="lead">Carregando…</p>' : L.length ? L.map(card).join('') : '<p class="sub">Nenhum representante ainda.</p>'}</div>
   <p class="sub" style="margin:0">Quem lê o QR Code do representante e cria uma pelada já fica ligado a ele (vale por 90 dias depois da leitura). O cálculo automático do que pagar chega na fase 2, junto com a assinatura nas lojas.</p>`; }
 const foneBR = d => { d = String(d || '').replace(/\D/g, ''); if (d.length > 11 && d.startsWith('55')) d = d.slice(2); return d.length === 11 ? `(${d.slice(0, 2)}) ${d[2]} ${d.slice(3, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d; };
-const condTxt = (c, x) => { c = c && c.pct != null ? c : x; const M = Number(c.meses) || 0; return `${pctBR(c.pct)} · ${M ? `até ${M} ${M === 1 ? 'mês' : 'meses'}` : 'sem prazo'}`; };
+const condTxt = (c, x) => { const fixo = !!(c && c.valor != null); c = fixo ? c : { valor: valorDe(x), meses: x.meses }; const M = Number(c.meses) || 0; return `${rsBR(c.valor)}/mês · ${M ? `até ${M} ${M === 1 ? 'mês' : 'meses'}` : 'sem prazo'}${fixo ? '' : ' (a fechar)'}`; };
 function situacaoGrupoRep(g) {
   if (g.repEncerradoEm) return { conta: false, txt: `❌ cancelou a assinatura em ${new Date(g.repEncerradoEm).toLocaleDateString('pt-BR')} · comissão encerrada` };
   if (g.assina) return { conta: true, txt: `✅ assinatura em dia · ${rsBR(g.valorMes || 0)}` };
@@ -683,7 +684,7 @@ function situacaoGrupoRep(g) {
 function relatorioRep(x) { const hoje = new Date(Date.now() - 3 * 36e5), mes = MESES[hoje.getUTCMonth()].toLowerCase() + ' de ' + hoje.getUTCFullYear();
   const L = x.gruposLista || [], S = L.map(situacaoGrupoRep), contam = S.filter(s => s.conta).length, valor = L.reduce((t, g, i) => t + (S[i].conta ? Number(g.valorMes || 0) : 0), 0);
   const prazo = Number(x.meses) ? `por até ${x.meses} ${Number(x.meses) === 1 ? 'mês' : 'meses'} de cada grupo` : 'enquanto o grupo for assinante';
-  return [`*Pelota FC · Relatório do parceiro*`, `Olá, ${String(x.nome).split(' ')[0]}!`, '', `Mês: ${mes}`, `Seu código: ${x.codigo}`, `Sua comissão: ${pctBR(x.pct)} da assinatura, ${prazo}`, '',
+  return [`*Pelota FC · Relatório do parceiro*`, `Olá, ${String(x.nome).split(' ')[0]}!`, '', `Mês: ${mes}`, `Seu código: ${x.codigo}`, `Você recebe: ${rsBR(valorDe(x))} por grupo assinante, ${prazo}`, '',
     `*Grupos que você trouxe: ${L.length || x.grupos || 0}*`, ...L.slice(0, 30).map((g, i) => `• ${g.nome}${g.cidade ? ` (${g.cidade}${g.uf ? '/' + g.uf : ''})` : ''}\n   ${S[i].txt}`), ...(L.length > 30 ? [`• e mais ${L.length - 30}`] : []), '',
     `Grupos que contam neste mês: ${contam}`, `*Valor a receber: ${rsBR(valor)}*`, '',
     '_Regra: a comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra._',
@@ -825,20 +826,20 @@ function docPDF(titulo, sub, blocos) { const W = 1654, H = 2339, M = 150, LW = W
   pags.forEach((cv, i) => { const c = cv.getContext('2d'); c.textAlign = 'right'; c.fillStyle = '#8A9A8E'; c.font = `500 24px ${ft}`; c.fillText(`Página ${i + 1} de ${pags.length}`, W - M, H - 60); c.textAlign = 'left'; c.fillText(titulo, M, H - 60); });
   return pags; }
 const simDe = sv => sv ? { ...SIM0, preco: String(sv.preco).replace('.', ','), loja: String(sv.loja).replace('.', ','), imp: String(sv.imp).replace('.', ',') } : { ...SIM0 };
-const condRep = x => ({ codigo: x.codigo, pct: Number(x.pct), meses: Number(x.meses) || 0, dia: Number(x.dia) || 10 });
+const valorDe = (x, S) => x.valor != null ? Number(x.valor) : Math.round(contaSim(S || UIp.sim || SIM0, Number(x.pct)).c * 100) / 100;
+const condRep = x => ({ codigo: x.codigo, valor: Number(valorDe(x)) || 0, meses: Number(x.meses) || 0, dia: Number(x.dia) || 10 });
 const dataHora = t => new Date(t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 function termoBlocos(x, E, S) { E = E || {}; const r = contaSim(S || SIM0, Number(x.pct)), M = Number(x.meses) || 0, dia = x.dia || 10;
   const parte = `${E.nome || 'a empresa responsável pelo Pelota FC'}${E.cnpj ? ', CNPJ ' + docBR(E.cnpj) : ''}`, parc = `${x.nome}${x.doc ? (String(x.doc).length === 14 ? ', CNPJ ' : ', CPF ') + docBR(x.doc) : ''}`;
   return [
     { p: `De um lado, ${parte}, responsável pelo aplicativo Pelota FC (EMPRESA). De outro, ${parc} (PARCEIRO). As partes registram aqui as condições da parceria de indicação de grupos.` },
-    { h: '1. O que o parceiro faz' }, { p: `O PARCEIRO divulga o Pelota FC e indica grupos de pelada usando o seu código ${x.codigo} e o seu QR Code. Os grupos criados a partir desse QR Code ficam ligados ao PARCEIRO.` },
-    { h: '2. Comissão' }, { kv: [['Percentual', `${pctBR(x.pct)} da assinatura Pro`], ['Base de cálculo', 'Valor da assinatura que a Apple ou o Google repassam à EMPRESA'], ['Assinatura hoje', `${rsBR(r.P)} por mês por grupo`], ['Valor por grupo assinante', `${rsBR(r.c)} por mês`, true], ['Duração', M ? `Até ${M} ${M === 1 ? 'mês' : 'meses'} de cada grupo` : 'Enquanto o grupo for assinante']] },
-    { nota: 'O valor por grupo acompanha o preço da assinatura e a taxa da loja. Se algum deles mudar, a EMPRESA avisa o PARCEIRO antes.' },
+    { h: '1. O que o parceiro faz' }, { p: `O PARCEIRO divulga o Pelota FC e indica grupos de pelada usando o seu código ${x.codigo} e o seu QR Code. Os grupos criados a partir desse QR Code ficam ligados ao PARCEIRO. O grupo conta como fechado no primeiro pagamento da assinatura Pro, depois do período grátis, e é a partir daí que a comissão começa.` },
+    { h: '2. Comissão' }, { kv: [['Valor por grupo assinante', `${rsBR(valorDe(x, S))} por mês`, true], ['Começa', 'No primeiro pagamento da assinatura de cada grupo'], ['Duração', M ? `Até ${M} ${M === 1 ? 'mês' : 'meses'} de cada grupo` : 'Enquanto o grupo for assinante']] },
     { h: '3. Regra' }, { p: 'A comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra.' },
     { h: '4. Pagamento' }, { kv: [['Quando', `Todo dia ${dia} do mês seguinte`], ['Como', 'Pix'], ['Chave Pix do parceiro', x.pix || x.contato || 'a informar']] },
     { p: `Antes de cada pagamento, a EMPRESA envia ao PARCEIRO o relatório do mês, com os grupos que contaram e o valor a receber.` },
     { h: '5. Condições gerais' }, { li: ['Esta parceria não cria vínculo de emprego nem sociedade entre as partes.', 'Qualquer uma das partes pode encerrar a parceria quando quiser, avisando a outra. As comissões já apuradas até o encerramento são pagas normalmente.', 'O PARCEIRO não pode prometer condições ou descontos em nome do Pelota FC que não estejam combinados por escrito.'] },
-    { h: '6. Mudança de condições' }, { p: 'Se o percentual ou o prazo mudarem, cada grupo continua com a condição que valia no dia em que foi ligado ao PARCEIRO. As novas condições valem só para os grupos ligados depois da mudança. O dia do pagamento, se mudar, vale para todos os pagamentos seguintes. Toda mudança precisa de um novo aceite deste termo.' }]; }
+    { h: '6. Mudança de condições' }, { p: 'Se o valor ou o prazo mudarem, cada grupo continua com a condição que valia no dia do primeiro pagamento da assinatura dele. As novas condições valem só para os grupos que pagarem a primeira vez depois da mudança. O dia do pagamento, se mudar, vale para todos os pagamentos seguintes. Toda mudança precisa de um novo aceite deste termo.' }]; }
 function termoRep(x, E, S) { E = E || {}; const A = x.aceiteOk && x.aceite;
   return docPDF('Termo de parceria', `Código do parceiro: ${x.codigo}`, [...termoBlocos(x, E, S),
     ...(A ? [{ h: 'Aceite eletrônico' }, { kv: [['Aceito por', `${A.nome || x.nome}${A.email ? ' · ' + A.email : ''}`], ['Data e hora', dataHora(A.em)], ['Registro', A.id || '—']] },
@@ -851,10 +852,10 @@ function relatorioRepPDF(x, E) { E = E || {}; const L = x.gruposLista || [], St 
   const valor = L.reduce((t, g, i) => t + (St[i].conta ? Number(g.valorMes || 0) : 0), 0), M = Number(x.meses) || 0, semAss = !L.some(g => g.assina != null);
   const sit = g => g.repEncerradoEm ? `Cancelou em ${new Date(g.repEncerradoEm).toLocaleDateString('pt-BR')} · encerrada` : g.assina ? 'Assinatura em dia' : 'Ainda não assina';
   return docPDF('Relatório do parceiro', `${R0.nome[0].toUpperCase() + R0.nome.slice(1)} · ${x.nome} · código ${x.codigo}`, [
-    { kv: [['Comissão', `${pctBR(x.pct)} da assinatura${M ? `, até ${M} ${M === 1 ? 'mês' : 'meses'} de cada grupo` : ''}`], ['Grupos trazidos', String(L.length || x.grupos || 0)], ['Grupos que contam neste mês', String(contam)], ['Valor a receber', rsBR(valor), true], ['Pagamento', `Dia ${x.dia || 10} de ${R0.prox}, por Pix`], ['Chave Pix', x.pix || x.contato || 'a informar']] },
+    { kv: [['Valor por grupo assinante', `${rsBR(valorDe(x))} por mês${M ? `, até ${M} ${M === 1 ? 'mês' : 'meses'}` : ''}`], ['Grupos trazidos', String(L.length || x.grupos || 0)], ['Grupos que contam neste mês', String(contam)], ['Valor a receber', rsBR(valor), true], ['Pagamento', `Dia ${x.dia || 10} de ${R0.prox}, por Pix`], ['Chave Pix', x.pix || x.contato || 'a informar']] },
     { h: 'Grupos' }, L.length ? { tab: [['Grupo', 'Cidade', 'Condição', 'Situação', 'Valor'], ...L.map((g, i) => [g.nome, [g.cidade, g.uf].filter(Boolean).join('/') || '—', condTxt(g.cond, x), sit(g), St[i].conta ? rsBR(g.valorMes || 0) : '—'])], cw: [.25, .17, .2, .25, .13] } : { p: 'Nenhum grupo ligado a este código ainda.' },
     { h: 'Regra' }, { p: 'A comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra.' },
-    { nota: 'Cada grupo segue a condição (percentual e prazo) que valia no dia em que ele foi ligado a você.' },
+    { nota: 'Cada grupo segue a condição (valor e prazo) que valia no dia do primeiro pagamento da assinatura dele.' },
     ...(semAss ? [{ nota: 'A assinatura Pro começa quando o app chegar às lojas. A partir daí, este relatório mostra o valor de cada mês.' }] : []),
     { nota: `Emitido por ${E.nome || 'Pelota FC'} em ${new Date().toLocaleDateString('pt-BR')}.` }]); }
 function cartaoRep(x) { // cartão para imprimir: 1240 x 1748 px (A6 em 300 dpi)
@@ -906,7 +907,8 @@ function telaParceiro() { const P = UIp.parc; if (!P || !P.rep) return '<h2>Áre
       <button class="btn primary block" data-sh="parc-aceitar">Aceitar termo</button></div>`;
   return `<h2>Área do parceiro</h2><p class="lead">Olá, ${escH(String(x.nome).split(' ')[0])}! Aqui ficam o seu código, os grupos que você trouxe e o seu termo.</p>
   <div class="panel" style="padding:14px;display:grid;gap:6px"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b style="font-size:18px">Seu código</b><span class="num" style="font-size:16px;font-weight:800;letter-spacing:.06em;padding:4px 10px;border-radius:6px;background:var(--surface2,#e3e9df)">${escH(x.codigo)}</span></div>
-    <span class="small">${pctBR(x.pct)} da assinatura, ${M ? `por até ${M} ${M === 1 ? 'mês' : 'meses'} de cada grupo` : 'enquanto o grupo for assinante'} · ${rsBR(contaSim(S, Number(x.pct)).c)} por grupo por mês</span>
+    <span class="small"><b>${rsBR(valorDe(x, S))} por grupo assinante, por mês</b>, ${M ? `por até ${M} ${M === 1 ? 'mês' : 'meses'} de cada grupo` : 'enquanto o grupo for assinante'}</span>
+    <span class="sub">Conta a partir do primeiro pagamento da assinatura do grupo, depois do período grátis.</span>
     <span class="sub">Pagamento todo dia ${x.dia || 10}, por Pix.</span>
     <button class="btn primary" style="margin-top:6px" data-sh="parc-qr">QR Code e pôster para divulgar</button></div>
   ${termo}
@@ -920,7 +922,7 @@ function telaParceiro() { const P = UIp.parc; if (!P || !P.rep) return '<h2>Áre
     <label class="field" style="margin:0"><span>WhatsApp com DDD</span><input type="tel" id="pc-whats" inputmode="tel" value="${escH(foneBR(x.whats || ''))}" placeholder="(81) 9 9999-9999"></label>
     <button class="btn" type="submit">Salvar</button></form>`; }
 async function carregarReps() { const R = UIp.reps = UIp.reps || {}; R.carregando = true; R.erro = null; if (TELA === 'donoreps') render();
-  try { const j = MOCK ? { reps: (UIp.repsMock = UIp.repsMock || [{ id: 'r1', nome: 'João Representante', codigo: 'JOAO10', pct: 10, meses: 12, pix: 'joao@exemplo.com', whats: '81999990000', obs: 'Zona Norte do Recife', ativo: true, grupos: 2, gruposLista: [{ nome: 'Pelada do Sábado', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 80 * 864e5, assina: true, valorMes: 1.69, cond: { pct: 10, meses: 3 } }, { nome: 'Racha da Quinta', cidade: 'Olinda', uf: 'PE', criadoEm: Date.now() - 70 * 864e5, assina: true, repEncerradoEm: Date.now() - 12 * 864e5 }, { nome: 'Fut da Firma', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 5 * 864e5, assina: null }] }]).slice(), simulador: UIp.simMock || null, empresa: UIp.empMock || null } : await notasServidor('reps');
+  try { const j = MOCK ? { reps: (UIp.repsMock = UIp.repsMock || [{ id: 'r1', nome: 'João Representante', codigo: 'JOAO10', pct: 10, valor: 1.69, meses: 12, pix: 'joao@exemplo.com', whats: '81999990000', obs: 'Zona Norte do Recife', ativo: true, grupos: 2, gruposLista: [{ nome: 'Pelada do Sábado', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 80 * 864e5, assina: true, valorMes: 1.69, cond: { valor: 1.69, meses: 3 } }, { nome: 'Racha da Quinta', cidade: 'Olinda', uf: 'PE', criadoEm: Date.now() - 70 * 864e5, assina: true, repEncerradoEm: Date.now() - 12 * 864e5 }, { nome: 'Fut da Firma', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 5 * 864e5, assina: null }] }]).slice(), simulador: UIp.simMock || null, empresa: UIp.empMock || null } : await notasServidor('reps');
     if (MOCK) j.reps.forEach(r => { r.aceiteOk = !!(r.aceite && JSON.stringify(r.aceite.cond) === JSON.stringify(condRep(r))); });
     R.lista = j.reps; R.simSalvo = j.simulador || null; R.empresa = j.empresa || null;
     if (R.simSalvo && !UIp.simMexido) { const f = v => String(v).replace('.', ','); UIp.sim = { ...(UIp.sim || SIM0), preco: f(R.simSalvo.preco.toFixed(2)), loja: f(R.simSalvo.loja), imp: f(R.simSalvo.imp), regime: R.simSalvo.regime }; } } catch (e) { R.erro = e.message; }
@@ -1214,6 +1216,7 @@ document.addEventListener('submit', async e => {
     if (dados.whats && (dados.whats.length < 10 || dados.whats.length > 13)) { aviso('Confira o WhatsApp: DDD e número.'); return; }
     if (!(dados.pct >= 0 && dados.pct <= 100)) { aviso('A comissão vai de 0 a 100%.'); return; } if (!(dados.meses >= 0 && dados.meses <= 120)) { aviso('O prazo vai de 0 a 120 meses.'); return; }
     OCUPADO = true;
+    if (MOCK) dados.valor = Math.round(contaSim(simDe(UIp.simMock), dados.pct).c * 100) / 100;
     try { if (MOCK) { const M = UIp.repsMock; if (M.some(x => x.codigo === codigo && x.id !== dados.id)) throw new Error('Esse código já é de outro representante.');
         const i = M.findIndex(x => x.id === dados.id); if (i >= 0) M[i] = { ...M[i], ...dados }; else M.push({ ...dados, id: 'r' + Date.now(), grupos: 0 }); }
       else await notasServidor('rep-salvar', dados);

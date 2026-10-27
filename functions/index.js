@@ -29,11 +29,6 @@ Object.assign(exports, pagamentos);
 /* Notas fiscais da comissão: relatório, emissão automática no Emissor Nacional e PDF para o organizador */
 const { interno: NFSE, ...notas } = require('./nfse')(db, PAG);
 Object.assign(exports, notas);
-// grupo criado pelo QR Code de um parceiro: guarda as condições do parceiro naquele dia
-exports.grupoDoParceiro = onDocumentCreated('grupos/{gid}', async ev => {
-  const rep = ev.data && ev.data.get('rep'); if (!rep) return;
-  try { await NFSE.congelarRep(ev.params.gid, rep); } catch (e) { logger.error('parceiro', e.message); }
-});
 /* Excluir a própria conta (pedido das lojas) */
 Object.assign(exports, require('./conta')(db));
 const MAX_DESTINOS = 300;

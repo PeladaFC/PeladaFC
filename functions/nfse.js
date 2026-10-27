@@ -258,7 +258,7 @@ module.exports = (db, PAG) => {
         const q = await db.collection('servidor/plataforma/representantes').get();
         const { por, lista } = await gruposDosReps();
         const plat = (await ler('servidor/plataforma')) || {};
-        return res.json({ simulador: plat.simulador || null, empresa: plat.empresa || null, reps: q.docs.map(d => ({ id: d.id, ...d.data(), aceiteOk: aceiteValido(d.data()), grupos: por[d.get('codigo')] || 0, gruposLista: lista[d.get('codigo')] || [] })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
+        return res.json({ simulador: plat.simulador || null, empresa: plat.empresa || null, reps: q.docs.map(d => comValor(d.data(), plat.simulador)).map((r, i) => ({ id: q.docs[i].id, ...r, aceiteOk: aceiteValido(r), grupos: por[r.codigo] || 0, gruposLista: lista[r.codigo] || [] })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
       }
       if (b.acao === 'empresa-salvar') {
         const emp = { nome: String(b.nome || '').trim().slice(0, 120), cnpj: String(b.cnpj || '').replace(/\D/g, '').slice(0, 14), cidade: String(b.cidade || '').trim().slice(0, 60), em: Date.now() };
@@ -284,12 +284,13 @@ module.exports = (db, PAG) => {
         if (em) { const mesmo = await col.where('email', '==', em).get(); if (mesmo.docs.some(d => d.id !== id)) return res.status(409).json({ erro: 'Esse e-mail já está ligado a outro parceiro.' }); }
         const igual = await col.where('codigo', '==', codigo).get();
         if (igual.docs.some(d => d.id !== id)) return res.status(409).json({ erro: 'Esse código já é de outro representante.' });
-        const dados = { nome, codigo, pct, meses, contato: String(b.contato || '').trim().slice(0, 120), pix: String(b.pix || '').trim().slice(0, 120), whats: String(b.whats || '').replace(/\D/g, '').slice(0, 13), doc: String(b.doc || '').replace(/\D/g, '').slice(0, 14), dia: [5, 10, 15, 20, 25].includes(Number(b.dia)) ? Number(b.dia) : 10, email: String(b.email || '').trim().toLowerCase().slice(0, 120), obs: String(b.obs || '').trim().slice(0, 300), ativo: b.ativo !== false, atualizadoEm: Date.now() };
+        const platS = (await ler('servidor/plataforma')) || {};
+        const dados = { nome, codigo, pct, meses, valor: valorRep({ pct }, platS.simulador), contato: String(b.contato || '').trim().slice(0, 120), pix: String(b.pix || '').trim().slice(0, 120), whats: String(b.whats || '').replace(/\D/g, '').slice(0, 13), doc: String(b.doc || '').replace(/\D/g, '').slice(0, 14), dia: [5, 10, 15, 20, 25].includes(Number(b.dia)) ? Number(b.dia) : 10, email: String(b.email || '').trim().toLowerCase().slice(0, 120), obs: String(b.obs || '').trim().slice(0, 300), ativo: b.ativo !== false, atualizadoEm: Date.now() };
         if (id) { const atual = await col.doc(id).get(); if (!atual.exists) return res.status(404).json({ erro: 'Representante não encontrado.' });
           dados.codigo = atual.get('codigo') || codigo; // o código não muda: QR Codes impressos continuam valendo
           if ((atual.get('email') || '') !== dados.email) dados.uid = null; // trocou o e-mail: a conta antiga deixa de ver a área
           await col.doc(id).set(dados, { merge: true }); return res.json({ ok: true, id }); }
-        const ref = await col.add({ ...dados, criadoEm: Date.now() }); return res.json({ ok: true, id: ref.id });
+        const ref = await col.add({ ...dados, criadoEm: Date.now() }); // (valor já calculado em dados) return res.json({ ok: true, id: ref.id });
       }
       if (b.acao === 'tomador') {
         const gid = String(b.gid || ''), doc = String(b.doc || '').replace(/\D/g, '');
@@ -322,15 +323,19 @@ module.exports = (db, PAG) => {
         assina: A.ativa != null ? !!A.ativa : null, repEncerradoEm: A.repEncerradoEm || null, valorMes: A.repValorMes || 0, cond: A.repCond || null, ligadoEm: A.repLigadoEm || null }); }
     return { por, lista };
   }
-  // grupo novo ligado a um parceiro: guarda as condições do dia (% e prazo). Mudanças futuras valem só para grupos novos.
+  // fase 2: chamar no PRIMEIRO pagamento da assinatura do grupo (é aí que o grupo está fechado): guarda o valor e o prazo daquele dia.
+  // Mudanças futuras valem só para os grupos que pagarem a primeira vez depois delas.
   async function congelarRep(gid, codigo) {
     const r = (await db.collection('servidor/plataforma/representantes').where('codigo', '==', String(codigo || '')).limit(1).get()).docs[0];
     const ref = db.doc(`grupos/${gid}/segredos/assinatura`);
     await db.runTransaction(async tx => { const s = await tx.get(ref); if (s.exists && s.get('repCond')) return;
-      tx.set(ref, { repCond: r ? { codigo: r.get('codigo'), pct: Number(r.get('pct')) || 0, meses: Number(r.get('meses')) || 0 } : { codigo, pct: null, meses: null }, repLigadoEm: Date.now() }, { merge: true }); });
+      tx.set(ref, { repCond: r ? { codigo: r.get('codigo'), pct: Number(r.get('pct')) || 0, valor: r.get('valor') != null ? Number(r.get('valor')) : valorRep(r.data(), null), meses: Number(r.get('meses')) || 0 } : { codigo, valor: null, meses: null }, repFechadoEm: Date.now() }, { merge: true }); });
   }
   // o aceite vale enquanto código, %, prazo e dia do pagamento forem os mesmos que a pessoa aceitou
-  const condicoes = r => ({ codigo: r.codigo, pct: Number(r.pct), meses: Number(r.meses) || 0, dia: Number(r.dia) || 10 });
+  // valor em reais que o parceiro recebe por grupo/mês: % sobre o que a loja repassa (o parceiro só vê o valor, nunca a %)
+  const valorRep = (r, sim) => { const S = sim || {}, P = Number(S.preco) || 19.9, loja = S.loja != null ? Number(S.loja) : 15; return Math.round((P - P * loja / 100) * (Number(r.pct) || 0)) / 100; };
+  const comValor = (r, sim) => ({ ...r, valor: r.valor != null ? Number(r.valor) : valorRep(r, sim) });
+  const condicoes = r => ({ codigo: r.codigo, valor: Number(r.valor) || 0, meses: Number(r.meses) || 0, dia: Number(r.dia) || 10 });
   const aceiteValido = r => !!(r.aceite && r.aceite.cond && JSON.stringify(r.aceite.cond) === JSON.stringify(condicoes(r)));
   const parceiro = onRequest({ cors: true, maxInstances: 3, memory: '512MiB' }, async (req, res) => {
     try {
@@ -340,7 +345,7 @@ module.exports = (db, PAG) => {
       let doc = (await col.where('uid', '==', u.uid).limit(1).get()).docs[0];
       if (!doc && em) { const d = (await col.where('email', '==', em).limit(1).get()).docs[0]; if (d && !d.get('uid')) { await d.ref.update({ uid: u.uid, ligadoEm: Date.now() }); doc = await d.ref.get(); } }
       if (!doc || doc.get('ativo') === false) return res.status(404).json({ erro: 'Esta conta não é de um parceiro.' });
-      const r = doc.data();
+      const plat0 = (await ler('servidor/plataforma')) || {}, r = comValor(doc.data(), plat0.simulador);
       if (b.acao === 'dados') { const pix = String(b.pix || '').trim().slice(0, 120), whats = String(b.whats || '').replace(/\D/g, '').slice(0, 13);
         if (whats && (whats.length < 10 || whats.length > 13)) return res.status(400).json({ erro: 'Confira o WhatsApp: DDD e número.' });
         await doc.ref.update({ pix, whats, atualizadoPeloParceiroEm: Date.now() }); return res.json({ ok: true }); }
@@ -348,10 +353,10 @@ module.exports = (db, PAG) => {
         const cond = condicoes(r); if (JSON.stringify(b.cond || {}) !== JSON.stringify(cond)) return res.status(409).json({ erro: 'As condições mudaram. Abra a área do parceiro de novo para ler a versão atual.' });
         const plat = (await ler('servidor/plataforma')) || {}, ac = { em: Date.now(), uid: u.uid, email: em, nome: r.nome, cond, preco: (plat.simulador || {}).preco || null,
           ip: String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim().slice(0, 60), aparelho: String(req.headers['user-agent'] || '').slice(0, 200) };
-        const reg = await doc.ref.collection('aceites').add(ac); await doc.ref.update({ aceite: { ...ac, id: reg.id } }); return res.json({ ok: true });
+        const reg = await doc.ref.collection('aceites').add(ac); await doc.ref.update({ aceite: { ...ac, id: reg.id }, valor: cond.valor }); return res.json({ ok: true });
       }
       const { lista } = await gruposDosReps(r.codigo), plat = (await ler('servidor/plataforma')) || {};
-      const { uid, email, obs, contato, ...pub } = r;
+      const { uid, email, obs, contato, pct, ...pub } = r; // a % fica só com o dono
       return res.json({ rep: { id: doc.id, ...pub, email: em, aceiteOk: aceiteValido(r), gruposLista: lista[r.codigo] || [], grupos: (lista[r.codigo] || []).length }, empresa: plat.empresa || null, simulador: plat.simulador || null });
     } catch (e) { logger.error(e); res.status(e.http || 500).json({ erro: e.http ? e.message : 'Algo deu errado. Tente de novo.' }); }
   });
