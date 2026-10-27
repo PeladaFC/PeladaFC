@@ -256,14 +256,9 @@ module.exports = (db, PAG) => {
       // representantes: cadastro do dono (comissão e prazo editáveis). Os grupos ligam na fase 2, pelo código da loja.
       if (b.acao === 'reps') {
         const q = await db.collection('servidor/plataforma/representantes').get();
-        const gq = await db.collection('grupos').where('rep', '>', '').select('rep', 'nome', 'criadoEm').get(), por = {}, lista = {};
-        for (const d of gq.docs) { const c = d.get('rep'); if (!c) continue; por[c] = (por[c] || 0) + 1;
-          // fase 2: o servidor grava em segredos/assinatura (o organizador não mexe): ativa, repEncerradoEm (quando cancelou: a comissão acaba de vez) e repValorMes
-          const [cfg, ass] = await Promise.all([ler(`grupos/${d.id}/config/geral`), ler(`grupos/${d.id}/segredos/assinatura`)]), C = cfg || {}, A = ass || {};
-          (lista[c] = lista[c] || []).push({ nome: d.get('nome') || C.nome || 'Pelada', cidade: C.cidade || '', uf: C.uf || '', criadoEm: d.get('criadoEm') || null,
-            assina: ass ? !!A.ativa : null, repEncerradoEm: A.repEncerradoEm || null, valorMes: A.repValorMes || 0 }); }
+        const { por, lista } = await gruposDosReps();
         const plat = (await ler('servidor/plataforma')) || {};
-        return res.json({ simulador: plat.simulador || null, empresa: plat.empresa || null, reps: q.docs.map(d => ({ id: d.id, ...d.data(), grupos: por[d.get('codigo')] || 0, gruposLista: lista[d.get('codigo')] || [] })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
+        return res.json({ simulador: plat.simulador || null, empresa: plat.empresa || null, reps: q.docs.map(d => ({ id: d.id, ...d.data(), aceiteOk: aceiteValido(d.data()), grupos: por[d.get('codigo')] || 0, gruposLista: lista[d.get('codigo')] || [] })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
       }
       if (b.acao === 'empresa-salvar') {
         const emp = { nome: String(b.nome || '').trim().slice(0, 120), cnpj: String(b.cnpj || '').replace(/\D/g, '').slice(0, 14), cidade: String(b.cidade || '').trim().slice(0, 60), em: Date.now() };
@@ -285,11 +280,14 @@ module.exports = (db, PAG) => {
         if (!(meses >= 0 && meses <= 120)) return res.status(400).json({ erro: 'O prazo vai de 0 a 120 meses (0 = sem prazo).' });
         const col = db.collection('servidor/plataforma/representantes'), id = String(b.id || '');
         if (id && (id.includes('/') || id.length > 60)) return res.status(400).json({ erro: 'Pedido inválido.' });
+        const em = String(b.email || '').trim().toLowerCase(); if (em && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return res.status(400).json({ erro: 'Confira o e-mail da conta do parceiro.' });
+        if (em) { const mesmo = await col.where('email', '==', em).get(); if (mesmo.docs.some(d => d.id !== id)) return res.status(409).json({ erro: 'Esse e-mail já está ligado a outro parceiro.' }); }
         const igual = await col.where('codigo', '==', codigo).get();
         if (igual.docs.some(d => d.id !== id)) return res.status(409).json({ erro: 'Esse código já é de outro representante.' });
-        const dados = { nome, codigo, pct, meses, contato: String(b.contato || '').trim().slice(0, 120), pix: String(b.pix || '').trim().slice(0, 120), whats: String(b.whats || '').replace(/\D/g, '').slice(0, 13), doc: String(b.doc || '').replace(/\D/g, '').slice(0, 14), dia: [5, 10, 15, 20, 25].includes(Number(b.dia)) ? Number(b.dia) : 10, obs: String(b.obs || '').trim().slice(0, 300), ativo: b.ativo !== false, atualizadoEm: Date.now() };
+        const dados = { nome, codigo, pct, meses, contato: String(b.contato || '').trim().slice(0, 120), pix: String(b.pix || '').trim().slice(0, 120), whats: String(b.whats || '').replace(/\D/g, '').slice(0, 13), doc: String(b.doc || '').replace(/\D/g, '').slice(0, 14), dia: [5, 10, 15, 20, 25].includes(Number(b.dia)) ? Number(b.dia) : 10, email: String(b.email || '').trim().toLowerCase().slice(0, 120), obs: String(b.obs || '').trim().slice(0, 300), ativo: b.ativo !== false, atualizadoEm: Date.now() };
         if (id) { const atual = await col.doc(id).get(); if (!atual.exists) return res.status(404).json({ erro: 'Representante não encontrado.' });
           dados.codigo = atual.get('codigo') || codigo; // o código não muda: QR Codes impressos continuam valendo
+          if ((atual.get('email') || '') !== dados.email) dados.uid = null; // trocou o e-mail: a conta antiga deixa de ver a área
           await col.doc(id).set(dados, { merge: true }); return res.json({ ok: true, id }); }
         const ref = await col.add({ ...dados, criadoEm: Date.now() }); return res.json({ ok: true, id: ref.id });
       }
@@ -313,6 +311,44 @@ module.exports = (db, PAG) => {
     } catch (e) { logger.error(e); res.status(e.http || 500).json({ erro: e.http ? e.message : 'Algo deu errado. Tente de novo.' }); }
   });
 
+  /* ---------- parceiros: grupos de cada um, aceite do termo e área do parceiro no app ---------- */
+  async function gruposDosReps(codigo) {
+    let qq = db.collection('grupos'); qq = codigo ? qq.where('rep', '==', codigo) : qq.where('rep', '>', '');
+    const gq = await qq.select('rep', 'nome', 'criadoEm').get(), por = {}, lista = {};
+    for (const d of gq.docs) { const c = d.get('rep'); if (!c) continue; por[c] = (por[c] || 0) + 1;
+      // fase 2: o servidor grava em segredos/assinatura (o organizador não mexe): ativa, repEncerradoEm (cancelou: a comissão se encerra) e repValorMes
+      const [cfg, ass] = await Promise.all([ler(`grupos/${d.id}/config/geral`), ler(`grupos/${d.id}/segredos/assinatura`)]), C = cfg || {}, A = ass || {};
+      (lista[c] = lista[c] || []).push({ nome: d.get('nome') || C.nome || 'Pelada', cidade: C.cidade || '', uf: C.uf || '', criadoEm: d.get('criadoEm') || null,
+        assina: ass ? !!A.ativa : null, repEncerradoEm: A.repEncerradoEm || null, valorMes: A.repValorMes || 0 }); }
+    return { por, lista };
+  }
+  // o aceite vale enquanto código, %, prazo e dia do pagamento forem os mesmos que a pessoa aceitou
+  const condicoes = r => ({ codigo: r.codigo, pct: Number(r.pct), meses: Number(r.meses) || 0, dia: Number(r.dia) || 10 });
+  const aceiteValido = r => !!(r.aceite && r.aceite.cond && JSON.stringify(r.aceite.cond) === JSON.stringify(condicoes(r)));
+  const parceiro = onRequest({ cors: true, maxInstances: 3, memory: '512MiB' }, async (req, res) => {
+    try {
+      if (req.method !== 'POST') return res.status(405).json({ erro: 'Use POST.' });
+      const u = await PAG.usuario(req), b = req.body || {}, em = String(u.email || '').toLowerCase();
+      const col = db.collection('servidor/plataforma/representantes');
+      let doc = (await col.where('uid', '==', u.uid).limit(1).get()).docs[0];
+      if (!doc && em) { const d = (await col.where('email', '==', em).limit(1).get()).docs[0]; if (d && !d.get('uid')) { await d.ref.update({ uid: u.uid, ligadoEm: Date.now() }); doc = await d.ref.get(); } }
+      if (!doc || doc.get('ativo') === false) return res.status(404).json({ erro: 'Esta conta não é de um parceiro.' });
+      const r = doc.data();
+      if (b.acao === 'dados') { const pix = String(b.pix || '').trim().slice(0, 120), whats = String(b.whats || '').replace(/\D/g, '').slice(0, 13);
+        if (whats && (whats.length < 10 || whats.length > 13)) return res.status(400).json({ erro: 'Confira o WhatsApp: DDD e número.' });
+        await doc.ref.update({ pix, whats, atualizadoPeloParceiroEm: Date.now() }); return res.json({ ok: true }); }
+      if (b.acao === 'aceitar') {
+        const cond = condicoes(r); if (JSON.stringify(b.cond || {}) !== JSON.stringify(cond)) return res.status(409).json({ erro: 'As condições mudaram. Abra a área do parceiro de novo para ler a versão atual.' });
+        const plat = (await ler('servidor/plataforma')) || {}, ac = { em: Date.now(), uid: u.uid, email: em, nome: r.nome, cond, preco: (plat.simulador || {}).preco || null,
+          ip: String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim().slice(0, 60), aparelho: String(req.headers['user-agent'] || '').slice(0, 200) };
+        const reg = await doc.ref.collection('aceites').add(ac); await doc.ref.update({ aceite: { ...ac, id: reg.id } }); return res.json({ ok: true });
+      }
+      const { lista } = await gruposDosReps(r.codigo), plat = (await ler('servidor/plataforma')) || {};
+      const { uid, email, obs, contato, ...pub } = r;
+      return res.json({ rep: { id: doc.id, ...pub, email: em, aceiteOk: aceiteValido(r), gruposLista: lista[r.codigo] || [], grupos: (lista[r.codigo] || []).length }, empresa: plat.empresa || null, simulador: plat.simulador || null });
+    } catch (e) { logger.error(e); res.status(e.http || 500).json({ erro: e.http ? e.message : 'Algo deu errado. Tente de novo.' }); }
+  });
+
   /* ---------- o organizador baixa as notas dele (só administrador do grupo) ---------- */
   const notaComissao = onRequest({ cors: true, maxInstances: 3, memory: '512MiB' }, async (req, res) => {
     try {
@@ -328,5 +364,5 @@ module.exports = (db, PAG) => {
     } catch (e) { logger.error(e); res.status(e.http || 500).json({ erro: e.http ? e.message : 'Algo deu errado. Tente de novo.' }); }
   });
 
-  return { notasPlataforma, notaComissao, interno: { ondeFica, tarefaDiaria, emitirMes, parametros, mesAnterior, store, contador } };
+  return { notasPlataforma, notaComissao, parceiro, interno: { ondeFica, tarefaDiaria, emitirMes, parametros, mesAnterior, store, contador } };
 };

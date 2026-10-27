@@ -219,10 +219,12 @@ function render() {
     <div class="ob-div">ou</div>
     <button class="btn block ob-google" data-sh="google">Continuar com o Google</button>
     <p class="sub" style="text-align:center;margin:0">Ao criar a conta, você aceita os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>`;
+  if (t === 'perfil' && EU && UIp.parcOk === undefined) { UIp.parcOk = null; carregarParceiro(true); }
   if (t === 'perfil' && EU && UIp.notasOk === undefined) { UIp.notasOk = null; UIp.notasErro = null; notasServidor('acesso').then(() => { UIp.notasOk = true; if (TELA === 'perfil') render(); }, e => { if (e && e.status === 403) UIp.notasOk = false; else { UIp.notasOk = undefined; UIp.notasErro = (e && e.message) || 'erro'; if (TELA === 'perfil') render(); } }); }
   if (t === 'perfil') { const p = PERFIL || {}; const pos = UIp.pos || p.pos || 'MEI'; const pronto = !!(p.apelido || p.pos);
     h = (pronto ? topo('minhas') : '') + `<h2>${pronto ? 'Meu perfil' : 'Seu perfil de jogador'}</h2><p class="lead">É assim que a galera vai te ver.</p>
     ${EU && UIp.notasOk ? `<button class="btn block primary" data-sh="dono" style="margin-bottom:6px">Painel do dono</button>` : ''}
+    ${EU && UIp.parcOk ? `<button class="btn block" data-sh="parceiro" style="margin-bottom:6px">🤝 Área do parceiro${UIp.parc && UIp.parc.rep && !UIp.parc.rep.aceiteOk ? ' · termo para aceitar' : ''}</button>` : ''}
     ${EU && UIp.notasErro && !UIp.notasOk ? `<button class="btn sm" data-sh="dono-verificar" style="align-self:flex-start;margin-bottom:6px">Não consegui verificar o acesso ao painel. Tocar para tentar de novo</button>` : ''}
     <form id="f-perfil" class="stack" novalidate>
       <div class="row" style="gap:14px;flex-wrap:nowrap"><div class="av bg-${pos}" style="width:84px;height:84px;font-size:30px;${(UIp.foto ?? p.foto) ? `background-image:url('${UIp.foto ?? p.foto}');background-size:cover;background-position:center` : ''}">${(UIp.foto ?? p.foto) ? '' : escH(((p.apelido || p.nome || EU.nome || '?').trim()[0] || '?').toUpperCase())}</div>
@@ -242,8 +244,9 @@ function render() {
   if (t === 'dono') h = topo('perfil') + abasDono('dono') + telaDono();
   if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + telaGruposDono();
   if (t === 'donoreps') h = topo('perfil') + abasDono('reps') + telaRepsDono();
+  if (t === 'parceiro') h = topo('perfil') + telaParceiro();
   if (t === 'donorepqr') { const x = repDoQr(), A3 = UIp.repFmt === 'a3', A4 = UIp.repFmt === 'a4' || A3;
-    h = topo('donoreps') + (x ? `<h2>${x.codigo ? 'QR Code de ' + escH(x.nome) : 'Pôster do Pelota FC'}</h2><p class="lead">${x.codigo ? `Quem ler este código abre o Pelota FC. As peladas que essa pessoa criar ficam marcadas como trazidas por <b>${escH(x.codigo)}</b>.` : 'Pôster sem representante: o QR Code abre o Pelota FC.'}</p>
+    h = topo(UIp.repqr === '_meu' ? 'parceiro' : 'donoreps') + (x ? `<h2>${x.codigo ? 'QR Code de ' + escH(x.nome) : 'Pôster do Pelota FC'}</h2><p class="lead">${x.codigo ? `Quem ler este código abre o Pelota FC. As peladas que essa pessoa criar ficam marcadas como trazidas por <b>${escH(x.codigo)}</b>.` : 'Pôster sem representante: o QR Code abre o Pelota FC.'}</p>
     <div class="pick">${x.codigo ? `<button type="button" data-sh="rep-fmt" data-v="a6" aria-pressed="${!A4}">Cartão pequeno</button>` : ''}<button type="button" data-sh="rep-fmt" data-v="a4" aria-pressed="${UIp.repFmt === 'a4'}">Pôster A4</button><button type="button" data-sh="rep-fmt" data-v="a3" aria-pressed="${UIp.repFmt === 'a3'}">Pôster grande (A3)</button></div>
     <p id="rep-gerando" class="sub" style="text-align:center;margin:0">Montando a arte…</p><img id="rep-cartao" alt="${A3 ? 'Pôster A3' : A4 ? 'Pôster A4' : 'Cartão'} com QR Code${x.codigo ? ' do representante ' + escH(x.nome) : ''}" style="width:min(100%,${A4 ? 420 : 360}px);margin:0 auto;display:block;border-radius:${A4 ? 4 : 10}px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.08)">
     <div class="num" style="font-weight:700;text-align:center;word-break:break-all">${escH(linkRep(x.codigo))}</div>
@@ -630,6 +633,8 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
       <label class="field" style="margin:0"><span>Comissão (%)</span><input type="text" inputmode="decimal" id="r-pct" value="${escH(String(e.pct ?? '').replace('.', ','))}"></label>
       <label class="field" style="margin:0"><span>Por quantos meses</span><input type="number" inputmode="numeric" min="0" max="120" id="r-meses" value="${escH(String(e.meses ?? 0))}"></label></div>
     <p class="sub" style="margin:-4px 0 0">Prazo contado a partir da 1ª mensalidade de cada grupo. Coloque 0 para pagar enquanto o grupo for assinante.</p>
+    <label class="field" style="margin:0"><span>E-mail da conta do parceiro no app (opcional)</span><input type="email" id="r-email" inputmode="email" autocomplete="off" value="${escH(e.email || '')}" placeholder="O mesmo e-mail que ele usa para entrar no Pelota FC"></label>
+    <p class="sub" style="margin:-4px 0 0">Com o e-mail, ele ganha a Área do parceiro no perfil dele: vê os grupos, baixa o QR Code e aceita o termo dentro do app.</p>
     <label class="field" style="margin:0"><span>Chave Pix (opcional)</span><input type="text" id="r-pix" value="${escH(e.pix || e.contato || '')}" placeholder="CPF, e-mail, telefone ou chave aleatória" autocomplete="off"></label>
     <label class="field" style="margin:0"><span>WhatsApp com DDD (opcional)</span><input type="tel" id="r-whats" inputmode="tel" value="${escH(foneBR(e.whats || ''))}" placeholder="(81) 9 9999-9999"></label>
     <p class="sub" style="margin:-4px 0 0">Com o WhatsApp, você manda o relatório do mês para o parceiro com um toque.</p>
@@ -648,6 +653,7 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
     ${x.whats ? `<span class="sub">WhatsApp: ${escH(foneBR(x.whats))}</span>` : ''}${x.obs ? `<span class="sub">${escH(x.obs)}</span>` : ''}
     <div class="row" style="gap:8px;margin-top:4px"><button class="btn sm" data-sh="rep-editar" data-v="${escH(x.id)}">Editar</button><button class="btn sm" data-sh="rep-qr" data-v="${escH(x.id)}">QR Code e pôster</button></div>
     <div class="row" style="gap:8px"><button class="btn sm" data-sh="rep-termo" data-v="${escH(x.id)}">📄 Termo de parceria</button><button class="btn sm" data-sh="rep-relpdf" data-v="${escH(x.id)}">📄 Relatório do mês</button></div>
+    <span class="small">${!x.email ? '📝 Termo: sem conta ligada. Coloque o e-mail dele para aceitar pelo app, ou mande o PDF.' : x.aceiteOk ? `✅ Termo aceito no app em ${dataHora(x.aceite.em)}` : x.aceite ? '⚠️ As condições mudaram depois do aceite. Ele precisa aceitar de novo no app.' : x.uid ? '⏳ Termo aguardando o aceite dele no app' : `⏳ Esperando ${escH(x.email)} entrar no app`}</span>
     <span class="sub">Pagamento todo dia ${x.dia || 10}. Os PDFs abrem o compartilhar do celular: escolha o WhatsApp e o contato.</span></div>`;
   return `<h2>Representantes</h2><p class="lead">Quem traz grupos para o app. Você decide quanto cada um ganha e por quanto tempo.</p>
   <div class="panel" style="padding:14px;display:grid;gap:12px"><b style="font-size:18px">Quanto chega líquido</b>
@@ -682,7 +688,7 @@ function relatorioRep(x) { const hoje = new Date(Date.now() - 3 * 36e5), mes = M
     '_Regra: a comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra._',
     '', L.some(g => g.assina != null) ? 'O pagamento é feito por Pix na chave cadastrada.' : 'A assinatura Pro começa quando o app chegar às lojas. A partir daí, este relatório mostra o valor de cada mês.'].join('\n'); }
 const linkRep = c => c ? LINK_APP + '?rep=' + encodeURIComponent(c) : LINK_APP;
-const repDoQr = () => UIp.repqr === '_geral' ? { id: '_geral', nome: '', codigo: '' } : ((UIp.reps || {}).lista || []).find(r => r.id === UIp.repqr);
+const repDoQr = () => UIp.repqr === '_geral' ? { id: '_geral', nome: '', codigo: '' } : UIp.repqr === '_meu' ? ((UIp.parc || {}).rep || null) : ((UIp.reps || {}).lista || []).find(r => r.id === UIp.repqr);
 function desenhaQR(g, texto, x, y, lado) { const q = window.qrcode(0, 'M'); q.addData(texto); q.make(); const n = q.getModuleCount(), cel = Math.floor(lado / (n + 4)), tam = cel * (n + 4), ox = x + (lado - tam) / 2, oy = y + (lado - tam) / 2;
   g.fillStyle = '#fff'; g.fillRect(ox, oy, tam, tam); g.fillStyle = '#000'; for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) g.fillRect(ox + (c + 2) * cel, oy + (r + 2) * cel, cel, cel); }
 function quebra(g, txt, larg) { const L = []; let l = ''; for (const w of String(txt).split(' ')) { const t = l ? l + ' ' + w : w; if (g.measureText(t).width > larg && l) { L.push(l); l = w; } else l = t; } if (l) L.push(l); return L; }
@@ -817,9 +823,12 @@ function docPDF(titulo, sub, blocos) { const W = 1654, H = 2339, M = 150, LW = W
         g.fillStyle = '#132018'; g.font = `700 30px ${ft}`; linhas(nome, `700 30px ${ft}`, cw).slice(0, 2).forEach((l, k) => g.fillText(l, x0, y + 46 + k * 40)); g.fillStyle = '#56665B'; g.font = `500 26px ${ft}`; g.fillText(papel, x0, y + 46 + Math.min(2, linhas(nome, `700 30px ${ft}`, cw).length) * 40); }); y += 200; } }
   pags.forEach((cv, i) => { const c = cv.getContext('2d'); c.textAlign = 'right'; c.fillStyle = '#8A9A8E'; c.font = `500 24px ${ft}`; c.fillText(`Página ${i + 1} de ${pags.length}`, W - M, H - 60); c.textAlign = 'left'; c.fillText(titulo, M, H - 60); });
   return pags; }
-function termoRep(x) { const E = UIp.reps.empresa || {}, S = UIp.sim || SIM0, r = contaSim(S, Number(x.pct)), M = Number(x.meses) || 0, dia = x.dia || 10;
-  const parte = `${E.nome}${E.cnpj ? ', CNPJ ' + docBR(E.cnpj) : ''}`, parc = `${x.nome}${x.doc ? (String(x.doc).length === 14 ? ', CNPJ ' : ', CPF ') + docBR(x.doc) : ''}`;
-  return docPDF('Termo de parceria', `Código do parceiro: ${x.codigo}`, [
+const simDe = sv => sv ? { ...SIM0, preco: String(sv.preco).replace('.', ','), loja: String(sv.loja).replace('.', ','), imp: String(sv.imp).replace('.', ',') } : { ...SIM0 };
+const condRep = x => ({ codigo: x.codigo, pct: Number(x.pct), meses: Number(x.meses) || 0, dia: Number(x.dia) || 10 });
+const dataHora = t => new Date(t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+function termoBlocos(x, E, S) { E = E || {}; const r = contaSim(S || SIM0, Number(x.pct)), M = Number(x.meses) || 0, dia = x.dia || 10;
+  const parte = `${E.nome || 'a empresa responsável pelo Pelota FC'}${E.cnpj ? ', CNPJ ' + docBR(E.cnpj) : ''}`, parc = `${x.nome}${x.doc ? (String(x.doc).length === 14 ? ', CNPJ ' : ', CPF ') + docBR(x.doc) : ''}`;
+  return [
     { p: `De um lado, ${parte}, responsável pelo aplicativo Pelota FC (EMPRESA). De outro, ${parc} (PARCEIRO). As partes registram aqui as condições da parceria de indicação de grupos.` },
     { h: '1. O que o parceiro faz' }, { p: `O PARCEIRO divulga o Pelota FC e indica grupos de pelada usando o seu código ${x.codigo} e o seu QR Code. Os grupos criados a partir desse QR Code ficam ligados ao PARCEIRO.` },
     { h: '2. Comissão' }, { kv: [['Percentual', `${pctBR(x.pct)} da assinatura Pro`], ['Base de cálculo', 'Valor da assinatura que a Apple ou o Google repassam à EMPRESA'], ['Assinatura hoje', `${rsBR(r.P)} por mês por grupo`], ['Valor por grupo assinante', `${rsBR(r.c)} por mês`, true], ['Duração', M ? `Até ${M} ${M === 1 ? 'mês' : 'meses'} de cada grupo` : 'Enquanto o grupo for assinante']] },
@@ -827,10 +836,16 @@ function termoRep(x) { const E = UIp.reps.empresa || {}, S = UIp.sim || SIM0, r 
     { h: '3. Regra' }, { p: 'A comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra.' },
     { h: '4. Pagamento' }, { kv: [['Quando', `Todo dia ${dia} do mês seguinte`], ['Como', 'Pix'], ['Chave Pix do parceiro', x.pix || x.contato || 'a informar']] },
     { p: `Antes de cada pagamento, a EMPRESA envia ao PARCEIRO o relatório do mês, com os grupos que contaram e o valor a receber.` },
-    { h: '5. Condições gerais' }, { li: ['Esta parceria não cria vínculo de emprego nem sociedade entre as partes.', 'Qualquer uma das partes pode encerrar a parceria quando quiser, avisando a outra. As comissões já apuradas até o encerramento são pagas normalmente.', 'O PARCEIRO não pode prometer condições ou descontos em nome do Pelota FC que não estejam combinados por escrito.'] },
-    { p: `${E.cidade || 'Recife'}, ${dataExtenso()}.` },
-    { assin: [[E.nome || 'EMPRESA', 'EMPRESA'], [x.nome, 'PARCEIRO']] }]); }
-function relatorioRepPDF(x) { const E = UIp.reps.empresa || {}, L = x.gruposLista || [], St = L.map(situacaoGrupoRep), contam = St.filter(s => s.conta).length, R0 = mesRef();
+    { h: '5. Condições gerais' }, { li: ['Esta parceria não cria vínculo de emprego nem sociedade entre as partes.', 'Qualquer uma das partes pode encerrar a parceria quando quiser, avisando a outra. As comissões já apuradas até o encerramento são pagas normalmente.', 'O PARCEIRO não pode prometer condições ou descontos em nome do Pelota FC que não estejam combinados por escrito.'] }]; }
+function termoRep(x, E, S) { E = E || {}; const A = x.aceiteOk && x.aceite;
+  return docPDF('Termo de parceria', `Código do parceiro: ${x.codigo}`, [...termoBlocos(x, E, S),
+    ...(A ? [{ h: 'Aceite eletrônico' }, { kv: [['Aceito por', `${A.nome || x.nome}${A.email ? ' · ' + A.email : ''}`], ['Data e hora', dataHora(A.em)], ['Registro', A.id || '—']] },
+      { nota: `O PARCEIRO leu e aceitou este termo dentro do app Pelota FC, entrando na própria conta. A EMPRESA registrou o aceite com data, hora e aparelho. ${E.cidade || 'Recife'}, ${dataExtenso()}.` }]
+      : [{ p: `${E.cidade || 'Recife'}, ${dataExtenso()}.` }, { assin: [[E.nome || 'EMPRESA', 'EMPRESA'], [x.nome, 'PARCEIRO']] }])]); }
+function blocosHTML(B) { return B.map(b => b.h ? `<b style="font-size:17px;margin-top:6px">${escH(b.h)}</b>` : b.p ? `<p style="margin:0">${escH(b.p)}</p>` : b.nota ? `<p class="sub" style="margin:0">${escH(b.nota)}</p>`
+  : b.li ? `<ul style="margin:0;padding-left:20px;display:grid;gap:4px">${b.li.map(i => `<li>${escH(i)}</li>`).join('')}</ul>`
+  : b.kv ? `<div style="display:grid;gap:4px">${b.kv.map(([k, v, f]) => `<div class="row" style="justify-content:space-between;gap:10px;flex-wrap:nowrap;padding:6px 10px;border-radius:8px;background:${f ? '#e5f4e4' : 'var(--surface2,#eef2eb)'}"><span class="sub" style="flex:none">${escH(k)}</span><span style="text-align:right;${f ? 'font-weight:800;color:#0F4D27' : 'font-weight:600'}">${escH(v)}</span></div>`).join('')}</div>` : '').join(''); }
+function relatorioRepPDF(x, E) { E = E || {}; const L = x.gruposLista || [], St = L.map(situacaoGrupoRep), contam = St.filter(s => s.conta).length, R0 = mesRef();
   const valor = L.reduce((t, g, i) => t + (St[i].conta ? Number(g.valorMes || 0) : 0), 0), M = Number(x.meses) || 0, semAss = !L.some(g => g.assina != null);
   const sit = g => g.repEncerradoEm ? `Cancelou em ${new Date(g.repEncerradoEm).toLocaleDateString('pt-BR')} · encerrada` : g.assina ? 'Assinatura em dia' : 'Ainda não assina';
   return docPDF('Relatório do parceiro', `${R0.nome[0].toUpperCase() + R0.nome.slice(1)} · ${x.nome} · código ${x.codigo}`, [
@@ -859,8 +874,51 @@ function cartaoRep(x) { // cartão para imprimir: 1240 x 1748 px (A6 em 300 dpi)
   y += 86; g.fillStyle = '#F0662A'; g.font = `700 54px ${ft}`; g.fillText('Código ' + x.codigo, W / 2, y);
   g.fillStyle = '#F2C12E'; g.fillRect(0, H - 40, W * .64, 40); g.fillStyle = '#F0662A'; g.fillRect(W * .64, H - 40, W * .36, 40);
   return cv; }
+const URL_PARC = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/parceiro';
+async function parceiroServidor(acao, extra) {
+  if (MOCK) { const M = UIp.repsMock || [], em = String((EU && EU.email) || '').toLowerCase(), x = M.find(r => r.email && r.email === em);
+    if (!x) throw Object.assign(new Error('Esta conta não é de um parceiro.'), { status: 404 });
+    if (acao === 'dados') { x.pix = extra.pix; x.whats = extra.whats; return { ok: true }; }
+    if (acao === 'aceitar') { x.aceite = { em: Date.now(), email: em, nome: x.nome, cond: condRep(x), id: 'AC' + Date.now().toString(36).toUpperCase() }; x.aceiteOk = true; return { ok: true }; }
+    x.aceiteOk = !!(x.aceite && JSON.stringify(x.aceite.cond) === JSON.stringify(condRep(x)));
+    return { rep: { ...x }, empresa: UIp.empMock || null, simulador: UIp.simMock || null }; }
+  let t = null; try { t = await B.token(); } catch (e) { }
+  if (!t) throw new Error('Entre na sua conta de novo.');
+  let r; try { r = await fetch(URL_PARC, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify({ acao, ...(extra || {}) }) }); }
+  catch (e) { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.erro || 'Não deu certo agora. Tente de novo.'), { status: r.status });
+  return j; }
+async function carregarParceiro(silencioso) { try { UIp.parc = await parceiroServidor('meu'); UIp.parcOk = true; } catch (e) { if (e.status === 404) { UIp.parcOk = false; UIp.parc = null; } else { UIp.parcOk = UIp.parcOk || null; if (!silencioso) aviso(e.message); } }
+  if (TELA === 'perfil' || TELA === 'parceiro') render(); }
+function telaParceiro() { const P = UIp.parc; if (!P || !P.rep) return '<h2>Área do parceiro</h2><p class="lead">Carregando…</p>';
+  const x = P.rep, S = simDe(P.simulador), L = x.gruposLista || [], St = L.map(situacaoGrupoRep), M = Number(x.meses) || 0, R0 = mesRef();
+  const valor = L.reduce((t, g, i) => t + (St[i].conta ? Number(g.valorMes || 0) : 0), 0);
+  const termo = x.aceiteOk ? `<div class="panel" style="padding:14px;display:grid;gap:8px;border-color:#9fd3a8"><b style="font-size:18px">✅ Termo de parceria aceito</b><span class="sub">Você aceitou em ${dataHora(x.aceite.em)}. Registro ${escH(x.aceite.id || '')}.</span>
+      <div class="row" style="gap:8px"><button class="btn sm" data-sh="parc-ler">${UIp.parcLer ? 'Fechar termo' : 'Ler o termo'}</button><button class="btn sm" data-sh="parc-termo-pdf">📄 Baixar PDF</button></div>${UIp.parcLer ? `<div style="display:grid;gap:10px;margin-top:6px">${blocosHTML(termoBlocos(x, P.empresa, S))}</div>` : ''}</div>`
+    : `<div class="panel" style="padding:14px;display:grid;gap:10px;border-color:#F2C12E"><b style="font-size:18px">📝 Termo de parceria${x.aceite ? ' (atualizado)' : ''}</b>
+      <p class="sub" style="margin:0">${x.aceite ? 'As condições mudaram. Leia a versão nova e aceite de novo.' : 'Leia com calma. Ao aceitar aqui, vale como sua assinatura: o app registra a sua conta, a data e a hora.'}</p>
+      <div style="display:grid;gap:10px">${blocosHTML(termoBlocos(x, P.empresa, S))}</div>
+      <label class="row" style="gap:10px;align-items:flex-start"><input type="checkbox" id="parc-li" style="margin-top:4px"> <span>Li e aceito o termo de parceria do Pelota FC, código <b>${escH(x.codigo)}</b>.</span></label>
+      <button class="btn primary block" data-sh="parc-aceitar">Aceitar termo</button></div>`;
+  return `<h2>Área do parceiro</h2><p class="lead">Olá, ${escH(String(x.nome).split(' ')[0])}! Aqui ficam o seu código, os grupos que você trouxe e o seu termo.</p>
+  <div class="panel" style="padding:14px;display:grid;gap:6px"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b style="font-size:18px">Seu código</b><span class="num" style="font-size:16px;font-weight:800;letter-spacing:.06em;padding:4px 10px;border-radius:6px;background:var(--surface2,#e3e9df)">${escH(x.codigo)}</span></div>
+    <span class="small">${pctBR(x.pct)} da assinatura, ${M ? `por até ${M} ${M === 1 ? 'mês' : 'meses'} de cada grupo` : 'enquanto o grupo for assinante'} · ${rsBR(contaSim(S, Number(x.pct)).c)} por grupo por mês</span>
+    <span class="sub">Pagamento todo dia ${x.dia || 10}, por Pix.</span>
+    <button class="btn primary" style="margin-top:6px" data-sh="parc-qr">QR Code e pôster para divulgar</button></div>
+  ${termo}
+  <div class="panel" style="padding:14px;display:grid;gap:8px"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b style="font-size:18px">Seus grupos</b><span class="sub">${R0.nome}</span></div>
+    ${L.length ? L.map((g, i) => `<div style="display:grid;gap:2px;padding:8px 0;border-top:1px solid var(--line)"><b>${escH(g.nome)}</b><span class="sub">${escH([g.cidade, g.uf].filter(Boolean).join('/') || 'Sem cidade')}</span><span class="small">${escH(St[i].txt)}</span></div>`).join('') : '<p class="sub" style="margin:0">Nenhum grupo ainda. Quem ler o seu QR Code e criar uma pelada aparece aqui.</p>'}
+    <div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px;border-top:1px solid var(--line);padding-top:8px"><b>Valor do mês</b><b class="num">${rsBR(valor)}</b></div>
+    <span class="sub">Regra: a comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra.</span>
+    <button class="btn sm" style="justify-self:start" data-sh="parc-rel-pdf">📄 Relatório do mês (PDF)</button></div>
+  <form id="f-parc" class="panel stack" style="padding:14px"><b style="font-size:18px">Onde você recebe</b>
+    <label class="field" style="margin:0"><span>Chave Pix</span><input type="text" id="pc-pix" value="${escH(x.pix || '')}" autocomplete="off" placeholder="CPF, e-mail, telefone ou chave aleatória"></label>
+    <label class="field" style="margin:0"><span>WhatsApp com DDD</span><input type="tel" id="pc-whats" inputmode="tel" value="${escH(foneBR(x.whats || ''))}" placeholder="(81) 9 9999-9999"></label>
+    <button class="btn" type="submit">Salvar</button></form>`; }
 async function carregarReps() { const R = UIp.reps = UIp.reps || {}; R.carregando = true; R.erro = null; if (TELA === 'donoreps') render();
   try { const j = MOCK ? { reps: (UIp.repsMock = UIp.repsMock || [{ id: 'r1', nome: 'João Representante', codigo: 'JOAO10', pct: 10, meses: 12, pix: 'joao@exemplo.com', whats: '81999990000', obs: 'Zona Norte do Recife', ativo: true, grupos: 2, gruposLista: [{ nome: 'Pelada do Sábado', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 80 * 864e5, assina: true, valorMes: 1.69 }, { nome: 'Racha da Quinta', cidade: 'Olinda', uf: 'PE', criadoEm: Date.now() - 70 * 864e5, assina: true, repEncerradoEm: Date.now() - 12 * 864e5 }, { nome: 'Fut da Firma', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 5 * 864e5, assina: null }] }]).slice(), simulador: UIp.simMock || null, empresa: UIp.empMock || null } : await notasServidor('reps');
+    if (MOCK) j.reps.forEach(r => { r.aceiteOk = !!(r.aceite && JSON.stringify(r.aceite.cond) === JSON.stringify(condRep(r))); });
     R.lista = j.reps; R.simSalvo = j.simulador || null; R.empresa = j.empresa || null;
     if (R.simSalvo && !UIp.simMexido) { const f = v => String(v).replace('.', ','); UIp.sim = { ...(UIp.sim || SIM0), preco: f(R.simSalvo.preco.toFixed(2)), loja: f(R.simSalvo.loja), imp: f(R.simSalvo.imp), regime: R.simSalvo.regime }; } } catch (e) { R.erro = e.message; }
   R.carregando = false; if (TELA === 'donoreps') render(); }
@@ -1075,12 +1133,22 @@ document.addEventListener('click', async e => {
   if (a === 'sim-salvar') { const S = UIp.sim, d = { preco: numBR(S.preco), loja: numBR(S.loja), imp: numBR(S.imp), regime: S.regime || 'simples' };
     if (!(d.preco > 0) || !(d.loja >= 0 && d.loja <= 100) || !(d.imp >= 0 && d.imp <= 100)) { aviso('Confira os números.'); return; }
     b.disabled = true; try { if (MOCK) UIp.simMock = { ...d, em: Date.now() }; else await notasServidor('sim-salvar', d); UIp.simMexido = false; aviso('Valores salvos.'); await carregarReps(); } catch (err) { aviso(err.message); b.disabled = false; } }
+  if (a === 'parceiro') { ir('parceiro'); carregarParceiro(); }
+  if (a === 'parc-ler') { UIp.parcLer = !UIp.parcLer; render(); }
+  if (a === 'parc-qr') { UIp.repqr = '_meu'; UIp.repFmt = UIp.repFmt || 'a6'; ir('donorepqr'); await (document.fonts ? document.fonts.ready : null); const x = repDoQr(), im = $('rep-cartao'); if (x && im) { try { UIp.repCv = UIp.repFmt === 'a3' ? await posterGrande(x) : UIp.repFmt === 'a4' ? posterRep(x) : cartaoRep(x); im.src = UIp.repCv.toDataURL('image/jpeg', .85); } catch (err) { aviso('Não consegui montar a arte. Tente de novo.'); } const gm = $('rep-gerando'); if (gm) gm.remove(); } }
+  if (a === 'parc-aceitar') { if (!$('parc-li') || !$('parc-li').checked) { aviso('Marque "Li e aceito" para continuar.'); return; }
+    b.disabled = true; try { await parceiroServidor('aceitar', { cond: condRep(UIp.parc.rep) }); aviso('Termo aceito. Obrigado!'); await carregarParceiro(); } catch (err) { aviso(err.message); b.disabled = false; } }
+  if (a === 'parc-termo-pdf' || a === 'parc-rel-pdf') { const P = UIp.parc; if (!P || !P.rep) return; b.disabled = true;
+    try { await (document.fonts ? document.fonts.ready : null); const termo = a === 'parc-termo-pdf', x = P.rep;
+      const pags = termo ? termoRep(x, P.empresa, simDe(P.simulador)) : relatorioRepPDF(x, P.empresa);
+      await enviarPDF(pdfPaginas(pags, 595.28, 841.89), `PelotaFC_${termo ? 'termo_parceria' : 'relatorio_' + mesRef().id}_${x.codigo}.pdf`, termo ? 'Termo de parceria Pelota FC' : 'Relatório Pelota FC'); } catch (err) { aviso('Não consegui gerar o PDF. Tente de novo.'); }
+    b.disabled = false; }
   if (a === 'empresa-salvar') { const d = { nome: ($('e-nome').value || '').trim(), cnpj: ($('e-cnpj').value || '').replace(/\D/g, ''), cidade: ($('e-cidade').value || '').trim() };
     if (!d.nome) { aviso('Coloque a razão social.'); return; } if (d.cnpj && d.cnpj.length !== 14) { aviso('CNPJ incompleto.'); return; }
     b.disabled = true; try { if (MOCK) UIp.empMock = { ...d, em: Date.now() }; else await notasServidor('empresa-salvar', d); aviso('Dados da empresa salvos.'); await carregarReps(); } catch (err) { aviso(err.message); b.disabled = false; } }
   if (a === 'rep-termo' || a === 'rep-relpdf') { const x = ((UIp.reps || {}).lista || []).find(r => r.id === v); if (!x) return;
     if (!(UIp.reps || {}).empresa) { aviso('Antes, preencha os dados da empresa (logo acima).'); return; }
-    b.disabled = true; try { await (document.fonts ? document.fonts.ready : null); const termo = a === 'rep-termo', pags = termo ? termoRep(x) : relatorioRepPDF(x);
+    b.disabled = true; try { await (document.fonts ? document.fonts.ready : null); const termo = a === 'rep-termo', pags = termo ? termoRep(x, UIp.reps.empresa, UIp.sim || SIM0) : relatorioRepPDF(x, UIp.reps.empresa);
       const nome = `PelotaFC_${termo ? 'termo_parceria' : 'relatorio_' + mesRef().id}_${x.codigo}.pdf`;
       await enviarPDF(pdfPaginas(pags, 595.28, 841.89), nome, termo ? `Termo de parceria Pelota FC · ${x.nome}` : `Relatório Pelota FC · ${x.nome}`); } catch (err) { aviso('Não consegui gerar o PDF. Tente de novo.'); }
     b.disabled = false; }
@@ -1137,7 +1205,7 @@ document.addEventListener('submit', async e => {
   if (f.id === 'f-login') { if (!val('l-email') || !val('l-senha')) { aviso('Preencha e-mail e senha.'); return; } OCUPADO = true; try { await B.login(val('l-email'), $('l-senha').value); } catch (err) { aviso(msgErro(err)); } OCUPADO = false; }
   if (f.id === 'f-criar') { if (!val('c-nome2') || !val('c-email') || !$('c-senha').value) { aviso('Preencha nome, e-mail e senha.'); return; } OCUPADO = true; try { await B.cadastrar(val('c-nome2'), val('c-email'), $('c-senha').value); } catch (err) { aviso(msgErro(err)); } OCUPADO = false; }
   if (f.id === 'f-rep') { const nome = val('r-nome'), codigo = (val('r-codigo') || nome.split(' ')[0] + numBR(val('r-pct'))).toUpperCase().normalize('NFD').replace(/[^A-Z0-9]/g, '');
-    const dados = { id: f.dataset.id || '', nome, codigo, pct: numBR(val('r-pct')), meses: Number(val('r-meses') || 0), pix: val('r-pix'), doc: val('r-doc').replace(/\D/g, ''), dia: Number(($('r-dia') || {}).value || 10), whats: val('r-whats').replace(/\D/g, ''), contato: '', obs: val('r-obs'), ativo: $('r-ativo').checked };
+    const dados = { id: f.dataset.id || '', nome, codigo, pct: numBR(val('r-pct')), meses: Number(val('r-meses') || 0), pix: val('r-pix'), email: val('r-email').toLowerCase(), doc: val('r-doc').replace(/\D/g, ''), dia: Number(($('r-dia') || {}).value || 10), whats: val('r-whats').replace(/\D/g, ''), contato: '', obs: val('r-obs'), ativo: $('r-ativo').checked };
     if (!nome) { aviso('Coloque o nome.'); return; } if (codigo.length < 4) { aviso('O código precisa de pelo menos 4 letras ou números.'); return; }
     if (dados.doc && dados.doc.length !== 11 && dados.doc.length !== 14) { aviso('CPF ou CNPJ incompleto.'); return; }
     if (dados.whats && (dados.whats.length < 10 || dados.whats.length > 13)) { aviso('Confira o WhatsApp: DDD e número.'); return; }
@@ -1146,8 +1214,10 @@ document.addEventListener('submit', async e => {
     try { if (MOCK) { const M = UIp.repsMock; if (M.some(x => x.codigo === codigo && x.id !== dados.id)) throw new Error('Esse código já é de outro representante.');
         const i = M.findIndex(x => x.id === dados.id); if (i >= 0) M[i] = { ...M[i], ...dados }; else M.push({ ...dados, id: 'r' + Date.now(), grupos: 0 }); }
       else await notasServidor('rep-salvar', dados);
-      UIp.reps.editar = null; aviso('Representante salvo.'); await carregarReps(); } catch (err) { aviso(err.message); }
+      UIp.reps.editar = null; UIp.parcOk = undefined; aviso('Representante salvo.'); await carregarReps(); } catch (err) { aviso(err.message); }
     OCUPADO = false; return; }
+  if (f.id === 'f-parc') { const whats = val('pc-whats').replace(/\D/g, ''); if (whats && (whats.length < 10 || whats.length > 13)) { aviso('Confira o WhatsApp: DDD e número.'); return; }
+    OCUPADO = true; try { await parceiroServidor('dados', { pix: val('pc-pix'), whats }); aviso('Dados salvos.'); await carregarParceiro(); } catch (err) { aviso(err.message); } OCUPADO = false; return; }
   if (f.id === 'f-tomador') { const doc = val('t-doc').replace(/\D/g, '');
     if (!val('t-nome')) { aviso('Coloque o nome completo.'); return; } if (doc.length !== 11 && doc.length !== 14) { aviso('CPF ou CNPJ incompleto.'); return; }
     OCUPADO = true; try { await notasServidor('tomador', { gid: f.dataset.gid, nome: val('t-nome'), doc, email: val('t-email') }); aviso('Dados salvos.'); OCUPADO = false; carregarNotas(); } catch (err) { OCUPADO = false; aviso(err.message); } return; }
