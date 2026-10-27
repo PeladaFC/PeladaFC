@@ -279,7 +279,9 @@ module.exports = (db, PAG) => {
         const igual = await col.where('codigo', '==', codigo).get();
         if (igual.docs.some(d => d.id !== id)) return res.status(409).json({ erro: 'Esse código já é de outro representante.' });
         const dados = { nome, codigo, pct, meses, contato: String(b.contato || '').trim().slice(0, 120), obs: String(b.obs || '').trim().slice(0, 300), ativo: b.ativo !== false, atualizadoEm: Date.now() };
-        if (id) { if (!(await col.doc(id).get()).exists) return res.status(404).json({ erro: 'Representante não encontrado.' }); await col.doc(id).set(dados, { merge: true }); return res.json({ ok: true, id }); }
+        if (id) { const atual = await col.doc(id).get(); if (!atual.exists) return res.status(404).json({ erro: 'Representante não encontrado.' });
+          dados.codigo = atual.get('codigo') || codigo; // o código não muda: QR Codes impressos continuam valendo
+          await col.doc(id).set(dados, { merge: true }); return res.json({ ok: true, id }); }
         const ref = await col.add({ ...dados, criadoEm: Date.now() }); return res.json({ ok: true, id: ref.id });
       }
       if (b.acao === 'tomador') {
