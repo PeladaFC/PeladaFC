@@ -258,7 +258,10 @@ module.exports = (db, PAG) => {
         const q = await db.collection('servidor/plataforma/representantes').get();
         const gq = await db.collection('grupos').where('rep', '>', '').select('rep', 'nome', 'criadoEm').get(), por = {}, lista = {};
         for (const d of gq.docs) { const c = d.get('rep'); if (!c) continue; por[c] = (por[c] || 0) + 1;
-          const cfg = (await ler(`grupos/${d.id}/config/geral`)) || {}; (lista[c] = lista[c] || []).push({ nome: d.get('nome') || cfg.nome || 'Pelada', cidade: cfg.cidade || '', uf: cfg.uf || '', criadoEm: d.get('criadoEm') || null }); }
+          // fase 2: o servidor grava em segredos/assinatura (o organizador não mexe): ativa, repEncerradoEm (quando cancelou: a comissão acaba de vez) e repValorMes
+          const [cfg, ass] = await Promise.all([ler(`grupos/${d.id}/config/geral`), ler(`grupos/${d.id}/segredos/assinatura`)]), C = cfg || {}, A = ass || {};
+          (lista[c] = lista[c] || []).push({ nome: d.get('nome') || C.nome || 'Pelada', cidade: C.cidade || '', uf: C.uf || '', criadoEm: d.get('criadoEm') || null,
+            assina: ass ? !!A.ativa : null, repEncerradoEm: A.repEncerradoEm || null, valorMes: A.repValorMes || 0 }); }
         const plat = (await ler('servidor/plataforma')) || {};
         return res.json({ simulador: plat.simulador || null, reps: q.docs.map(d => ({ id: d.id, ...d.data(), grupos: por[d.get('codigo')] || 0, gruposLista: lista[d.get('codigo')] || [] })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
       }
