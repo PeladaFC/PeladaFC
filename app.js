@@ -216,7 +216,7 @@ function render() {
     <div class="ob-div">ou</div>
     <button class="btn block ob-google" data-sh="google">Continuar com o Google</button>
     <p class="sub" style="text-align:center;margin:0">Ao criar a conta, você aceita os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>`;
-  if (t === 'perfil' && EU && UIp.notasOk === undefined) { UIp.notasOk = null; notasServidor('acesso').then(() => { UIp.notasOk = true; if (TELA === 'perfil') render(); }, () => { UIp.notasOk = false; }); }
+  if (t === 'perfil' && EU && UIp.notasOk === undefined) { UIp.notasOk = null; notasServidor('acesso').then(() => { UIp.notasOk = true; if (TELA === 'perfil') render(); }, e => { UIp.notasOk = e && e.status === 403 ? false : undefined; }); }
   if (t === 'perfil') { const p = PERFIL || {}; const pos = UIp.pos || p.pos || 'MEI'; const pronto = !!(p.apelido || p.pos);
     h = (pronto ? topo('minhas') : '') + `<h2>${pronto ? 'Meu perfil' : 'Seu perfil de jogador'}</h2><p class="lead">É assim que a galera vai te ver.</p>
     <form id="f-perfil" class="stack" novalidate>
@@ -229,10 +229,11 @@ function render() {
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
       <button class="btn primary block" type="submit">Salvar</button></form>
-    ${EU && UIp.notasOk ? `<button class="btn block" data-sh="notas">Notas fiscais da comissão</button>` : ''}
+    ${EU && UIp.notasOk ? `<button class="btn block primary" data-sh="dono">Painel do dono</button>` : ''}
     ${EU ? `<button class="btn block" data-sh="sair">Sair da conta</button>${EU.email ? `<p class="sub" style="text-align:center">Você entrou como: <b>${escH(EU.email)}</b></p>` : ''}
       <p class="sub" style="text-align:center;margin:0"><a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
       <button class="btn sm" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
+  if (t === 'dono') h = topo('perfil') + abasDono('dono') + telaDono();
   if (t === 'notas') { const N = UIp.nf || {}, [ano, mm] = (N.mes || '2026-01').split('-'), D = N.dados, L = (D && D.linhas) || [];
     const rs = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fdoc = d => d && d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d && d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : '';
@@ -259,7 +260,7 @@ function render() {
         ${l.doc ? '' : '<div class="banner" style="margin:0">O Mercado Pago não informou o CPF deste organizador. Peça a ele e preencha para emitir a nota.</div>'}
         ${situacao(l)}
         <div class="row" style="gap:8px;flex-wrap:wrap">${l.nota && l.nota.status === 'ok' ? `<button class="btn sm primary" data-sh="nf-pdf" data-v="${escH(l.gid)}">Baixar PDF</button>` : l.doc ? `<button class="btn sm" data-sh="nf-copiar" data-v="${i}">Copiar dados da nota</button>` : ''}<button class="btn sm" data-sh="nf-editar" data-v="${escH(l.gid)}">${l.doc ? 'Corrigir dados' : 'Preencher dados'}</button></div></div>`;
-    h = topo('perfil') + `<h2>Notas fiscais</h2><p class="lead">Comissão de 1% dos Pix, separada por organizador. Uma nota para cada um, uma vez por mês.</p>
+    h = topo('perfil') + abasDono('notas') + `<h2>Notas fiscais</h2><p class="lead">Comissão de 1% dos Pix, separada por organizador. Uma nota para cada um, uma vez por mês.</p>
     <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:nowrap"><button class="btn sm" data-sh="nf-mes" data-v="-1" aria-label="Mês anterior">‹</button><b style="font-size:18px">${MESES[Number(mm) - 1]} de ${ano}</b><button class="btn sm" data-sh="nf-mes" data-v="1" aria-label="Próximo mês">›</button></div>
     ${N.carregando ? '<p class="lead">Somando as comissões…</p>' : N.erro ? `<div class="banner">${escH(N.erro)}</div>` : !L.length ? '<p class="sub">Nenhuma comissão neste mês. Não precisa emitir nota.</p>' : `
     ${auto}
@@ -311,6 +312,8 @@ function render() {
   if (t === 'nova') h = topo('minhas') + `<h2>Criar sua pelada</h2><p class="lead">Depois você ajusta tudo nos Ajustes.</p>
     <form id="f-nova" class="stack" novalidate>
       <label class="field"><span>Nome da pelada</span><input type="text" id="n-nome" placeholder="Pelada do Sábado" required></label>
+      <div class="grid2"><label class="field"><span>Cidade</span><input type="text" id="n-cidade" placeholder="Recife" autocomplete="address-level2"></label>
+      <label class="field"><span>Estado</span><select id="n-uf"><option value="">Escolha</option>${UFS.map(u => `<option>${u}</option>`).join('')}</select></label></div>
       <div class="field"><span>Tipo</span><div class="pick" id="n-tipo"><button type="button" data-sh="tipo-pel" data-v="fixa" aria-pressed="true">Fixa (toda semana)</button><button type="button" data-sh="tipo-pel" data-v="evento" aria-pressed="false">Evento livre</button></div>
         <p class="sub" id="n-tipo-txt" style="margin:4px 0 0">Tem mensalistas e diaristas, e acontece toda semana no mesmo dia.</p></div>
       <div class="grid2"><label class="field" id="n-dia-box"><span>Dia fixo</span><select id="n-dia">${DIASN.map((d, i) => `<option value="${i}" ${i === 6 ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
@@ -419,7 +422,7 @@ async function aceitarConvite() {
 async function criarGrupo(f) {
   if (OCUPADO) return; OCUPADO = true;
   const gid = novoId(), codigo = novoCodigo(), p = PERFIL || {}, now = Date.now();
-  const cfg = { nome: f.nome, dia: f.dia, hora: f.hora, horaFim: f.fim, golSorteio: false, local: '', times: f.times, porTime: f.por, mensal: f.evento ? 0 : f.mens, diaria: f.evento ? 0 : f.diaria, pix: '', restr: [], nivelPublico: false, evento: !!f.evento, dataEvento: f.data || null };
+  const cfg = { nome: f.nome, cidade: f.cidade || '', uf: f.uf || '', dia: f.dia, hora: f.hora, horaFim: f.fim, golSorteio: false, local: '', times: f.times, porTime: f.por, mensal: f.evento ? 0 : f.mens, diaria: f.evento ? 0 : f.diaria, pix: '', restr: [], nivelPublico: false, evento: !!f.evento, dataEvento: f.data || null };
   try {
     await B.batch([
       { op: 'set', path: 'grupos/' + gid, data: { nome: f.nome, dia: f.dia, hora: f.hora, evento: !!f.evento, data: f.data || null, dono: EU.uid, admins: [EU.uid], codigo, criadoEm: now } },
@@ -542,9 +545,54 @@ async function notasServidor(acao, extra) {
   let r; try { r = await fetch(URL_NOTAS, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify({ acao, ...(extra || {}) }) }); }
   catch (e) { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.erro || 'Não deu certo agora. Tente de novo.');
+  if (!r.ok) throw Object.assign(new Error(j.erro || 'Não deu certo agora. Tente de novo.'), { status: r.status });
   return j;
 }
+function abasDono(at) { return `<div class="pick" style="margin:6px 0 4px"><button type="button" data-sh="dono" aria-pressed="${at === 'dono'}">Visão geral</button><button type="button" data-sh="notas" aria-pressed="${at === 'notas'}">Notas fiscais</button></div>`; }
+const REG_ORDEM = ['Nordeste', 'Sudeste', 'Sul', 'Centro-Oeste', 'Norte', 'Sem cidade informada'];
+function telaDono() { const P = UIp.painel || {}, D = P.dados;
+  if (P.carregando && !D) return '<h2>Painel do dono</h2><p class="lead">Contando usuários, grupos e jogadores…</p>';
+  if (P.erro && !D) return `<h2>Painel do dono</h2><div class="banner">${escH(P.erro)}</div><button class="btn block" data-sh="dono-atualizar">Tentar de novo</button>`;
+  if (!D) return '<h2>Painel do dono</h2>';
+  const n = v => Number(v || 0).toLocaleString('pt-BR'), pl = (v, um, varios) => n(v) + ' ' + (Number(v) === 1 ? um : (varios || um + 's')), rs = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const T = D.totais, C = D.contas, [a, m] = D.mes.split('-');
+  const tile = (rot, val, sub) => `<div class="panel" style="padding:12px 14px;display:grid;gap:2px"><span class="sub">${rot}</span><b class="num" style="font-size:26px;line-height:1.1">${val}</b>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`;
+  const MET = { grupos: 'Grupos', jogadores: 'Jogadores', contas: 'Contas', pagantes: 'Pagantes' }, met = P.met || 'grupos';
+  const barras = (lista, ord) => { const L = ord ? lista.slice().sort((x, y) => ord.indexOf(x.nome) - ord.indexOf(y.nome)) : lista; const max = Math.max(1, ...L.map(r => r[met] || 0));
+    return L.length ? `<div style="display:grid;gap:10px">${L.map(r => `<div><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><span class="small"><b>${escH(r.nome)}</b></span><b class="num">${n(r[met])}</b></div>
+      <div style="height:12px;border-radius:6px;background:var(--surface2,#e3e9df);overflow:hidden;margin-top:4px"><div style="height:100%;width:${Math.round((r[met] || 0) / max * 100)}%;background:${r.nome === 'Sem cidade informada' ? '#9AA79E' : 'var(--pitch,#1B6A36)'};border-radius:6px"></div></div>
+      <div class="sub" style="margin-top:3px">${pl(r.grupos, 'grupo')} · ${pl(r.ativos, 'ativo')} · ${pl(r.jogadores, 'jogador', 'jogadores')} · ${pl(r.contas, 'conta')} · ${pl(r.pagantes, 'pagante')}</div></div>`).join('')}</div>` : '<p class="sub" style="margin:0">Nada ainda.</p>'; };
+  return `<h2>Painel do dono</h2><p class="lead">Como o app está sendo usado. Só você e a empresa veem esta tela.</p>
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+    ${tile('Contas criadas', n(C.total), `+${n(C.novas30)} nos últimos 30 dias`)}
+    ${tile('Contas ativas', n(C.ativas30), 'usaram nos últimos 30 dias')}
+    ${tile('Grupos', n(T.grupos), `${n(T.ativos)} com pelada nos últimos 30 dias`)}
+    ${tile('Jogadores no elenco', n(T.jogadores), `${n(T.membros)} entraram com conta`)}
+    ${tile('Grupos com Pix', n(T.comPix), 'Mercado Pago conectado')}
+    ${tile('Grupos pagantes', n(T.pagantes), `geraram comissão em ${MESES[Number(m) - 1].toLowerCase()}`)}
+    ${tile('Pix no mês', n(T.pixMes), rs(T.volumeMes) + ' movimentados')}
+    ${tile('Comissão no mês', rs(T.comissaoMes), '1% dos Pix aprovados')}
+  </div>
+  <p class="sub" style="margin:2px 0 0">"Pagantes" conta quem gerou comissão no Pix. Quando a assinatura Pro existir, ela entra aqui também.</p>
+  <div class="panel" style="padding:14px;display:grid;gap:12px"><b style="font-size:18px">Uso por região</b>
+    <div class="pick">${Object.entries(MET).map(([k, v]) => `<button type="button" data-sh="dono-met" data-v="${k}" aria-pressed="${met === k}">${v}</button>`).join('')}</div>
+    ${barras(D.regioes, REG_ORDEM)}
+    ${T.semCidade ? `<p class="sub" style="margin:0">${n(T.semCidade)} grupo${T.semCidade === 1 ? '' : 's'} sem cidade. O organizador preenche em Ajustes → Cidade e Estado.</p>` : ''}</div>
+  <div class="panel" style="padding:14px;display:grid;gap:12px"><b style="font-size:18px">Por estado</b>${barras(D.estados)}</div>
+  <div class="panel" style="padding:14px;display:grid;gap:8px"><b style="font-size:18px">Cidades</b>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left"><th style="padding:6px 4px">Cidade</th><th style="padding:6px 4px;text-align:right">Grupos</th><th style="padding:6px 4px;text-align:right">Jog.</th><th style="padding:6px 4px;text-align:right">Contas</th><th style="padding:6px 4px;text-align:right">Pag.</th></tr></thead>
+    <tbody>${D.cidades.length ? D.cidades.map(c => `<tr style="border-top:1px solid var(--line,#d2dbce)"><td style="padding:6px 4px">${escH(c.nome)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.grupos)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.jogadores)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.contas)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.pagantes)}</td></tr>`).join('') : '<tr><td colspan="5" class="sub" style="padding:6px 4px">Nenhuma cidade informada ainda.</td></tr>'}</tbody></table></div></div>
+  <p class="sub" style="text-align:center;margin:0">Atualizado às ${new Date(D.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${P.carregando ? ' · atualizando…' : ''}</p>
+  <button class="btn block" data-sh="dono-atualizar">Atualizar números</button>`; }
+async function carregarPainel() { const P = UIp.painel = UIp.painel || {}; P.carregando = true; P.erro = null; if (TELA === 'dono') render();
+  try { P.dados = MOCK ? painelMock() : await notasServidor('painel'); } catch (e) { P.erro = e.message; }
+  P.carregando = false; if (TELA === 'dono') render(); }
+function painelMock() { const r = (nome, grupos, ativos, jogadores, contas, pagantes) => ({ nome, grupos, ativos, jogadores, contas, pagantes, comissaoMes: pagantes * 9.4 });
+  return { em: Date.now(), mes: new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 7), contas: { total: 412, novas30: 58, ativas30: 296 },
+    totais: { grupos: 23, ativos: 19, jogadores: 486, membros: 351, comPix: 9, pagantes: 7, pixMes: 214, volumeMes: 5180.5, comissaoMes: 51.81, semCidade: 2 },
+    regioes: [r('Nordeste', 17, 15, 372, 268, 6), r('Sudeste', 3, 2, 61, 44, 1), r('Sul', 1, 1, 18, 12, 0), r('Sem cidade informada', 2, 1, 35, 27, 0)],
+    estados: [r('PE', 14, 12, 310, 221, 5), r('PB', 2, 2, 41, 30, 1), r('SP', 2, 1, 40, 29, 1), r('RN', 1, 1, 21, 17, 0), r('RJ', 1, 1, 21, 15, 0), r('RS', 1, 1, 18, 12, 0)],
+    cidades: [r('Recife · PE', 9, 8, 203, 146, 4), r('Olinda · PE', 3, 2, 62, 41, 1), r('Jaboatão dos Guararapes · PE', 2, 2, 45, 34, 0), r('João Pessoa · PB', 2, 2, 41, 30, 1), r('São Paulo · SP', 2, 1, 40, 29, 1), r('Natal · RN', 1, 1, 21, 17, 0), r('Rio de Janeiro · RJ', 1, 1, 21, 15, 0), r('Porto Alegre · RS', 1, 1, 18, 12, 0)] }; }
 function baixarPdf(r) { const b = atob(r.pdf), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
   const u = URL.createObjectURL(new Blob([u8], { type: 'application/pdf' })), el = document.createElement('a'); el.href = u; el.download = r.nome || 'nota.pdf'; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); }
 // notas da comissão do organizador (administrador do grupo aberto): 'listar' ou 'pdf' {mes}
@@ -692,6 +740,9 @@ document.addEventListener('click', async e => {
     $('n-dia-box').hidden = ev; $('n-fixa-box').hidden = ev;
     $('n-tipo-txt').textContent = ev ? 'Sem cobrança e sem dia fixo: o administrador marca cada pelada na data que quiser, e o grupo continua para os próximos eventos. Ninguém entra como mensalista nem diarista: quem confirma primeiro garante a vaga.' : 'Tem mensalistas e diaristas, e acontece toda semana no mesmo dia.'; }
   if (a === 'push-ativar') ativarPush();
+  if (a === 'dono') { ir('dono'); if (!UIp.painel || !UIp.painel.dados) carregarPainel(); }
+  if (a === 'dono-atualizar') carregarPainel();
+  if (a === 'dono-met') { UIp.painel.met = v; render(); }
   if (a === 'notas') { const d = new Date(Date.now() - 3 * 36e5); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); UIp.nf = { mes: d.toISOString().slice(0, 7) }; ir('notas'); carregarNotas(); }
   if (a === 'nf-mes') { const [y, m] = UIp.nf.mes.split('-').map(Number), d = new Date(Date.UTC(y, m - 1 + Number(v), 1)); UIp.nf.mes = d.toISOString().slice(0, 7); carregarNotas(); }
   if (a === 'nf-emitir') { b.disabled = true; b.textContent = 'Emitindo… (pode levar um minuto)'; try { const r = await notasServidor('emitir', { mes: UIp.nf.mes }); aviso(r.ok ? `${r.ok} nota${r.ok === 1 ? '' : 's'} emitida${r.ok === 1 ? '' : 's'}.` : 'Nenhuma nota nova emitida. Veja a situação de cada uma.'); } catch (err) { aviso(err.message); } carregarNotas(); }
@@ -739,9 +790,9 @@ document.addEventListener('submit', async e => {
     catch (err) { aviso(msgErro(err)); OCUPADO = false; }
     return;
   }
-  if (f.id === 'f-nova') { if (!val('n-nome')) { aviso('Dê um nome para a pelada.'); return; }
+  if (f.id === 'f-nova') { if (!val('n-nome')) { aviso('Dê um nome para a pelada.'); return; } if (!val('n-cidade') || !$('n-uf').value) { aviso('Diga a cidade e o estado da pelada.'); return; }
     const ev = UIp.tipoPel === 'evento', dataEv = null;
-    criarGrupo({ evento: ev, data: dataEv, nome: val('n-nome'), dia: ev ? null : Number($('n-dia').value), hora: $('n-hora').value || '08:00', fim: $('n-fim').value || '', times: Number($('n-times').value) || 2, por: Math.max(3, Math.min(11, Number($('n-por').value) || 5)), mens: Number($('n-mens').value) || 0, diaria: Number($('n-dia2').value) || 0 }); }
+    criarGrupo({ evento: ev, data: dataEv, nome: val('n-nome'), cidade: val('n-cidade'), uf: $('n-uf').value, dia: ev ? null : Number($('n-dia').value), hora: $('n-hora').value || '08:00', fim: $('n-fim').value || '', times: Number($('n-times').value) || 2, por: Math.max(3, Math.min(11, Number($('n-por').value) || 5)), mens: Number($('n-mens').value) || 0, diaria: Number($('n-dia2').value) || 0 }); }
   if (f.id === 'f-codigo') buscarCodigo(val('cod'));
 });
 
