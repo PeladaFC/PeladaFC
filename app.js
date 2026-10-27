@@ -639,8 +639,7 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
   const prazo = x => Number(x.meses) ? `por ${x.meses} ${Number(x.meses) === 1 ? 'mês' : 'meses'}` : 'enquanto o grupo pagar';
   const card = x => `<div class="panel" style="padding:12px 14px;display:grid;gap:4px;${x.ativo === false ? 'opacity:.6' : ''}"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b>${escH(x.nome)}</b><span class="num" style="flex:none;font-size:12px;font-weight:700;letter-spacing:.06em;padding:3px 8px;border-radius:6px;background:var(--surface2,#e3e9df)">${escH(x.codigo)}</span></div>
     <span class="small">${pctBR(x.pct)} da assinatura, ${prazo(x)}${x.ativo === false ? ' · <b>inativo</b>' : ''}</span>
-    <span class="sub">Por grupo assinante: ${rsBR(contaSim(S, Number(x.pct)).c)} por mês · Grupos trazidos: ${x.grupos || 0}${(x.gruposLista || []).length ? ` (${x.gruposLista.filter(g => g.ativo).length} ativo${x.gruposLista.filter(g => g.ativo).length === 1 ? '' : 's'})` : ''}</span>
-    <span class="sub">Só conta grupo ativo (pelada nos últimos 30 dias) e com assinatura paga no mês. Cada mês pago é uma parcela${Number(x.meses) ? ` (até ${x.meses}/${x.meses})` : ''}.</span>
+    <span class="sub">Por grupo assinante: ${rsBR(contaSim(S, Number(x.pct)).c)} por mês · Grupos trazidos: ${x.grupos || 0}</span>
     ${x.pix || x.contato ? `<div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><span class="sub" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pix: <b>${escH(x.pix || x.contato)}</b></span><button class="btn sm" style="flex:none" data-sh="rep-copiar-pix" data-v="${escH(x.id)}">Copiar Pix</button></div>` : ''}
     ${x.whats ? `<span class="sub">WhatsApp: ${escH(foneBR(x.whats))}</span>` : ''}${x.obs ? `<span class="sub">${escH(x.obs)}</span>` : ''}
     <div class="row" style="gap:8px;margin-top:4px"><button class="btn sm" data-sh="rep-editar" data-v="${escH(x.id)}">Editar</button><button class="btn sm" data-sh="rep-qr" data-v="${escH(x.id)}">QR Code e pôster</button>${x.whats ? `<button class="btn sm" data-sh="rep-relatorio" data-v="${escH(x.id)}">📲 Relatório no WhatsApp</button>` : ''}</div></div>`;
@@ -657,20 +656,12 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
   <div class="stack" style="gap:10px">${R.carregando && !R.lista ? '<p class="lead">Carregando…</p>' : L.length ? L.map(card).join('') : '<p class="sub">Nenhum representante ainda.</p>'}</div>
   <p class="sub" style="margin:0">Quem lê o QR Code do representante e cria uma pelada já fica ligado a ele (vale por 90 dias depois da leitura). O cálculo automático do que pagar chega na fase 2, junto com a assinatura nas lojas.</p>`; }
 const foneBR = d => { d = String(d || '').replace(/\D/g, ''); if (d.length > 11 && d.startsWith('55')) d = d.slice(2); return d.length === 11 ? `(${d.slice(0, 2)}) ${d[2]} ${d.slice(3, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d; };
-function situacaoGrupoRep(g, x) { const M = Number(x.meses) || 0, n = g.parcela;
-  if (!g.ativo) return { conta: false, txt: '⏸️ parado (sem pelada há mais de 30 dias) · não conta este mês' };
-  if (!g.assinaMes) return { conta: false, txt: '✅ ativo · ainda não assina o Pro' };
-  if (M && n > M) return { conta: false, txt: `✅ ativo · prazo encerrado (${M}/${M} já pagas)` };
-  return { conta: true, txt: `✅ ativo · parcela ${n || 1}${M ? '/' + M : ''} · ${rsBR(g.valorMes || 0)}` }; }
 function relatorioRep(x) { const hoje = new Date(Date.now() - 3 * 36e5), mes = MESES[hoje.getUTCMonth()].toLowerCase() + ' de ' + hoje.getUTCFullYear();
-  const L = x.gruposLista || [], S = L.map(g => situacaoGrupoRep(g, x)), contam = S.filter(s => s.conta).length, ativos = L.filter(g => g.ativo).length;
-  const valor = L.reduce((t, g, i) => t + (S[i].conta ? Number(g.valorMes || 0) : 0), 0), M = Number(x.meses) || 0;
-  const prazo = M ? `por ${M} ${M === 1 ? 'mês' : 'meses'} de cada grupo (parcelas 1/${M} até ${M}/${M})` : 'enquanto o grupo for assinante';
+  const L = x.gruposLista || [], pag = Number(x.pagantes || 0), valor = Number(x.aReceber || 0), prazo = Number(x.meses) ? `por ${x.meses} ${Number(x.meses) === 1 ? 'mês' : 'meses'} de cada grupo` : 'enquanto o grupo for assinante';
   return [`*Pelota FC · Relatório do parceiro*`, `Olá, ${String(x.nome).split(' ')[0]}!`, '', `Mês: ${mes}`, `Seu código: ${x.codigo}`, `Sua comissão: ${pctBR(x.pct)} da assinatura, ${prazo}`, '',
-    `*Grupos que você trouxe: ${L.length || x.grupos || 0}* (${ativos} ativo${ativos === 1 ? '' : 's'})`, ...L.slice(0, 30).map((g, i) => `• ${g.nome}${g.cidade ? ` (${g.cidade}${g.uf ? '/' + g.uf : ''})` : ''}\n   ${S[i].txt}`), ...(L.length > 30 ? [`• e mais ${L.length - 30}`] : []), '',
-    `Grupos que contam neste mês: ${contam}`, `*Valor a receber: ${rsBR(valor)}*`, '',
-    '_Regra: só entra na comissão o grupo *ativo* (com pelada nos últimos 30 dias) e com a assinatura Pro paga no mês. Cada mês pago conta como uma parcela, até o limite combinado._',
-    ...(L.some(g => g.assinaMes != null) ? ['', 'O pagamento é feito por Pix na chave cadastrada.'] : ['', 'A assinatura Pro começa quando o app chegar às lojas. A partir daí, este relatório mostra o valor de cada mês.'])].join('\n'); }
+    `*Grupos que você trouxe: ${L.length || x.grupos || 0}*`, ...L.slice(0, 30).map(g => `• ${g.nome}${g.cidade ? ` (${g.cidade}${g.uf ? '/' + g.uf : ''})` : ''}`), ...(L.length > 30 ? [`• e mais ${L.length - 30}`] : []), '',
+    `Grupos assinantes neste mês: ${pag}`, `*Valor a receber: ${rsBR(valor)}*`, '',
+    x.aReceber == null ? 'A assinatura Pro começa quando o app chegar às lojas. A partir daí, este relatório mostra o valor de cada mês.' : 'O pagamento é feito por Pix na chave cadastrada.'].join('\n'); }
 const linkRep = c => c ? LINK_APP + '?rep=' + encodeURIComponent(c) : LINK_APP;
 const repDoQr = () => UIp.repqr === '_geral' ? { id: '_geral', nome: '', codigo: '' } : ((UIp.reps || {}).lista || []).find(r => r.id === UIp.repqr);
 function desenhaQR(g, texto, x, y, lado) { const q = window.qrcode(0, 'M'); q.addData(texto); q.make(); const n = q.getModuleCount(), cel = Math.floor(lado / (n + 4)), tam = cel * (n + 4), ox = x + (lado - tam) / 2, oy = y + (lado - tam) / 2;
@@ -791,7 +782,7 @@ function cartaoRep(x) { // cartão para imprimir: 1240 x 1748 px (A6 em 300 dpi)
   g.fillStyle = '#F2C12E'; g.fillRect(0, H - 40, W * .64, 40); g.fillStyle = '#F0662A'; g.fillRect(W * .64, H - 40, W * .36, 40);
   return cv; }
 async function carregarReps() { const R = UIp.reps = UIp.reps || {}; R.carregando = true; R.erro = null; if (TELA === 'donoreps') render();
-  try { const j = MOCK ? { reps: (UIp.repsMock = UIp.repsMock || [{ id: 'r1', nome: 'João Representante', codigo: 'JOAO10', pct: 10, meses: 12, pix: 'joao@exemplo.com', whats: '81999990000', obs: 'Zona Norte do Recife', ativo: true, grupos: 2, gruposLista: [{ nome: 'Pelada do Sábado', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 80 * 864e5, ativo: true, assinaMes: true, parcela: 2, valorMes: 1.69 }, { nome: 'Racha da Quinta', cidade: 'Olinda', uf: 'PE', criadoEm: Date.now() - 50 * 864e5, ativo: false, assinaMes: true, parcela: 1, valorMes: 1.69 }, { nome: 'Fut da Firma', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 5 * 864e5, ativo: true, assinaMes: false }] }]).slice(), simulador: UIp.simMock || null } : await notasServidor('reps');
+  try { const j = MOCK ? { reps: (UIp.repsMock = UIp.repsMock || [{ id: 'r1', nome: 'João Representante', codigo: 'JOAO10', pct: 10, meses: 12, pix: 'joao@exemplo.com', whats: '81999990000', obs: 'Zona Norte do Recife', ativo: true, grupos: 2, gruposLista: [{ nome: 'Pelada do Sábado', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 20 * 864e5 }, { nome: 'Racha da Quinta', cidade: 'Olinda', uf: 'PE', criadoEm: Date.now() - 5 * 864e5 }] }]).slice(), simulador: UIp.simMock || null } : await notasServidor('reps');
     R.lista = j.reps; R.simSalvo = j.simulador || null;
     if (R.simSalvo && !UIp.simMexido) { const f = v => String(v).replace('.', ','); UIp.sim = { ...(UIp.sim || SIM0), preco: f(R.simSalvo.preco.toFixed(2)), loja: f(R.simSalvo.loja), imp: f(R.simSalvo.imp), regime: R.simSalvo.regime }; } } catch (e) { R.erro = e.message; }
   R.carregando = false; if (TELA === 'donoreps') render(); }

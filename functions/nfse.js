@@ -256,12 +256,9 @@ module.exports = (db, PAG) => {
       // representantes: cadastro do dono (comissão e prazo editáveis). Os grupos ligam na fase 2, pelo código da loja.
       if (b.acao === 'reps') {
         const q = await db.collection('servidor/plataforma/representantes').get();
-        const gq = await db.collection('grupos').where('rep', '>', '').select('rep', 'nome', 'criadoEm', 'repParcela', 'assinaMes', 'repValorMes').get(), por = {}, lista = {};
+        const gq = await db.collection('grupos').where('rep', '>', '').select('rep', 'nome', 'criadoEm').get(), por = {}, lista = {};
         for (const d of gq.docs) { const c = d.get('rep'); if (!c) continue; por[c] = (por[c] || 0) + 1;
-          const [cfg, ultS] = await Promise.all([ler(`grupos/${d.id}/config/geral`), d.ref.collection('peladas').orderBy('data', 'desc').limit(1).select('data').get()]);
-          const ultima = ultS.empty ? null : String(ultS.docs[0].get('data') || '') || null, desde = diaRecife(Date.now() - 30 * 864e5);
-          // fase 2: parcela = quantas mensalidades da assinatura já contaram para o parceiro; assinaMes = pagou a assinatura neste mês
-          (lista[c] = lista[c] || []).push({ nome: d.get('nome') || (cfg || {}).nome || 'Pelada', cidade: (cfg || {}).cidade || '', uf: (cfg || {}).uf || '', criadoEm: d.get('criadoEm') || null, ultima, ativo: !!ultima && ultima >= desde, parcela: d.get('repParcela') ?? null, assinaMes: d.get('assinaMes') ?? null, valorMes: d.get('repValorMes') ?? null }); }
+          const cfg = (await ler(`grupos/${d.id}/config/geral`)) || {}; (lista[c] = lista[c] || []).push({ nome: d.get('nome') || cfg.nome || 'Pelada', cidade: cfg.cidade || '', uf: cfg.uf || '', criadoEm: d.get('criadoEm') || null }); }
         const plat = (await ler('servidor/plataforma')) || {};
         return res.json({ simulador: plat.simulador || null, reps: q.docs.map(d => ({ id: d.id, ...d.data(), grupos: por[d.get('codigo')] || 0, gruposLista: lista[d.get('codigo')] || [] })).sort((x, y) => (y.ativo ? 1 : 0) - (x.ativo ? 1 : 0) || String(x.nome).localeCompare(String(y.nome))) });
       }
