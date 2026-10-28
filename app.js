@@ -598,7 +598,7 @@ function telaGruposDono() { const P = UIp.painel || {}, D = P.dados;
   <div class="row" style="gap:8px;flex-wrap:nowrap"><label class="field" style="flex:1;min-width:0;margin:0"><input type="search" data-gf="q" value="${escH(F.q)}" placeholder="Nome, cidade ou código" aria-label="Procurar grupo"></label><button class="btn sm" data-sh="dono-qr" aria-label="Ler QR Code do grupo">📷 QR</button></div>
   <div class="pick">${[['todos', 'Todos'], ['ativos', 'Ativos'], ['parados', 'Parados']].map(([v, t]) => `<button type="button" data-sh="gf-sit" data-v="${v}" aria-pressed="${F.sit === v}">${t}</button>`).join('')}</div>
   <details class="panel" style="padding:10px 14px" ${UIp.gfAberto ? 'open' : ''}><summary data-sh="gf-abrir"><b>Mais filtros</b></summary>
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px">
+    <div class="par" style="margin-top:10px">
     ${sel('uf', 'Estado', [['', 'Todos'], ...ufs.map(u => [u, u])])}
     ${sel('cidade', 'Cidade', [['', 'Todas'], ...cids.map(c => [c, c])])}
     ${sel('pix', 'Pix', [['', 'Todos'], ['sim', 'Com Pix'], ['nao', 'Sem Pix']])}
@@ -607,7 +607,7 @@ function telaGruposDono() { const P = UIp.painel || {}, D = P.dados;
     ${sel('dia', 'Dia da pelada', [['', 'Todos'], ...DIAS_CURTO.map((d, i) => [String(i), d])])}
     </div></details>
   <div class="row" style="gap:8px;flex-wrap:nowrap;align-items:flex-end">${sel('ord', 'Ordenar por', [['recente', 'Mais novos'], ['antigo', 'Mais antigos'], ['ultima', 'Pelada mais recente'], ['jogadores', 'Mais jogadores'], ['comissao', 'Mais comissão'], ['nome', 'Nome (A–Z)']])}
-    <button class="btn sm" data-sh="gf-limpar" style="flex:none">Limpar filtros</button></div>
+    <button class="btn" data-sh="gf-limpar" style="flex:none;min-height:42px">Limpar filtros</button></div>
   <div id="gf-lista" class="stack" style="gap:10px">${listaGruposHTML()}</div>`; }
 /* representantes + simulador do líquido (fase 1: só cadastro; os grupos ligam na fase 2 pelo código da loja) */
 const SIM0 = { preco: '19,90', loja: '15', imp: '6', com: '10', regime: 'simples' };
@@ -629,26 +629,26 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
     <label class="field" style="margin:0"><span>Nome</span><input type="text" id="r-nome" value="${escH(e.nome || '')}" placeholder="Nome do representante" required></label>
     <label class="field" style="margin:0"><span>Código do representante</span><input type="text" id="r-codigo" value="${escH(e.codigo || '')}" placeholder="Ex.: JOAO10" autocapitalize="characters" maxlength="16" ${e.id ? 'readonly style="opacity:.7"' : ''}></label>${e.id ? '<p class="sub" style="margin:-4px 0 0">O código não muda depois de criado, para os QR Codes já impressos continuarem valendo.</p>' : ''}
     <p class="sub" style="margin:-4px 0 0">Só letras e números. Na fase 2 vira o código de oferta na Apple e no Google, e é por ele que o app sabe quais grupos esse representante trouxe.</p>
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+    <div class="par">
       <label class="field" style="margin:0"><span>Comissão (%)</span><input type="text" inputmode="decimal" id="r-pct" value="${escH(String(e.pct ?? '').replace('.', ','))}"></label>
       <label class="field" style="margin:0"><span>Por quantos meses</span><input type="number" inputmode="numeric" min="0" max="120" id="r-meses" value="${escH(String(e.meses ?? 0))}"></label></div>
     <p class="sub" style="margin:-4px 0 0">A % só você vê: no termo e na área do parceiro aparece só o valor em reais por grupo. Mudou a % ou o prazo? Só vale para os grupos que pagarem a primeira vez depois da mudança. Prazo contado a partir da 1ª mensalidade de cada grupo. Coloque 0 para pagar enquanto o grupo for assinante.</p>
-    <label class="field" style="margin:0"><span>E-mail da conta do parceiro no app (opcional)</span><input type="email" id="r-email" inputmode="email" autocomplete="off" value="${escH(e.email || '')}" placeholder="O mesmo e-mail que ele usa para entrar no Pelota FC"></label>
+    <label class="field" style="margin:0"><span>E-mail da conta dele no app <i class="opc">opcional</i></span><input type="email" id="r-email" inputmode="email" autocomplete="off" value="${escH(e.email || '')}" placeholder="O mesmo e-mail que ele usa para entrar no Pelota FC"></label>
     <p class="sub" style="margin:-4px 0 0">Com o e-mail, ele ganha a Área do parceiro no perfil dele: vê os grupos, baixa o QR Code e aceita o termo dentro do app.</p>
-    <label class="field" style="margin:0"><span>Chave Pix (opcional)</span><input type="text" id="r-pix" value="${escH(e.pix || e.contato || '')}" placeholder="CPF, e-mail, telefone ou chave aleatória" autocomplete="off"></label>
-    <label class="field" style="margin:0"><span>WhatsApp com DDD (opcional)</span><input type="tel" id="r-whats" inputmode="tel" value="${escH(foneBR(e.whats || ''))}" placeholder="(81) 9 9999-9999"></label>
+    <label class="field" style="margin:0"><span>Chave Pix <i class="opc">opcional</i></span><input type="text" id="r-pix" value="${escH(e.pix || e.contato || '')}" placeholder="CPF, e-mail, telefone ou chave aleatória" autocomplete="off"></label>
+    <label class="field" style="margin:0"><span>WhatsApp com DDD <i class="opc">opcional</i></span><input type="tel" id="r-whats" inputmode="tel" value="${escH(foneBR(e.whats || ''))}" placeholder="(81) 9 9999-9999"></label>
     <p class="sub" style="margin:-4px 0 0">Com o WhatsApp, você manda o relatório do mês para o parceiro com um toque.</p>
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-      <label class="field" style="margin:0;min-width:0"><span>CPF ou CNPJ (opcional)</span><input type="text" inputmode="numeric" id="r-doc" value="${escH(docBR(e.doc || ''))}" placeholder="Para o termo"></label>
+    <div class="par">
+      <label class="field" style="margin:0;min-width:0"><span>CPF ou CNPJ</span><input type="text" inputmode="numeric" id="r-doc" value="${escH(docBR(e.doc || ''))}" placeholder="Opcional"></label>
       <label class="field" style="margin:0;min-width:0"><span>Dia do pagamento</span><select id="r-dia" style="width:100%">${[5, 10, 15, 20, 25].map(d => `<option value="${d}" ${Number(e.dia || 10) === d ? 'selected' : ''}>Todo dia ${d}</option>`).join('')}</select></label></div>
-    <label class="field" style="margin:0"><span>Anotação (opcional)</span><input type="text" id="r-obs" value="${escH(e.obs || '')}" placeholder="Ex.: cuida da Zona Norte do Recife"></label>
+    <label class="field" style="margin:0"><span>Anotação <i class="opc">opcional</i></span><input type="text" id="r-obs" value="${escH(e.obs || '')}" placeholder="Ex.: cuida da Zona Norte do Recife"></label>
     <label class="row" style="gap:8px;align-items:center"><input type="checkbox" id="r-ativo" ${e.ativo !== false ? 'checked' : ''}> <span>Ativo</span></label>
     <div class="row" style="gap:8px"><button class="btn primary" type="submit" style="flex:1">Salvar</button><button class="btn" type="button" data-sh="rep-editar" data-v="">Cancelar</button></div></form>` : '';
   const prazo = x => Number(x.meses) ? `por ${x.meses} ${Number(x.meses) === 1 ? 'mês' : 'meses'}` : 'enquanto o grupo pagar';
   const card = x => `<div class="panel" style="padding:12px 14px;display:grid;gap:4px;${x.ativo === false ? 'opacity:.6' : ''}"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><b>${escH(x.nome)}</b><span class="num" style="flex:none;font-size:12px;font-weight:700;letter-spacing:.06em;padding:3px 8px;border-radius:6px;background:var(--surface2,#e3e9df)">${escH(x.codigo)}</span></div>
     <span class="small">${pctBR(x.pct)} da assinatura → <b>${rsBR(valorDe(x))} por grupo/mês</b>, ${prazo(x)}${x.ativo === false ? ' · <b>inativo</b>' : ''}</span>
     <span class="sub">O parceiro só vê o valor em reais, nunca a %.</span>
-    <span class="sub">Por grupo assinante: ${rsBR(contaSim(S, Number(x.pct)).c)} por mês · Grupos trazidos: ${x.grupos || 0}</span>
+    <span class="sub">Grupos trazidos: ${x.grupos || 0}</span>
     <span class="sub">Regra: a comissão vale enquanto o grupo mantém a assinatura Pro paga, sem interromper. Se o grupo cancelar ou deixar de pagar, a comissão daquele grupo se encerra.</span>
     ${x.pix || x.contato ? `<div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><span class="sub" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pix: <b>${escH(x.pix || x.contato)}</b></span><button class="btn sm" style="flex:none" data-sh="rep-copiar-pix" data-v="${escH(x.id)}">Copiar Pix</button></div>` : ''}
     ${x.whats ? `<span class="sub">WhatsApp: ${escH(foneBR(x.whats))}</span>` : ''}${x.obs ? `<span class="sub">${escH(x.obs)}</span>` : ''}
@@ -658,7 +658,7 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
     <span class="sub">Pagamento todo dia ${x.dia || 10}. Os PDFs abrem o compartilhar do celular: escolha o WhatsApp e o contato.</span></div>`;
   return `<h2>Representantes</h2><p class="lead">Quem traz grupos para o app. Você decide quanto cada um ganha e por quanto tempo.</p>
   <div class="panel" style="padding:14px;display:grid;gap:12px"><b style="font-size:18px">Quanto chega líquido</b>
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">${campo('preco', 'Preço (R$/mês)')}${campo('loja', 'Taxa da loja (%)')}${campo('imp', 'Imposto (%)')}${campo('com', 'Comissão (%)')}</div>
+    <div class="par">${campo('preco', 'Preço (R$/mês)')}${campo('loja', 'Taxa da loja (%)')}${campo('imp', 'Imposto (%)')}${campo('com', 'Comissão (%)')}</div>
     <button class="btn block" type="button" data-sh="sim-salvar">Salvar valores</button>
     <p class="sub" style="margin:0">${R.simSalvo ? `Salvo em ${new Date(R.simSalvo.em).toLocaleDateString('pt-BR')}: preço ${rsBR(R.simSalvo.preco)}, loja ${pctBR(R.simSalvo.loja)}, imposto ${pctBR(R.simSalvo.imp)}.` : 'Ainda não salvo: o imposto de 6% é só um exemplo.'} O imposto quem passa é a contadora; quando mudar, troque aqui e toque em Salvar valores.</p>
     <div id="sim-res" style="display:grid;gap:6px">${simResultadoHTML()}</div>
@@ -666,7 +666,7 @@ function telaRepsDono() { const R = UIp.reps || {}, S = UIp.sim = UIp.sim || { .
   <details class="panel" style="padding:10px 14px" ${R.empresa ? '' : 'open'}><summary><b>Dados da empresa nos documentos</b>${R.empresa ? ` <span class="sub">· ${escH(R.empresa.nome)}</span>` : ''}</summary>
     <div class="stack" style="gap:10px;margin-top:10px">
     <label class="field" style="margin:0"><span>Razão social</span><input type="text" id="e-nome" value="${escH((R.empresa || {}).nome || '')}" placeholder="Nome da empresa que opera o Pelota FC"></label>
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px"><label class="field" style="margin:0;min-width:0"><span>CNPJ</span><input type="text" inputmode="numeric" id="e-cnpj" value="${escH(docBR((R.empresa || {}).cnpj || ''))}"></label>
+    <div class="par"><label class="field" style="margin:0;min-width:0"><span>CNPJ</span><input type="text" inputmode="numeric" id="e-cnpj" value="${escH(docBR((R.empresa || {}).cnpj || ''))}"></label>
     <label class="field" style="margin:0;min-width:0"><span>Cidade</span><input type="text" id="e-cidade" value="${escH((R.empresa || {}).cidade || '')}" placeholder="Recife"></label></div>
     <button class="btn" type="button" data-sh="empresa-salvar">Salvar dados da empresa</button>
     <p class="sub" style="margin:0">Vão no termo de parceria e no relatório em PDF.</p></div></details>

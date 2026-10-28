@@ -156,10 +156,12 @@ h3{font-size:17px;text-transform:uppercase;letter-spacing:.04em}
 .awards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px}
 .award{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface)}
 .award label{display:block;font-family:var(--f-display);font-size:15px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
-select,input[type=text],input[type=tel],input[type=number],input[type=date],input[type=time],input[type=url],textarea{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:9px 10px;min-width:0}
+select,input[type=text],input[type=tel],input[type=number],input[type=date],input[type=time],input[type=url],input[type=email],input[type=password],input[type=search],textarea{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:9px 10px;min-width:0}
 textarea{resize:vertical}
+select{min-height:42px}
 .field{display:flex;flex-direction:column;gap:5px}
 .field > span{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.par{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:end}.par>.field>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:10px}
 
 /* critérios */
@@ -579,9 +581,9 @@ label.btn{position:relative;cursor:pointer}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261027u"></script>
-<script src="br.js?v=20261027u"></script>
-<script src="core.js?v=20261027u"></script>
-<script type="module" src="app.js?v=20261027u"></script>
+<script src="qrcode.js?v=20261027w"></script>
+<script src="br.js?v=20261027w"></script>
+<script src="core.js?v=20261027w"></script>
+<script type="module" src="app.js?v=20261027w"></script>
 </body>
 </html>
