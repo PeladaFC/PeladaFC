@@ -114,12 +114,16 @@ function enviarErro(reg) { ERR_ENVIANDO = true; const id = Date.now().toString(3
   Promise.resolve().then(() => B.set('erros/' + id, reg)).catch(() => { }).finally(() => { ERR_ENVIANDO = false; }); }
 function enviarFilaErros() { try { if (!EU || !B) return; ERR_FILA.splice(0).forEach(r => { r.uid = EU.uid; enviarErro(r); }); } catch (e) { } }
 window.registrarErro = registrarErro;
+// abriu o app: zera o número no ícone
+function zerarContador() { try { if (navigator.clearAppBadge) navigator.clearAppBadge().catch(() => { }); if (window.caches) caches.open('pelota-contador').then(c => c.put('/__pelota_contador', new Response('0'))).catch(() => { }); } catch (e) { } }
+zerarContador(); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') zerarContador(); });
 window.addEventListener('error', ev => registrarErro(ev.error || { message: ev.message, stack: `${ev.filename || ''}:${ev.lineno || 0}:${ev.colno || 0}` }, 'janela'));
 window.addEventListener('unhandledrejection', ev => registrarErro(ev.reason instanceof Error ? ev.reason : { message: 'Promessa rejeitada: ' + (ev.reason && (ev.reason.message || ev.reason)) , stack: (ev.reason && ev.reason.stack) || '', code: ev.reason && ev.reason.code, status: ev.reason && ev.reason.status }, 'promessa'));
 ['warn', 'error'].forEach(n => { const orig = console[n].bind(console); console[n] = (...a) => { orig(...a); const e = a.find(x => x instanceof Error || (x && typeof x === 'object' && x.message && (x.stack || x.code))); if (e) registrarErro(e, 'console'); }; });
 document.addEventListener('click', e => { const el = e.target.closest && e.target.closest('[data-sh],[data-act]'); if (el) ULTIMA_ACAO = (el.dataset.sh || el.dataset.act) + (el.dataset.v ? ':' + String(el.dataset.v).slice(0, 30) : ''); }, true);
 document.addEventListener('submit', e => { ULTIMA_ACAO = 'form:' + (e.target.id || '?'); }, true);
 const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { } } };
+let ABRIR = new URLSearchParams(location.search).get('abrir'); // notificação de erros do app abre direto a aba Erros
 const MP_VOLTA = new URLSearchParams(location.search).get('mp'); // volta do Mercado Pago (?mp=ok|erro)
 const novoId = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
 const novoCodigo = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('');
@@ -1328,6 +1332,7 @@ document.addEventListener('submit', async e => {
     if (antes === u.uid) return;
     enviarFilaErros();
     ir('carregando'); await depoisDoLogin();
+    if (ABRIR === 'erros') { ABRIR = null; history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); notasServidor('acesso').then(() => { ir('donoerros'); carregarErros(); }, () => { }); }
   });
 })();
 

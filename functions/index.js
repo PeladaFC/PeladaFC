@@ -75,6 +75,18 @@ async function enviarPara(uids, aviso) {
   }));
   logger.info('aviso', aviso.tag, { destinos: lista.length, entregues: ok, removidos: mortos });
 }
+// Erros do app: uma vez por dia (na rotina das 10h), se apareceram erros novos, avisa no celular do dono do app
+async function avisarErros() {
+  const ref = db.doc('servidor/plataforma'), plat = (await ref.get()).data() || {}, agora = Date.now();
+  const desde = Number(plat.errosVistoAte) || agora - 864e5;
+  const q = await db.collection('erros').where('em', '>', desde).select('chave').get();
+  await ref.set({ errosVistoAte: agora }, { merge: true });
+  if (q.empty) return;
+  const n = q.size, tipos = new Set(q.docs.map(d => d.get('chave'))).size, uids = [];
+  for (const em of plat.emails || []) { try { uids.push((await admin.auth().getUserByEmail(em)).uid); } catch (e) { } }
+  if (!uids.length) return;
+  await enviarPara(uids, { titulo: 'Pelota FC · erros no app', texto: `${n} erro${n === 1 ? '' : 's'} novo${n === 1 ? '' : 's'} desde ontem (${tipos} tipo${tipos === 1 ? '' : 's'}). Abra o Painel do dono → Erros.`, tag: 'erros-app', url: URL_APP + '?abrir=erros' });
+}
 async function enviarTodos(avisos) { for (const a of avisos) if (a && a.para && a.para.length) await enviarPara(a.para, a); }
 
 /* ---------- contexto do grupo (lido só quando precisa) ---------- */
@@ -187,6 +199,7 @@ exports.pushPrazoMensalistas = onSchedule({ schedule: 'every 15 minutes', timeZo
 exports.pushCobrancas = onSchedule({ schedule: '0 10 * * *', timeZone: 'America/Recife', maxInstances: 1, memory: '512MiB', timeoutSeconds: 540 }, async () => {
   const hoje = new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 10);
   try { await NFSE.tarefaDiaria(hoje); } catch (e) { logger.error('nota fiscal', e.message); }
+  try { await avisarErros(); } catch (e) { logger.error('aviso de erros', e.message); }
   const grupos = await db.collection('grupos').select().get();
   for (const g of grupos.docs) {
     try { const ctx = await contexto(g.id, { pres: true, jog: true, pel: true, caixa: true }); await enviarTodos(R.avisosCobranca(ctx, hoje)); }
