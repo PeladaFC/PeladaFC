@@ -18,7 +18,7 @@ const admin = require('firebase-admin');
 const MP = 'https://api.mercadopago.com';
 const BASE = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net';
 const URL_WEBHOOK = BASE + '/mpWebhook', URL_RETORNO = BASE + '/mpRetorno';
-const URL_APP = 'https://peladafc.github.io/PeladaFC/';
+const URL_APP = 'https://pelotafc.com.br/';
 const TAXA = 0.0099;            // taxa do Pix online no Mercado Pago (conferida em 10/10/2026)
 const VALIDADE_H = 24;          // o QR vale por 24 horas
 const COMISSAO_PADRAO = 0.01;   // comissão da plataforma, se servidor/mp não disser outra

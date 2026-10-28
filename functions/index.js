@@ -21,7 +21,7 @@ admin.initializeApp();
 const db = admin.firestore();
 setGlobalOptions({ region: 'southamerica-east1', maxInstances: 5, memory: '256MiB', timeoutSeconds: 60 });
 
-const URL_APP = 'https://peladafc.github.io/PeladaFC/';
+const URL_APP = 'https://pelotafc.com.br/';
 
 /* Pix automático (Mercado Pago) */
 const { interno: PAG, ...pagamentos } = require('./pagamentos')(db);
