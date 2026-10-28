@@ -690,6 +690,9 @@ function relatorioRep(x) { const hoje = new Date(Date.now() - 3 * 36e5), mes = M
     '', L.some(g => g.assina != null) ? 'O pagamento é feito por Pix na chave cadastrada.' : 'A assinatura Pro começa quando o app chegar às lojas. A partir daí, este relatório mostra o valor de cada mês.'].join('\n'); }
 const linkRep = c => c ? LINK_APP + '?rep=' + encodeURIComponent(c) : LINK_APP;
 const INSTA = '@pelotafc.app';
+// desenha linhas [{t, font, cor, adv}] centralizadas na altura cy (adv = distância da linha anterior até a base desta)
+function blocoCentro(g, itens, x, cy) { const tot = itens.reduce((a, i) => a + i.adv, 0); let y = cy - tot / 2; g.textAlign = 'left';
+  for (const i of itens) { y += i.adv; g.font = i.font; if (i.partes) { let xx = x; for (const [t, f, c] of i.partes) { g.font = f; g.fillStyle = c; g.fillText(t, xx, y); xx += g.measureText(t).width; } } else { g.fillStyle = i.cor; g.fillText(i.t, x, y); } } }
 function iconeInsta(g, x, y, t, cor) { g.save(); g.strokeStyle = cor; g.fillStyle = cor; g.lineWidth = t * .1; g.beginPath(); g.roundRect(x + t * .05, y + t * .05, t * .9, t * .9, t * .26); g.stroke();
   g.beginPath(); g.arc(x + t / 2, y + t / 2, t * .21, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(x + t * .75, y + t * .25, t * .06, 0, Math.PI * 2); g.fill(); g.restore(); }
 // "texto · [ícone] @pelotafc.app" centralizado em cx; y é a linha de base do texto
@@ -716,7 +719,7 @@ function posterRep(x) { // A4 em 300 dpi: 2480 x 3508
   g.textBaseline = 'alphabetic'; g.font = `italic 800 360px ${fd}`; const w1 = g.measureText('PELOTA ').width, w2 = g.measureText('FC').width, x0 = (W - w1 - w2) / 2;
   g.textAlign = 'left'; g.fillStyle = 'rgba(0,0,0,.22)'; g.fillText('PELOTA ', x0 + 10, 470); g.fillText('FC', x0 + w1 + 10, 470);
   g.fillStyle = '#fff'; g.fillText('PELOTA ', x0, 460); g.fillStyle = '#F2C12E'; g.fillText('FC', x0 + w1, 460);
-  g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = `600 96px ${ft}`; g.fillText('ORGANIZE SUA PELADA', W / 2, 620);
+  g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = `600 96px ${ft}`; g.fillText('ORGANIZE SUA PELADA', W / 2, 620); linhaInsta(g, '', W / 2, 740, `800 76px ${ft}`, '#fff', '#F2C12E');
   g.fillStyle = '#0F4D27'; g.font = `italic 800 170px ${fd}`; g.fillText('A PELADA INTEIRA NO CELULAR', W / 2, 1060);
   g.fillStyle = '#3F5245'; g.font = `500 64px ${ft}`; g.fillText('Menos trabalho para quem organiza. Mais jogo para todo mundo.', W / 2, 1175);
   const colW = (W - 2 * M - 80) / 2, rowH = 440, y0 = 1290;
@@ -729,13 +732,12 @@ function posterRep(x) { // A4 em 300 dpi: 2480 x 3508
   const by = y0 + 3 * rowH + 20, bh = H - by - 190;
   const gb = g.createLinearGradient(0, by, W, by + bh); gb.addColorStop(0, '#1B6A36'); gb.addColorStop(1, '#0F4D27'); g.fillStyle = gb; g.beginPath(); g.roundRect(M, by, W - 2 * M, bh, 36); g.fill();
   const lado = bh - 120; g.fillStyle = '#fff'; g.beginPath(); g.roundRect(M + 60, by + 60, lado, lado, 20); g.fill(); desenhaQR(g, linkRep(x.codigo), M + 60, by + 60, lado);
-  const tx = M + 60 + lado + 80, tw = W - M - 60 - tx; let ty = x.codigo ? by + 200 : by + bh / 2 - 60; g.textAlign = 'left';
-  g.fillStyle = '#F2C12E'; g.font = `700 58px ${ft}`; g.fillText('APONTE A CÂMERA DO CELULAR', tx, ty);
-  g.fillStyle = '#fff'; g.font = `italic 800 150px ${fd}`; quebra(g, 'CRIE SUA PELADA AGORA', tw).forEach(l => { ty += 150; g.fillText(l, tx, ty); });
-  if (x.codigo) { ty += 120; g.fillStyle = 'rgba(255,255,255,.75)'; g.font = `600 50px ${ft}`; g.fillText('SEU REPRESENTANTE', tx, ty);
-    ty += 90; g.fillStyle = '#fff'; g.font = `700 76px ${ft}`; let nm = x.nome; while (g.measureText(nm).width > tw && nm.length > 3) nm = nm.slice(0, -2) + '…'; g.fillText(nm, tx, ty);
-    ty += 86; g.fillStyle = '#F2C12E'; g.font = `700 62px ${ft}`; g.fillText('Código ' + x.codigo, tx, ty); }
-  linhaInsta(g, 'Funciona no celular, iPhone ou Android', W / 2, H - 100, `600 52px ${ft}`, '#3F5245', '#0F4D27');
+  const tx = M + 60 + lado + 80, tw = W - M - 60 - tx, IT = [{ t: 'APONTE A CÂMERA DO CELULAR', font: `700 58px ${ft}`, cor: '#F2C12E', adv: 44 }];
+  g.font = `italic 800 150px ${fd}`; quebra(g, 'CRIE SUA PELADA AGORA', tw).forEach(l => IT.push({ t: l, font: `italic 800 150px ${fd}`, cor: '#fff', adv: 150 }));
+  if (x.codigo) { g.font = `700 76px ${ft}`; let nm = x.nome; while (g.measureText(nm).width > tw && nm.length > 3) nm = nm.slice(0, -2) + '…';
+    IT.push({ t: 'SEU REPRESENTANTE', font: `600 50px ${ft}`, cor: 'rgba(255,255,255,.75)', adv: 120 }, { t: nm, font: `700 76px ${ft}`, cor: '#fff', adv: 90 }, { t: 'Código ' + x.codigo, font: `700 62px ${ft}`, cor: '#F2C12E', adv: 86 }); }
+  blocoCentro(g, IT, tx, by + 60 + lado / 2);
+  g.textAlign = 'center'; g.fillStyle = '#3F5245'; g.font = `600 52px ${ft}`; g.fillText('Funciona no celular, iPhone ou Android', W / 2, H - 100);
   g.fillStyle = '#F2C12E'; g.fillRect(0, H - 40, W * .64, 40); g.fillStyle = '#F0662A'; g.fillRect(W * .64, H - 40, W * .36, 40);
   return cv; }
 const PAPEL = { A4: [595.28, 841.89, '21 × 29,7 cm'], A3: [841.89, 1190.55, '29,7 × 42 cm'], A2: [1190.55, 1683.78, '42 × 59,4 cm'], A1: [1683.78, 2383.94, '59,4 × 84,1 cm'] };
@@ -758,9 +760,9 @@ async function posterGrande(x) { // A3 em ~250 dpi; desenho em unidades de 2480 
   g.textBaseline = 'alphabetic'; g.font = `italic 800 210px ${fd}`; const w1 = g.measureText('PELOTA ').width, w2 = g.measureText('FC').width, x0 = (W - w1 - w2) / 2;
   g.textAlign = 'left'; g.fillStyle = 'rgba(0,0,0,.25)'; g.fillText('PELOTA ', x0 + 8, 318); g.fillText('FC', x0 + w1 + 8, 318);
   g.fillStyle = '#fff'; g.fillText('PELOTA ', x0, 310); g.fillStyle = '#F2C12E'; g.fillText('FC', x0 + w1, 310);
-  g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.85)'; g.font = `600 64px ${ft}`; g.fillText('ORGANIZE SUA PELADA', W / 2, 410);
-  g.font = `italic 800 270px ${fd}`; g.fillStyle = 'rgba(0,0,0,.25)'; g.fillText('CHEGA DE LISTA', W / 2 + 10, 700); g.fillText('NO GRUPO!', W / 2 + 10, 955);
-  g.fillStyle = '#fff'; g.fillText('CHEGA DE LISTA', W / 2, 690); g.fillStyle = '#F2C12E'; g.fillText('NO GRUPO!', W / 2, 945);
+  g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.85)'; g.font = `600 64px ${ft}`; g.fillText('ORGANIZE SUA PELADA', W / 2, 410); linhaInsta(g, '', W / 2, 520, `800 72px ${ft}`, '#fff', '#F2C12E'); g.textAlign = 'center';
+  g.font = `italic 800 270px ${fd}`; g.fillStyle = 'rgba(0,0,0,.25)'; g.fillText('CHEGA DE LISTA', W / 2 + 10, 790); g.fillText('NO GRUPO!', W / 2 + 10, 1040);
+  g.fillStyle = '#fff'; g.fillText('CHEGA DE LISTA', W / 2, 780); g.fillStyle = '#F2C12E'; g.fillText('NO GRUPO!', W / 2, 1035);
   celular(g, tel[0], 600, 1880, 560, -9); celular(g, tel[2], W - 600, 1880, 560, 9);
   const hc = celular(g, tel[1], W / 2, 1840, 700, 0);
   const etiqueta = (txt, cx, cy, cor, ang) => { g.save(); g.translate(cx, cy); g.rotate(ang * Math.PI / 180); g.font = `italic 800 74px ${fd}`; const tw = g.measureText(txt).width + 80;
@@ -775,12 +777,11 @@ async function posterGrande(x) { // A3 em ~250 dpi; desenho em unidades de 2480 
   const by = 2990, bh = 400; g.fillStyle = '#fff'; g.beginPath(); g.roundRect(M, by, W - 2 * M, bh, 36); g.fill();
   g.fillStyle = '#F2C12E'; g.beginPath(); g.roundRect(M, by + bh - 18, W - 2 * M, 18, [0, 0, 36, 36]); g.fill();
   desenhaQR(g, linkRep(x.codigo), M + 25, by + 25, bh - 60);
-  const tx = M + bh + 30; let ty = x.codigo ? by + 110 : by + 170; g.textAlign = 'left';
-  g.fillStyle = '#F0662A'; g.font = `700 52px ${ft}`; g.fillText('APONTE A CÂMERA DO CELULAR', tx, ty);
-  ty += 140; g.fillStyle = '#0F4D27'; g.font = `italic 800 150px ${fd}`; g.fillText('CRIE SUA PELADA AGORA', tx, ty);
-  if (x.codigo) { ty += 90; g.fillStyle = '#3F5245'; g.font = `600 50px ${ft}`; let lin = 'Representante: ' + x.nome; while (g.measureText(lin + ' · código ' + x.codigo).width > W - M - 40 - tx && lin.length > 20) lin = lin.slice(0, -2) + '…';
-    g.fillText(lin + ' · código ', tx, ty); const wl = g.measureText(lin + ' · código ').width; g.fillStyle = '#F0662A'; g.font = `800 50px ${ft}`; g.fillText(x.codigo, tx + wl, ty); }
-  linhaInsta(g, 'Funciona no celular, iPhone ou Android', W / 2, 3470, `600 48px ${ft}`, 'rgba(255,255,255,.85)', '#F2C12E');
+  const tx = M + bh + 30, IT = [{ t: 'APONTE A CÂMERA DO CELULAR', font: `700 52px ${ft}`, cor: '#F0662A', adv: 40 }, { t: 'CRIE SUA PELADA AGORA', font: `italic 800 150px ${fd}`, cor: '#0F4D27', adv: 140 }];
+  if (x.codigo) { g.font = `600 50px ${ft}`; let lin = 'Representante: ' + x.nome; while (g.measureText(lin + ' · código ' + x.codigo).width > W - M - 40 - tx && lin.length > 20) lin = lin.slice(0, -2) + '…';
+    IT.push({ adv: 92, partes: [[lin + ' · código ', `600 50px ${ft}`, '#3F5245'], [x.codigo, `800 50px ${ft}`, '#F0662A']] }); }
+  blocoCentro(g, IT, tx, by + 25 + (bh - 60) / 2);
+  g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.85)'; g.font = `600 48px ${ft}`; g.fillText('Funciona no celular, iPhone ou Android', W / 2, 3470);
   return cv; }
 function pdfPagina(cv, PW, PH) { return pdfPaginas([cv], PW, PH); }
 function pdfPaginas(cvs, PW, PH) { // PDF com uma imagem JPEG por página
