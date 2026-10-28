@@ -613,8 +613,8 @@ function telaGruposDono() { const P = UIp.painel || {}, D = P.dados;
 const SIM0 = { preco: '19,90', loja: '15', imp: '6', com: '10', regime: 'simples' };
 const REGIMES = [['simples', 'Simples Nacional'], ['presumido', 'Lucro Presumido'], ['real', 'Lucro Real'], ['outro', 'Outro']];
 const numBR = v => { const x = Number(String(v ?? '').replace(/\./g, '').replace(',', '.')); return isFinite(x) ? x : 0; };
-const rsBR = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const pctBR = v => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
+const rsBR = v => 'R$ ' + (Math.abs(Number(v || 0)) < .005 ? 0 : Number(v || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pctBR = v => (Math.abs(Number(v || 0)) < .05 ? 0 : Number(v || 0)).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
 function contaSim(S, com) { const P = numBR(S.preco), loja = P * numBR(S.loja) / 100, rep = P - loja, imp = rep * numBR(S.imp) / 100, c = rep * (com ?? numBR(S.com)) / 100, liq = rep - imp - c;
   return { P, loja, rep, imp, c, liq, pct: P ? liq / P * 100 : 0 }; }
 function simResultadoHTML() { const S = UIp.sim, r = contaSim(S), lin = (t, v, forte) => `<div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px;${forte ? 'border-top:1px solid var(--line);padding-top:8px' : ''}"><span class="small">${forte ? `<b>${t}</b>` : t}</span>${forte ? `<b class="num">${v}</b>` : `<span class="num">${v}</span>`}</div>`;
