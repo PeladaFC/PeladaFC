@@ -219,8 +219,8 @@ function render() {
     <div class="ob-div">ou</div>
     <button class="btn block ob-google" data-sh="google">Continuar com o Google</button>
     <p class="sub" style="text-align:center;margin:0">Ao criar a conta, você aceita os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>`;
-  if (t === 'perfil' && EU && UIp.parcOk === undefined) { UIp.parcOk = null; carregarParceiro(true); }
-  if (t === 'perfil' && EU && UIp.notasOk === undefined) { UIp.notasOk = null; UIp.notasErro = null; notasServidor('acesso').then(() => { UIp.notasOk = true; if (TELA === 'perfil') render(); }, e => { if (e && e.status === 403) UIp.notasOk = false; else { UIp.notasOk = undefined; UIp.notasErro = (e && e.message) || 'erro'; if (TELA === 'perfil') render(); } }); }
+  if (t === 'perfil' && EU && UIp.parcOk === undefined) { UIp.parcOk = ls.get('pelota.parc.' + EU.uid) === '1' ? true : null; carregarParceiro(true); }
+  if (t === 'perfil' && EU && UIp.notasOk === undefined) { const ck = 'pelota.dono.' + EU.uid, tinha = ls.get(ck) === '1'; UIp.notasOk = tinha ? true : null; UIp.notasErro = null; notasServidor('acesso').then(() => { ls.set(ck, '1'); UIp.notasOk = true; if (TELA === 'perfil' && !tinha) render(); }, e => { if (e && e.status === 403) { ls.set(ck, null); UIp.notasOk = false; if (TELA === 'perfil' && tinha) render(); } else if (!tinha) { UIp.notasOk = null; UIp.notasErro = (e && e.message) || 'erro'; if (TELA === 'perfil') render(); } }); }
   if (t === 'perfil') { const p = PERFIL || {}; const pos = UIp.pos || p.pos || 'MEI'; const pronto = !!(p.apelido || p.pos);
     h = (pronto ? topo('minhas') : '') + `<h2>${pronto ? 'Meu perfil' : 'Seu perfil de jogador'}</h2><p class="lead">É assim que a galera vai te ver.</p>
     ${EU && UIp.notasOk ? `<button class="btn block primary" data-sh="dono" style="margin-bottom:6px">Painel do dono</button>` : ''}
@@ -900,7 +900,7 @@ async function parceiroServidor(acao, extra) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(j.erro || 'Não deu certo agora. Tente de novo.'), { status: r.status });
   return j; }
-async function carregarParceiro(silencioso) { try { UIp.parc = await parceiroServidor('meu'); UIp.parcOk = true; } catch (e) { if (e.status === 404) { UIp.parcOk = false; UIp.parc = null; } else { UIp.parcOk = UIp.parcOk || null; if (!silencioso) aviso(e.message); } }
+async function carregarParceiro(silencioso) { const ck = 'pelota.parc.' + ((EU && EU.uid) || ''); try { UIp.parc = await parceiroServidor('meu'); UIp.parcOk = true; ls.set(ck, '1'); } catch (e) { if (e.status === 404) { UIp.parcOk = false; UIp.parc = null; ls.set(ck, null); } else { UIp.parcOk = UIp.parcOk || null; if (!silencioso) aviso(e.message); } }
   if (TELA === 'perfil' || TELA === 'parceiro') render(); }
 function telaParceiro() { const P = UIp.parc; if (!P || !P.rep) return '<h2>Área do parceiro</h2><p class="lead">Carregando…</p>';
   const x = P.rep, S = simDe(P.simulador), L = x.gruposLista || [], St = L.map(situacaoGrupoRep), M = Number(x.meses) || 0, R0 = mesRef();
