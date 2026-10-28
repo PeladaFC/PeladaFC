@@ -43,6 +43,7 @@ async function backendReal() {
     listenDoc: (p, cb, err) => F.onSnapshot(ref(p), s => cb({ exists: s.exists(), data: s.exists() ? s.data() : null }), e => err && err(e)),
     listenCol: (p, cb, err) => F.onSnapshot(F.collection(fs, p), s => cb(s.docs.map(d => ({ id: d.id, data: d.data() }))), e => err && err(e)),
     listar: async p => (await F.getDocs(F.collection(fs, p)).catch(erro)).docs.map(d => d.id),
+    ultimos: async (p, campo, n) => (await F.getDocs(F.query(F.collection(fs, p), F.orderBy(campo, 'desc'), F.limit(n))).catch(erro)).docs.map(d => ({ id: d.id, data: d.data() })),
     tirarGrupo: (uid, gid) => F.updateDoc(ref('users/' + uid), { ['grupos.' + gid]: F.deleteField() }).catch(erro),
     batch: async ops => { const b = F.writeBatch(fs); for (const o of ops) { if (o.op === 'del') b.delete(ref(o.path)); else b.set(ref(o.path), o.data, o.op === 'merge' ? { merge: true } : {}); } await b.commit().catch(erro); }
   };
@@ -75,6 +76,7 @@ function backendMock() {
     listenDoc: (p, cb) => { setTimeout(() => cb({ exists: store.has(p), data: clone(store.get(p)) ?? null }), 0); return add(docL, p, cb); },
     listenCol: (p, cb) => { setTimeout(() => cb(colDocs(p)), 0); return add(colL, p, cb); },
     listar: async p => colDocs(p).map(d => d.id),
+    ultimos: async (p, campo, n) => colDocs(p).sort((a, b) => (b.data[campo] || 0) - (a.data[campo] || 0)).slice(0, n),
     tirarGrupo: async (uid, gid) => { const p = 'users/' + uid, u = clone(store.get(p)) || {}; if (u.grupos) delete u.grupos[gid]; store.set(p, u); fire(p); },
     batch: async ops => { for (const o of ops) { if (o.op === 'del') await api.del(o.path); else await api.set(o.path, o.data, { merge: o.op === 'merge' }); } }
   };
@@ -85,6 +87,38 @@ function backendMock() {
 /* ================= Utilidades ================= */
 const $ = id => document.getElementById(id);
 const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/* ================= registro técnico de erros (sem nome, e-mail, CPF ou telefone) ================= */
+const VERSAO_APP = (((document.querySelector('script[src*="app.js"]') || {}).src || '').split('v=')[1] || 'dev').slice(0, 20);
+const ERR_IGNORA = /ResizeObserver loop|^Script error\.?$|Load failed|Failed to fetch|NetworkError|AbortError|operation was aborted|Sem conexão com o servidor/i;
+const ERR_ESPERADOS = new Set(['invalid-credential', 'wrong-password', 'user-not-found', 'email-already-in-use', 'weak-password', 'invalid-email', 'missing-password', 'too-many-requests', 'popup-closed-by-user', 'cancelled-popup-request', 'popup-blocked', 'network-request-failed', 'unavailable']);
+let ULTIMA_ACAO = '', ERR_FILA = [], ERR_N = 0, ERR_ENVIANDO = false; const ERR_MEM = {};
+const semPessoal = t => String(t || '').replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[e-mail]').replace(/\d[\d.\-/ ()]{7,}\d/g, '[número]');
+const hashErro = t => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+function telaErro() { let t = '?'; try { t = TELA; } catch (e) { } try { if (document.getElementById('shell') && document.getElementById('shell').hidden && typeof UI !== 'undefined') t = 'pelada/' + UI.tab + (UI.sub ? '/' + UI.sub : ''); } catch (e) { } return String(t).slice(0, 80); }
+function registrarErro(e, origem) { try {
+    if (!e || ERR_ENVIANDO) return; if (typeof e === 'string') e = { message: e };
+    const cod = String(e.code || '').replace(/^(auth|firestore)\//, ''), msg = semPessoal(e.message || e.reason || String(e)).slice(0, 500);
+    if (!msg || ERR_IGNORA.test(msg) || ERR_ESPERADOS.has(cod) || [400, 401, 403, 404, 409].includes(e.status) || ERR_N >= 30) return;
+    const stack = semPessoal(e.stack || '').slice(0, 2000), chave = hashErro(msg + '|' + (stack.split('\n').find(l => /:\d+:\d+/.test(l)) || ''));
+    let uid = ''; try { uid = (EU && EU.uid) || ''; } catch (x) { }
+    const k = chave + '.' + uid, agora = Date.now(); let mapa = {}; try { mapa = JSON.parse(ls.get('pelota.erros') || '{}'); } catch (x) { }
+    if (agora - Math.max(ERR_MEM[k] || 0, mapa[k] || 0) < 10 * 60e3) return; // o mesmo erro, da mesma pessoa, só uma vez a cada 10 minutos
+    ERR_MEM[k] = agora; mapa[k] = agora; for (const x in mapa) if (agora - mapa[x] > 10 * 60e3) delete mapa[x]; ls.set('pelota.erros', JSON.stringify(mapa));
+    ERR_N++;
+    const reg = { msg, stack, chave, cod: cod.slice(0, 60), tela: telaErro(), acao: semPessoal(ULTIMA_ACAO).slice(0, 120), origem: String(origem || '').slice(0, 20), uid, versao: VERSAO_APP,
+      aparelho: String(navigator.userAgent || '').slice(0, 250), telaPx: `${innerWidth}x${innerHeight}`, pwa: !!(window.matchMedia && matchMedia('(display-mode: standalone)').matches), em: agora, expiraEm: new Date(agora + 90 * 864e5) };
+    if (!uid || !B) { ERR_FILA.push(reg); ERR_FILA = ERR_FILA.slice(-5); return; }
+    enviarErro(reg);
+  } catch (x) { } }
+function enviarErro(reg) { ERR_ENVIANDO = true; const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  Promise.resolve().then(() => B.set('erros/' + id, reg)).catch(() => { }).finally(() => { ERR_ENVIANDO = false; }); }
+function enviarFilaErros() { try { if (!EU || !B) return; ERR_FILA.splice(0).forEach(r => { r.uid = EU.uid; enviarErro(r); }); } catch (e) { } }
+window.registrarErro = registrarErro;
+window.addEventListener('error', ev => registrarErro(ev.error || { message: ev.message, stack: `${ev.filename || ''}:${ev.lineno || 0}:${ev.colno || 0}` }, 'janela'));
+window.addEventListener('unhandledrejection', ev => registrarErro(ev.reason instanceof Error ? ev.reason : { message: 'Promessa rejeitada: ' + (ev.reason && (ev.reason.message || ev.reason)) , stack: (ev.reason && ev.reason.stack) || '', code: ev.reason && ev.reason.code, status: ev.reason && ev.reason.status }, 'promessa'));
+['warn', 'error'].forEach(n => { const orig = console[n].bind(console); console[n] = (...a) => { orig(...a); const e = a.find(x => x instanceof Error || (x && typeof x === 'object' && x.message && (x.stack || x.code))); if (e) registrarErro(e, 'console'); }; });
+document.addEventListener('click', e => { const el = e.target.closest && e.target.closest('[data-sh],[data-act]'); if (el) ULTIMA_ACAO = (el.dataset.sh || el.dataset.act) + (el.dataset.v ? ':' + String(el.dataset.v).slice(0, 30) : ''); }, true);
+document.addEventListener('submit', e => { ULTIMA_ACAO = 'form:' + (e.target.id || '?'); }, true);
 const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { } } };
 const MP_VOLTA = new URLSearchParams(location.search).get('mp'); // volta do Mercado Pago (?mp=ok|erro)
 const novoId = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
@@ -113,7 +147,7 @@ const ERROS = {
   'network-request-failed': 'Sem internet. Verifique a conexão.', 'popup-closed-by-user': 'O login com Google foi fechado antes de terminar.',
   'permission-denied': 'Sem permissão para isso.', 'unavailable': 'Sem conexão com o servidor. Tente de novo.'
 };
-const msgErro = e => ERROS[e && e.code] || 'Algo deu errado. Tente de novo.';
+const msgErro = e => { if (!ERROS[e && e.code]) registrarErro(e, 'tratado'); return ERROS[e && e.code] || 'Algo deu errado. Tente de novo.'; };
 function aviso(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(aviso.t); aviso.t = setTimeout(() => t.hidden = true, 3200); }
 
 /* ================= Link do app e QR Code ================= */
@@ -244,6 +278,7 @@ function render() {
   if (t === 'dono') h = topo('perfil') + abasDono('dono') + telaDono();
   if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + telaGruposDono();
   if (t === 'donoreps') h = topo('perfil') + abasDono('reps') + telaRepsDono();
+  if (t === 'donoerros') h = topo('perfil') + abasDono('erros') + telaErrosDono();
   if (t === 'parceiro') h = topo('perfil') + telaParceiro();
   if (t === 'donorepqr') { const x = repDoQr(), A3 = UIp.repFmt === 'a3', A4 = UIp.repFmt === 'a4' || A3;
     h = topo(UIp.repqr === '_meu' ? 'parceiro' : 'donoreps') + (x ? `<h2>${x.codigo ? 'QR Code de ' + escH(x.nome) : 'Pôster do Pelota FC'}</h2><p class="lead">${x.codigo ? `Quem ler este código abre o Pelota FC. As peladas que essa pessoa criar ficam marcadas como trazidas por <b>${escH(x.codigo)}</b>.` : 'Pôster sem representante: o QR Code abre o Pelota FC.'}</p>
@@ -546,7 +581,7 @@ async function contaServidor(acao) {
   let r; try { r = await fetch(URL_CONTA, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify({ acao }) }); }
   catch (e) { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.erro || 'Não deu certo agora. Tente de novo.'), { bloqueia: j.bloqueia });
+  if (!r.ok) throw Object.assign(new Error(j.erro || 'Não deu certo agora. Tente de novo.'), { bloqueia: j.bloqueia, status: r.status });
   return j;
 }
 const URL_NOTAS = 'https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/notasPlataforma';
@@ -568,7 +603,7 @@ async function notasServidor(acao, extra) {
   if (!r.ok) throw Object.assign(new Error(j.erro || 'Não deu certo agora. Tente de novo.'), { status: r.status });
   return j;
 }
-function abasDono(at) { return `<div class="pick" style="margin:6px 0 4px"><button type="button" data-sh="dono" aria-pressed="${at === 'dono'}">Visão geral</button><button type="button" data-sh="dono-grupos" aria-pressed="${at === 'grupos'}">Grupos</button><button type="button" data-sh="dono-reps" aria-pressed="${at === 'reps'}">Representantes</button><button type="button" data-sh="notas" aria-pressed="${at === 'notas'}">Notas fiscais</button></div>`; }
+function abasDono(at) { return `<div class="pick" style="margin:6px 0 4px"><button type="button" data-sh="dono" aria-pressed="${at === 'dono'}">Visão geral</button><button type="button" data-sh="dono-grupos" aria-pressed="${at === 'grupos'}">Grupos</button><button type="button" data-sh="dono-reps" aria-pressed="${at === 'reps'}">Representantes</button><button type="button" data-sh="notas" aria-pressed="${at === 'notas'}">Notas fiscais</button><button type="button" data-sh="dono-erros" aria-pressed="${at === 'erros'}">Erros</button></div>`; }
 /* lista de grupos do painel, com várias formas de procurar */
 const GF0 = { q: '', sit: 'todos', uf: '', cidade: '', pix: '', pag: '', tipo: '', dia: '', ord: 'recente' };
 const DIAS_CURTO = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -928,6 +963,27 @@ function telaParceiro() { const P = UIp.parc; if (!P || !P.rep) return '<h2>Áre
     <label class="field" style="margin:0"><span>Chave Pix</span><input type="text" id="pc-pix" value="${escH(x.pix || '')}" autocomplete="off" placeholder="CPF, e-mail, telefone ou chave aleatória"></label>
     <label class="field" style="margin:0"><span>WhatsApp com DDD</span><input type="tel" id="pc-whats" inputmode="tel" value="${escH(foneBR(x.whats || ''))}" placeholder="(81) 9 9999-9999"></label>
     <button class="btn" type="submit">Salvar</button></form>`; }
+async function carregarErros() { const E = UIp.erros = UIp.erros || {}; E.carregando = true; E.erro = null; if (TELA === 'donoerros') render();
+  try { E.lista = await B.ultimos('erros', 'em', 500); } catch (e) { E.erro = e.code === 'permission-denied' ? 'Sem permissão para ler os erros. Rode o Cloud Shell para atualizar as regras.' : 'Não consegui carregar os erros. Tente de novo.'; }
+  E.carregando = false; if (TELA === 'donoerros') render(); }
+function gruposErros() { const G = {}; for (const { id, data: d } of (UIp.erros || {}).lista || []) { const k = d.chave || d.msg; const g = G[k] = G[k] || { chave: k, msg: d.msg, ids: [], uids: new Set(), versoes: new Set(), telas: {}, acoes: {}, primeiro: d.em, ultimo: d.em, ult: d };
+    g.ids.push(id); if (d.uid) g.uids.add(d.uid); if (d.versao) g.versoes.add(d.versao); if (d.tela) g.telas[d.tela] = (g.telas[d.tela] || 0) + 1; if (d.acao) g.acoes[d.acao] = (g.acoes[d.acao] || 0) + 1;
+    if (d.em < g.primeiro) g.primeiro = d.em; if (d.em > g.ultimo) { g.ultimo = d.em; g.ult = d; } }
+  return Object.values(G).sort((a, b) => b.ids.length - a.ids.length || b.ultimo - a.ultimo); }
+const topN = (o, n) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${k} (${v})`).join(', ') || '—';
+function textoErro(g) { const d = g.ult; return ['Pelota FC · erro registrado', `Mensagem: ${g.msg}`, d.cod ? `Código: ${d.cod}` : '', `Vezes: ${g.ids.length} · pessoas: ${g.uids.size}`, `Primeira: ${dataHora(g.primeiro)} · última: ${dataHora(g.ultimo)}`,
+  `Versões: ${[...g.versoes].join(', ') || '—'}`, `Telas: ${topN(g.telas, 5)}`, `Ações: ${topN(g.acoes, 5)}`, `Origem: ${d.origem || '—'}`, `Aparelho (último): ${d.aparelho || '—'} · ${d.telaPx || ''}${d.pwa ? ' · app instalado' : ''}`, '', 'Stack (último):', d.stack || '—'].filter(x => x !== '').join('\n'); }
+function telaErrosDono() { const E = UIp.erros || {}, G = gruposErros(), total = (E.lista || []).length;
+  return `<h2>Erros do app</h2><p class="lead">Registro automático dos erros que acontecem no celular das pessoas. Só você vê esta tela. Não guarda nome, e-mail, CPF nem telefone.</p>
+  <div class="row" style="gap:8px"><button class="btn sm" data-sh="erros-atualizar">Atualizar</button><button class="btn sm" data-sh="erros-teste">Gerar erro de teste</button></div>
+  ${E.erro ? `<div class="banner">${escH(E.erro)}</div>` : ''}
+  ${E.carregando && !E.lista ? '<p class="lead">Carregando…</p>' : `<p class="sub" style="margin:0">${total} registro${total === 1 ? '' : 's'} (os 500 mais recentes) em ${G.length} tipo${G.length === 1 ? '' : 's'} de erro. Cada registro some sozinho depois de 90 dias.</p>`}
+  <div class="stack" style="gap:10px">${G.length ? G.map((g, i) => `<div class="panel" style="padding:12px 14px;display:grid;gap:6px">
+    <div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:10px;align-items:flex-start"><b style="min-width:0;word-break:break-word">${escH(g.msg)}</b><span class="num" style="flex:none;font-weight:800;padding:2px 10px;border-radius:999px;background:#fbebeb;color:#9b1c1c">${g.ids.length}×</span></div>
+    <span class="sub">${g.uids.size} pessoa${g.uids.size === 1 ? '' : 's'} · última vez ${dataHora(g.ultimo)} · versão ${escH([...g.versoes].slice(0, 3).join(', ') || '—')}</span>
+    <span class="sub">Tela: ${escH(topN(g.telas, 2))} · Ação: ${escH(topN(g.acoes, 2))}</span>
+    ${UIp.errAberto === i ? `<pre style="margin:0;white-space:pre-wrap;word-break:break-word;font-size:12px;background:var(--surface2,#eef2eb);padding:10px;border-radius:8px;max-height:260px;overflow:auto">${escH(textoErro(g))}</pre>` : ''}
+    <div class="row" style="gap:8px"><button class="btn sm" data-sh="erros-ver" data-v="${i}">${UIp.errAberto === i ? 'Fechar' : 'Ver detalhe'}</button><button class="btn sm" data-sh="erros-copiar" data-v="${i}">Copiar detalhe</button><button class="btn sm" data-sh="erros-apagar" data-v="${i}">Apagar</button></div></div>`).join('') : (E.lista ? '<p class="sub">Nenhum erro registrado. 🎉</p>' : '')}</div>`; }
 async function carregarReps() { const R = UIp.reps = UIp.reps || {}; R.carregando = true; R.erro = null; if (TELA === 'donoreps') render();
   try { const j = MOCK ? { reps: (UIp.repsMock = UIp.repsMock || [{ id: 'r1', nome: 'João Representante', codigo: 'JOAO10', pct: 10, valor: 1.69, meses: 12, pix: 'joao@exemplo.com', whats: '81999990000', obs: 'Zona Norte do Recife', ativo: true, grupos: 2, gruposLista: [{ nome: 'Pelada do Sábado', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 80 * 864e5, assina: true, valorMes: 1.69, cond: { valor: 1.69, meses: 3 } }, { nome: 'Racha da Quinta', cidade: 'Olinda', uf: 'PE', criadoEm: Date.now() - 70 * 864e5, assina: true, repEncerradoEm: Date.now() - 12 * 864e5 }, { nome: 'Fut da Firma', cidade: 'Recife', uf: 'PE', criadoEm: Date.now() - 5 * 864e5, assina: null }] }]).slice(), simulador: UIp.simMock || null, empresa: UIp.empMock || null } : await notasServidor('reps');
     if (MOCK) j.reps.forEach(r => { r.aceiteOk = !!(r.aceite && JSON.stringify(r.aceite.cond) === JSON.stringify(condRep(r))); });
@@ -1133,9 +1189,17 @@ document.addEventListener('click', async e => {
   if (a === 'dono') { ir('dono'); if (!UIp.painel || !UIp.painel.dados) carregarPainel(); }
   if (a === 'dono-atualizar') carregarPainel();
   if (a === 'dono-grupos') { ir('donogrupos'); if (!UIp.painel || !UIp.painel.dados) carregarPainel(); }
+  if (a === 'dono-erros') { ir('donoerros'); carregarErros(); }
+  if (a === 'erros-atualizar') carregarErros();
+  if (a === 'erros-ver') { UIp.errAberto = UIp.errAberto === Number(v) ? null : Number(v); render(); }
+  if (a === 'erros-copiar') { const g = gruposErros()[Number(v)]; if (g) { const t = textoErro(g); try { await navigator.clipboard.writeText(t); aviso('Detalhe copiado. É só colar na conversa.'); } catch (err) { UIp.errAberto = Number(v); render(); aviso('Não deu para copiar: abri o detalhe para você selecionar.'); } } }
+  if (a === 'erros-apagar') { const g = gruposErros()[Number(v)]; if (!g) return; if (b.dataset.ok !== '1') { b.dataset.ok = '1'; b.textContent = `Toque de novo para apagar ${g.ids.length}`; setTimeout(() => { if (b.isConnected) { b.dataset.ok = ''; b.textContent = 'Apagar'; } }, 4000); return; }
+    b.disabled = true; try { for (let i = 0; i < g.ids.length; i += 400) await B.batch(g.ids.slice(i, i + 400).map(id => ({ op: 'del', path: 'erros/' + id }))); UIp.errAberto = null; aviso('Erros apagados.'); await carregarErros(); } catch (err) { aviso('Não consegui apagar. Tente de novo.'); b.disabled = false; } }
+  if (a === 'erros-teste') { ls.set('pelota.erros', null); ERR_N = 0;
+    Object.keys(ERR_MEM).forEach(x => delete ERR_MEM[x]); registrarErro(new Error('Teste do registro de erros (pode apagar)'), 'teste'); aviso('Erro de teste registrado.'); setTimeout(carregarErros, 1200); }
   if (a === 'dono-reps') { ir('donoreps'); carregarReps(); }
   if (a === 'rep-qr' || a === 'rep-fmt') { if (a === 'rep-qr') { UIp.repqr = v; UIp.repFmt = v === '_geral' ? (UIp.repFmt === 'a6' || !UIp.repFmt ? 'a3' : UIp.repFmt) : (UIp.repFmt || 'a6'); ir('donorepqr'); } else { UIp.repFmt = v; render(); }
-    await (document.fonts ? document.fonts.ready : null); const x = repDoQr(), im = $('rep-cartao'); if (x && im) { try { UIp.repCv = UIp.repFmt === 'a3' ? await posterGrande(x) : UIp.repFmt === 'a4' ? posterRep(x) : cartaoRep(x); im.src = UIp.repCv.toDataURL('image/jpeg', .85); } catch (err) { aviso('Não consegui montar a arte. Tente de novo.'); } const gm = $('rep-gerando'); if (gm) gm.remove(); } }
+    await (document.fonts ? document.fonts.ready : null); const x = repDoQr(), im = $('rep-cartao'); if (x && im) { try { UIp.repCv = UIp.repFmt === 'a3' ? await posterGrande(x) : UIp.repFmt === 'a4' ? posterRep(x) : cartaoRep(x); im.src = UIp.repCv.toDataURL('image/jpeg', .85); } catch (err) { registrarErro(err, 'acao'); aviso('Não consegui montar a arte. Tente de novo.'); } const gm = $('rep-gerando'); if (gm) gm.remove(); } }
   if (a === 'rep-baixar' || a === 'rep-compartilhar' || a === 'rep-pdf') { const x = repDoQr(), cv = UIp.repCv; if (!x || !cv) return;
     const pdf = a === 'rep-pdf', tam = pdf ? (($('rep-tam') || {}).value || 'A4') : '', nomeArq = `PelotaFC_${UIp.repFmt === 'a3' ? 'poster_grande' : UIp.repFmt === 'a4' ? 'poster' : 'QR'}${pdf ? '_' + tam : ''}${x.codigo ? '_' + x.codigo : ''}.${pdf ? 'pdf' : 'png'}`;
     const blob = pdf ? pdfPagina(cv, PAPEL[tam][0], PAPEL[tam][1]) : await new Promise(r => cv.toBlob(r, 'image/png'));
@@ -1144,25 +1208,25 @@ document.addEventListener('click', async e => {
   if (a === 'rep-copiar') { const x = repDoQr(); if (x) { try { await navigator.clipboard.writeText(linkRep(x.codigo)); aviso('Link copiado.'); } catch (err) { aviso(linkRep(x.codigo)); } } }
   if (a === 'sim-salvar') { const S = UIp.sim, d = { preco: numBR(S.preco), loja: numBR(S.loja), imp: numBR(S.imp), regime: S.regime || 'simples' };
     if (!(d.preco > 0) || !(d.loja >= 0 && d.loja <= 100) || !(d.imp >= 0 && d.imp <= 100)) { aviso('Confira os números.'); return; }
-    b.disabled = true; try { if (MOCK) UIp.simMock = { ...d, em: Date.now() }; else await notasServidor('sim-salvar', d); UIp.simMexido = false; aviso('Valores salvos.'); await carregarReps(); } catch (err) { aviso(err.message); b.disabled = false; } }
+    b.disabled = true; try { if (MOCK) UIp.simMock = { ...d, em: Date.now() }; else await notasServidor('sim-salvar', d); UIp.simMexido = false; aviso('Valores salvos.'); await carregarReps(); } catch (err) { registrarErro(err, 'acao'); aviso(err.message); b.disabled = false; } }
   if (a === 'parceiro') { ir('parceiro'); carregarParceiro(); }
   if (a === 'parc-ler') { UIp.parcLer = !UIp.parcLer; render(); }
-  if (a === 'parc-qr') { UIp.repqr = '_meu'; UIp.repFmt = UIp.repFmt || 'a6'; ir('donorepqr'); await (document.fonts ? document.fonts.ready : null); const x = repDoQr(), im = $('rep-cartao'); if (x && im) { try { UIp.repCv = UIp.repFmt === 'a3' ? await posterGrande(x) : UIp.repFmt === 'a4' ? posterRep(x) : cartaoRep(x); im.src = UIp.repCv.toDataURL('image/jpeg', .85); } catch (err) { aviso('Não consegui montar a arte. Tente de novo.'); } const gm = $('rep-gerando'); if (gm) gm.remove(); } }
+  if (a === 'parc-qr') { UIp.repqr = '_meu'; UIp.repFmt = UIp.repFmt || 'a6'; ir('donorepqr'); await (document.fonts ? document.fonts.ready : null); const x = repDoQr(), im = $('rep-cartao'); if (x && im) { try { UIp.repCv = UIp.repFmt === 'a3' ? await posterGrande(x) : UIp.repFmt === 'a4' ? posterRep(x) : cartaoRep(x); im.src = UIp.repCv.toDataURL('image/jpeg', .85); } catch (err) { registrarErro(err, 'acao'); aviso('Não consegui montar a arte. Tente de novo.'); } const gm = $('rep-gerando'); if (gm) gm.remove(); } }
   if (a === 'parc-aceitar') { if (!$('parc-li') || !$('parc-li').checked) { aviso('Marque "Li e aceito" para continuar.'); return; }
-    b.disabled = true; try { await parceiroServidor('aceitar', { cond: condRep(UIp.parc.rep) }); aviso('Termo aceito. Obrigado!'); await carregarParceiro(); } catch (err) { aviso(err.message); b.disabled = false; } }
+    b.disabled = true; try { await parceiroServidor('aceitar', { cond: condRep(UIp.parc.rep) }); aviso('Termo aceito. Obrigado!'); await carregarParceiro(); } catch (err) { registrarErro(err, 'acao'); aviso(err.message); b.disabled = false; } }
   if (a === 'parc-termo-pdf' || a === 'parc-rel-pdf') { const P = UIp.parc; if (!P || !P.rep) return; b.disabled = true;
     try { await (document.fonts ? document.fonts.ready : null); const termo = a === 'parc-termo-pdf', x = P.rep;
       const pags = termo ? termoRep(x, P.empresa, simDe(P.simulador)) : relatorioRepPDF(x, P.empresa);
-      await enviarPDF(pdfPaginas(pags, 595.28, 841.89), `PelotaFC_${termo ? 'termo_parceria' : 'relatorio_' + mesRef().id}_${x.codigo}.pdf`, termo ? 'Termo de parceria Pelota FC' : 'Relatório Pelota FC'); } catch (err) { aviso('Não consegui gerar o PDF. Tente de novo.'); }
+      await enviarPDF(pdfPaginas(pags, 595.28, 841.89), `PelotaFC_${termo ? 'termo_parceria' : 'relatorio_' + mesRef().id}_${x.codigo}.pdf`, termo ? 'Termo de parceria Pelota FC' : 'Relatório Pelota FC'); } catch (err) { registrarErro(err, 'acao'); aviso('Não consegui gerar o PDF. Tente de novo.'); }
     b.disabled = false; }
   if (a === 'empresa-salvar') { const d = { nome: ($('e-nome').value || '').trim(), cnpj: ($('e-cnpj').value || '').replace(/\D/g, ''), cidade: ($('e-cidade').value || '').trim() };
     if (!d.nome) { aviso('Coloque a razão social.'); return; } if (d.cnpj && d.cnpj.length !== 14) { aviso('CNPJ incompleto.'); return; }
-    b.disabled = true; try { if (MOCK) UIp.empMock = { ...d, em: Date.now() }; else await notasServidor('empresa-salvar', d); aviso('Dados da empresa salvos.'); await carregarReps(); } catch (err) { aviso(err.message); b.disabled = false; } }
+    b.disabled = true; try { if (MOCK) UIp.empMock = { ...d, em: Date.now() }; else await notasServidor('empresa-salvar', d); aviso('Dados da empresa salvos.'); await carregarReps(); } catch (err) { registrarErro(err, 'acao'); aviso(err.message); b.disabled = false; } }
   if (a === 'rep-termo' || a === 'rep-relpdf') { const x = ((UIp.reps || {}).lista || []).find(r => r.id === v); if (!x) return;
     if (!(UIp.reps || {}).empresa) { aviso('Antes, preencha os dados da empresa (logo acima).'); return; }
     b.disabled = true; try { await (document.fonts ? document.fonts.ready : null); const termo = a === 'rep-termo', pags = termo ? termoRep(x, UIp.reps.empresa, UIp.sim || SIM0) : relatorioRepPDF(x, UIp.reps.empresa);
       const nome = `PelotaFC_${termo ? 'termo_parceria' : 'relatorio_' + mesRef().id}_${x.codigo}.pdf`;
-      await enviarPDF(pdfPaginas(pags, 595.28, 841.89), nome, termo ? `Termo de parceria Pelota FC · ${x.nome}` : `Relatório Pelota FC · ${x.nome}`); } catch (err) { aviso('Não consegui gerar o PDF. Tente de novo.'); }
+      await enviarPDF(pdfPaginas(pags, 595.28, 841.89), nome, termo ? `Termo de parceria Pelota FC · ${x.nome}` : `Relatório Pelota FC · ${x.nome}`); } catch (err) { registrarErro(err, 'acao'); aviso('Não consegui gerar o PDF. Tente de novo.'); }
     b.disabled = false; }
   if (a === 'rep-copiar-pix') { const x = ((UIp.reps || {}).lista || []).find(r => r.id === v); if (x) { const k = x.pix || x.contato; try { await navigator.clipboard.writeText(k); aviso('Chave Pix copiada.'); } catch (err) { aviso(k); } } }
   if (a === 'rep-relatorio') { const x = ((UIp.reps || {}).lista || []).find(r => r.id === v); if (!x || !x.whats) return; let n = x.whats.replace(/\D/g, ''); if (n.length <= 11) n = '55' + n;
@@ -1176,8 +1240,8 @@ document.addEventListener('click', async e => {
   if (a === 'dono-met') { UIp.painel.met = v; render(); }
   if (a === 'notas') { const d = new Date(Date.now() - 3 * 36e5); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); UIp.nf = { mes: d.toISOString().slice(0, 7) }; ir('notas'); carregarNotas(); }
   if (a === 'nf-mes') { const [y, m] = UIp.nf.mes.split('-').map(Number), d = new Date(Date.UTC(y, m - 1 + Number(v), 1)); UIp.nf.mes = d.toISOString().slice(0, 7); carregarNotas(); }
-  if (a === 'nf-emitir') { b.disabled = true; b.textContent = 'Emitindo… (pode levar um minuto)'; try { const r = await notasServidor('emitir', { mes: UIp.nf.mes }); aviso(r.ok ? `${r.ok} nota${r.ok === 1 ? '' : 's'} emitida${r.ok === 1 ? '' : 's'}.` : 'Nenhuma nota nova emitida. Veja a situação de cada uma.'); } catch (err) { aviso(err.message); } carregarNotas(); }
-  if (a === 'nf-pdf') { b.disabled = true; try { baixarPdf(await notasServidor('pdf', { mes: UIp.nf.mes, gid: v })); } catch (err) { aviso(err.message); } b.disabled = false; }
+  if (a === 'nf-emitir') { b.disabled = true; b.textContent = 'Emitindo… (pode levar um minuto)'; try { const r = await notasServidor('emitir', { mes: UIp.nf.mes }); aviso(r.ok ? `${r.ok} nota${r.ok === 1 ? '' : 's'} emitida${r.ok === 1 ? '' : 's'}.` : 'Nenhuma nota nova emitida. Veja a situação de cada uma.'); } catch (err) { registrarErro(err, 'acao'); aviso(err.message); } carregarNotas(); }
+  if (a === 'nf-pdf') { b.disabled = true; try { baixarPdf(await notasServidor('pdf', { mes: UIp.nf.mes, gid: v })); } catch (err) { registrarErro(err, 'acao'); aviso(err.message); } b.disabled = false; }
   if (a === 'nf-editar') { UIp.nf.editar = v || null; render(); }
   if (a === 'nf-copiar') { const l = UIp.nf.dados.linhas[Number(v)], txt = textoNota(l, UIp.nf.mes); try { await navigator.clipboard.writeText(txt); aviso('Dados da nota copiados.'); } catch (err) { aviso(txt); } }
   if (a === 'nf-planilha') { const D = UIp.nf.dados, q = x => '"' + String(x ?? '').replace(/"/g, '""') + '"';
@@ -1227,10 +1291,10 @@ document.addEventListener('submit', async e => {
     try { if (MOCK) { const M = UIp.repsMock; if (M.some(x => x.codigo === codigo && x.id !== dados.id)) throw new Error('Esse código já é de outro representante.');
         const i = M.findIndex(x => x.id === dados.id); if (i >= 0) M[i] = { ...M[i], ...dados }; else M.push({ ...dados, id: 'r' + Date.now(), grupos: 0 }); }
       else await notasServidor('rep-salvar', dados);
-      UIp.reps.editar = null; UIp.parcOk = undefined; aviso('Representante salvo.'); await carregarReps(); } catch (err) { aviso(err.message); }
+      UIp.reps.editar = null; UIp.parcOk = undefined; aviso('Representante salvo.'); await carregarReps(); } catch (err) { registrarErro(err, 'acao'); aviso(err.message); }
     OCUPADO = false; return; }
   if (f.id === 'f-parc') { const whats = val('pc-whats').replace(/\D/g, ''); if (whats && (whats.length < 10 || whats.length > 13)) { aviso('Confira o WhatsApp: DDD e número.'); return; }
-    OCUPADO = true; try { await parceiroServidor('dados', { pix: val('pc-pix'), whats }); aviso('Dados salvos.'); await carregarParceiro(); } catch (err) { aviso(err.message); } OCUPADO = false; return; }
+    OCUPADO = true; try { await parceiroServidor('dados', { pix: val('pc-pix'), whats }); aviso('Dados salvos.'); await carregarParceiro(); } catch (err) { registrarErro(err, 'acao'); aviso(err.message); } OCUPADO = false; return; }
   if (f.id === 'f-tomador') { const doc = val('t-doc').replace(/\D/g, '');
     if (!val('t-nome')) { aviso('Coloque o nome completo.'); return; } if (doc.length !== 11 && doc.length !== 14) { aviso('CPF ou CNPJ incompleto.'); return; }
     OCUPADO = true; try { await notasServidor('tomador', { gid: f.dataset.gid, nome: val('t-nome'), doc, email: val('t-email') }); aviso('Dados salvos.'); OCUPADO = false; carregarNotas(); } catch (err) { OCUPADO = false; aviso(err.message); } return; }
@@ -1262,6 +1326,7 @@ document.addEventListener('submit', async e => {
     EU = u;
     if (!u) { if (ABERTO || antes) { window.pararPelada(); if (unsubGrupo) unsubGrupo(); if (unsubPerfil) unsubPerfil(); ABERTO = null; PERFIL = null; GRUPOS = {}; } ir('boas'); return; }
     if (antes === u.uid) return;
+    enviarFilaErros();
     ir('carregando'); await depoisDoLogin();
   });
 })();

@@ -53,6 +53,13 @@ else
     && echo "    ligada: uma cópia por dia, guardada por 4 semanas" \
     || echo "    ⚠️  não deu para ligar agora (o resto foi publicado). Rode o comando de novo mais tarde."
 fi
+echo "==> Registro de erros: apagar sozinho depois de 90 dias"
+if gcloud firestore fields ttls list --project "$PROJ" --format='value(name)' 2>/dev/null | grep -q "erros/fields/expiraEm"; then
+  echo "    já está ligado"
+else
+  gcloud firestore fields ttls update expiraEm --collection-group=erros --enable-ttl --async --project "$PROJ" >/dev/null 2>&1 \
+    && echo "    ligado" || echo "    ⚠️  não deu para ligar agora (o resto foi publicado). Rode o comando de novo mais tarde."
+fi
 echo "==> Limpando cópias antigas do servidor (evita custo de armazenamento)"
 $FB functions:artifacts:setpolicy --project "$PROJ" --location southamerica-east1 --days 1 --force >/dev/null 2>&1 || true
 echo

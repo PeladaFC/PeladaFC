@@ -6,6 +6,7 @@ service cloud.firestore {
 
     function logado() { return request.auth != null; }
     function eu() { return request.auth.uid; }
+    function donoDoApp() { return logado() && request.auth.token.email != null && request.auth.token.email.lower() in get(/databases/$(database)/documents/servidor/plataforma).data.get('emails', []); }
     function grupo(gid) { return get(/databases/$(database)/documents/grupos/$(gid)).data; }
     function grupoDepois(gid) { return getAfter(/databases/$(database)/documents/grupos/$(gid)).data; }
     function admin(gid) { return logado() && exists(/databases/$(database)/documents/grupos/$(gid)) && eu() in grupo(gid).admins; }
@@ -22,6 +23,21 @@ service cloud.firestore {
     }
 
     // Chaves do servidor de notificações: só o servidor acessa (o app não lê nem grava).
+    // Registro técnico de erros do app: quem está logado só cria (sem nome, e-mail, CPF ou telefone); ler e apagar, só o dono do app.
+    match /erros/{id} {
+      allow create: if logado()
+        && request.resource.data.uid == eu()
+        && request.resource.data.keys().hasOnly(['msg', 'stack', 'chave', 'cod', 'tela', 'acao', 'origem', 'uid', 'versao', 'aparelho', 'telaPx', 'pwa', 'em', 'expiraEm'])
+        && request.resource.data.msg is string && request.resource.data.msg.size() <= 500
+        && request.resource.data.stack is string && request.resource.data.stack.size() <= 2000
+        && request.resource.data.aparelho is string && request.resource.data.aparelho.size() <= 250
+        && request.resource.data.tela is string && request.resource.data.tela.size() <= 80
+        && request.resource.data.acao is string && request.resource.data.acao.size() <= 120
+        && request.resource.data.em is int
+        && request.resource.data.expiraEm is timestamp;
+      allow read, delete: if donoDoApp();
+      allow update: if false;
+    }
     match /servidor/{doc} {
       allow read, write: if false;
     }
