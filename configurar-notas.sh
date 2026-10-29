@@ -6,6 +6,11 @@
 set -euo pipefail
 PROJ=pelada-fc-990d6
 echo "==> Quem pode ver o relatório de notas fiscais"
+ATUAIS=$(curl -s "https://firestore.googleapis.com/v1/projects/$PROJ/databases/(default)/documents/servidor/plataforma?mask.fieldPaths=emails" -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "x-goog-user-project: $PROJ" | python3 -c 'import json,sys
+try: print(", ".join(v.get("stringValue","") for v in json.load(sys.stdin)["fields"]["emails"]["arrayValue"].get("values",[])))
+except Exception: print("")' 2>/dev/null || true)
+if [ -n "$ATUAIS" ]; then echo "    Cadastrados hoje: $ATUAIS"; else echo "    Nenhum e-mail cadastrado hoje."; fi
+echo "    ATENÇÃO: a lista nova SUBSTITUI a de hoje. Digite TODOS os e-mails que devem ter acesso."
 echo "    Digite os e-mails usados para ENTRAR no Pelota FC (separados por vírgula)."
 read -r -p "E-mails: " EMAILS </dev/tty
 CORPO=$(EMAILS="$EMAILS" python3 -c 'import json,os,re
