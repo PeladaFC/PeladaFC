@@ -825,6 +825,30 @@ function desenharEscudo(ctx,x,y,w,h){const im=cfg().escudo?FOTO_CACHE[cfg().escu
   ctx.shadowColor='rgba(0,0,0,.4)';ctx.shadowBlur=16;ctx.fillStyle=corEscudo();ctx.fill();ctx.shadowColor='transparent';ctx.lineWidth=Math.max(4,w*.04);ctx.strokeStyle='#F2C12E';ctx.stroke();
   const ini=(cfg().nome||'P').split(/\s+/).filter(t=>t.length>2||/^[A-ZÀ-Ú]/.test(t)).slice(0,2).map(t=>t[0]).join('').toUpperCase()||'P';
   ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font=`800 ${Math.round(h*.38)}px "Saira Condensed", Impact, sans-serif`;ctx.fillText(ini,x+w/2,y+h*.56);ctx.restore()}
+/* anéis em volta da foto do pôster: brilho, degradê, marcações de placar, cometa e faíscas */
+function arcosPoster(ctx,cx,cy,R){const A=(r,a,b,lw,col,cap,glow)=>{ctx.save();ctx.lineCap=cap||'round';ctx.lineWidth=lw;ctx.strokeStyle=col;if(glow){ctx.shadowColor=glow;ctx.shadowBlur=lw*2.2}ctx.beginPath();ctx.arc(cx,cy,r,a,b);ctx.stroke();ctx.restore()};
+  const grad=(c1,c2)=>{const g=ctx.createLinearGradient(cx-R,cy-R,cx+R,cy+R);g.addColorStop(0,c1);g.addColorStop(1,c2);return g};
+  const ponto=(r,a,rad,col,glow)=>{ctx.save();ctx.fillStyle=col;if(glow){ctx.shadowColor=glow;ctx.shadowBlur=rad*3}ctx.beginPath();ctx.arc(cx+r*Math.cos(a),cy+r*Math.sin(a),rad,0,Math.PI*2);ctx.fill();ctx.restore()};
+  const faisca=(r,a,t,col)=>{const x=cx+r*Math.cos(a),y=cy+r*Math.sin(a);ctx.save();ctx.translate(x,y);ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=t*1.4;ctx.beginPath();
+    for(let i=0;i<8;i++){const rr=i%2?t*.28:t,aa=i*Math.PI/4;ctx.lineTo(rr*Math.cos(aa),rr*Math.sin(aa))}ctx.closePath();ctx.fill();ctx.restore()};
+  // halo dourado colado na foto
+  A(R+9,0,Math.PI*2,8,grad('#FFE07A','#F2C12E'),'butt','rgba(242,193,46,.75)');
+  A(R+22,0,Math.PI*2,2,'rgba(255,255,255,.3)','butt');
+  // arco principal em degradê amarelo → laranja, com pontas de luz
+  A(R+62,1.95,2.75,16,grad('#F2C12E','#F0662A'),'round','rgba(240,102,42,.55)');ponto(R+62,1.95,11,'#FFE07A','#F2C12E');
+  A(R+62,4.4,5.4,16,grad('#F0662A','#F2C12E'),'round','rgba(242,193,46,.45)');ponto(R+62,5.4,11,'#FFE07A','#F2C12E');
+  // marcações de placar (tiques)
+  ctx.save();ctx.strokeStyle='rgba(255,255,255,.30)';ctx.lineCap='round';for(let i=0;i<=40;i++){const a=-1.35+i*(1.75/40),big=i%5===0,r1=R+100,r2=r1+(big?26:12);ctx.lineWidth=big?5:3;
+    ctx.beginPath();ctx.moveTo(cx+r1*Math.cos(a),cy+r1*Math.sin(a));ctx.lineTo(cx+r2*Math.cos(a),cy+r2*Math.sin(a));ctx.stroke()}ctx.restore();
+  // cometa: rastro que vai sumindo
+  { const a0=1.55,a1=2.55;let st='rgba(242,193,46,.6)';if(ctx.createConicGradient){const cg=ctx.createConicGradient(a0,cx,cy);cg.addColorStop(0,'rgba(255,224,122,.95)');cg.addColorStop((a1-a0)/(Math.PI*2),'rgba(242,193,46,0)');cg.addColorStop(1,'rgba(242,193,46,0)');st=cg}
+    A(R+150,a0,a1,14,st,'butt');ponto(R+150,a0,13,'#FFF3C4','#F2C12E') }
+  // arco fino tracejado por fora
+  ctx.save();ctx.setLineDash([2,18]);A(R+190,-.4,.9,6,'rgba(240,102,42,.7)','round');ctx.restore();
+  A(R+190,3.3,4.15,4,'rgba(255,255,255,.22)','round');
+  // faíscas nas pontas
+  faisca(R+62,2.75,22,'#FFE07A');faisca(R+190,.9,16,'#F0662A');faisca(R+120,-1.45,14,'#FFFFFF');
+}
 /* arte estilo pôster: título gigante empilhado, foto grande em círculo com anéis */
 const POSTER_TIT={mvp:['CRA','QUE'],art:['ARTI','LHEIRO'],gar:['GAR','ÇOM'],def:['XERIFE',''],gol:['GOLEI','RO']};
 function espacado(ctx,txt,x,y,sp){ctx.save();ctx.textAlign='left';let w=0;for(const ch of txt)w+=ctx.measureText(ch).width+sp;w-=sp;let cx=x-w/2;for(const ch of txt){ctx.fillText(ch,cx,y);cx+=ctx.measureText(ch).width+sp}ctx.restore()}
@@ -837,8 +861,7 @@ function artePoster(p,k,story){
   const gl=ctx.createRadialGradient(Y.cx-50,Y.cy-40,40,Y.cx-50,Y.cy-40,620);gl.addColorStop(0,'rgba(242,193,46,.16)');gl.addColorStop(1,'rgba(242,193,46,0)');ctx.fillStyle=gl;ctx.fillRect(0,0,W,H);
   // anéis concêntricos atrás da foto
   const cx=Y.cx,cy=Y.cy,R=Y.R;ctx.lineCap='butt';
-  [[R+40,4,'#F2C12E',[-.5,1.1]],[R+80,14,'rgba(242,193,46,.55)',[2.3,3.6]],[R+80,14,'rgba(240,102,42,.7)',[4.1,5.0]],[R+125,4,'rgba(255,255,255,.25)',[-1.3,.4]],[R+125,4,'rgba(255,255,255,.25)',[1.6,2.9]],[R+165,22,'rgba(240,102,42,.55)',[-.15,.5]],[R+165,22,'rgba(242,193,46,.35)',[3.3,4.0]]]
-    .forEach(([r,lw,col,[a,b]])=>{ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.beginPath();ctx.arc(cx,cy,r,a,b);ctx.stroke()});
+  arcosPoster(ctx,cx,cy,R);
   // foto
   const im=imgDe(id);ctx.fillStyle=POSCOR[j.pos]||'#555';ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fill();
   if(im)circFoto(ctx,im,cx,cy,R);else{ctx.fillStyle='rgba(255,255,255,.95)';ctx.textAlign='center';ctx.font=`800 300px ${FAM}`;ctx.fillText(initials(nm(id)),cx,cy+105)}
