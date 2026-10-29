@@ -271,8 +271,7 @@ function render() {
       <div class="dica-foto"><b>📸 Para a foto ficar boa</b><ul><li>De rosto, olhando para a câmera</li><li>Rosto no centro, do peito para cima</li><li>Lugar claro, sem luz atrás de você</li><li>Sem boné ou óculos escuros cobrindo o rosto</li></ul></div>
       <label class="field"><span>Nome</span><input type="text" id="p-nome" value="${escH(p.nome || EU.nome || '')}" required></label>
       <label class="field"><span>Apelido</span><input type="text" id="p-ap" value="${escH(p.apelido || '')}" placeholder="Como te chamam no campo"></label>
-      <div class="grid2"><label class="field"><span>Cidade</span><input type="text" id="p-cidade" value="${escH(UIp.pcid ?? p.cidade ?? '')}" placeholder="Recife" autocomplete="address-level2"></label>
-      <label class="field"><span>Estado</span><select id="p-uf"><option value="">Escolha</option>${UFS.map(u => `<option ${(UIp.puf ?? p.uf) === u ? 'selected' : ''}>${u}</option>`).join('')}</select></label></div>
+      ${campoUFCidade('p', UIp.pcid ?? p.cidade ?? '', UIp.puf ?? p.uf ?? '')}
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
       <button class="btn primary block" type="submit">Salvar</button></form>
@@ -371,8 +370,7 @@ function render() {
   if (t === 'nova') h = topo('minhas') + `<h2>Criar sua pelada</h2><p class="lead">Depois você ajusta tudo nos Ajustes.</p>
     <form id="f-nova" class="stack" novalidate>
       <label class="field"><span>Nome da pelada</span><input type="text" id="n-nome" placeholder="Pelada do Sábado" required></label>
-      <div class="grid2"><label class="field"><span>Cidade</span><input type="text" id="n-cidade" placeholder="Recife" autocomplete="address-level2"></label>
-      <label class="field"><span>Estado</span><select id="n-uf"><option value="">Escolha</option>${UFS.map(u => `<option>${u}</option>`).join('')}</select></label></div>
+      ${campoUFCidade('n', (PERFIL && PERFIL.cidade) || '', (PERFIL && PERFIL.uf) || '')}
       <div class="field"><span>Tipo</span><div class="pick" id="n-tipo"><button type="button" data-sh="tipo-pel" data-v="fixa" aria-pressed="true">Fixa (toda semana)</button><button type="button" data-sh="tipo-pel" data-v="evento" aria-pressed="false">Evento livre</button></div>
         <p class="sub" id="n-tipo-txt" style="margin:4px 0 0">Tem mensalistas e diaristas, e acontece toda semana no mesmo dia.</p></div>
       <div class="grid2"><label class="field" id="n-dia-box"><span>Dia fixo</span><select id="n-dia">${DIASN.map((d, i) => `<option value="${i}" ${i === 6 ? 'selected' : ''}>${d}</option>`).join('')}</select></label>

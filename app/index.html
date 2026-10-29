@@ -210,6 +210,14 @@ nav.tabs button[aria-current="page"]{color:var(--pitch)}
 .sheet-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;position:sticky;top:-16px;background:var(--bg);padding-block:6px;z-index:1}
 .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;font-size:14px;z-index:60;max-width:calc(100% - 32px)}
 .empty{text-align:center;padding:22px 10px;color:var(--muted)}
+.ufcid{display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px}
+.cidbtn{width:100%;min-height:42px;border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:9px 30px 9px 10px;text-align:left;font:inherit;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+.cidbtn.vazio{color:var(--muted)}
+.cidpick{z-index:95}.cidpick .sheet{height:86%;display:flex;flex-direction:column;overflow:hidden}
+.cidpick input[type=search]{flex-shrink:0;margin-bottom:8px;font-size:16px}
+.cidlista{overflow:auto;flex:1;-webkit-overflow-scrolling:touch;margin:0 -4px}
+.cidlista button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;padding:13px 6px;font:inherit;color:var(--ink)}
+.cidlista button[aria-selected]{font-weight:700;color:var(--pitch)}
 .hist{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
 .hist:first-child{border-top:0}
 .hist{flex-wrap:wrap}.hist>.grow{min-width:140px}.hist-bt{flex:1 1 100%;display:grid!important;grid-template-columns:repeat(4,1fr)}.hist-bt .btn{min-width:0;padding-inline:4px}
@@ -581,9 +589,9 @@ label.btn{position:relative;cursor:pointer}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261029b"></script>
-<script src="br.js?v=20261029b"></script>
-<script src="core.js?v=20261029b"></script>
-<script type="module" src="app.js?v=20261029b"></script>
+<script src="qrcode.js?v=20261029c"></script>
+<script src="br.js?v=20261029c"></script>
+<script src="core.js?v=20261029c"></script>
+<script type="module" src="app.js?v=20261029c"></script>
 </body>
 </html>

@@ -2119,7 +2119,7 @@ function sheetCfg(){
   const c=cfg();F={restr:(c.restr||[]).slice(),golSorteio:!!c.golSorteio};
   openSheet('Ajustes da pelada',`<div class="stack">
     <label class="field"><span>Nome da pelada</span><input type="text" id="c-nome" value="${esc(c.nome)}"></label>
-    <div class="grid2"><label class="field"><span>Cidade</span><input type="text" id="c-cidade" value="${esc(c.cidade||(c.uf?'':'Recife'))}" placeholder="Recife" autocomplete="address-level2"></label><label class="field"><span>Estado</span><select id="c-uf"><option value="">Escolha</option>${UFS.map(u=>`<option ${(c.uf||'PE')===u?'selected':''}>${u}</option>`).join('')}</select></label></div>
+    ${campoUFCidade('c',c.cidade||(c.uf?'':'Recife'),c.uf||'PE')}
     <div class="grid2"><label class="field"><span>Dia fixo</span><select id="c-dia">${DIAS.map((d,i)=>`<option value="${i}" ${c.dia==i?'selected':''}>${d}</option>`).join('')}</select></label>
     <label class="field"><span>Início</span><input type="time" id="c-hora" value="${esc(c.hora)}"></label></div>
     <label class="field"><span>Término</span><input type="time" id="c-fim" value="${esc(horaFimDe(null))}"></label>
@@ -2955,3 +2955,29 @@ function pdfCampeonato(pid){const p=S.pel[pid];if(!p)return null;const c=cfg(),T
   if(vv){vv.addEventListener('resize',agenda);vv.addEventListener('scroll',agenda)}
   window.addEventListener('resize',agenda);window.addEventListener('scroll',agenda,{passive:true});window.addEventListener('orientationchange',firmar);
   window.addEventListener('pageshow',firmar);document.addEventListener('visibilitychange',()=>{if(!document.hidden)firmar()});document.addEventListener('focusout',firmar)})();
+
+/* ---------- Estado + Cidade: escolhe o estado e depois a cidade numa lista (rola ou digita) ---------- */
+let CIDADES_P=null;
+function cidadesUF(uf){if(!CIDADES_P)CIDADES_P=fetch('cidades.json?v=1').then(r=>r.ok?r.json():Promise.reject()).catch(()=>{CIDADES_P=null;return null});return CIDADES_P.then(d=>d?(d[uf]||[]):null)}
+const cidN=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+function campoUFCidade(pre,cidade,uf){cidade=cidade||'';uf=uf||'';
+  return`<div class="ufcid"><label class="field"><span>Estado</span><select id="${pre}-uf" data-ufcid="${pre}"><option value="">Escolha</option>${UFS.map(u=>`<option ${uf===u?'selected':''}>${u}</option>`).join('')}</select></label>
+  <div class="field"><span>Cidade</span><input type="hidden" id="${pre}-cidade" value="${esc(cidade)}"><button type="button" class="cidbtn${cidade?'':' vazio'}" id="${pre}-cidbtn" data-cidpick="${pre}">${esc(cidade||(uf?'Toque para escolher':'Escolha o estado antes'))}</button></div></div>`}
+function cidPor(pre,nome){const h=document.getElementById(pre+'-cidade'),b=document.getElementById(pre+'-cidbtn'),uf=(document.getElementById(pre+'-uf')||{}).value;if(h)h.value=nome||'';if(b){b.textContent=nome||(uf?'Toque para escolher':'Escolha o estado antes');b.classList.toggle('vazio',!nome)}}
+function abrirCidades(pre){const uf=(document.getElementById(pre+'-uf')||{}).value;if(!uf){toast('Escolha o estado primeiro.');const s=document.getElementById(pre+'-uf');if(s)s.focus();return}
+  const atual=(document.getElementById(pre+'-cidade')||{}).value||'',el=document.createElement('div');el.className='scrim cidpick';
+  el.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="Escolher cidade"><div class="sheet-h"><h2>Cidade · ${esc(uf)}</h2><button type="button" class="iconbtn" data-cidx aria-label="Fechar">✕</button></div>
+    <input type="search" placeholder="Digite o nome da cidade" aria-label="Procurar cidade" autocomplete="off" enterkeyhint="done"><div class="cidlista" role="listbox"><p class="sub" style="padding:10px 2px">Carregando as cidades…</p></div></div>`;
+  document.body.appendChild(el);const q=el.querySelector('input'),L=el.querySelector('.cidlista');let todas=[];
+  const fecha=()=>{el.remove();const b=document.getElementById(pre+'-cidbtn');if(b)b.focus({preventScroll:true})};
+  const pinta=()=>{const t=cidN(q.value),l=t?todas.filter(c=>cidN(c).includes(t)).sort((a,b)=>cidN(a).startsWith(t)===cidN(b).startsWith(t)?0:cidN(a).startsWith(t)?-1:1):todas;
+    L.innerHTML=l.map(c=>`<button type="button" role="option" data-cid="${esc(c)}"${cidN(c)===cidN(atual)?' aria-selected="true"':''}>${esc(c)}</button>`).join('')||(todas.length?`<p class="sub" style="padding:10px 2px">Nenhuma cidade com esse nome em ${esc(uf)}.</p>`:'')
+      +(!todas.length&&q.value.trim()?`<button type="button" data-cid="${esc(q.value.trim())}">Usar “${esc(q.value.trim())}”</button>`:'')};
+  el.addEventListener('click',e=>{if(e.target===el||e.target.closest('[data-cidx]'))return fecha();const b=e.target.closest('[data-cid]');if(b){cidPor(pre,b.dataset.cid);fecha()}});
+  el.addEventListener('keydown',e=>{if(e.key==='Escape')fecha();if(e.key==='Enter'){e.preventDefault();const b=L.querySelector('[data-cid]');if(b)b.click()}});
+  q.addEventListener('input',pinta);
+  cidadesUF(uf).then(l=>{if(!el.isConnected)return;if(l===null){L.innerHTML='<p class="sub" style="padding:10px 2px">Não consegui carregar a lista agora. Digite o nome da cidade acima.</p>';return}todas=l;pinta();const s=L.querySelector('[aria-selected]');if(s)s.scrollIntoView({block:'center'})});
+  setTimeout(()=>{if(matchMedia('(pointer:fine)').matches)q.focus()},50)}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-cidpick]');if(b){e.preventDefault();e.stopPropagation();abrirCidades(b.dataset.cidpick)}},true);
+document.addEventListener('change',e=>{const s=e.target;if(!s.dataset||!s.dataset.ufcid)return;const pre=s.dataset.ufcid,c=(document.getElementById(pre+'-cidade')||{}).value||'';
+  if(!s.value){cidPor(pre,'');return}if(!c){cidPor(pre,'');return}cidadesUF(s.value).then(l=>{if(l&&!l.some(x=>cidN(x)===cidN(c)))cidPor(pre,'')})});
