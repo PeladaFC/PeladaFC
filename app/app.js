@@ -601,8 +601,10 @@ async function notasServidor(acao, extra) {
   }
   let t = null; try { t = await B.token(); } catch (e) { }
   if (!t) throw new Error('Entre na sua conta de novo.');
-  let r; try { r = await fetch(URL_NOTAS, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify({ acao, ...(extra || {}) }) }); }
-  catch (e) { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
+  const ac = acao === 'acesso' && window.AbortController ? new AbortController() : null, tm = ac && setTimeout(() => ac.abort(), 15000);
+  let r; try { r = await fetch(URL_NOTAS, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify({ acao, ...(extra || {}) }), signal: ac ? ac.signal : undefined }); }
+  catch (e) { throw new Error(ac && ac.signal.aborted ? 'O servidor demorou para responder. Tente de novo.' : 'Sem conexão com o servidor. Tente de novo.'); }
+  finally { if (tm) clearTimeout(tm); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(j.erro || 'Não deu certo agora. Tente de novo.'), { status: r.status });
   return j;
@@ -1332,6 +1334,7 @@ document.addEventListener('submit', async e => {
     if (antes === u.uid) return;
     enviarFilaErros();
     ir('carregando'); await depoisDoLogin();
+    if (ABRIR === 'dono') { ABRIR = null; history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); aviso('Verificando o acesso ao painel…'); notasServidor('acesso').then(() => { ls.set('pelota.dono.' + EU.uid, '1'); UIp.notasOk = true; ir('dono'); carregarPainel(); }, e => alert(e && e.status === 403 ? 'A conta ' + (EU.email || '(sem e-mail)') + ' não está cadastrada como dona do app. Entre com o e-mail cadastrado ou cadastre este e-mail.' : 'Não consegui verificar: ' + ((e && e.message) || 'erro'))); }
     if (ABRIR === 'erros') { ABRIR = null; history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); notasServidor('acesso').then(() => { ir('donoerros'); carregarErros(); }, () => { }); }
   });
 })();
