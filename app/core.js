@@ -2707,7 +2707,7 @@ function obRender(){
     <label class="field"><span>E-mail</span><input type="text" id="ob-email2" inputmode="email" placeholder="seu@email.com"></label>
     <label class="field"><span>Senha</span><input type="password" id="ob-senha2" placeholder="Mínimo de 8 caracteres"></label>
     <button class="btn primary block" data-act="ob" data-v="escolha">Continuar</button>
-    <p class="sub" style="text-align:center;margin:0">Ao continuar, você aceita os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>`;
+    <p class="sub" style="text-align:center;margin:0">Ao continuar, você aceita os <a href="/termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>`;
   if(st==='escolha')h=top('criar')+prog(2,3)+`<h2>O que você quer fazer?</h2><p class="lead">Dá para fazer as duas coisas depois. Escolha por onde começar.</p>
     <button class="ob-opt" data-act="ob-tipo" data-v="organizar"><span class="ic">📋</span><span class="grow"><b>Organizar uma pelada</b><span class="sub">Crie a pelada, convide a galera e vire o administrador.</span></span></button>
     <button class="ob-opt" data-act="ob-tipo" data-v="jogar"><span class="ic">⚽</span><span class="grow"><b>Jogar numa pelada</b><span class="sub">Recebeu um convite? Entre com o link ou o código.</span></span></button>

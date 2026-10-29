@@ -256,7 +256,7 @@ function render() {
       <button class="btn primary block" type="submit">Criar conta</button></form>
     <div class="ob-div">ou</div>
     <button class="btn block ob-google" data-sh="google">Continuar com o Google</button>
-    <p class="sub" style="text-align:center;margin:0">Ao criar a conta, você aceita os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>`;
+    <p class="sub" style="text-align:center;margin:0">Ao criar a conta, você aceita os <a href="/termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>`;
   if (t === 'perfil' && EU && UIp.parcOk === undefined) { UIp.parcOk = ls.get('pelota.parc.' + EU.uid) === '1' ? true : null; carregarParceiro(true); }
   if (t === 'perfil' && EU && UIp.notasOk === undefined) { const ck = 'pelota.dono.' + EU.uid, tinha = ls.get(ck) === '1'; UIp.notasOk = tinha ? true : null; UIp.notasErro = null; notasServidor('acesso').then(() => { ls.set(ck, '1'); UIp.notasOk = true; if (TELA === 'perfil' && !tinha) render(); }, e => { if (e && e.status === 403) { ls.set(ck, null); UIp.notasOk = false; if (TELA === 'perfil' && tinha) render(); } else if (!tinha) { UIp.notasOk = null; UIp.notasErro = (e && e.message) || 'erro'; if (TELA === 'perfil') render(); } }); }
   if (t === 'perfil') { const p = PERFIL || {}; const pos = UIp.pos || p.pos || 'MEI'; const pronto = !!(p.apelido || p.pos);
@@ -277,7 +277,7 @@ function render() {
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
       <button class="btn primary block" type="submit">Salvar</button></form>
     ${EU ? `<button class="btn block" data-sh="sair">Sair da conta</button>${EU.email ? `<p class="sub" style="text-align:center">Você entrou como: <b>${escH(EU.email)}</b></p>` : ''}
-      <p class="sub" style="text-align:center;margin:0"><a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
+      <p class="sub" style="text-align:center;margin:0"><a href="/termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="/privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
       <button class="btn sm" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
   if (t === 'dono') h = topo('perfil') + abasDono('dono') + telaDono();
   if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + telaGruposDono();
@@ -1113,7 +1113,7 @@ async function chavePublica() {
   const r = await fetch(URL_CHAVE, { cache: 'no-store' }); if (!r.ok) throw new Error('sem servidor');
   return (PUSH.pub = (await r.json()).publica);
 }
-async function regSW() { if (!('serviceWorker' in navigator)) return null; try { return await navigator.serviceWorker.register('sw.js', { scope: './' }); } catch (e) { console.warn(e); return null; } }
+async function regSW() { if (!('serviceWorker' in navigator)) return null; try { return await navigator.serviceWorker.register('/sw.js', { scope: '/' }); } catch (e) { console.warn(e); return null; } }
 async function avaliarPush() {
   let est;
   if (ehIOS && !noIcone()) est = 'abrir-icone';

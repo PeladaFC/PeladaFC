@@ -7,7 +7,7 @@ self.addEventListener('push', e => {
   // sempre mostra algo: o iPhone cancela a permissão de quem recebe aviso "silencioso"
   e.waitUntil(Promise.all([self.registration.showNotification(d.title || 'Pelota FC', {
     body: d.body || 'Tem novidade na pelada.', tag: d.tag || undefined, icon: 'icon-192.png', badge: 'icon-192.png',
-    data: { url: d.url || self.registration.scope }
+    data: { url: d.url || self.registration.scope + 'app/' }
   }), somaContador()]));
 });
 // número no ícone do app (iPhone com o app na tela de início e Android): soma 1 a cada aviso; o app zera quando é aberto
@@ -18,9 +18,9 @@ async function somaContador() {
 }
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || self.registration.scope;
+  const url = (e.notification.data && e.notification.data.url) || self.registration.scope + 'app/';
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
-    for (const c of cs) if (c.url.startsWith(self.registration.scope) && 'focus' in c) { if (url.includes('abrir=') && 'navigate' in c) return c.navigate(url).then(x => (x || c).focus()); return c.focus(); }
+    for (const c of cs) if (c.url.startsWith(self.registration.scope + 'app/') && 'focus' in c) { if (url.includes('abrir=') && 'navigate' in c) return c.navigate(url).then(x => (x || c).focus()); return c.focus(); }
     return self.clients.openWindow(url);
   }));
 });
