@@ -60,9 +60,18 @@ exports.chavePush = onRequest({ cors: true, maxInstances: 3 }, async (req, res) 
 async function enviarPara(uids, aviso) {
   await chaves();
   const lista = [...new Set(uids || [])].slice(0, MAX_DESTINOS);
-  const payload = JSON.stringify({ title: aviso.titulo, body: aviso.texto, tag: aviso.tag || undefined, url: aviso.url || URL_APP });
+  const base = { title: aviso.titulo, body: aviso.texto, tag: aviso.tag || undefined, url: aviso.url || URL_APP };
+  // convocação: cada pessoa recebe os botões "Vou" e "Não vou" com uma chave só dela (vale só para essa pelada)
+  const payloadDe = uid => {
+    if (!aviso.rsvp) return JSON.stringify(base);
+    const { g, p } = aviso.rsvp;
+    return JSON.stringify({ ...base, url: `${URL_APP}?g=${encodeURIComponent(g)}&p=${encodeURIComponent(p)}&r=ver`,
+      actions: [{ action: 'sim', title: '✅ Vou' }, { action: 'nao', title: '❌ Não vou' }],
+      rsvp: { g, p, u: uid, k: chaveResp(g, p, uid) } });
+  };
   let ok = 0, mortos = 0;
   await Promise.all(lista.map(async uid => {
+    const payload = payloadDe(uid);
     const subs = await db.collection(`users/${uid}/push`).get();
     await Promise.all(subs.docs.map(async d => {
       const s = d.data();
@@ -88,6 +97,45 @@ async function avisarErros() {
   await enviarPara(uids, { titulo: 'Pelota FC · erros no app', texto: `${n} erro${n === 1 ? '' : 's'} novo${n === 1 ? '' : 's'} desde ontem (${tipos} tipo${tipos === 1 ? '' : 's'}). Abra o Painel do dono → Erros.`, tag: 'erros-app', url: URL_APP + '?abrir=erros' });
 }
 async function enviarTodos(avisos) { for (const a of avisos) if (a && a.para && a.para.length) await enviarPara(a.para, a); }
+
+/* ---------- "Vou" / "Não vou" direto da notificação (Android) ----------
+   A chave vai só no aviso que chega no celular daquela pessoa e vale só para aquela pelada.
+   Abrir um endereço não confirma nada: só o botão da notificação, que manda a chave. */
+const crypto = require('crypto');
+function chaveResp(g, p, u) { return crypto.createHmac('sha256', CHAVES.privada).update(`resp|${g}|${p}|${u}`).digest('base64url').slice(0, 32); }
+const okId = x => typeof x === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(x);
+exports.respostaPush = onRequest({ cors: true, maxInstances: 5 }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') return res.status(405).json({ ok: false });
+    const { g, p, u, k, r, a } = req.body || {};
+    if (![g, p, u].every(okId) || typeof k !== 'string' || !['sim', 'nao', 'desfazer'].includes(r)) return res.status(400).json({ ok: false, titulo: 'Não deu certo', texto: 'Abra o app para responder.' });
+    await chaves();
+    const certa = Buffer.from(chaveResp(g, p, u)), veio = Buffer.from(k);
+    if (certa.length !== veio.length || !crypto.timingSafeEqual(certa, veio)) return res.status(403).json({ ok: false, titulo: 'Não deu certo', texto: 'Abra o app para responder.' });
+    const ctx = await contexto(g, { jog: true, pres: true });
+    const ps = await db.doc(`grupos/${g}/peladas/${p}`).get();
+    if (!ps.exists) return res.json({ ok: false, titulo: 'Pelada cancelada', texto: 'Essa pelada foi cancelada ou não existe mais.' });
+    const P = ps.data(), quando = `${R.dShort(P.data)} às ${R.horaIni(P, ctx.cfg)}`;
+    if (P.status === 'encerrada' || Date.now() >= R.inicioMs(P, ctx.cfg)) return res.json({ ok: false, titulo: 'Prazo encerrado', texto: `A confirmação da pelada de ${quando} já fechou.` });
+    const doc = ctx.pres[u], jid = doc && doc.jogador;
+    if (!jid || !ctx.jog[jid] || ctx.jog[jid].ativo === false) return res.json({ ok: false, titulo: 'Ainda não dá para responder', texto: 'Sua conta ainda não foi liberada pelo administrador desta pelada.' });
+    const pel = { ...(doc.pel || {}) }, ant = pel[p] || null, ref = db.doc(`grupos/${g}/presencas/${u}`);
+    if (r === 'desfazer') {
+      const volta = a && typeof a === 'object' && ['sim', 'nao', null].includes(a.s ?? null) && Number.isFinite(Number(a.t)) ? { s: a.s ?? null, t: Number(a.t), a: a.a ?? null, esp: !!a.esp, ...(a.via ? { via: String(a.via).slice(0, 8) } : {}) } : null;
+      if (volta) pel[p] = volta; else pel[p] = { s: null, t: Date.now(), a: ant ? ant.s : null, via: 'push' };
+      await ref.update({ pel });
+      return res.json({ ok: true, titulo: 'Resposta desfeita', texto: `Pelada de ${quando}. Responda de novo quando quiser.`, desfeito: true });
+    }
+    if (ant && ant.s === r) return res.json({ ok: true, titulo: r === 'sim' ? 'Você já tinha confirmado' : 'Você já tinha avisado que não vai', texto: `Pelada de ${quando}. Nada mudou.` });
+    const cheia = r === 'sim' && R.listaCheiaPara(P, p, ctx, jid);
+    pel[p] = { s: r, t: Date.now(), a: ant ? ant.s : null, esp: cheia, via: 'push' };
+    const fica = Object.fromEntries(Object.entries(pel).sort((x, y) => (x[1].t || 0) - (y[1].t || 0)).slice(-10));
+    await ref.update({ pel: fica });
+    const titulo = r === 'nao' ? 'Ausência registrada' : (cheia || R.ehDiaristaSrv(ctx, jid)) ? 'Pedido enviado' : 'Presença confirmada ✅';
+    const texto = r === 'nao' ? `Você avisou que não vai na pelada de ${quando}.` : cheia ? `A lista está cheia: você foi para a espera da pelada de ${quando}.` : R.ehDiaristaSrv(ctx, jid) ? `Pelada de ${quando}. Agora é aguardar a convocação dos diaristas.` : `Pelada de ${quando}. Bom jogo!`;
+    return res.json({ ok: true, titulo, texto, ant });
+  } catch (e) { logger.error(e); return res.status(500).json({ ok: false, titulo: 'Não deu certo', texto: 'Abra o app para responder.' }); }
+});
 
 /* ---------- contexto do grupo (lido só quando precisa) ---------- */
 async function contexto(gid, { jog = false, pres = false, membros = false, pel = false, caixa = false } = {}) {

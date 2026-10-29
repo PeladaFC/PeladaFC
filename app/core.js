@@ -157,7 +157,7 @@ function pidOf(p){return Object.keys(S.pel).find(k=>S.pel[k]===p)}
 function respDe(p,pid){
   const resp={...(p.resp||{})};pid=pid||pidOf(p);if(!pid)return resp;
   for(const[u,doc] of Object.entries(S.pres||{})){const j=doc.jogador,r=doc.pel&&doc.pel[pid];if(!j||!r)continue;
-    if(!resp[j]||(resp[j].t||0)<(r.t||0))resp[j]={s:r.s,t:r.t,app:true,esp:!!r.esp}}
+    if(!resp[j]||(resp[j].t||0)<(r.t||0))resp[j]={s:r.s,t:r.t,app:true,esp:!!r.esp,via:r.via||null}}
   return resp;
 }
 function vinculo(jid){return Object.entries(S.pres||{}).find(([,d])=>d.jogador===jid)?.[0]||null}
@@ -519,7 +519,7 @@ function msg0(tipo,ctx={}){
   const quando=p?`📅 *${dLong(p.data)}* das *${horaIniDe(p)}* às *${horaFimDe(p)}*`:EV()?'📅 Data a definir':`📅 *${DIAS[c.dia]}* das *${c.hora}* às *${horaFimDe(null)}*`;
   const LL=localDe(p),onde=LL?LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):'';
   const head=`⚽ *${c.nome.toUpperCase()}*`;
-  if(tipo==='convocacao')return[head,quando,onde?'📍 '+onde:'','',`São ${vagasCfg()} vagas na linha + goleiros.${EV()?' Quem confirmar primeiro garante a vaga.':' Mensalista tem prioridade.'}`,...(p&&CX()&&valorTxt(p)?['💰 '+valorTxt(p)+(p.extra?' · evento extra, mensalista também paga':PA(p)?'':' · mensalista já paga na mensalidade')]:[]),'Responda aqui: ✅ vou  |  ❌ não vou'].filter((x,i)=>x!==''||i===3).join('\n');
+  if(tipo==='convocacao')return[head,quando,onde?'📍 '+onde:'','',`São ${vagasCfg()} vagas na linha + goleiros.${EV()?' Quem confirmar primeiro garante a vaga.':' Mensalista tem prioridade.'}`,...(p&&CX()&&valorTxt(p)?['💰 '+valorTxt(p)+(p.extra?' · evento extra, mensalista também paga':PA(p)?'':' · mensalista já paga na mensalidade')]:[]),...(p&&pidOf(p)&&GRUPO&&GRUPO.codigo&&!demo?['\u0001','Responda com um toque (entre no app com a sua conta):','✅ VOU: '+linkResp(pidOf(p),'sim'),'❌ NÃO VOU: '+linkResp(pidOf(p),'nao')]:['Responda aqui: ✅ vou  |  ❌ não vou'])].filter((x,i)=>x!==''||i===3).map(x=>x==='\u0001'?'':x).join('\n');
   if(!p&&tipo!=='pagamento'&&tipo!=='convite'&&tipo!=='prestacao')return head+'\n\nAinda não tem pelada marcada. Marque a próxima no app.';
   if(tipo==='cobrar'){const l=lista(p);if(!l.pend.length)return head+'\n'+quando+'\n\nTodo mundo já respondeu. Valeu! 🙌';
     return[head,quando,'',`⏰ Ainda faltam ${l.pend.length} responder:`,...l.pend.map(id=>'• '+nm(id)),'','Confirma aí pra gente fechar a lista! ✅ ou ❌'].join('\n')}
@@ -1280,6 +1280,7 @@ function subPresenca(pid,p,l,A){
   // prioridade de quem ficou fora da lista (espera, pediu vaga, perdeu o prazo): só o administrador vê
   const ordPed={};l.espera.forEach((id,i)=>ordPed[id]=i+1);
   let h=`<div class="panel"><div class="panel-h"><h3>Quem vai?</h3>${A?'<div class="row"><button class="btn sm" data-act="msg" data-v="convocacao">Convocar</button><button class="btn sm" data-act="msg" data-v="cobrar">Cobrar</button><button class="btn sm primary" data-act="msg" data-v="lista">Lista</button></div>':''}</div>`;
+  if(A)h+=`<button class="btn block" style="margin-bottom:10px" data-act="msg" data-v="convocacao">📲 Mandar no WhatsApp · links “Vou” e “Não vou”</button>`;
   if(!PA(p)&&p.mensAte)h+=`<div class="sub" style="margin:-4px 0 8px">⏳ Mensalistas confirmam até <b>${prazoMensTxt(p)}</b>${Date.now()<p.mensAte?'':' · prazo encerrado'}.</div>`;
   if(A&&!PA(p)&&ativos().some(id=>J(id).tipo==='diarista')){const np=l.aguardando.filter(id=>ehDiarista(id)).length;h+=`<button class="btn block${p.mensAte&&Date.now()>=p.mensAte&&np?' primary':''}" style="margin-bottom:10px" data-act="cv-abrir" data-p="${pid}">📣 Convocar diaristas${np?` · ${np} pediram vaga`:''}</button>`}
   if(!order.length)h+=`<div class="empty">Ninguém no elenco ainda.${A?' <button class="btn sm" data-act="add-jog">Adicionar jogador</button>':''}</div>`;
@@ -1290,10 +1291,11 @@ function subPresenca(pid,p,l,A){
     // fora da lista: uma linha curta no lugar de "Mensalista/Diarista" (o número da fila só o administrador vê)
     const naFila=ag||wait.has(id),tagFila=naFila?`<span class="chip tag-espera">${A&&ordPed[id]?ordPed[id]+'º na fila':ag?'Pediu vaga':'Espera'}</span>`:'',fila=naFila?`<span>${tipoTxt(id)}</span>${A&&hp?`<span class="pediu-as">pediu vaga às ${hp}</span>`:''}`:null;
     const extra=((p.expirou||{})[id]&&!(p.conv||{})[id]?'<span class="chip tag-espera">⌛ PERDEU A VAGA</span>':(p.conv||{})[id]?(stPag((p.diarias||{})[id])?'<span class="chip solid">✅ PAGO</span>':prazoPag(p,pid,id)?`<span class="chip tag-espera">PAGAR ATÉ ${horaPedido(prazoPag(p,pid,id)).slice(-5)}</span>`:'<span class="chip solid">CONVOCADO</span>'):'');
+    const viaTag=resp[id]?.s&&resp[id].via==='link'?'<span class="chip via-tag">🔗 pelo link</span>':resp[id]?.s&&resp[id].via==='push'?'<span class="chip via-tag">🔔 pela notificação</span>':'';
     const libBtn=A&&ag?`<button class="btn sm primary lib-mini" data-act="liberar" data-p="${pid}" data-j="${id}" ${J(id).pos!=='GOL'&&l.escalados.length>=l.vagas?'disabled title="Lista cheia"':''}>Liberar</button>`:'';
     const right=A?`<div class="rsvp">${libBtn||`<button aria-label="Vai" class="${s==='sim'?'on-sim':''}" data-act="rsvp" data-p="${pid}" data-j="${id}" data-v="sim">✓</button>`}<button aria-label="Não vai" class="${s==='nao'?'on-nao':''}" data-act="rsvp" data-p="${pid}" data-j="${id}" data-v="nao">✕</button></div>`
       :`<span class="chip solid">${s==='sim'?'VAI':s==='nao'?'NÃO VAI':'—'}</span>`;
-    h+=rowPlayer(id,right,extra,fila,tagFila)}
+    h+=rowPlayer(id,right,extra+viaTag,fila,tagFila)}
   h+='</div></div>';
   if(A)h+=`<div class="row" style="margin-top:12px"><button class="btn danger sm" data-act="cancel-pel" data-p="${pid}">Cancelar esta pelada</button></div>`;
   return h;
@@ -1576,6 +1578,40 @@ function renderHist(A){
   if(enc.length>3)h+=`<button class="btn sm block" style="margin-top:8px" data-act="hist">${UI.showHist?'Mostrar menos':'Ver todas ('+enc.length+')'}</button>`;
   return h+'</div>';
 }
+
+/* ---------- responder presença (botões do app, link do WhatsApp e notificação) ---------- */
+let RESP_LINK=null;
+function euVou(pid,v,via){const doc=S.pres[myId];if(!doc)return null;const p=S.pel[pid];if(!p)return null;const prev=respDe(p,pid)[doc.jogador]?.s||null;
+  if(prev===v)return{igual:true,s:v,texto:v==='sim'?'Você já tinha confirmado presença.':'Você já tinha avisado que não vai.'};
+  const l0=lista(p,pid),jj=doc.jogador,cheia=v==='sim'&&J(jj).pos!=='GOL'&&!l0.escalados.includes(jj)&&l0.escalados.length>=l0.vagas;
+  const ant=(doc.pel||{})[pid]||null;
+  const pel=Object.fromEntries(Object.entries({...(doc.pel||{}),[pid]:{s:v,t:Date.now(),a:prev,esp:cheia,...(via?{via}:{})}}).sort((x,y)=>x[1].t-y[1].t).slice(-10));
+  put('presencas/'+myId,{...doc,pel});UI.respAnt={pid,ant};
+  return{s:v,ant,pedido:v==='sim'&&(cheia||ehDiarista(jj)),cheia,texto:v!=='sim'?'Resposta enviada: não vai.':(cheia||ehDiarista(jj))?'Pedido enviado. Agora é só aguardar o administrador liberar.':'Presença confirmada!'}}
+function inicioPel(p){return new Date(`${p.data}T${horaIniDe(p)}:00-03:00`).getTime()}
+// chegou pelo link: confere a pelada, o prazo e o vínculo; depois registra (ou só mostra as opções, vindo da notificação do iPhone)
+function aplicarRespLink(){const R=RESP_LINK;if(!R||!ready||demo)return;RESP_LINK=null;UI.tab='jogo';UI.sub='presenca';render();
+  const p=S.pel[R.p];
+  if(!p)return sheetRespAviso('Pelada cancelada','Essa pelada foi cancelada ou não existe mais. Veja a próxima na tela do jogo.');
+  const q=`${dShort(p.data)} às ${horaIniDe(p)}`;
+  if(p.status==='encerrada'||Date.now()>=inicioPel(p))return sheetRespAviso('Prazo encerrado',`A confirmação da pelada de ${q} já fechou.`);
+  const doc=S.pres[myId];
+  if(!doc||!S.jog[doc.jogador]||J(doc.jogador).ativo===false)return sheetRespAviso('Ainda não dá para responder','Sua conta ainda não foi liberada pelo administrador desta pelada. Assim que ele liberar, você confirma presença por aqui.');
+  if(R.r==='ver')return sheetRespPedir(R.p);
+  const r=euVou(R.p,R.r,'link');if(r)sheetResp(R.p,r)}
+function sheetRespAviso(t,txt){openSheet(t,`<div class="stack"><p style="margin:0">${esc(txt)}</p><button class="btn primary block" data-act="close">Ok</button></div>`)}
+function sheetRespPedir(pid,topo){const p=S.pel[pid];if(!p)return closeSheet();const doc=S.pres[myId],s=doc&&respDe(p,pid)[doc.jogador]?.s;
+  openSheet('Você vai?',`<div class="stack">${topo?`<p class="sub" style="margin:0">${esc(topo)}</p>`:''}<p style="margin:0"><b>${esc(dLong(p.data))}</b> das ${esc(horaIniDe(p))} às ${esc(horaFimDe(p))}${localDe(p)?' · '+esc(localDe(p).nome):''}</p>
+    <div class="row" style="flex-wrap:nowrap;gap:10px"><button class="btn grow btn-grande ${s==='sim'?'primary':''}" data-act="resp-escolher" data-p="${pid}" data-v="sim">✓ Vou</button><button class="btn grow btn-grande ${s==='nao'?'danger':''}" data-act="resp-escolher" data-p="${pid}" data-v="nao">✕ Não vou</button></div>
+    ${s?`<p class="sub" style="margin:0">Sua resposta agora: <b>${s==='sim'?'vou':'não vou'}</b>.</p>`:''}</div>`)}
+function sheetResp(pid,r){const p=S.pel[pid];if(!p)return closeSheet();const doc=S.pres[myId],l=lista(p,pid),j=doc&&doc.jogador;
+  let t=r.s==='nao'?'Ausência registrada':r.pedido?'Pedido enviado':'Presença confirmada',det='';
+  if(r.igual)t=r.s==='sim'?'Você já tinha confirmado':'Você já tinha avisado';
+  if(r.s==='sim'&&j){const i=l.escalados.indexOf(j);det=J(j).pos==='GOL'?'Confirmado no gol.':i>=0?`Você está na lista: ${i+1}º de ${l.vagas}.`:l.aguardando.includes(j)?(ehDiarista(j)?'Agora é aguardar a convocação dos diaristas.':'A lista está cheia: aguarde o administrador liberar.'):l.espera.includes(j)?`Você é o ${l.espera.indexOf(j)+1}º da espera.`:''}
+  openSheet(t,`<div class="stack" style="text-align:center"><div style="font-size:46px;line-height:1">${r.s==='nao'?'👋':r.pedido?'⏳':'✅'}</div>
+    <p style="margin:0"><b>${esc(dLong(p.data))}</b> às ${esc(horaIniDe(p))}</p>${det?`<p class="sub" style="margin:0">${esc(det)}</p>`:''}
+    <button class="btn primary block" data-act="close">Ok</button>${r.igual?'':'<button class="btn block" data-act="resp-desfazer">↩️ Desfazer</button>'}</div>`)}
+function linkResp(pid,v){const base=location.origin+location.pathname.replace(/index\.html$/,'');return`${base}?c=${encodeURIComponent((GRUPO&&GRUPO.codigo)||'')}&p=${encodeURIComponent(pid)}&r=${v}`}
 
 function painelJogador(pid,p,l){
 
@@ -2279,11 +2315,10 @@ document.addEventListener('click',e=>{
       patch('peladas/'+d.p,{resp:{[d.j]:{s:v,t:now,esp:v==='sim'&&cheia}},aprov:{[d.j]:v==='sim'&&!cheia?now:null}});
       if(v==='sim'&&cheia)toast(`Lista cheia: ${nm(d.j)} foi para a espera.`);
       eventosPresenca(S.pel[d.p],before,lista(S.pel[d.p],d.p),d.j,cur,v);break}
-    case'eu-vou':{const doc=S.pres[myId];if(!doc)return;const p=S.pel[d.p],prev=respDe(p,d.p)[doc.jogador]?.s||null;
-      if(prev===d.v)return;
-      const l0=lista(p,d.p),jj=doc.jogador,cheia=d.v==='sim'&&J(jj).pos!=='GOL'&&!l0.escalados.includes(jj)&&l0.escalados.length>=l0.vagas;
-      const pel=Object.fromEntries(Object.entries({...(doc.pel||{}),[d.p]:{s:d.v,t:Date.now(),a:prev,esp:cheia}}).sort((x,y)=>x[1].t-y[1].t).slice(-10));
-      put('presencas/'+myId,{...doc,pel});toast(d.v!=='sim'?'Resposta enviada: não vai.':(cheia||ehDiarista(jj))?'Pedido enviado. Agora é só aguardar o administrador liberar.':'Presença confirmada!');break}
+    case'eu-vou':{const r=euVou(d.p,d.v);if(r)toast(r.texto);break}
+    case'resp-escolher':{const r=euVou(d.p,d.v,'link');if(r)sheetResp(d.p,r);else closeSheet();break}
+    case'resp-desfazer':{const u=UI.respAnt;if(!u)return;const doc=S.pres[myId];if(!doc)return;const pel={...(doc.pel||{})};if(u.ant)pel[u.pid]=u.ant;else delete pel[u.pid];
+      put('presencas/'+myId,{...doc,pel});UI.respAnt=null;sheetRespPedir(u.pid,'Resposta desfeita. Quer responder de novo?');break}
     case'como-jogador':document.getElementById('push').hidden=true;PUSH_PRONTO=false;PUSH_VISTOS.clear();UI.comoJogador=!UI.comoJogador;UI.sub='presenca';closeSheet();render();window.scrollTo(0,0);break
     case'notif':sheetNotif();break;
     case'voltar-grupos':if(window.voltarGrupos)window.voltarGrupos();break;
@@ -2779,10 +2814,10 @@ function stopDemo(){if(!REAL||!db){if(window.voltarGrupos)window.voltarGrupos();
 window.iniciarPelada=function(ctx){
   window.pararPelada();
   S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};
-  demo=false;REAL=null;ready=false;loaded=0;db=ctx.db;myId=ctx.uid;isAdmin=!!ctx.isAdmin;dl=ctx.dl||null;GRUPO=ctx.grupo;GID=ctx.gid;
+  demo=false;REAL=null;ready=false;loaded=0;db=ctx.db;myId=ctx.uid;isAdmin=!!ctx.isAdmin;dl=ctx.dl||null;GRUPO=ctx.grupo;GID=ctx.gid;RESP_LINK=ctx.resp||null;
   UI.tab='jogo';UI.sub='presenca';UI.npLoc=undefined;UI.comoJogador=false;PUSH_PRONTO=false;PUSH_VISTOS.clear();
   closeSheet();render();window.scrollTo(0,0);
-  const N=11;const done=()=>{if(++loaded===N){ready=true;render()}};
+  const N=11;const done=()=>{if(++loaded===N){ready=true;render();aplicarRespLink()}};
   const onErr=e=>{console.warn(e);toast('Não foi possível carregar os dados. Verifique a internet.')};
   const one=(path,key)=>{let first=true;db.doc(path).onSnapshot(snap=>{const tgt=demo?REAL:S;tgt[key]=snap.exists?snap.data():null;if(first){first=false;done()}else if(!demo)render()},e=>{onErr(e);if(first){first=false;done()}})};
   const live=(name,key)=>{let first=true;db.collection(name).onSnapshot(snap=>{

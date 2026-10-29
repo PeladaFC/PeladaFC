@@ -42,13 +42,13 @@ function pelCriada(p, pid, ctx) {
   const quando = `${dShort(p.data)} das ${horaIni(p, cfg)} às ${horaFim(p, cfg)}${onde}`;
   if (ehPA(p, cfg)) { // evento livre ou evento extra
     const v = precoPel(p, cfg), nome = p.nome || (p.extra ? 'Evento extra' : g);
-    return [{ para: todos(ctx), titulo: `🎉 ${nome} · ${g}`, texto: `${dShort(p.data)} às ${horaIni(p, cfg)}${onde}. ${v > 0 ? `Valor: ${BRL(v)} por atleta${p.extra ? ' (mensalista também paga)' : ''}.` : 'Sem cobrança.'} Confirme pelo app!`, tag: 'pel-' + pid }];
+    return [{ para: todos(ctx), titulo: `🎉 ${nome} · ${g}`, texto: `${dShort(p.data)} às ${horaIni(p, cfg)}${onde}. ${v > 0 ? `Valor: ${BRL(v)} por atleta${p.extra ? ' (mensalista também paga)' : ''}.` : 'Sem cobrança.'} Confirme pelo app!`, tag: 'pel-' + pid, rsvp: { g: ctx.gid, p: pid } }];
   }
   const mens = [], dia = [];
   for (const u of todos(ctx)) (tipoDe(ctx, u) === 'diarista' ? dia : mens).push(u);
   const out = [];
-  if (mens.length) out.push({ para: mens, titulo: `⚽ ${g} · nova pelada`, texto: `${quando}. ${p.mensAte ? `Mensalista: confirme até ${quandoMs(p.mensAte)} para garantir sua vaga.` : 'Confirme sua presença!'}`, tag: 'pel-' + pid });
-  if (dia.length) out.push({ para: dia, titulo: `⚽ ${g} · nova pelada`, texto: `${quando}. Diarista: peça sua vaga pelo app.${p.mensAte ? ` A convocação dos diaristas sai depois de ${quandoMs(p.mensAte)}, por ordem de pedido.` : ''}`, tag: 'pel-' + pid });
+  if (mens.length) out.push({ para: mens, titulo: `⚽ ${g} · nova pelada`, texto: `${quando}. ${p.mensAte ? `Mensalista: confirme até ${quandoMs(p.mensAte)} para garantir sua vaga.` : 'Confirme sua presença!'}`, tag: 'pel-' + pid, rsvp: { g: ctx.gid, p: pid } });
+  if (dia.length) out.push({ para: dia, titulo: `⚽ ${g} · nova pelada`, texto: `${quando}. Diarista: peça sua vaga pelo app.${p.mensAte ? ` A convocação dos diaristas sai depois de ${quandoMs(p.mensAte)}, por ordem de pedido.` : ''}`, tag: 'pel-' + pid, rsvp: { g: ctx.gid, p: pid } });
   return out;
 }
 // 15 minutos antes do prazo: avisa os mensalistas que ainda não responderam
@@ -57,7 +57,7 @@ function lembreteMens(p, pid, ctx) {
   if (ehPA(p, ctx.cfg)) return [];
   const para = todos(ctx).filter(u => { if (tipoDe(ctx, u) !== 'mensalista') return false; const r = respDe(p, pid, ctx, ctx.pres[u].jogador); return !r || !r.s; });
   if (!para.length) return [];
-  return [{ para, titulo: `⏰ Faltam 15 minutos · ${nomePelada(ctx)}`, texto: `Confirme sua presença na pelada de ${dShort(p.data)}. Às ${horaMs(p.mensAte)} fecha o prazo dos mensalistas e as vagas que sobrarem vão para os diaristas convocados.`, tag: 'mens15-' + pid }];
+  return [{ para, titulo: `⏰ Faltam 15 minutos · ${nomePelada(ctx)}`, texto: `Confirme sua presença na pelada de ${dShort(p.data)}. Às ${horaMs(p.mensAte)} fecha o prazo dos mensalistas e as vagas que sobrarem vão para os diaristas convocados.`, tag: 'mens15-' + pid, rsvp: { g: ctx.gid, p: pid } }];
 }
 // campos que interessam numa atualização da pelada (para não ler o banco à toa)
 function pelMudouAlgo(a, b) {
@@ -218,4 +218,23 @@ function cobrancaEvento(p, pid, jid, uid, ctx) {
   const v = valorJog(p, ctx.cfg, jid); if (!(v > 0) || stPag((p.diarias || {})[jid])) return [];
   return [{ para: [uid], titulo: `💰 ${p.extra ? (p.nome || 'Evento extra') : (p.nome || 'Evento')} de ${dBR(p.data)} · ${nomePelada(ctx)}`, texto: `${BRL(v)}, vence em ${dBR(p.data)}. Pague pelo app com Pix.${linhaDono(ctx, uid)}`, tag: 'cobev-' + pid }];
 }
-module.exports = { aPagar, vencidosConv, avisosVencidos, cobrancaConvocado, devidas, avisosCobranca, extrasNovas, cobrancaEvento, prazoMensChegando, lembreteMens, rodadaNova, dShort, fimDe, janelaH, pelCriada, pelMudouAlgo, pelAtualizada, presAtualizada, membroNovo, muralAtualizado, avalAbriu, avisoAval, participantes, uidsDe };
+
+/* ---------- resposta pelo botão da notificação (Vou / Não vou) ---------- */
+// início da pelada em ms (Recife, UTC-3)
+function inicioMs(p, cfg) { return new Date(`${p.data}T${horaIni(p, cfg)}:00-03:00`).getTime(); }
+// mesma conta da lista do app: a pessoa que confirma agora entra na lista ou vai para a espera?
+function listaCheiaPara(p, pid, ctx, jid) {
+  const cfg = ctx.cfg || {}, jog = ctx.jog || {}, J = id => jog[id] || {};
+  const vagas = Math.max(2, Number(cfg.vagas) || (Number(cfg.times) || 2) * (Number(cfg.porTime) || 5));
+  const diar = id => !cfg.evento && J(id).tipo === 'diarista';
+  const resp = {}; for (const [j, r] of Object.entries(p.resp || {})) if (r) resp[j] = { ...r };
+  for (const d of Object.values(ctx.pres || {})) { const j = d && d.jogador, r = j && d.pel && d.pel[pid]; if (!r) continue; if (!resp[j] || (resp[j].t || 0) < (r.t || 0)) resp[j] = { s: r.s, t: r.t, app: true, esp: !!r.esp }; }
+  const aprov = p.aprov || {}, conv = p.conv || {};
+  const lib = id => (aprov[id] && aprov[id] >= (resp[id].t || 0) - 1000) || !!conv[id];
+  const ok = id => !(resp[id].esp || (diar(id) && resp[id].app)) || lib(id);
+  const elig = Object.keys(jog).filter(id => J(id).ativo !== false && J(id).pos !== 'GOL' && resp[id] && resp[id].s === 'sim' && ok(id));
+  if (J(jid).pos === 'GOL' || elig.includes(jid)) return false;
+  return elig.length >= vagas;
+}
+const ehDiaristaSrv = (ctx, jid) => !(ctx.cfg || {}).evento && ((ctx.jog || {})[jid] || {}).tipo === 'diarista';
+module.exports = { inicioMs, listaCheiaPara, ehDiaristaSrv, horaIni, nomePelada, aPagar, vencidosConv, avisosVencidos, cobrancaConvocado, devidas, avisosCobranca, extrasNovas, cobrancaEvento, prazoMensChegando, lembreteMens, rodadaNova, dShort, fimDe, janelaH, pelCriada, pelMudouAlgo, pelAtualizada, presAtualizada, membroNovo, muralAtualizado, avalAbriu, avisoAval, participantes, uidsDe };
