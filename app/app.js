@@ -242,7 +242,7 @@ function render() {
   if (TELA === 'boas' && !INTRO_VISTA) TELA = 'intro';
   const t = TELA;
   if (t === 'intro') { el.innerHTML = telaIntro(); iniciarIntro(); return; }
-  if (t === 'carregando') h = `<div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Carregando…</p></div>`;
+  if (t === 'carregando') h = HERO_BOAS; // o mesmo cartão da tela inicial: nada pisca ao abrir
   if (t === 'boas') h = `${HERO_BOAS}
     ${respGuardada() ? `<div class="banner due"><span><b>Entre na sua conta para responder.</b><br>Assim que você entrar, sua resposta da pelada é registrada.</span></div>` : ls.get('pelada.convite') ? `<div class="banner due"><span><b>Você recebeu um convite!</b><br>Crie sua conta ou entre para participar.</span></div>` : ''}
     <button class="btn primary block" data-sh="ir" data-v="criar">Criar conta</button>
