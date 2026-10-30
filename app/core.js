@@ -1193,7 +1193,7 @@ function sheetMinhaPos(){const id=meuJogador();if(!id)return;const j=J(id);
     <div class="pick">${Object.entries(POS).map(([k,n])=>`<button data-act="minha-pos" data-v="${k}" aria-pressed="${j.pos===k}">${n}</button>`).join('')}</div></div>`)}
 /* --- Jogo --- */
 function tJogo(A){
-  const c=cfg();let h='';
+  const c=cfg();let h=bannerPedidoSuporte();
   if(!A&&euPendente())h+=bannerPendente().replace('margin-top:12px','margin:0 0 12px');
   if(!A){const pend=avalPendenteJogador();if(pend){const[pid,p]=pend,L=S.locais[p.localId],d=S.pres[myId]||{};
     h+=`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Como estava o campo?</h3></div>
@@ -2132,12 +2132,15 @@ function sheetMsg(tipo,ctx={}){
 /* Suporte do Pelota FC: o administrador libera por 24 horas; tudo o que o suporte fizer fica registrado */
 function painelSuporte(){const su=(GRUPO&&GRUPO.suporte)||{},on=(su.ate||0)>Date.now();
   return`<div class="panel" style="margin-top:14px"><h3 style="margin-bottom:4px">🛟 Suporte do Pelota FC</h3>
-    <div class="sub" style="margin-bottom:8px">${on?`<b>Suporte liberado até ${esc(horaPedido(su.ate))}.</b> A equipe do Pelota FC pode entrar nesta pelada como administradora para te ajudar. Tudo o que ela fizer fica registrado aqui.`:'Precisa de ajuda? Libere o acesso por 24 horas: a equipe do Pelota FC entra na pelada como administradora, resolve com você e tudo o que ela fizer fica registrado. Depois do prazo, o acesso fecha sozinho.'}</div>
-    ${on?'<button class="btn danger block" data-act="sup-encerrar">Encerrar o suporte agora</button>':'<button class="btn block" data-act="sup-liberar">Liberar suporte por 24 horas</button>'}
-    <button class="btn sm" style="margin-top:8px" data-act="sup-log">Ver o que o suporte fez</button></div>`}
-async function sheetLogSuporte(){openSheet('O que o suporte fez','<p class="sub">Carregando…</p>');let L=[];try{L=await window.suporteAdmin('log')}catch(e){toast('Não consegui carregar agora.');return}
-  const nomeOp={entrou:'Entrou na pelada',saiu:'Saiu da pelada',set:'Salvou',update:'Alterou',delete:'Apagou'},area=p=>{const c=String(p||'').split('/')[0];return({jogadores:'elenco',peladas:'pelada',caixa:'caixa',avisos:'avisos',presencas:'presença',locais:'locais',config:'ajustes',membros:'membros',avaliacoes:'avaliações',mural:'mural',eventos:'avisos do app'})[c]||c}
-  openSheet('O que o suporte fez',L.length?`<div class="list">${L.map(x=>`<div class="item"><div class="grow"><div class="name">${esc(nomeOp[x.acao]||x.acao)}${x.path?' · '+esc(area(x.path)):''}</div><div class="sub">${esc(horaPedido(x.em))}${x.email?' · '+esc(x.email):''}</div></div></div>`).join('')}</div>`:'<div class="empty">O suporte ainda não entrou nesta pelada.</div>')}
+    <div class="sub" style="margin-bottom:8px">${on?`<b>Suporte liberado até ${esc(horaPedido(su.ate))}.</b> A equipe do Pelota FC pode entrar nesta pelada como administradora para te ajudar.`:'Quando você pedir ajuda, a equipe do Pelota FC manda um pedido de acesso. Ele aparece como um aviso laranja na tela inicial: é só tocar em Liberar.'}</div>
+    ${on?'<button class="btn danger block" data-act="sup-encerrar">Encerrar o suporte agora</button>':''}
+    <button class="btn sm" style="margin-top:8px" data-act="sup-log">Ver as visitas do suporte</button></div>`}
+function bannerPedidoSuporte(){if(demo||SUP||!isAdmin||!GRUPO||!window.pedidoSuporte||!window.pedidoSuporte(GRUPO))return'';
+  return`<div class="alerta-sup"><span class="ic">🛟</span><div class="grow"><b>O suporte do Pelota FC pediu acesso</b><span>Para te ajudar, a equipe entra nesta pelada como administradora por 24 horas.</span>
+    <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm sup-sim" data-act="sup-aceitar">Liberar por 24 horas</button><button class="btn sm sup-nao" data-act="sup-recusar">Agora não</button></div></div></div>`}
+async function sheetLogSuporte(){openSheet('Visitas do suporte','<p class="sub">Carregando…</p>');let L=[];try{L=await window.suporteAdmin('log')}catch(e){toast('Não consegui carregar agora.');return}
+  const nomeOp={entrou:'🛟 Entrou na pelada',saiu:'↩️ Saiu da pelada',marcou:'📅 Marcou pelada'};
+  openSheet('Visitas do suporte',(L.length?`<div class="list">${L.map(x=>`<div class="item"><div class="grow"><div class="name">${esc(x.texto||nomeOp[x.acao]||x.acao)}</div><div class="sub">${esc(horaPedido(x.em))}</div></div></div>`).join('')}</div>`:'<div class="empty">O suporte ainda não entrou nesta pelada.</div>')+'<p class="sub" style="margin-top:10px">Cada registro some sozinho depois de 30 dias.</p>')}
 function sheetCfg(){
   const c=cfg();F={restr:(c.restr||[]).slice(),golSorteio:!!c.golSorteio};
   openSheet('Ajustes da pelada',`<div class="stack">
@@ -2318,6 +2321,7 @@ document.addEventListener('click',e=>{
       const hi=document.getElementById('np-hora').value||cfg().hora;
       const ext0=!EV()&&UI.npTipo==='extra',mv=!EV()&&!ext0&&document.getElementById('np-mens')?.value,mensAte=mv?new Date(mv).getTime():null,nomeEv=(document.getElementById('np-nome')?.value||'').trim();
       put('peladas/'+id,{data,hora:hi,...(mensAte?{mensAte}:{}),...(nomeEv?{nome:nomeEv}:{}),horaFim:document.getElementById('np-fim').value||maisHora(hi,60),localId:UI.npLoc||null,local:(S.locais[UI.npLoc]||{}).nome||'',status:'aberta',resp:{},criadoEm:Date.now(),formato:document.getElementById('np-formato')?.value||cfg().formato||'conv',nTimes:Number(document.getElementById('np-times')?.value)||Number(cfg().times)||3,...(()=>{const ext=!EV()&&UI.npTipo==='extra',pa=EV()||ext,base=ext?{extra:true}:{};const cb=UI.npCobra??(pa?'nao':(precoD(data.slice(0,7))>0?'sim':'nao'));if(cb==='nao')return{...base,precoDiaria:0};if(Object.keys(UI.npDesc||{}).length)base.descontos={...UI.npDesc};const v=Number(String(document.getElementById('np-valor')?.value||'').replace(',','.'));if(!(v>0))return pa?{...base,precoDiaria:0}:base;if(!CX())patch('config/geral',{usarCaixa:true});return v===precoD(data.slice(0,7))&&!pa?base:{...base,precoDiaria:Math.round(v*100)/100}})()});
+      if(SUP&&window.suporteRegistro)window.suporteRegistro('marcou','📅 Marcou a pelada de '+dShort(data));
       if(UI.npLoc&&S.locais[UI.npLoc])put('locais/'+UI.npLoc,{...S.locais[UI.npLoc],usadoEm:Date.now()});
       UI.npLoc=undefined;UI.npData=UI.npHora=UI.npFim=UI.npTimes=UI.npFormato=UI.npCobra=UI.npValor=UI.npTipo=UI.npModo=UI.npTotal=UI.npDesc=UI.npQpAberta=UI.npMens=UI.npNome=null;UI.npFimManual=false;UI.sub='presenca';toast('Pelada marcada. Agora é só convocar.');break}
     case'cancel-pel':if(Object.values((S.pel[d.p]||{}).diarias||{}).some(pagoPorPix)){toast('Esta pelada já recebeu Pix pelo app e não pode ser apagada. Para devolver, lance uma saída no Caixa.');break}if(b.dataset.sure){del('peladas/'+d.p);toast('Pelada cancelada.')}else{b.dataset.sure='1';b.textContent='Toque de novo para cancelar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Cancelar esta pelada'}},3500)}break;
@@ -2326,7 +2330,8 @@ document.addEventListener('click',e=>{
       patch('peladas/'+d.p,{resp:{[d.j]:{s:v,t:now,esp:v==='sim'&&cheia}},aprov:{[d.j]:v==='sim'&&!cheia?now:null}});
       if(v==='sim'&&cheia)toast(`Lista cheia: ${nm(d.j)} foi para a espera.`);
       eventosPresenca(S.pel[d.p],before,lista(S.pel[d.p],d.p),d.j,cur,v);break}
-    case'sup-liberar':window.suporteAdmin('liberar').then(()=>{toast('Suporte liberado por 24 horas.');sheetCfg()},e=>toast((e&&e.message)||'Não deu certo.'));break;
+    case'sup-aceitar':window.suporteAdmin('liberar').then(()=>toast('Suporte liberado por 24 horas. Pode avisar o Pelota FC.'),e=>toast((e&&e.message)||'Não deu certo.'));break;
+    case'sup-recusar':window.suporteAdmin('recusar').then(()=>toast('Pedido recusado.'),e=>toast((e&&e.message)||'Não deu certo.'));break;
     case'sup-encerrar':window.suporteAdmin('encerrar').then(()=>{toast('Suporte encerrado.');sheetCfg()},e=>toast((e&&e.message)||'Não deu certo.'));break;
     case'sup-log':sheetLogSuporte();break;
     case'eu-vou':{const r=euVou(d.p,d.v);if(r)toast(r.texto);break}

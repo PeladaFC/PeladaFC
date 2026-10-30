@@ -268,6 +268,11 @@ input::-webkit-date-and-time-value{text-align:left}
 .avpop p{margin:0;font-size:16px}.avpop .sub{color:var(--card-ink);opacity:.75;font-size:14px}
 .avpop .btn:not(.primary){background:transparent;border-color:rgba(0,0,0,.25);color:var(--card-ink)}
 .alerta-av{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card);color:var(--card-ink);border:0;border-radius:16px;padding:14px 16px;margin-bottom:12px;font:inherit;cursor:pointer}
+.alerta-sup{display:flex;gap:12px;align-items:flex-start;background:#E8590C;color:#fff;border-radius:16px;padding:14px 16px;margin-bottom:12px;box-shadow:0 6px 18px rgba(232,89,12,.35)}
+.alerta-sup .ic{font-size:32px;line-height:1}.alerta-sup b{display:block;font-size:17px}.alerta-sup span{font-size:14px;opacity:.95}
+.alerta-sup .sup-sim{background:#fff;color:#B8450F;border-color:#fff;font-weight:800}.alerta-sup .sup-nao{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.8)}
+@media (prefers-reduced-motion:no-preference){.alerta-sup{animation:supPulsa 2.4s ease-in-out 3}}
+@keyframes supPulsa{50%{box-shadow:0 6px 26px rgba(232,89,12,.7)}}
 .alerta-av b{display:block;font-size:17px}.alerta-av .ic{font-size:34px;line-height:1}.alerta-av .ir{margin-left:auto;font-weight:800;background:var(--card-ink);color:var(--card);border-radius:10px;padding:9px 14px;white-space:nowrap}
 .avstrip{display:flex;gap:6px;overflow-x:auto;padding:4px 2px 8px;scrollbar-width:none}
 .avthumb{all:unset;position:relative;cursor:pointer;border-radius:50%;padding:2px;opacity:.6}
@@ -631,9 +636,9 @@ body.em-suporte #app{padding-top:calc(58px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261030c"></script>
-<script src="br.js?v=20261030c"></script>
-<script src="core.js?v=20261030c"></script>
-<script type="module" src="app.js?v=20261030c"></script>
+<script src="qrcode.js?v=20261030d"></script>
+<script src="br.js?v=20261030d"></script>
+<script src="core.js?v=20261030d"></script>
+<script type="module" src="app.js?v=20261030d"></script>
 </body>
 </html>

@@ -60,6 +60,13 @@ else
   gcloud firestore fields ttls update expiraEm --collection-group=erros --enable-ttl --async --project "$PROJ" >/dev/null 2>&1 \
     && echo "    ligado" || echo "    ⚠️  não deu para ligar agora (o resto foi publicado). Rode o comando de novo mais tarde."
 fi
+echo "==> Visitas do suporte: apagar sozinho depois de 30 dias"
+if gcloud firestore fields ttls list --project "$PROJ" --format='value(name)' 2>/dev/null | grep -q "suporteLog/fields/expiraEm"; then
+  echo "    já está ligado"
+else
+  gcloud firestore fields ttls update expiraEm --collection-group=suporteLog --enable-ttl --async --project "$PROJ" >/dev/null 2>&1 \
+    && echo "    ligado" || echo "    ⚠️  não deu para ligar agora (o resto foi publicado). Rode o comando de novo mais tarde."
+fi
 echo "==> Limpando cópias antigas do servidor (evita custo de armazenamento)"
 $FB functions:artifacts:setpolicy --project "$PROJ" --location southamerica-east1 --days 1 --force >/dev/null 2>&1 || true
 echo

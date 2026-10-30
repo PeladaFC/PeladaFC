@@ -58,9 +58,12 @@ service cloud.firestore {
       allow create: if logado()
         && request.resource.data.dono == eu()
         && request.resource.data.admins == [eu()];
+      // o dono do app só pode registrar o pedido de suporte (o administrador libera ou recusa)
+      allow update: if donoDoApp()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suportePedido']);
       // o suporte pode ajustar a pelada, mas não mexe em quem administra, no dono, no representante nem na própria liberação
       allow update: if suporte(gid)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['admins', 'dono', 'rep', 'suporte', 'codigo']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['admins', 'dono', 'rep', 'suporte', 'suportePedido', 'codigo']);
       allow update: if admin(gid)
         && request.resource.data.dono == resource.data.dono
         && request.resource.data.dono in request.resource.data.admins
@@ -109,7 +112,9 @@ service cloud.firestore {
       // Registro do suporte: o suporte só cria (com o próprio usuário); o administrador da pelada e o dono do app leem; ninguém altera ou apaga.
       match /suporteLog/{id} {
         allow create: if suporte(gid) && request.resource.data.uid == eu()
-          && request.resource.data.keys().hasOnly(['uid', 'email', 'acao', 'path', 'campos', 'em']);
+          && request.resource.data.keys().hasOnly(['uid', 'email', 'acao', 'texto', 'em', 'expiraEm'])
+          && request.resource.data.acao in ['entrou', 'saiu', 'marcou']
+          && request.resource.data.expiraEm is timestamp;
         allow read: if admin(gid) || donoDoApp();
         // quem criou o grupo apaga o registro junto quando apaga o grupo inteiro
         allow delete: if logado() && grupo(gid).dono == eu();
