@@ -1,0 +1,9 @@
+{
+  "applinks": {
+    "details": [{
+      "appIDs": ["PREENCHER_TEAM_ID.br.com.pelotafc.app"],
+      "components": [{ "/": "/app/*", "comment": "links do app: convite, presença (Vou / Não vou), parceiro" }]
+    }]
+  },
+  "webcredentials": { "apps": ["PREENCHER_TEAM_ID.br.com.pelotafc.app"] }
+}
