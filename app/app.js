@@ -292,7 +292,7 @@ function render() {
       <p class="sub" style="text-align:center;margin:0"><a href="/termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="/privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
       <button class="btn sm" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
   if (t === 'dono') h = topo('perfil') + abasDono('dono') + telaDono();
-  if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + telaGruposDono();
+  if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + (UIp.supPedir ? `<div class="banner due" style="display:block"><b>🛟 Suporte ainda não liberado em ${escH(UIp.supPedir.nome)}.</b><br>Peça ao administrador: abrir a pelada → ⚙️ Ajustes → <b>Suporte do Pelota FC</b> → <b>Liberar suporte por 24 horas</b>. Depois toque de novo em "Entrar como suporte".<br><button class="btn sm" style="margin-top:8px" data-sh="sup-pedir-ok">Entendi</button></div>` : '') + telaGruposDono();
   if (t === 'donoreps') h = topo('perfil') + abasDono('reps') + telaRepsDono();
   if (t === 'donoerros') h = topo('perfil') + abasDono('erros') + telaErrosDono();
   if (t === 'parceiro') h = topo('perfil') + telaParceiro();
@@ -507,7 +507,7 @@ async function abrirResposta(rv) {
   if (rv.c) { UIp.convResp = true; await buscarCodigo(rv.c); return; }
   aviso('Você não faz parte desta pelada.'); ir('minhas');
 }
-if (MOCK) window.__resp = abrirResposta; // só no modo de teste
+if (MOCK) { window.__resp = abrirResposta; window.__sup = g => entrarSuporte(g); window.__gid = () => ABERTO; } // só no modo de teste
 async function buscarCodigo(cod) {
   cod = String(cod || '').trim().toUpperCase();
   if (cod.length !== 6) { aviso('O código tem 6 letras.'); ir('codigo'); return; }
@@ -553,12 +553,14 @@ async function criarGrupo(f) {
 }
 function makeDb(gid) {
   const base = 'grupos/' + gid + '/', unsubs = [];
+  // modo suporte: cada alteração do suporte fica registrada para o administrador ver
+  const reg = (acao, p, d) => r => { if (SUPORTE && SUPORTE.gid === gid) logSuporte(gid, acao, p, d); return r; };
   return {
     unsubs,
     doc(p) {
       const full = base + p, id = p.split('/').pop();
       return {
-        set: d => B.set(full, d), update: d => B.set(full, d, { merge: true }), replace: d => B.upd(full, d), delete: () => B.del(full),
+        set: d => B.set(full, d).then(reg('set', p, d)), update: d => B.set(full, d, { merge: true }).then(reg('update', p, d)), replace: d => B.upd(full, d).then(reg('update', p, d)), delete: () => B.del(full).then(reg('delete', p)),
         get: async () => { const d = await B.get(full); return { exists: !!d, data: () => d, id }; },
         onSnapshot: (n, e) => { const u = B.listenDoc(full, s => n({ exists: s.exists, data: () => s.data, id }), e); unsubs.push(u); return u; }
       };
@@ -569,6 +571,53 @@ function makeDb(gid) {
     }
   };
 }
+/* ================= Suporte do Pelota FC =================
+   O administrador da pelada libera por 24 horas (Ajustes → Suporte do Pelota FC). O dono do app entra pelo
+   Painel do dono → Grupos → "Entrar como suporte", como administrador, sem virar membro. Tudo fica registrado. */
+let SUPORTE = null, SUP_T = null;
+function logSuporte(gid, acao, path, d) {
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  return B.set(`grupos/${gid}/suporteLog/${id}`, { uid: EU.uid, email: EU.email || '', acao, path: path || '', campos: d && typeof d === 'object' ? Object.keys(d).slice(0, 20) : [], em: Date.now() }).catch(e => console.warn(e));
+}
+function mostrarFaixaSuporte() {
+  let f = $('sup-faixa');
+  if (!SUPORTE) { if (f) f.remove(); document.body.classList.remove('em-suporte'); clearInterval(SUP_T); return; }
+  if (!f) { f = document.createElement('div'); f.id = 'sup-faixa'; f.className = 'sup-faixa'; document.body.appendChild(f);
+    f.addEventListener('click', e => { if (e.target.closest('[data-sup-sair]')) sairSuporte(); }); }
+  document.body.classList.add('em-suporte');
+  const hh = new Date(SUPORTE.ate), hr = String(hh.getHours()).padStart(2, '0') + ':' + String(hh.getMinutes()).padStart(2, '0');
+  f.innerHTML = `<span>🛟 <b>Modo suporte</b> · ${escH(SUPORTE.nome || 'Pelada')} · até ${hr}</span><button type="button" data-sup-sair>Sair do suporte</button>`;
+  clearInterval(SUP_T); SUP_T = setInterval(() => { if (SUPORTE && Date.now() > SUPORTE.ate) { aviso('O prazo do suporte acabou.'); sairSuporte(); } }, 30e3);
+}
+async function entrarSuporte(gid) {
+  if (OCUPADO) return; OCUPADO = true;
+  try {
+    const G = await B.get('grupos/' + gid);
+    if (!G) { aviso('Esse grupo não existe mais.'); return; }
+    const ate = (G.suporte || {}).ate || 0;
+    if (ate <= Date.now()) { UIp.supPedir = { gid, nome: G.nome || 'Pelada' }; render(); return; }
+    if (GRUPOS[gid]) { aviso('Você já faz parte desta pelada: abra pelas suas peladas.'); return; }
+    SUPORTE = { gid, ate, nome: G.nome || 'Pelada' }; GRUPOS[gid] = { ...G, _suporte: true };
+    await logSuporte(gid, 'entrou');
+    abrirGrupo(gid);
+  } catch (e) { aviso(msgErro(e)); } finally { OCUPADO = false; }
+}
+function sairSuporte() {
+  const s = SUPORTE; if (!s) return;
+  logSuporte(s.gid, 'saiu'); SUPORTE = null; mostrarFaixaSuporte();
+  window.pararPelada(); if (unsubGrupo) { unsubGrupo(); unsubGrupo = null; }
+  delete GRUPOS[s.gid]; ABERTO = null; ls.set('pelada.ultimo', null);
+  ir('donogrupos');
+}
+// usado pelos Ajustes da pelada (administrador): liberar, encerrar e ver o registro
+window.suporteAdmin = async op => {
+  const gid = ABERTO; if (!gid || !GRUPOS[gid] || SUPORTE) throw new Error('Abra a sua pelada para isso.');
+  if (op === 'log') return (await B.ultimos(`grupos/${gid}/suporteLog`, 'em', 100)).map(x => x.data);
+  const suporte = op === 'liberar' ? { ate: Date.now() + 24 * 3600e3, por: EU.uid, em: Date.now() } : { ate: 0, por: EU.uid, em: Date.now() };
+  await B.set('grupos/' + gid, { suporte }, { merge: true });
+  GRUPOS[gid] = { ...GRUPOS[gid], suporte }; window.atualizarGrupo({ ...GRUPOS[gid] });
+};
+
 const compartilhar = {
   save: async ({ filename, data, type }) => {
     const file = new File([data], filename, { type: type || 'image/png' });
@@ -580,11 +629,13 @@ const compartilhar = {
 function abrirGrupo(gid, resp) {
   const G = GRUPOS[gid]; if (!G) { ir('minhas'); return; }
   ABERTO = gid; ls.set('pelada.ultimo', gid); mostrarCasca(false);
-  window.iniciarPelada({ db: makeDb(gid), uid: EU.uid, isAdmin: (G.admins || []).includes(EU.uid), grupo: { ...G }, gid, dl: compartilhar, resp: resp || null });
+  const sup = !!(SUPORTE && SUPORTE.gid === gid); mostrarFaixaSuporte();
+  window.iniciarPelada({ db: makeDb(gid), uid: EU.uid, isAdmin: sup || (G.admins || []).includes(EU.uid), grupo: { ...G }, gid, dl: compartilhar, resp: resp || null, suporte: sup });
   if (unsubGrupo) unsubGrupo();
-  unsubGrupo = B.listenDoc('grupos/' + gid, s => { if (!s.exists) { if (ABERTO === gid) { delete GRUPOS[gid]; aviso('Este grupo foi apagado.'); window.voltarGrupos(); } return; } GRUPOS[gid] = s.data; window.atualizarGrupo({ ...s.data }); }, e => console.warn(e));
+  unsubGrupo = B.listenDoc('grupos/' + gid, s => { if (sup && s.exists && !((s.data.suporte || {}).ate > Date.now())) { aviso('O administrador encerrou o suporte desta pelada.'); sairSuporte(); return; } if (!s.exists) { if (ABERTO === gid) { delete GRUPOS[gid]; aviso('Este grupo foi apagado.'); window.voltarGrupos(); } return; } GRUPOS[gid] = s.data; window.atualizarGrupo({ ...s.data }); }, e => console.warn(e));
 }
 window.voltarGrupos = () => {
+  if (SUPORTE) { sairSuporte(); return; }
   window.pararPelada(); if (unsubGrupo) { unsubGrupo(); unsubGrupo = null; }
   ABERTO = null; ls.set('pelada.ultimo', null);
   if (!EU) { ir('boas'); return; }
@@ -597,7 +648,7 @@ window.mudarAdmins = async admins => {
   try { await B.set('grupos/' + ABERTO, { admins }, { merge: true }); aviso('Administradores atualizados.'); } catch (e) { aviso(msgErro(e)); }
 };
 // Apagar o grupo (só quem criou): limpa as coleções, o código do convite e o grupo.
-const COLS_GRUPO = ['config', 'jogadores', 'peladas', 'presencas', 'locais', 'caixa', 'avisos', 'mural', 'avaliacoes', 'notificacoes', 'membros'];
+const COLS_GRUPO = ['config', 'jogadores', 'peladas', 'presencas', 'locais', 'caixa', 'avisos', 'mural', 'avaliacoes', 'notificacoes', 'membros', 'suporteLog'];
 window.apagarGrupo = async () => {
   const gid = ABERTO, G = GRUPOS[gid]; if (!gid || !G || G.dono !== EU.uid) { aviso('Só quem criou o grupo pode apagá-lo.'); return; }
   try {
@@ -683,7 +734,8 @@ function listaGruposHTML() { const L = gruposFiltrados(), n = v => Number(v || 0
     <div class="row" style="justify-content:space-between;gap:10px;flex-wrap:nowrap;align-items:flex-start"><div><b style="font-size:17px">${escH(g.nome)}</b><div class="sub">${escH([g.cidade, g.uf].filter(Boolean).join(' · ') || 'Sem cidade')}${g.evento ? ' · evento' : g.dia != null ? ' · ' + DIAS_CURTO[g.dia] : ''}</div></div>
       <span class="small" style="flex:none;padding:3px 10px;border-radius:999px;font-weight:700;background:${g.ativo ? '#d8eedd' : '#e6e8e4'};color:${g.ativo ? '#0F4D27' : '#56665B'}">${g.ativo ? 'Ativo' : 'Parado'}</span></div>
     <div class="small" style="display:flex;flex-wrap:wrap;gap:4px 14px"><span>👥 ${n(g.jogadores)} no elenco · ${n(g.contas)} com conta</span><span>📅 Última pelada: ${dt(g.ultima)}</span>
-      <span>${g.pix ? '💳 Pix conectado' : '💳 Sem Pix'}${g.comissaoMes > 0 ? ' · ' + rs(g.comissaoMes) + ' de comissão no mês' : ''}</span><span>🔑 Código ${escH(g.codigo || '—')}</span>${g.rep ? `<span>🤝 Representante ${escH(g.rep)}</span>` : ''}<span>🗓️ Criado em ${dc(g.criadoEm)}</span></div></div>`).join('')
+      <span>${g.pix ? '💳 Pix conectado' : '💳 Sem Pix'}${g.comissaoMes > 0 ? ' · ' + rs(g.comissaoMes) + ' de comissão no mês' : ''}</span><span>🔑 Código ${escH(g.codigo || '—')}</span>${g.rep ? `<span>🤝 Representante ${escH(g.rep)}</span>` : ''}<span>🗓️ Criado em ${dc(g.criadoEm)}</span></div>
+    <button class="btn sm" style="align-self:flex-start" data-sh="suporte-entrar" data-v="${escH(g.gid)}">🛟 Entrar como suporte</button></div>`).join('')
     : '<p class="sub">Nenhum grupo com esses filtros.</p>'); }
 function telaGruposDono() { const P = UIp.painel || {}, D = P.dados;
   if (!D) return '<h2>Grupos</h2>' + (P.erro ? `<div class="banner">${escH(P.erro)}</div>` : '<p class="lead">Carregando os grupos…</p>');
@@ -1236,6 +1288,8 @@ document.addEventListener('click', async e => {
   if (a === 'reset') { const em = ($('l-email') || {}).value || ''; if (!em) { aviso('Digite seu e-mail acima e toque de novo em "Esqueci minha senha".'); return; } try { await B.reset(em.trim()); aviso('Mandamos um link para criar uma nova senha no seu e-mail.'); } catch (err) { aviso(msgErro(err)); } }
   // sair pede um segundo toque (evita sair sem querer e cair na tela inicial)
   if (a === 'intro-seguir') { seguirIntro(); return; }
+  if (a === 'suporte-entrar') { await entrarSuporte(v); return; }
+  if (a === 'sup-pedir-ok') { UIp.supPedir = null; render(); return; }
   if (a === 'sair') {
     if (!b.dataset.certeza) { b.dataset.certeza = '1'; b.textContent = 'Toque de novo para sair da conta'; b.classList.add('danger');
       clearTimeout(b._t); b._t = setTimeout(() => { if (b.isConnected) { delete b.dataset.certeza; b.textContent = 'Sair da conta'; b.classList.remove('danger'); } }, 4000); return; }

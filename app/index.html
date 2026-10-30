@@ -615,6 +615,11 @@ label.btn{position:relative;cursor:pointer}
 .ob-pel{text-align:left}
 #shell form .btn{margin-top:4px}
 .top .iconbtn[data-act="voltar-grupos"]{font-size:22px;font-weight:700;line-height:1}
+/* modo suporte (dono do app dentro de uma pelada, com autorização do administrador) */
+.sup-faixa{position:fixed;left:0;right:0;top:0;z-index:35;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(8px + env(safe-area-inset-top,0px)) 14px 8px;background:#B8450F;color:#fff;font-size:13.5px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.sup-faixa span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sup-faixa button{flex:none;border:1.5px solid #fff;background:transparent;color:#fff;border-radius:8px;padding:5px 10px;font:inherit;font-weight:700}
+body.em-suporte #app{padding-top:calc(58px + env(safe-area-inset-top,0px))}
 </style>
 </head>
 <body>
@@ -626,9 +631,9 @@ label.btn{position:relative;cursor:pointer}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261030b"></script>
-<script src="br.js?v=20261030b"></script>
-<script src="core.js?v=20261030b"></script>
-<script type="module" src="app.js?v=20261030b"></script>
+<script src="qrcode.js?v=20261030c"></script>
+<script src="br.js?v=20261030c"></script>
+<script src="core.js?v=20261030c"></script>
+<script type="module" src="app.js?v=20261030c"></script>
 </body>
 </html>
