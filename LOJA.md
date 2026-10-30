@@ -25,4 +25,4 @@ O servidor (`respostaPush`) já confere a chave de cada pessoa; só muda o canal
 - Conta Google Play (organização, com D-U-N-S) e Apple Developer (organização, com D-U-N-S)
 - Política de privacidade: https://pelotafc.com.br/privacidade.html
 - Termos de uso: https://pelotafc.com.br/termos.html
-- Exclusão de conta dentro do app: já existe (Perfil → Excluir conta)
+- Exclusão de conta dentro do app: já existe (Perfil → Excluir minha conta)
