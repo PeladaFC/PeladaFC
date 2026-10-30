@@ -1197,7 +1197,11 @@ document.addEventListener('click', async e => {
   if (a === 'pref') { UIp.prefere = v; render(); }
   if (a === 'google') { try { await B.google(); } catch (err) { aviso(msgErro(err) + ' Se não abrir, use e-mail e senha.'); } }
   if (a === 'reset') { const em = ($('l-email') || {}).value || ''; if (!em) { aviso('Digite seu e-mail acima e toque de novo em "Esqueci minha senha".'); return; } try { await B.reset(em.trim()); aviso('Mandamos um link para criar uma nova senha no seu e-mail.'); } catch (err) { aviso(msgErro(err)); } }
-  if (a === 'sair') { ls.set('pelada.ultimo', null); await B.sair(); }
+  // sair pede um segundo toque (evita sair sem querer e cair na tela inicial)
+  if (a === 'sair') {
+    if (!b.dataset.certeza) { b.dataset.certeza = '1'; b.textContent = 'Toque de novo para sair da conta'; b.classList.add('danger');
+      clearTimeout(b._t); b._t = setTimeout(() => { if (b.isConnected) { delete b.dataset.certeza; b.textContent = 'Sair da conta'; b.classList.remove('danger'); } }, 4000); return; }
+    ls.set('pelada.ultimo', null); await B.sair(); }
   if (a === 'excluir-ver') { UIp.exc = { carregando: true }; ir('excluir'); try { UIp.exc = await contaServidor('verificar'); } catch (e) { UIp.exc = {}; aviso(e.message); } if (TELA === 'excluir') render(); }
   if (a === 'excluir-ok') { if ((($('x-conf') || {}).value || '').trim().toUpperCase() !== 'EXCLUIR') { aviso('Escreva EXCLUIR para confirmar.'); return; }
     b.disabled = true; b.textContent = 'Excluindo…';
