@@ -233,6 +233,7 @@ function mostrarCasca(on) {
 function ir(t) { TELA = t; mostrarCasca(true); render(); }
 
 /* ================= Telas ================= */
+const HERO_BOAS = '<div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Organize a pelada, sorteie times equilibrados e acompanhe quem é o craque da galera.</p></div>';
 function topo(voltar) {
   return `<div class="ob-top">${voltar ? `<button class="btn sm" data-sh="ir" data-v="${voltar}">‹ Voltar</button>` : '<span></span>'}<span></span>${EU ? '' : ''}</div>`;
 }
@@ -241,15 +242,15 @@ function render() {
   if (TELA === 'boas' && !INTRO_VISTA) TELA = 'intro';
   const t = TELA;
   if (t === 'intro') { el.innerHTML = telaIntro(); iniciarIntro(); return; }
-  if (t === 'carregando') h = `<div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Carregando…</p></div>`;
-  if (t === 'boas') h = `<div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Organize a pelada, sorteie times equilibrados e acompanhe quem é o craque da galera.</p></div>
+  if (t === 'carregando') h = HERO_BOAS; // o mesmo cartão da tela inicial: nada pisca ao abrir
+  if (t === 'boas') h = `${HERO_BOAS}
     ${respGuardada() ? `<div class="banner due"><span><b>Entre na sua conta para responder.</b><br>Assim que você entrar, sua resposta da pelada é registrada.</span></div>` : ls.get('pelada.convite') ? `<div class="banner due"><span><b>Você recebeu um convite!</b><br>Crie sua conta ou entre para participar.</span></div>` : ''}
     <button class="btn primary block" data-sh="ir" data-v="criar">Criar conta</button>
     <button class="btn block" data-sh="ir" data-v="login">Já tenho conta</button>
     <div class="ob-div">ou</div>
     <button class="btn block ob-google" data-sh="google">Continuar com o Google</button>
     ${ls.get('pelada.convite') ? '' : '<button class="btn block" data-sh="ler-qr">📷 Recebi um QR Code de convite</button>'}`;
-  if (t === 'login') h = topo('boas') + `<h2>Entrar</h2><p class="lead">Bem-vindo de volta.</p>
+  if (t === 'login') h = HERO_BOAS + `<div class="ob-troca"><h2>Entrar</h2><p class="lead">Bem-vindo de volta.</p>
     <form id="f-login" class="stack" novalidate>
       <label class="field"><span>E-mail</span><input type="email" id="l-email" autocomplete="email" inputmode="email" placeholder="seu@email.com" required></label>
       <label class="field"><span>Senha</span><input type="password" id="l-senha" autocomplete="current-password" placeholder="Sua senha" required></label>
@@ -257,8 +258,9 @@ function render() {
     <button class="ob-link" data-sh="reset">Esqueci minha senha</button>
     <div class="ob-div">ou</div>
     <button class="btn block ob-google" data-sh="google">Continuar com o Google</button>
-    <p class="sub" style="text-align:center">Não tem conta? <button class="ob-link" data-sh="ir" data-v="criar">Criar conta</button></p>`;
-  if (t === 'criar') h = topo('boas') + `<h2>Criar conta</h2><p class="lead">Leva menos de um minuto.</p>
+    <p class="sub" style="text-align:center">Não tem conta? <button class="ob-link" data-sh="ir" data-v="criar">Criar conta</button></p>
+    <button class="ob-link ob-voltar" data-sh="ir" data-v="boas">‹ Voltar</button></div>`;
+  if (t === 'criar') h = HERO_BOAS + `<div class="ob-troca"><h2>Criar conta</h2><p class="lead">Leva menos de um minuto.</p>
     <form id="f-criar" class="stack" novalidate>
       <label class="field"><span>Nome</span><input type="text" id="c-nome2" autocomplete="name" placeholder="Seu nome completo" required></label>
       <label class="field"><span>E-mail</span><input type="email" id="c-email" autocomplete="email" inputmode="email" placeholder="seu@email.com" required></label>
@@ -266,7 +268,8 @@ function render() {
       <button class="btn primary block" type="submit">Criar conta</button></form>
     <div class="ob-div">ou</div>
     <button class="btn block ob-google" data-sh="google">Continuar com o Google</button>
-    <p class="sub" style="text-align:center;margin:0">Ao criar a conta, você aceita os <a href="/termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>`;
+    <p class="sub" style="text-align:center;margin:0">Ao criar a conta, você aceita os <a href="/termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>
+    <button class="ob-link ob-voltar" data-sh="ir" data-v="boas">‹ Voltar</button></div>`;
   if (t === 'perfil' && EU && UIp.parcOk === undefined) { UIp.parcOk = ls.get('pelota.parc.' + EU.uid) === '1' ? true : null; carregarParceiro(true); }
   if (t === 'perfil' && EU && UIp.notasOk === undefined) { const ck = 'pelota.dono.' + EU.uid, tinha = ls.get(ck) === '1'; UIp.notasOk = tinha ? true : null; UIp.notasErro = null; notasServidor('acesso').then(() => { ls.set(ck, '1'); UIp.notasOk = true; if (TELA === 'perfil' && !tinha) render(); }, e => { if (e && e.status === 403) { ls.set(ck, null); UIp.notasOk = false; if (TELA === 'perfil' && tinha) render(); } else if (!tinha) { UIp.notasOk = null; UIp.notasErro = (e && e.message) || 'erro'; if (TELA === 'perfil') render(); } }); }
   if (t === 'perfil') { const p = PERFIL || {}; const pos = UIp.pos || p.pos || 'MEI'; const pronto = !!(p.apelido || p.pos);
@@ -427,7 +430,7 @@ function render() {
     <button class="btn block" data-sh="copiar-app">Copiar link</button>
     ${navigator.share ? '<button class="btn block" data-sh="share-app">Compartilhar…</button>' : ''}
     <p class="sub" style="margin:0">Para convidar alguém direto para a sua pelada, use o link ou o QR Code que ficam na ⚙️ engrenagem, dentro da pelada.</p>`;
-  el.innerHTML = `<div class="ob-in${['login', 'criar'].includes(t) ? ' ob-centro' : t === 'boas' ? ' ob-centro-baixo' : ''}">${h}</div>`;
+  el.innerHTML = `<div class="ob-in${['boas', 'login', 'criar'].includes(t) ? ' ob-centro-baixo' : ''}">${h}</div>`;
 }
 const UIp = {};
 
@@ -441,15 +444,13 @@ const IC_INTRO = {
   trofeu: '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>'
 };
 function telaIntro() {
-  const itens = [['lista', 'Lista de presença com um toque', 'A galera confirma pelo app, pelo link do WhatsApp ou pela notificação.'],
-    ['times', 'Times equilibrados', 'O sorteio usa a nota e a posição de cada jogador. Chega de time desequilibrado.'],
-    ['caixa', 'Caixa da pelada em dia', 'Mensalidade e diária por Pix, com a baixa feita sozinha e o caixa do mês.'],
-    ['trofeu', 'Craque da galera', 'Notas, gols, prêmios e ranking depois de cada pelada.']];
-  return `<div class="intro">
-    <div class="intro-topo"><span class="intro-marca">Pelota <span>FC</span></span><button class="intro-pular" data-sh="intro-seguir">Pular</button></div>
-    <h1 class="intro-titulo sobe" style="--d:150ms">O app da<br>sua pelada</h1>
-    <ul class="intro-lista">${itens.map(([ic, t, d], i) => `<li class="sobe" style="--d:${500 + i * 900}ms"><span class="intro-ic">${IC_INTRO[ic]}</span><span><b>${escH(t)}</b><span class="s">${escH(d)}</span></span></li>`).join('')}</ul>
-    <div class="intro-fim sobe" style="--d:${500 + itens.length * 900}ms"><div class="intro-barra"><i></i></div>
+  const itens = [['lista', 'Presença com um toque', 'Pelo app, pelo WhatsApp ou pela notificação.'],
+    ['times', 'Times equilibrados', 'Sorteio pela nota e pela posição de cada um.'],
+    ['caixa', 'Caixa em dia', 'Mensalidade e diária no Pix, com baixa sozinha.'],
+    ['trofeu', 'Craque da galera', 'Notas, ranking e a arte do craque para postar.']];
+  return `<div class="intro">${HERO_BOAS}
+    <ul class="intro-lista">${itens.map(([ic, t, d], i) => `<li class="sobe" style="--d:${400 + i * 900}ms"><span class="intro-ic">${IC_INTRO[ic]}</span><span><b>${escH(t)}</b><span class="s">${escH(d)}</span></span></li>`).join('')}</ul>
+    <div class="intro-fim sobe" style="--d:${400 + itens.length * 900}ms"><div class="intro-barra"><i></i></div>
       <button class="btn primary block" data-sh="intro-seguir">Continuar</button></div></div>`;
 }
 function iniciarIntro() { clearTimeout(INTRO_T); INTRO_T = setTimeout(seguirIntro, matchMedia('(prefers-reduced-motion: reduce)').matches ? 6000 : 9000); }
