@@ -1582,6 +1582,8 @@ function renderHist(A){
 
 /* ---------- responder presença (botões do app, link do WhatsApp e notificação) ---------- */
 let RESP_LINK=null;
+// Ações importantes pedem um segundo toque: devolve true só no segundo toque
+function doisToques(b,texto){if(b.dataset.certeza){delete b.dataset.certeza;clearTimeout(b._t2);return true}b.dataset.certeza='1';b.dataset.orig=b.innerHTML;b.textContent=texto||'Toque de novo para confirmar';b.classList.add('confirmar');clearTimeout(b._t2);b._t2=setTimeout(()=>{if(b.isConnected&&b.dataset.certeza){delete b.dataset.certeza;b.innerHTML=b.dataset.orig;b.classList.remove('confirmar')}},4000);return false}
 let SUP=false; // modo suporte: o dono do Pelota FC entrou com a autorização do administrador
 function euVou(pid,v,via){const doc=S.pres[myId];if(!doc)return null;const p=S.pel[pid];if(!p)return null;const prev=respDe(p,pid)[doc.jogador]?.s||null;
   if(prev===v)return{igual:true,s:v,texto:v==='sim'?'Você já tinha confirmado presença.':'Você já tinha avisado que não vai.'};
@@ -2346,14 +2348,14 @@ document.addEventListener('click',e=>{
       patch('peladas/'+d.p,{resp:{[d.j]:{s:v,t:now,esp:v==='sim'&&cheia}},aprov:{[d.j]:v==='sim'&&!cheia?now:null}});
       if(v==='sim'&&cheia)toast(`Lista cheia: ${nm(d.j)} foi para a espera.`);
       eventosPresenca(S.pel[d.p],before,lista(S.pel[d.p],d.p),d.j,cur,v);break}
-    case'sup-aceitar':window.suporteAdmin('liberar').then(()=>toast('Suporte liberado por 24 horas. Pode avisar o Pelota FC.'),e=>toast((e&&e.message)||'Não deu certo.'));break;
-    case'sup-recusar':window.suporteAdmin('recusar').then(()=>toast('Pedido recusado.'),e=>toast((e&&e.message)||'Não deu certo.'));break;
-    case'sup-encerrar':window.suporteAdmin('encerrar').then(()=>{toast('Suporte encerrado.');closeSheet()},e=>toast((e&&e.message)||'Não deu certo.'));break;
+    case'sup-aceitar':if(!doisToques(b,'Toque de novo para liberar'))break;window.suporteAdmin('liberar').then(()=>toast('Suporte liberado por 24 horas. Pode avisar o Pelota FC.'),e=>toast((e&&e.message)||'Não deu certo.'));break;
+    case'sup-recusar':if(!doisToques(b,'Toque de novo'))break;window.suporteAdmin('recusar').then(()=>toast('Pedido recusado.'),e=>toast((e&&e.message)||'Não deu certo.'));break;
+    case'sup-encerrar':if(!doisToques(b,'Toque de novo para encerrar'))break;window.suporteAdmin('encerrar').then(()=>{toast('Suporte encerrado.');closeSheet()},e=>toast((e&&e.message)||'Não deu certo.'));break;
     case'sup-log':sheetLogSuporte();break;
     case'sup-painel':sheetSuporteAdm();break;
-    case'duv-enviar':{const t=(document.getElementById('duv-texto')||{}).value||'',tel=(document.getElementById('duv-tel')||{}).value||'';b.disabled=true;
+    case'duv-enviar':{const t=(document.getElementById('duv-texto')||{}).value||'',tel=(document.getElementById('duv-tel')||{}).value||'';if(t.trim().length<5){toast('Escreva a sua dúvida.');break}if(!doisToques(b,'Toque de novo para enviar'))break;b.disabled=true;
       window.suporteDuvida('enviar',{texto:t,tel}).then(()=>{toast('Dúvida enviada. O Pelota FC vai responder por aqui ou pelo WhatsApp.');setTimeout(sheetSuporteAdm,300)},e=>{b.disabled=false;toast((e&&e.message)||'Não deu certo.')});break}
-    case'duv-resp':{const t=(document.getElementById('duv-r-'+d.v)||{}).value||'';window.suporteDuvida('responder',{id:d.v,texto:t}).then(()=>{toast('Mensagem enviada.');setTimeout(sheetSuporteAdm,300)},e=>toast((e&&e.message)||'Não deu certo.'));break}
+    case'duv-resp':{const t=(document.getElementById('duv-r-'+d.v)||{}).value||'';if(!t.trim()){toast('Escreva a mensagem.');break}if(!doisToques(b,'Confirmar'))break;window.suporteDuvida('responder',{id:d.v,texto:t}).then(()=>{toast('Mensagem enviada.');setTimeout(sheetSuporteAdm,300)},e=>toast((e&&e.message)||'Não deu certo.'));break}
     case'eu-vou':{const r=euVou(d.p,d.v);if(r)toast(r.texto);break}
     case'resp-escolher':{const r=euVou(d.p,d.v,'link');if(r)sheetResp(d.p,r);else closeSheet();break}
     case'resp-desfazer':{const u=UI.respAnt;if(!u)return;const doc=S.pres[myId];if(!doc)return;const pel={...(doc.pel||{})};if(u.ant)pel[u.pid]=u.ant;else delete pel[u.pid];

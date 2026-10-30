@@ -575,6 +575,13 @@ function makeDb(gid) {
     }
   };
 }
+// Ações importantes pedem um segundo toque (nada acontece sem querer): devolve true só no segundo toque
+function doisToques(b, texto) {
+  if (b.dataset.certeza) { delete b.dataset.certeza; clearTimeout(b._t2); return true; }
+  b.dataset.certeza = '1'; b.dataset.orig = b.innerHTML; b.textContent = texto || 'Toque de novo para confirmar'; b.classList.add('confirmar');
+  clearTimeout(b._t2); b._t2 = setTimeout(() => { if (b.isConnected && b.dataset.certeza) { delete b.dataset.certeza; b.innerHTML = b.dataset.orig; b.classList.remove('confirmar'); } }, 4000);
+  return false;
+}
 /* ================= Suporte do Pelota FC =================
    O dono do app pede o acesso pelo Painel do dono → Grupos → "Suporte". O administrador da pelada vê um aviso laranja
    na tela inicial (e dentro da pelada) e libera por 24 horas. O dono entra como administrador, sem virar membro.
@@ -593,7 +600,7 @@ function mostrarFaixaSuporte() {
   let f = $('sup-faixa');
   if (!SUPORTE) { if (f) f.remove(); document.body.classList.remove('em-suporte'); clearInterval(SUP_T); return; }
   if (!f) { f = document.createElement('div'); f.id = 'sup-faixa'; f.className = 'sup-faixa'; document.body.appendChild(f);
-    f.addEventListener('click', e => { if (e.target.closest('[data-sup-sair]')) sairSuporte(); }); }
+    f.addEventListener('click', e => { const bt = e.target.closest('[data-sup-sair]'); if (bt && doisToques(bt, 'Toque de novo para sair')) sairSuporte(); }); }
   document.body.classList.add('em-suporte');
   const hh = new Date(SUPORTE.ate), hr = String(hh.getHours()).padStart(2, '0') + ':' + String(hh.getMinutes()).padStart(2, '0');
   f.innerHTML = `<span>🛟 <b>Modo suporte</b> · ${escH(SUPORTE.nome || 'Pelada')} · até ${hr}</span><button type="button" data-sup-sair>Sair do suporte</button>`;
@@ -1350,15 +1357,15 @@ document.addEventListener('click', async e => {
   if (a === 'reset') { const em = ($('l-email') || {}).value || ''; if (!em) { aviso('Digite seu e-mail acima e toque de novo em "Esqueci minha senha".'); return; } try { await B.reset(em.trim()); aviso('Mandamos um link para criar uma nova senha no seu e-mail.'); } catch (err) { aviso(msgErro(err)); } }
   // sair pede um segundo toque (evita sair sem querer e cair na tela inicial)
   if (a === 'intro-seguir') { seguirIntro(); return; }
-  if (a === 'suporte-dono') { await suporteDono(v); return; }
+  if (a === 'suporte-dono') { if (!doisToques(b, 'Toque de novo para confirmar')) return; await suporteDono(v); return; }
   if (a === 'dono-suporte') { ouvirDuvidasDono(); ir('donosuporte'); return; }
-  if (a === 'duv-responder') { const t = ($('duv-r-' + v) || {}).value || '', d = (DUV_DONO || []).find(x => x.id === v); if (!d) return; if (!t.trim()) { aviso('Escreva a resposta.'); return; }
+  if (a === 'duv-responder') { const t = ($('duv-r-' + v) || {}).value || '', d = (DUV_DONO || []).find(x => x.id === v); if (!d) return; if (!t.trim()) { aviso('Escreva a resposta.'); return; } if (!doisToques(b, 'Toque de novo para enviar')) return;
     try { await B.set('suporte/' + v, { respostas: [...(d.respostas || []), { de: 'dono', texto: t.trim().slice(0, 1000), em: Date.now() }] }, { merge: true }); aviso('Resposta enviada. O administrador recebe um aviso no celular.'); } catch (e) { aviso(msgErro(e)); } return; }
-  if (a === 'duv-resolver') { if (!b.dataset.certeza) { b.dataset.certeza = '1'; b.textContent = 'Toque de novo para confirmar'; setTimeout(() => { if (b.isConnected) { delete b.dataset.certeza; b.textContent = '✅ Dúvida resolvida'; } }, 4000); return; }
+  if (a === 'duv-resolver') { if (!doisToques(b, 'Toque de novo para confirmar')) return;
     try { await B.set('suporte/' + v, { status: 'resolvido', resolvidoEm: Date.now() }, { merge: true }); aviso('Dúvida resolvida.'); } catch (e) { aviso(msgErro(e)); } return; }
   if (a === 'sup-info-ok') { UIp.supInfo = null; render(); return; }
-  if (a === 'sup-cancelar') { try { await B.set('grupos/' + v, { suportePedido: null }, { merge: true }); UIp.supInfo = null; aviso('Pedido de suporte retirado.'); render(); } catch (e) { aviso(msgErro(e)); } return; }
-  if (a === 'sup-aceitar' || a === 'sup-recusar') { try { await window.suporteAdmin(a === 'sup-aceitar' ? 'liberar' : 'recusar', v); aviso(a === 'sup-aceitar' ? 'Suporte liberado por 24 horas. Pode avisar o Pelota FC.' : 'Pedido recusado.'); } catch (e) { aviso(msgErro(e)); } return; }
+  if (a === 'sup-cancelar') { if (!doisToques(b, 'Confirmar')) return; try { await B.set('grupos/' + v, { suportePedido: null }, { merge: true }); UIp.supInfo = null; aviso('Pedido de suporte retirado.'); render(); } catch (e) { aviso(msgErro(e)); } return; }
+  if (a === 'sup-aceitar' || a === 'sup-recusar') { if (!doisToques(b, a === 'sup-aceitar' ? 'Toque de novo para liberar' : 'Toque de novo')) return; try { await window.suporteAdmin(a === 'sup-aceitar' ? 'liberar' : 'recusar', v); aviso(a === 'sup-aceitar' ? 'Suporte liberado por 24 horas. Pode avisar o Pelota FC.' : 'Pedido recusado.'); } catch (e) { aviso(msgErro(e)); } return; }
   if (a === 'sair') {
     if (!b.dataset.certeza) { b.dataset.certeza = '1'; b.textContent = 'Toque de novo para sair da conta'; b.classList.add('danger');
       clearTimeout(b._t); b._t = setTimeout(() => { if (b.isConnected) { delete b.dataset.certeza; b.textContent = 'Sair da conta'; b.classList.remove('danger'); } }, 4000); return; }
