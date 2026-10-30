@@ -42,6 +42,7 @@ async function backendReal() {
     del: p => F.deleteDoc(ref(p)).catch(erro),
     listenDoc: (p, cb, err) => F.onSnapshot(ref(p), s => cb({ exists: s.exists(), data: s.exists() ? s.data() : null }), e => err && err(e)),
     listenCol: (p, cb, err) => F.onSnapshot(F.collection(fs, p), s => cb(s.docs.map(d => ({ id: d.id, data: d.data() }))), e => err && err(e)),
+    listenOnde: (p, campo, valor, cb, err) => F.onSnapshot(F.query(F.collection(fs, p), F.where(campo, '==', valor)), s => cb(s.docs.map(d => ({ id: d.id, data: d.data() }))), e => err && err(e)),
     listar: async p => (await F.getDocs(F.collection(fs, p)).catch(erro)).docs.map(d => d.id),
     ultimos: async (p, campo, n) => (await F.getDocs(F.query(F.collection(fs, p), F.orderBy(campo, 'desc'), F.limit(n))).catch(erro)).docs.map(d => ({ id: d.id, data: d.data() })),
     tirarGrupo: (uid, gid) => F.updateDoc(ref('users/' + uid), { ['grupos.' + gid]: F.deleteField() }).catch(erro),
@@ -75,6 +76,7 @@ function backendMock() {
     del: async p => { store.delete(p); fire(p); },
     listenDoc: (p, cb) => { setTimeout(() => cb({ exists: store.has(p), data: clone(store.get(p)) ?? null }), 0); return add(docL, p, cb); },
     listenCol: (p, cb) => { setTimeout(() => cb(colDocs(p)), 0); return add(colL, p, cb); },
+    listenOnde: (p, campo, valor, cb) => { const f = ds => ds.filter(x => x.data[campo] === valor); setTimeout(() => cb(f(colDocs(p))), 0); return add(colL, p, ds => cb(f(ds))); },
     listar: async p => colDocs(p).map(d => d.id),
     ultimos: async (p, campo, n) => colDocs(p).sort((a, b) => (b.data[campo] || 0) - (a.data[campo] || 0)).slice(0, n),
     tirarGrupo: async (uid, gid) => { const p = 'users/' + uid, u = clone(store.get(p)) || {}; if (u.grupos) delete u.grupos[gid]; store.set(p, u); fire(p); },
@@ -295,6 +297,7 @@ function render() {
   if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + (UIp.supInfo ? `<div class="sup-info"><span>🛟 <b>${UIp.supInfo.novo ? 'Pedido enviado' : 'Pedido já enviado'}</b> · ${escH(UIp.supInfo.nome)} · vale até ${(d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'))(new Date(UIp.supInfo.em + PEDIDO_VALE))}</span><button class="btn sm" data-sh="sup-cancelar" data-v="${escH(UIp.supInfo.gid)}">Retirar</button><button class="btn sm" data-sh="sup-info-ok" aria-label="Fechar">✕</button></div>` : '') + telaGruposDono();
   if (t === 'donoreps') h = topo('perfil') + abasDono('reps') + telaRepsDono();
   if (t === 'donoerros') h = topo('perfil') + abasDono('erros') + telaErrosDono();
+  if (t === 'donosuporte') h = topo('perfil') + abasDono('suporte') + telaDuvidasDono();
   if (t === 'parceiro') h = topo('perfil') + telaParceiro();
   if (t === 'donorepqr') { const x = repDoQr(), A3 = UIp.repFmt === 'a3', A4 = UIp.repFmt === 'a4' || A3;
     h = topo(UIp.repqr === '_meu' ? 'parceiro' : 'donoreps') + (x ? `<h2>${x.codigo ? 'QR Code de ' + escH(x.nome) : 'Pôster do Pelota FC'}</h2><p class="lead">${x.codigo ? `Quem ler este código abre o Pelota FC. As peladas que essa pessoa criar ficam marcadas como trazidas por <b>${escH(x.codigo)}</b>.` : 'Pôster sem representante: o QR Code abre o Pelota FC.'}</p>
@@ -489,6 +492,7 @@ window.salvarMeuLocal = (id, L) => { if (!EU) return; PERFIL = PERFIL || {}; PER
 async function depoisDoLogin() {
   await carregarPerfil();
   if (!PERFIL || !PERFIL.apelido && !PERFIL.pos) { ir('perfil'); return; }
+  ouvirMinhasDuvidas();
   const rv = respGuardada();
   if (rv) { ls.set('pelota.resp', null); await abrirResposta(rv); return; }
   UIp.convResp = false;
@@ -571,6 +575,13 @@ function makeDb(gid) {
     }
   };
 }
+// Ações importantes pedem um segundo toque (nada acontece sem querer): devolve true só no segundo toque
+function doisToques(b, texto) {
+  if (b.dataset.certeza) { delete b.dataset.certeza; clearTimeout(b._t2); return true; }
+  b.dataset.certeza = '1'; b.dataset.orig = b.innerHTML; b.textContent = texto || 'Toque de novo para confirmar'; b.classList.add('confirmar');
+  clearTimeout(b._t2); b._t2 = setTimeout(() => { if (b.isConnected && b.dataset.certeza) { delete b.dataset.certeza; b.innerHTML = b.dataset.orig; b.classList.remove('confirmar'); } }, 4000);
+  return false;
+}
 /* ================= Suporte do Pelota FC =================
    O dono do app pede o acesso pelo Painel do dono → Grupos → "Suporte". O administrador da pelada vê um aviso laranja
    na tela inicial (e dentro da pelada) e libera por 24 horas. O dono entra como administrador, sem virar membro.
@@ -589,7 +600,7 @@ function mostrarFaixaSuporte() {
   let f = $('sup-faixa');
   if (!SUPORTE) { if (f) f.remove(); document.body.classList.remove('em-suporte'); clearInterval(SUP_T); return; }
   if (!f) { f = document.createElement('div'); f.id = 'sup-faixa'; f.className = 'sup-faixa'; document.body.appendChild(f);
-    f.addEventListener('click', e => { if (e.target.closest('[data-sup-sair]')) sairSuporte(); }); }
+    f.addEventListener('click', e => { const bt = e.target.closest('[data-sup-sair]'); if (bt && doisToques(bt, 'Toque de novo para sair')) sairSuporte(); }); }
   document.body.classList.add('em-suporte');
   const hh = new Date(SUPORTE.ate), hr = String(hh.getHours()).padStart(2, '0') + ':' + String(hh.getMinutes()).padStart(2, '0');
   f.innerHTML = `<span>🛟 <b>Modo suporte</b> · ${escH(SUPORTE.nome || 'Pelada')} · até ${hr}</span><button type="button" data-sup-sair>Sair do suporte</button>`;
@@ -629,6 +640,52 @@ window.suporteAdmin = async (op, gid) => {
   await B.set('grupos/' + gid, d, { merge: true });
   GRUPOS[gid] = { ...GRUPOS[gid], ...d }; if (ABERTO === gid) window.atualizarGrupo({ ...GRUPOS[gid] }); else if (TELA === 'minhas') render();
 };
+
+/* ================= Dúvidas de suporte =================
+   O administrador escreve a dúvida em Ajustes → Suporte do Pelota FC. Ela chega no Painel do dono → Suporte técnico
+   (com número de pendentes). O dono responde pelo app ou pelo WhatsApp e marca "Dúvida resolvida", que tira do painel. */
+let MINHAS_DUV = [], UNSUB_DUV = null, DUV_DONO = null, UNSUB_DUV_DONO = null;
+function ouvirMinhasDuvidas() {
+  if (UNSUB_DUV) { UNSUB_DUV(); UNSUB_DUV = null; } MINHAS_DUV = [];
+  if (!EU) return;
+  UNSUB_DUV = B.listenOnde('suporte', 'uid', EU.uid, ds => { MINHAS_DUV = ds.map(x => ({ id: x.id, ...x.data })).sort((a, b) => b.em - a.em); if (window.atualizarDuvidas) window.atualizarDuvidas(); }, e => console.warn(e));
+}
+// dono: começa a ouvir as dúvidas abertas na primeira vez que abre o painel; devolve quantas estão pendentes
+function ouvirDuvidasDono() {
+  if (!UNSUB_DUV_DONO && EU && UIp.notasOk) UNSUB_DUV_DONO = B.listenOnde('suporte', 'status', 'aberto', ds => {
+    DUV_DONO = ds.map(x => ({ id: x.id, ...x.data })).sort((a, b) => a.em - b.em); if (/^dono/.test(TELA)) render(); }, e => console.warn(e));
+  return DUV_DONO ? DUV_DONO.length : 0;
+}
+const ultimaResp = d => (d.respostas || []).slice(-1)[0] || null;
+window.minhasDuvidas = gid => MINHAS_DUV.filter(d => d.gid === gid);
+window.duvidaNaoLida = gid => MINHAS_DUV.some(d => d.gid === gid && (d.respostas || []).some(r => r.de === 'dono' && r.em > (d.lidoGrupo || 0)));
+window.meuWhats = () => (PERFIL && PERFIL.tel) || '';
+window.suporteDuvida = async (op, a) => {
+  if (op === 'enviar') {
+    const gid = ABERTO, G = GRUPOS[gid]; if (!gid || !G || SUPORTE) throw new Error('Abra a sua pelada para isso.');
+    const texto = String(a.texto || '').trim().slice(0, 1000); if (texto.length < 5) throw new Error('Escreva a sua dúvida.');
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    await B.set('suporte/' + id, { gid, grupo: G.nome || 'Pelada', uid: EU.uid, nome: (PERFIL && (PERFIL.apelido || PERFIL.nome)) || EU.nome || '', tel: String(a.tel || '').replace(/\D/g, '').slice(0, 13), email: EU.email || '', texto, em: Date.now(), status: 'aberto', respostas: [], lidoGrupo: Date.now() });
+    return;
+  }
+  const d = MINHAS_DUV.find(x => x.id === a.id); if (!d) return;
+  if (op === 'responder') { const texto = String(a.texto || '').trim().slice(0, 1000); if (!texto) throw new Error('Escreva a mensagem.');
+    await B.set('suporte/' + d.id, { respostas: [...(d.respostas || []), { de: 'grupo', texto, em: Date.now() }], status: 'aberto', lidoGrupo: Date.now() }, { merge: true }); }
+  if (op === 'lido') await B.set('suporte/' + d.id, { lidoGrupo: Date.now() }, { merge: true });
+};
+function telaDuvidasDono() {
+  const L = DUV_DONO; if (!L) return '<h2>Suporte técnico</h2><p class="lead">Carregando as dúvidas…</p>';
+  const hora = ms => { const d = new Date(ms); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  return `<h2>Suporte técnico</h2><p class="lead">${L.length ? `${L.length} dúvida${L.length === 1 ? '' : 's'} esperando. Responda pelo app ou pelo WhatsApp e marque como resolvida.` : 'Nenhuma dúvida esperando. 🙌'}</p>
+  ${L.map(d => { const fone = d.tel ? (d.tel.length <= 11 ? '55' + d.tel : d.tel) : '', ult = ultimaResp(d), novaDoGrupo = ult && ult.de === 'grupo';
+    const wa = `https://wa.me/${fone}?text=${encodeURIComponent(`Olá, ${d.nome || ''}! Aqui é do suporte do Pelota FC, sobre a sua dúvida na pelada ${d.grupo}: "${d.texto.slice(0, 200)}"`)}`;
+    return `<div class="panel duv-card"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><b>${escH(d.grupo)}</b><span class="small">${hora(d.em)}</span></div>
+    <div class="sub">${escH(d.nome || 'Administrador')}${d.tel ? ' · ' + escH(d.tel) : ''}${d.email ? ' · ' + escH(d.email) : ''}${novaDoGrupo ? ' · <b style="color:#B8450F">nova mensagem</b>' : ''}</div>
+    <div class="duv-msg duv-grupo">${escH(d.texto)}</div>
+    ${(d.respostas || []).map(r => `<div class="duv-msg ${r.de === 'dono' ? 'duv-dono' : 'duv-grupo'}">${escH(r.texto)}<span>${r.de === 'dono' ? 'Você' : escH(d.nome || 'Grupo')} · ${hora(r.em)}</span></div>`).join('')}
+    <textarea id="duv-r-${d.id}" rows="2" placeholder="Responder pelo app…"></textarea>
+    <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm primary" data-sh="duv-responder" data-v="${d.id}">Responder no app</button>${fone ? `<a class="btn sm" target="_blank" rel="noopener" href="${wa}">WhatsApp</a>` : ''}<button class="btn sm" data-sh="suporte-dono" data-v="${escH(d.gid)}">🛟 Acessar a pelada</button><button class="btn sm duv-ok" data-sh="duv-resolver" data-v="${d.id}">✅ Dúvida resolvida</button></div></div>`; }).join('')}`;
+}
 
 const compartilhar = {
   save: async ({ filename, data, type }) => {
@@ -727,7 +784,7 @@ async function notasServidor(acao, extra) {
   if (!r.ok) throw Object.assign(new Error(j.erro || 'Não deu certo agora. Tente de novo.'), { status: r.status });
   return j;
 }
-function abasDono(at) { return `<div class="pick" style="margin:6px 0 4px"><button type="button" data-sh="dono" aria-pressed="${at === 'dono'}">Visão geral</button><button type="button" data-sh="dono-grupos" aria-pressed="${at === 'grupos'}">Grupos</button><button type="button" data-sh="dono-reps" aria-pressed="${at === 'reps'}">Representantes</button><button type="button" data-sh="notas" aria-pressed="${at === 'notas'}">Notas fiscais</button><button type="button" data-sh="dono-erros" aria-pressed="${at === 'erros'}">Erros</button></div>`; }
+function abasDono(at) { return `<div class="pick" style="margin:6px 0 4px"><button type="button" data-sh="dono" aria-pressed="${at === 'dono'}">Visão geral</button><button type="button" data-sh="dono-grupos" aria-pressed="${at === 'grupos'}">Grupos</button><button type="button" data-sh="dono-reps" aria-pressed="${at === 'reps'}">Representantes</button><button type="button" data-sh="notas" aria-pressed="${at === 'notas'}">Notas fiscais</button><button type="button" data-sh="dono-erros" aria-pressed="${at === 'erros'}">Erros</button><button type="button" class="aba-sup" data-sh="dono-suporte" aria-pressed="${at === 'suporte'}">🛟 Suporte técnico${ouvirDuvidasDono() ? `<span class="badge-n">${ouvirDuvidasDono()}</span>` : ''}</button></div>`; }
 /* lista de grupos do painel, com várias formas de procurar */
 const GF0 = { q: '', sit: 'todos', uf: '', cidade: '', pix: '', pag: '', tipo: '', dia: '', ord: 'recente' };
 const DIAS_CURTO = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -1300,10 +1357,15 @@ document.addEventListener('click', async e => {
   if (a === 'reset') { const em = ($('l-email') || {}).value || ''; if (!em) { aviso('Digite seu e-mail acima e toque de novo em "Esqueci minha senha".'); return; } try { await B.reset(em.trim()); aviso('Mandamos um link para criar uma nova senha no seu e-mail.'); } catch (err) { aviso(msgErro(err)); } }
   // sair pede um segundo toque (evita sair sem querer e cair na tela inicial)
   if (a === 'intro-seguir') { seguirIntro(); return; }
-  if (a === 'suporte-dono') { await suporteDono(v); return; }
+  if (a === 'suporte-dono') { if (!doisToques(b, 'Toque de novo para confirmar')) return; await suporteDono(v); return; }
+  if (a === 'dono-suporte') { ouvirDuvidasDono(); ir('donosuporte'); return; }
+  if (a === 'duv-responder') { const t = ($('duv-r-' + v) || {}).value || '', d = (DUV_DONO || []).find(x => x.id === v); if (!d) return; if (!t.trim()) { aviso('Escreva a resposta.'); return; } if (!doisToques(b, 'Toque de novo para enviar')) return;
+    try { await B.set('suporte/' + v, { respostas: [...(d.respostas || []), { de: 'dono', texto: t.trim().slice(0, 1000), em: Date.now() }] }, { merge: true }); aviso('Resposta enviada. O administrador recebe um aviso no celular.'); } catch (e) { aviso(msgErro(e)); } return; }
+  if (a === 'duv-resolver') { if (!doisToques(b, 'Toque de novo para confirmar')) return;
+    try { await B.set('suporte/' + v, { status: 'resolvido', resolvidoEm: Date.now() }, { merge: true }); aviso('Dúvida resolvida.'); } catch (e) { aviso(msgErro(e)); } return; }
   if (a === 'sup-info-ok') { UIp.supInfo = null; render(); return; }
-  if (a === 'sup-cancelar') { try { await B.set('grupos/' + v, { suportePedido: null }, { merge: true }); UIp.supInfo = null; aviso('Pedido de suporte retirado.'); render(); } catch (e) { aviso(msgErro(e)); } return; }
-  if (a === 'sup-aceitar' || a === 'sup-recusar') { try { await window.suporteAdmin(a === 'sup-aceitar' ? 'liberar' : 'recusar', v); aviso(a === 'sup-aceitar' ? 'Suporte liberado por 24 horas. Pode avisar o Pelota FC.' : 'Pedido recusado.'); } catch (e) { aviso(msgErro(e)); } return; }
+  if (a === 'sup-cancelar') { if (!doisToques(b, 'Confirmar')) return; try { await B.set('grupos/' + v, { suportePedido: null }, { merge: true }); UIp.supInfo = null; aviso('Pedido de suporte retirado.'); render(); } catch (e) { aviso(msgErro(e)); } return; }
+  if (a === 'sup-aceitar' || a === 'sup-recusar') { if (!doisToques(b, a === 'sup-aceitar' ? 'Toque de novo para liberar' : 'Toque de novo')) return; try { await window.suporteAdmin(a === 'sup-aceitar' ? 'liberar' : 'recusar', v); aviso(a === 'sup-aceitar' ? 'Suporte liberado por 24 horas. Pode avisar o Pelota FC.' : 'Pedido recusado.'); } catch (e) { aviso(msgErro(e)); } return; }
   if (a === 'sair') {
     if (!b.dataset.certeza) { b.dataset.certeza = '1'; b.textContent = 'Toque de novo para sair da conta'; b.classList.add('danger');
       clearTimeout(b._t); b._t = setTimeout(() => { if (b.isConnected) { delete b.dataset.certeza; b.textContent = 'Sair da conta'; b.classList.remove('danger'); } }, 4000); return; }
@@ -1458,11 +1520,13 @@ document.addEventListener('submit', async e => {
   B.onAuth(async u => {
     const antes = EU && EU.uid;
     EU = u;
-    if (!u) { if (ABERTO || antes) { window.pararPelada(); if (unsubGrupo) unsubGrupo(); if (unsubPerfil) unsubPerfil(); ABERTO = null; PERFIL = null; GRUPOS = {}; } INTRO_VISTA = false; ir('boas'); return; }
+    if (!u) { if (ABERTO || antes) { window.pararPelada(); if (unsubGrupo) unsubGrupo(); if (unsubPerfil) unsubPerfil(); ABERTO = null; PERFIL = null; GRUPOS = {}; } if (UNSUB_DUV) { UNSUB_DUV(); UNSUB_DUV = null; } if (UNSUB_DUV_DONO) { UNSUB_DUV_DONO(); UNSUB_DUV_DONO = null; DUV_DONO = null; } INTRO_VISTA = false; ir('boas'); return; }
     if (antes === u.uid) return;
     enviarFilaErros();
     ir('carregando'); await depoisDoLogin();
     if (ABRIR === 'dono') { ABRIR = null; history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); aviso('Verificando o acesso ao painel…'); notasServidor('acesso').then(() => { ls.set('pelota.dono.' + EU.uid, '1'); UIp.notasOk = true; ir('dono'); carregarPainel(); }, e => alert(e && e.status === 403 ? 'A conta ' + (EU.email || '(sem e-mail)') + ' não está cadastrada como dona do app. Entre com o e-mail cadastrado ou cadastre este e-mail.' : 'Não consegui verificar: ' + ((e && e.message) || 'erro'))); }
+    if (ABRIR === 'suporte') { ABRIR = null; history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); notasServidor('acesso').then(() => { UIp.notasOk = true; ouvirDuvidasDono(); ir('donosuporte'); }, () => { }); }
+    if (ABRIR === 'duvida') { ABRIR = null; const g = new URLSearchParams(location.search).get('g'); history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); if (g && GRUPOS[g]) abrirGrupo(g, { sup: true }); }
     if (ABRIR === 'erros') { ABRIR = null; history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); notasServidor('acesso').then(() => { ir('donoerros'); carregarErros(); }, () => { }); }
   });
 })();

@@ -173,6 +173,21 @@ exports.pushPresenca = onDocumentWritten('grupos/{gid}/presencas/{uid}', async e
   await enviarTodos(R.presAtualizada(a, b, ev.params.uid, ctx));
 });
 
+// Dúvidas de suporte: avisa o dono do app quando chega dúvida (ou mensagem nova do grupo) e avisa o administrador quando o dono responde
+async function uidsDonos() { const plat = (await db.doc('servidor/plataforma').get()).data() || {}, uids = [];
+  for (const em of plat.emails || []) { try { uids.push((await admin.auth().getUserByEmail(em)).uid); } catch (e) { } } return uids; }
+exports.pushSuporte = onDocumentWritten('suporte/{id}', async ev => {
+  const a = ev.data.before.exists ? ev.data.before.data() : null, b = ev.data.after.exists ? ev.data.after.data() : null;
+  if (!b || b.status !== 'aberto') return;
+  const ra = (a && a.respostas) || [], rb = b.respostas || [], nova = rb.length > ra.length ? rb[rb.length - 1] : null;
+  if (!a || (nova && nova.de === 'grupo')) {
+    const uids = await uidsDonos(); if (!uids.length) return;
+    await enviarPara(uids, { titulo: `🛟 ${a ? 'Nova mensagem' : 'Nova dúvida'} · ${b.grupo || 'Pelada'}`, texto: String((nova && nova.texto) || b.texto || '').slice(0, 140), tag: 'suporte-' + ev.params.id, url: URL_APP + '?abrir=suporte' });
+  } else if (nova && nova.de === 'dono' && b.uid) {
+    await enviarPara([b.uid], { titulo: '🛟 O Pelota FC respondeu sua dúvida', texto: String(nova.texto || '').slice(0, 140), tag: 'suporte-' + ev.params.id, url: URL_APP + '?abrir=duvida&g=' + encodeURIComponent(b.gid) });
+  }
+});
+
 exports.pushMembroNovo = onDocumentCreated('grupos/{gid}/membros/{uid}', async ev => {
   const m = ev.data && ev.data.data(); if (!m) return;
   const ctx = await contexto(ev.params.gid);

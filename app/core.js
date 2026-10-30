@@ -1582,6 +1582,8 @@ function renderHist(A){
 
 /* ---------- responder presença (botões do app, link do WhatsApp e notificação) ---------- */
 let RESP_LINK=null;
+// Ações importantes pedem um segundo toque: devolve true só no segundo toque
+function doisToques(b,texto){if(b.dataset.certeza){delete b.dataset.certeza;clearTimeout(b._t2);return true}b.dataset.certeza='1';b.dataset.orig=b.innerHTML;b.textContent=texto||'Toque de novo para confirmar';b.classList.add('confirmar');clearTimeout(b._t2);b._t2=setTimeout(()=>{if(b.isConnected&&b.dataset.certeza){delete b.dataset.certeza;b.innerHTML=b.dataset.orig;b.classList.remove('confirmar')}},4000);return false}
 let SUP=false; // modo suporte: o dono do Pelota FC entrou com a autorização do administrador
 function euVou(pid,v,via){const doc=S.pres[myId];if(!doc)return null;const p=S.pel[pid];if(!p)return null;const prev=respDe(p,pid)[doc.jogador]?.s||null;
   if(prev===v)return{igual:true,s:v,texto:v==='sim'?'Você já tinha confirmado presença.':'Você já tinha avisado que não vai.'};
@@ -1592,7 +1594,7 @@ function euVou(pid,v,via){const doc=S.pres[myId];if(!doc)return null;const p=S.p
   return{s:v,ant,pedido:v==='sim'&&(cheia||ehDiarista(jj)),cheia,texto:v!=='sim'?'Resposta enviada: não vai.':(cheia||ehDiarista(jj))?'Pedido enviado. Agora é só aguardar o administrador liberar.':'Presença confirmada!'}}
 function inicioPel(p){return new Date(`${p.data}T${horaIniDe(p)}:00-03:00`).getTime()}
 // chegou pelo link: confere a pelada, o prazo e o vínculo; depois registra (ou só mostra as opções, vindo da notificação do iPhone)
-function aplicarRespLink(){const R=RESP_LINK;if(!R||!ready||demo)return;RESP_LINK=null;UI.tab='jogo';UI.sub='presenca';render();
+function aplicarRespLink(){const R=RESP_LINK;if(!R||!ready||demo)return;if(R.sup){RESP_LINK=null;return sheetSuporteAdm()}RESP_LINK=null;UI.tab='jogo';UI.sub='presenca';render();
   const p=S.pel[R.p];
   if(!p)return sheetRespAviso('Pelada cancelada','Essa pelada foi cancelada ou não existe mais. Veja a próxima na tela do jogo.');
   const q=`${dShort(p.data)} às ${horaIniDe(p)}`;
@@ -2109,7 +2111,7 @@ function openSheet(title,body,foot=''){
   const cur=document.querySelector('#sheet .sheet');if(cur&&cur.getAttribute('aria-label')===title){const sb=cur.querySelector('#sheet-body');if(sb){while(sb.nextSibling)sb.nextSibling.remove();sb.innerHTML=body;if(foot)sb.insertAdjacentHTML('afterend',foot);return}}
   document.getElementById('sheet').innerHTML=`<div class="scrim" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-h"><h2>${esc(title)}</h2><button class="iconbtn" data-act="close" aria-label="Fechar">✕</button></div><div id="sheet-body">${body}</div>${foot}</div></div>`;
 }
-function closeSheet(){if(UI.trocaPend){UI.trocaPend=null;UI.sel=null;setTimeout(render,0)}document.getElementById('sheet').innerHTML='';F=null;UI.rasc=null;UI.ed=null;UI.mt=null;UI.xc=null}
+function closeSheet(){UI.supAberto=false;if(UI.trocaPend){UI.trocaPend=null;UI.sel=null;setTimeout(render,0)}document.getElementById('sheet').innerHTML='';F=null;UI.rasc=null;UI.ed=null;UI.mt=null;UI.xc=null}
 let F=null;
 
 function sheetMsg(tipo,ctx={}){
@@ -2133,19 +2135,24 @@ function sheetMsg(tipo,ctx={}){
 /* Suporte do Pelota FC: o administrador libera por 24 horas; tudo o que o suporte fizer fica registrado */
 function supLiberado(){const su=(GRUPO&&GRUPO.suporte)||{};return(su.ate||0)>Date.now()?su:null}
 function supAtuando(){const su=supLiberado(),n=GRUPO&&GRUPO.suporteNaPelada;return!!(su&&n&&n>(su.em||0))}
-// tarja discreta no topo da pelada (só para o administrador) enquanto o suporte está liberado
-function tagSuporte(){if(demo||SUP||!isAdmin)return'';const su=supLiberado();if(!su)return'';
-  return`<button type="button" class="sup-tag" data-act="sup-painel">🛟 ${supAtuando()?'Suporte técnico atuando agora':'Suporte técnico liberado até '+esc(horaPedido(su.ate).slice(-5))}</button>`}
-// nos Ajustes: bloco fechado, só abre se o administrador precisar
-function painelSuporte(){const su=supLiberado();
-  return`<details class="panel sup-det" style="margin-top:14px"><summary><b>🛟 Suporte do Pelota FC</b>${su?' · <span class="sub">liberado</span>':''}</summary>
-    <div class="sub" style="margin:8px 0">${su?`Liberado até <b>${esc(horaPedido(su.ate))}</b>.`:'Quando você pedir ajuda, a equipe do Pelota FC manda um pedido de acesso, que aparece como aviso laranja. É só tocar em Liberar.'}</div>
-    ${su?'<button class="btn danger block" data-act="sup-encerrar">Encerrar o suporte agora</button>':''}
-    <button class="btn sm" style="margin-top:8px" data-act="sup-log">Ver as visitas do suporte</button></details>`}
-function sheetSuporteAdm(){const su=supLiberado();
-  openSheet('Suporte do Pelota FC',`<div class="stack">${su?`<p style="margin:0">${supAtuando()?'<b>O suporte técnico está atuando nesta pelada agora.</b>':'O suporte técnico está liberado.'} O acesso fecha sozinho às <b>${esc(horaPedido(su.ate).slice(-5))}</b> de ${esc(horaPedido(su.ate).slice(0,-6))}.</p>
-    <button class="btn danger block" data-act="sup-encerrar">Encerrar o suporte agora</button>`:'<p style="margin:0">O suporte não está liberado.</p>'}
-    <button class="btn block" data-act="sup-log">Ver as visitas do suporte</button></div>`)}
+// tarja discreta no topo da pelada (só para o administrador): suporte liberado/atuando ou resposta nova do Pelota FC
+function tagSuporte(){if(demo||SUP||!isAdmin)return'';const su=supLiberado(),nova=window.duvidaNaoLida&&window.duvidaNaoLida(GID);if(!su&&!nova)return'';
+  return`<button type="button" class="sup-tag" data-act="sup-painel">🛟 ${nova?'O Pelota FC respondeu sua dúvida':supAtuando()?'Suporte técnico atuando agora':'Suporte técnico liberado até '+esc(horaPedido(su.ate).slice(-5))}</button>`}
+// nos Ajustes: uma linha que abre o suporte
+function painelSuporte(){const n=(window.minhasDuvidas?window.minhasDuvidas(GID):[]).filter(d=>d.status==='aberto').length;
+  return`<button type="button" class="panel sup-linha" data-act="sup-painel"><span>🛟 <b>Suporte do Pelota FC</b><span class="sub" style="display:block">Tirar uma dúvida ou pedir ajuda${n?` · ${n} em aberto`:''}</span></span><span aria-hidden="true">›</span></button>`}
+function sheetSuporteAdm(){UI.supAberto=true;const su=supLiberado(),D=window.minhasDuvidas?window.minhasDuvidas(GID):[];
+  D.filter(d=>(d.respostas||[]).some(r=>r.de==='dono'&&r.em>(d.lidoGrupo||0))).forEach(d=>window.suporteDuvida('lido',{id:d.id}).catch(()=>{}));
+  const hora=ms=>horaPedido(ms);
+  openSheet('Suporte do Pelota FC',`<div class="stack">
+    ${su?`<div class="sup-box">${supAtuando()?'<b>O suporte técnico está atuando nesta pelada agora.</b>':'<b>Suporte técnico liberado</b>'} até ${esc(hora(su.ate))}.<button class="btn sm danger" style="margin-top:8px" data-act="sup-encerrar">Encerrar o suporte agora</button></div>`:''}
+    <label class="field"><span>Qual é a sua dúvida?</span><textarea id="duv-texto" rows="4" maxlength="1000" placeholder="Ex.: não estou conseguindo cadastrar um jogador novo."></textarea></label>
+    <label class="field"><span>Seu WhatsApp <i class="opc">para o Pelota FC falar com você</i></span><input type="tel" id="duv-tel" inputmode="tel" value="${esc(window.meuWhats?window.meuWhats():'')}" placeholder="(81) 99999-9999"></label>
+    <button class="btn primary block" data-act="duv-enviar">Enviar para o Pelota FC</button>
+    ${D.length?`<h3 style="margin:8px 0 0">Suas dúvidas</h3>${D.map(d=>`<div class="duv-item"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><span class="small">${esc(hora(d.em))}</span><span class="chip">${d.status==='aberto'?'Em aberto':'Resolvida'}</span></div>
+      <div class="duv-msg duv-grupo">${esc(d.texto)}</div>${(d.respostas||[]).map(r=>`<div class="duv-msg ${r.de==='dono'?'duv-dono':'duv-grupo'}">${esc(r.texto)}<span>${r.de==='dono'?'Pelota FC':'Você'} · ${esc(hora(r.em))}</span></div>`).join('')}
+      ${d.status==='aberto'&&(d.respostas||[]).some(r=>r.de==='dono')?`<div class="row" style="gap:6px;flex-wrap:nowrap;margin-top:6px"><input type="text" id="duv-r-${d.id}" placeholder="Responder…" style="flex:1;min-width:0"><button class="btn sm" data-act="duv-resp" data-v="${d.id}">Enviar</button></div>`:''}</div>`).join('')}`:''}
+    <button class="btn sm" style="align-self:flex-start" data-act="sup-log">Ver as visitas do suporte</button></div>`)}
 function bannerPedidoSuporte(){if(demo||SUP||!isAdmin||!GRUPO||!window.pedidoSuporte||!window.pedidoSuporte(GRUPO))return'';
   return`<div class="alerta-sup"><span class="ic">🛟</span><div class="grow"><b>O suporte do Pelota FC pediu acesso</b><span>Acesso por 24 horas, para te ajudar.</span>
     <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm sup-sim" data-act="sup-aceitar">Liberar por 24 horas</button><button class="btn sm sup-nao" data-act="sup-recusar">Agora não</button></div></div></div>`}
@@ -2341,11 +2348,14 @@ document.addEventListener('click',e=>{
       patch('peladas/'+d.p,{resp:{[d.j]:{s:v,t:now,esp:v==='sim'&&cheia}},aprov:{[d.j]:v==='sim'&&!cheia?now:null}});
       if(v==='sim'&&cheia)toast(`Lista cheia: ${nm(d.j)} foi para a espera.`);
       eventosPresenca(S.pel[d.p],before,lista(S.pel[d.p],d.p),d.j,cur,v);break}
-    case'sup-aceitar':window.suporteAdmin('liberar').then(()=>toast('Suporte liberado por 24 horas. Pode avisar o Pelota FC.'),e=>toast((e&&e.message)||'Não deu certo.'));break;
-    case'sup-recusar':window.suporteAdmin('recusar').then(()=>toast('Pedido recusado.'),e=>toast((e&&e.message)||'Não deu certo.'));break;
-    case'sup-encerrar':window.suporteAdmin('encerrar').then(()=>{toast('Suporte encerrado.');closeSheet()},e=>toast((e&&e.message)||'Não deu certo.'));break;
+    case'sup-aceitar':if(!doisToques(b,'Toque de novo para liberar'))break;window.suporteAdmin('liberar').then(()=>toast('Suporte liberado por 24 horas. Pode avisar o Pelota FC.'),e=>toast((e&&e.message)||'Não deu certo.'));break;
+    case'sup-recusar':if(!doisToques(b,'Toque de novo'))break;window.suporteAdmin('recusar').then(()=>toast('Pedido recusado.'),e=>toast((e&&e.message)||'Não deu certo.'));break;
+    case'sup-encerrar':if(!doisToques(b,'Toque de novo para encerrar'))break;window.suporteAdmin('encerrar').then(()=>{toast('Suporte encerrado.');closeSheet()},e=>toast((e&&e.message)||'Não deu certo.'));break;
     case'sup-log':sheetLogSuporte();break;
     case'sup-painel':sheetSuporteAdm();break;
+    case'duv-enviar':{const t=(document.getElementById('duv-texto')||{}).value||'',tel=(document.getElementById('duv-tel')||{}).value||'';if(t.trim().length<5){toast('Escreva a sua dúvida.');break}if(!doisToques(b,'Toque de novo para enviar'))break;b.disabled=true;
+      window.suporteDuvida('enviar',{texto:t,tel}).then(()=>{toast('Dúvida enviada. O Pelota FC vai responder por aqui ou pelo WhatsApp.');setTimeout(sheetSuporteAdm,300)},e=>{b.disabled=false;toast((e&&e.message)||'Não deu certo.')});break}
+    case'duv-resp':{const t=(document.getElementById('duv-r-'+d.v)||{}).value||'';if(!t.trim()){toast('Escreva a mensagem.');break}if(!doisToques(b,'Confirmar'))break;window.suporteDuvida('responder',{id:d.v,texto:t}).then(()=>{toast('Mensagem enviada.');setTimeout(sheetSuporteAdm,300)},e=>toast((e&&e.message)||'Não deu certo.'));break}
     case'eu-vou':{const r=euVou(d.p,d.v);if(r)toast(r.texto);break}
     case'resp-escolher':{const r=euVou(d.p,d.v,'link');if(r)sheetResp(d.p,r);else closeSheet();break}
     case'resp-desfazer':{const u=UI.respAnt;if(!u)return;const doc=S.pres[myId];if(!doc)return;const pel={...(doc.pel||{})};if(u.ant)pel[u.pid]=u.ant;else delete pel[u.pid];
@@ -2865,6 +2875,7 @@ function ouvirVotos(){if(unsubVotos){try{unsubVotos()}catch(e){}unsubVotos=null}
   if(isAdmin)unsubVotos=db.collection('votos').onSnapshot(snap=>{const m={};snap.docs.forEach(x=>m[x.id]=x.data());S.votos=withPending('votos',m);fim()},e=>console.warn(e));
   else unsubVotos=db.doc('votos/'+myId).onSnapshot(snap=>{S.votos={...(S.votos||{}),[myId]:snap.exists?snap.data():undefined};if(!snap.exists)delete S.votos[myId];fim()},e=>console.warn(e))}
 window.pararPelada=function(){if(db&&db.unsubs)db.unsubs.splice(0).forEach(u=>{try{u()}catch(e){}});db=null;ready=false;demo=false;REAL=null};
+window.atualizarDuvidas=function(){if(!ready)return;render();};
 window.atualizarGrupo=function(g){GRUPO=g;const adm=SUP||!!(g&&(g.admins||[]).includes(myId));if(adm!==isAdmin){isAdmin=adm;ouvirVotos();if(!adm&&['avisos','caixa'].includes(UI.tab))UI.tab='jogo'}render();renderAdmins()};
 window.abrirDemo=function(){window.pararPelada();SUP=false;S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};myId=null;isAdmin=true;GRUPO={codigo:'DEMO01',admins:[]};ready=true;startDemo()};
 /* ---------- PDF da prestação de contas (gerador próprio, sem biblioteca) ---------- */

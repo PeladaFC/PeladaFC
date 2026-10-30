@@ -41,6 +41,8 @@ module.exports = db => {
       for (const x of P.apaga) { await db.recursiveDelete(db.doc('grupos/' + x.gid)); const cods = await db.collection('codigos').where('gid', '==', x.gid).get(); for (const c of cods.docs) await c.ref.delete(); }
       // registro técnico de erros ligado à conta
       for (;;) { const q = await db.collection('erros').where('uid', '==', uid).limit(400).get(); if (q.empty) break; const bt = db.batch(); q.docs.forEach(d => bt.delete(d.ref)); await bt.commit(); }
+      // dúvidas enviadas ao suporte
+      for (;;) { const q = await db.collection('suporte').where('uid', '==', uid).limit(400).get(); if (q.empty) break; const bt = db.batch(); q.docs.forEach(d => bt.delete(d.ref)); await bt.commit(); }
       await db.recursiveDelete(db.doc('users/' + uid));
       await admin.auth().deleteUser(uid).catch(e => { if (e.code !== 'auth/user-not-found') throw e; });
       res.json({ ok: true });
