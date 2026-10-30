@@ -292,7 +292,7 @@ function render() {
       <p class="sub" style="text-align:center;margin:0"><a href="/termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="/privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
       <button class="btn sm" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
   if (t === 'dono') h = topo('perfil') + abasDono('dono') + telaDono();
-  if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + (UIp.supInfo ? `<div class="banner due" style="display:block"><b>🛟 ${UIp.supInfo.novo ? 'Pedido de suporte enviado' : 'Pedido de suporte já enviado'} · ${escH(UIp.supInfo.nome)}</b><br>O administrador vê um aviso laranja na tela inicial do app e na pelada. Quando ele tocar em <b>Liberar por 24 horas</b>, toque de novo em "🛟 Suporte" para entrar. O pedido vale 48 horas.<br><button class="btn sm" style="margin-top:8px" data-sh="sup-info-ok">Entendi</button></div>` : '') + telaGruposDono();
+  if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + (UIp.supInfo ? `<div class="sup-info"><span>🛟 <b>${UIp.supInfo.novo ? 'Pedido enviado' : 'Pedido já enviado'}</b> · ${escH(UIp.supInfo.nome)} · vale até ${(d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'))(new Date(UIp.supInfo.em + PEDIDO_VALE))}</span><button class="btn sm" data-sh="sup-cancelar" data-v="${escH(UIp.supInfo.gid)}">Retirar</button><button class="btn sm" data-sh="sup-info-ok" aria-label="Fechar">✕</button></div>` : '') + telaGruposDono();
   if (t === 'donoreps') h = topo('perfil') + abasDono('reps') + telaRepsDono();
   if (t === 'donoerros') h = topo('perfil') + abasDono('erros') + telaErrosDono();
   if (t === 'parceiro') h = topo('perfil') + telaParceiro();
@@ -372,7 +372,7 @@ function render() {
     h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELOTA FC</span><button class="eu-av" data-sh="ir" data-v="perfil" aria-label="Meu perfil" style="${eu.foto ? `background-image:url('${eu.foto}')` : ''}">${eu.foto ? '' : ini(eu.apelido || eu.nome)}</button></div>
     ${prox ? `<button class="home-hero" data-sh="abrir" data-v="${prox.g}"><span class="hh-ola">${ola}${nomeEu ? ', ' + escH(nomeEu) : ''}.</span><span class="hh-q">${escH(falta(prox.d, true))}</span><span class="hh-n">${escH(GRUPOS[prox.g].nome || 'Pelada')}</span><span class="hh-ir">Abrir pelada</span></button>`
       : `<div class="home-hero"><span class="hh-ola">${ola}${nomeEu ? ', ' + escH(nomeEu) : ''}.</span><span class="hh-q">${ids.length ? 'Sem jogo marcado' : 'Bora jogar?'}</span><span class="hh-n">${ids.length ? 'Quando marcarem a próxima, ela aparece aqui.' : 'Crie sua pelada ou entre com o código de um convite.'}</span></div>`}
-    ${adm.filter(g => window.pedidoSuporte(GRUPOS[g])).map(g => `<div class="alerta-sup"><span class="ic">🛟</span><div class="grow"><b>O suporte do Pelota FC pediu acesso</b><span>${escH(GRUPOS[g].nome || 'Pelada')} · para te ajudar, a equipe entra como administradora por 24 horas.</span>
+    ${adm.filter(g => window.pedidoSuporte(GRUPOS[g])).map(g => `<div class="alerta-sup"><span class="ic">🛟</span><div class="grow"><b>O suporte do Pelota FC pediu acesso</b><span>${escH(GRUPOS[g].nome || 'Pelada')} · para te ajudar, a equipe entra como administradora por 24 horas. O pedido vale 2 horas.</span>
       <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm sup-sim" data-sh="sup-aceitar" data-v="${g}">Liberar por 24 horas</button><button class="btn sm sup-nao" data-sh="sup-recusar" data-v="${g}">Agora não</button></div></div></div>`).join('')}
     ${ids.filter(avAb).map(g => `<button class="alerta-av" data-sh="avaliar" data-v="${g}"><span class="ic">⭐</span><span><b>Avaliação da galera aberta!</b>${escH(GRUPOS[g].nome || 'Pelada')} · dê sua nota para o elenco</span><span class="ir">Avaliar</span></button>`).join('')}
     ${cartaoPush()}
@@ -574,15 +574,15 @@ function makeDb(gid) {
 /* ================= Suporte do Pelota FC =================
    O dono do app pede o acesso pelo Painel do dono → Grupos → "Suporte". O administrador da pelada vê um aviso laranja
    na tela inicial (e dentro da pelada) e libera por 24 horas. O dono entra como administrador, sem virar membro.
-   Registro curto (entrou, saiu e peladas marcadas pelo suporte), apagado sozinho depois de 30 dias. */
+   Registro curto (acessou, encerrou visita e peladas marcadas pelo suporte), apagado sozinho depois de 7 dias. */
 let SUPORTE = null, SUP_T = null;
-const PEDIDO_VALE = 48 * 3600e3;
+const PEDIDO_VALE = 2 * 3600e3; // o pedido de suporte vale 2 horas
 function logSuporte(gid, acao, texto) {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  return B.set(`grupos/${gid}/suporteLog/${id}`, { uid: EU.uid, email: EU.email || '', acao, texto: texto || '', em: Date.now(), expiraEm: new Date(Date.now() + 30 * 864e5) }).catch(e => console.warn(e));
+  return B.set(`grupos/${gid}/suporteLog/${id}`, { uid: EU.uid, email: EU.email || '', acao, texto: texto || '', em: Date.now(), expiraEm: new Date(Date.now() + 7 * 864e5) }).catch(e => console.warn(e));
 }
 window.suporteRegistro = (acao, texto) => { if (SUPORTE && ABERTO === SUPORTE.gid) logSuporte(SUPORTE.gid, acao, texto); };
-// pedido de suporte esperando o administrador (vale 48 horas)
+// pedido de suporte esperando o administrador (vale 2 horas)
 window.pedidoSuporte = G => { const pd = G && G.suportePedido, su = (G && G.suporte) || {};
   return !!(pd && pd.em && Date.now() - pd.em < PEDIDO_VALE && !(su.ate > Date.now()) && pd.em > (su.em || 0)); };
 function mostrarFaixaSuporte() {
@@ -605,7 +605,7 @@ async function suporteDono(gid) {
     if (ate > Date.now()) {
       if (GRUPOS[gid]) { aviso('Você já faz parte desta pelada: abra pelas suas peladas.'); return; }
       SUPORTE = { gid, ate, nome: G.nome || 'Pelada' }; GRUPOS[gid] = { ...G, _suporte: true };
-      await logSuporte(gid, 'entrou'); abrirGrupo(gid); return;
+      await logSuporte(gid, 'entrou'); B.set('grupos/' + gid, { suporteNaPelada: Date.now() }, { merge: true }).catch(e => console.warn(e)); abrirGrupo(gid); return;
     }
     if (window.pedidoSuporte(G)) { UIp.supInfo = { nome: G.nome || 'Pelada', em: G.suportePedido.em, gid }; render(); return; }
     const suportePedido = { em: Date.now(), por: EU.uid };
@@ -615,7 +615,7 @@ async function suporteDono(gid) {
 }
 function sairSuporte() {
   const s = SUPORTE; if (!s) return;
-  logSuporte(s.gid, 'saiu'); SUPORTE = null; mostrarFaixaSuporte();
+  logSuporte(s.gid, 'saiu'); if (Date.now() < s.ate) B.set('grupos/' + s.gid, { suporteNaPelada: null }, { merge: true }).catch(e => console.warn(e)); SUPORTE = null; mostrarFaixaSuporte();
   window.pararPelada(); if (unsubGrupo) { unsubGrupo(); unsubGrupo = null; }
   delete GRUPOS[s.gid]; ABERTO = null; ls.set('pelada.ultimo', null);
   ir('donogrupos');
@@ -1302,6 +1302,7 @@ document.addEventListener('click', async e => {
   if (a === 'intro-seguir') { seguirIntro(); return; }
   if (a === 'suporte-dono') { await suporteDono(v); return; }
   if (a === 'sup-info-ok') { UIp.supInfo = null; render(); return; }
+  if (a === 'sup-cancelar') { try { await B.set('grupos/' + v, { suportePedido: null }, { merge: true }); UIp.supInfo = null; aviso('Pedido de suporte retirado.'); render(); } catch (e) { aviso(msgErro(e)); } return; }
   if (a === 'sup-aceitar' || a === 'sup-recusar') { try { await window.suporteAdmin(a === 'sup-aceitar' ? 'liberar' : 'recusar', v); aviso(a === 'sup-aceitar' ? 'Suporte liberado por 24 horas. Pode avisar o Pelota FC.' : 'Pedido recusado.'); } catch (e) { aviso(msgErro(e)); } return; }
   if (a === 'sair') {
     if (!b.dataset.certeza) { b.dataset.certeza = '1'; b.textContent = 'Toque de novo para sair da conta'; b.classList.add('danger');
