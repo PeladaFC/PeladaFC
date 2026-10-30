@@ -268,11 +268,12 @@ input::-webkit-date-and-time-value{text-align:left}
 .avpop p{margin:0;font-size:16px}.avpop .sub{color:var(--card-ink);opacity:.75;font-size:14px}
 .avpop .btn:not(.primary){background:transparent;border-color:rgba(0,0,0,.25);color:var(--card-ink)}
 .alerta-av{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card);color:var(--card-ink);border:0;border-radius:16px;padding:14px 16px;margin-bottom:12px;font:inherit;cursor:pointer}
-.alerta-sup{display:flex;gap:12px;align-items:flex-start;background:#E8590C;color:#fff;border-radius:16px;padding:14px 16px;margin-bottom:12px;box-shadow:0 6px 18px rgba(232,89,12,.35)}
-.alerta-sup .ic{font-size:32px;line-height:1}.alerta-sup b{display:block;font-size:17px}.alerta-sup span{font-size:14px;opacity:.95}
+.alerta-sup{display:flex;gap:10px;align-items:flex-start;background:#E8590C;color:#fff;border-radius:12px;padding:10px 12px;margin-bottom:10px;box-shadow:0 4px 12px rgba(232,89,12,.3)}
+.alerta-sup .ic{font-size:22px;line-height:1.1}.alerta-sup b{display:block;font-size:14.5px}.alerta-sup span{font-size:12.5px;opacity:.95}
+.alerta-sup .row{margin-top:7px!important;gap:6px!important}.alerta-sup .btn{padding:4px 10px;min-height:0;font-size:13px}
 .alerta-sup .sup-sim{background:#fff;color:#B8450F;border-color:#fff;font-weight:800}.alerta-sup .sup-nao{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.8)}
 @media (prefers-reduced-motion:no-preference){.alerta-sup{animation:supPulsa 2.4s ease-in-out 3}}
-@keyframes supPulsa{50%{box-shadow:0 6px 26px rgba(232,89,12,.7)}}
+@keyframes supPulsa{50%{box-shadow:0 4px 18px rgba(232,89,12,.65)}}
 .sup-tag{display:inline-flex;align-items:center;gap:4px;margin:-4px 0 10px;border:1px solid #F0A57C;background:#FFF1E8;color:#B8450F;border-radius:999px;padding:3px 10px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
 .sup-info{display:flex;align-items:center;gap:8px;background:var(--card);color:var(--card-ink);border-radius:10px;padding:6px 8px 6px 12px;font-size:13px;margin:4px 0 8px}
 .sup-info span{flex:1;min-width:0}.sup-info .btn{flex:none;padding:4px 10px;min-height:0}
@@ -640,9 +641,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261030e"></script>
-<script src="br.js?v=20261030e"></script>
-<script src="core.js?v=20261030e"></script>
-<script type="module" src="app.js?v=20261030e"></script>
+<script src="qrcode.js?v=20261030f"></script>
+<script src="br.js?v=20261030f"></script>
+<script src="core.js?v=20261030f"></script>
+<script type="module" src="app.js?v=20261030f"></script>
 </body>
 </html>

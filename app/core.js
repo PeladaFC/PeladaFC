@@ -2147,7 +2147,7 @@ function sheetSuporteAdm(){const su=supLiberado();
     <button class="btn danger block" data-act="sup-encerrar">Encerrar o suporte agora</button>`:'<p style="margin:0">O suporte não está liberado.</p>'}
     <button class="btn block" data-act="sup-log">Ver as visitas do suporte</button></div>`)}
 function bannerPedidoSuporte(){if(demo||SUP||!isAdmin||!GRUPO||!window.pedidoSuporte||!window.pedidoSuporte(GRUPO))return'';
-  return`<div class="alerta-sup"><span class="ic">🛟</span><div class="grow"><b>O suporte do Pelota FC pediu acesso</b><span>Para te ajudar, a equipe entra nesta pelada como administradora por 24 horas. O pedido vale 2 horas.</span>
+  return`<div class="alerta-sup"><span class="ic">🛟</span><div class="grow"><b>O suporte do Pelota FC pediu acesso</b><span>Acesso por 24 horas, para te ajudar.</span>
     <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm sup-sim" data-act="sup-aceitar">Liberar por 24 horas</button><button class="btn sm sup-nao" data-act="sup-recusar">Agora não</button></div></div></div>`}
 async function sheetLogSuporte(){openSheet('Visitas do suporte','<p class="sub">Carregando…</p>');let L=[];try{L=await window.suporteAdmin('log')}catch(e){toast('Não consegui carregar agora.');return}
   const nomeOp={entrou:'🛟 Acessou a pelada',saiu:'↩️ Encerrou visita',marcou:'📅 Marcou pelada'};
