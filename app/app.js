@@ -444,15 +444,13 @@ const IC_INTRO = {
   trofeu: '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>'
 };
 function telaIntro() {
-  const itens = [['lista', 'Lista de presença com um toque', 'A galera confirma pelo app, pelo link do WhatsApp ou pela notificação.'],
-    ['times', 'Times equilibrados', 'O sorteio usa a nota e a posição de cada jogador. Chega de time desequilibrado.'],
-    ['caixa', 'Caixa da pelada em dia', 'Mensalidade e diária por Pix, com a baixa feita sozinha e o caixa do mês.'],
-    ['trofeu', 'Craque da galera', 'Notas, gols, prêmios e ranking depois de cada pelada.']];
-  return `<div class="intro">
-    <div class="intro-topo"><span class="intro-marca">Pelota <span>FC</span></span><button class="intro-pular" data-sh="intro-seguir">Pular</button></div>
-    <h1 class="intro-titulo sobe" style="--d:150ms">O app da<br>sua pelada</h1>
-    <ul class="intro-lista">${itens.map(([ic, t, d], i) => `<li class="sobe" style="--d:${500 + i * 900}ms"><span class="intro-ic">${IC_INTRO[ic]}</span><span><b>${escH(t)}</b><span class="s">${escH(d)}</span></span></li>`).join('')}</ul>
-    <div class="intro-fim sobe" style="--d:${500 + itens.length * 900}ms"><div class="intro-barra"><i></i></div>
+  const itens = [['lista', 'Presença com um toque', 'Pelo app, pelo WhatsApp ou pela notificação.'],
+    ['times', 'Times equilibrados', 'Sorteio pela nota e pela posição de cada um.'],
+    ['caixa', 'Caixa em dia', 'Mensalidade e diária no Pix, com baixa sozinha.'],
+    ['trofeu', 'Craque da galera', 'Notas, ranking e a arte do craque para postar.']];
+  return `<div class="intro">${HERO_BOAS}
+    <ul class="intro-lista">${itens.map(([ic, t, d], i) => `<li class="sobe" style="--d:${400 + i * 900}ms"><span class="intro-ic">${IC_INTRO[ic]}</span><span><b>${escH(t)}</b><span class="s">${escH(d)}</span></span></li>`).join('')}</ul>
+    <div class="intro-fim sobe" style="--d:${400 + itens.length * 900}ms"><div class="intro-barra"><i></i></div>
       <button class="btn primary block" data-sh="intro-seguir">Continuar</button></div></div>`;
 }
 function iniciarIntro() { clearTimeout(INTRO_T); INTRO_T = setTimeout(seguirIntro, matchMedia('(prefers-reduced-motion: reduce)').matches ? 6000 : 9000); }
