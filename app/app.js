@@ -427,7 +427,7 @@ function render() {
     <button class="btn block" data-sh="copiar-app">Copiar link</button>
     ${navigator.share ? '<button class="btn block" data-sh="share-app">Compartilhar…</button>' : ''}
     <p class="sub" style="margin:0">Para convidar alguém direto para a sua pelada, use o link ou o QR Code que ficam na ⚙️ engrenagem, dentro da pelada.</p>`;
-  el.innerHTML = `<div class="ob-in${['boas', 'login', 'criar'].includes(t) ? ' ob-centro' : ''}">${h}</div>`;
+  el.innerHTML = `<div class="ob-in${['login', 'criar'].includes(t) ? ' ob-centro' : t === 'boas' ? ' ob-centro-baixo' : ''}">${h}</div>`;
 }
 const UIp = {};
 

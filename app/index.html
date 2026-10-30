@@ -402,6 +402,10 @@ nav.tabs button:active svg{transform:scale(.9)}
 .ob-centro>.ob-top+*,.ob-centro>:first-child:not(.ob-top){margin-top:auto}
 .ob-centro>:last-child{margin-bottom:auto}
 .ob-centro{padding-bottom:max(40px,6vh)}
+/* tela inicial: o cartão verde fica no topo; os botões ficam no meio do espaço que sobra embaixo */
+.ob-centro-baixo>.ob-hero+*{margin-top:auto}
+.ob-centro-baixo>:last-child{margin-bottom:auto}
+.ob-centro-baixo{padding-bottom:max(40px,6vh)}
 /* apresentação antes do login */
 .intro{max-width:460px;margin:0 auto;min-height:100%;padding:calc(18px + env(safe-area-inset-top,0px)) 20px calc(26px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px}
 .intro-topo{display:flex;align-items:center;gap:10px}
@@ -618,9 +622,9 @@ label.btn{position:relative;cursor:pointer}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261029f"></script>
-<script src="br.js?v=20261029f"></script>
-<script src="core.js?v=20261029f"></script>
-<script type="module" src="app.js?v=20261029f"></script>
+<script src="qrcode.js?v=20261029g"></script>
+<script src="br.js?v=20261029g"></script>
+<script src="core.js?v=20261029g"></script>
+<script type="module" src="app.js?v=20261029g"></script>
 </body>
 </html>
