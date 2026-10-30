@@ -238,7 +238,9 @@ function topo(voltar) {
 }
 function render() {
   const el = $('shell'); let h = '';
+  if (TELA === 'boas' && !INTRO_VISTA) TELA = 'intro';
   const t = TELA;
+  if (t === 'intro') { el.innerHTML = telaIntro(); iniciarIntro(); return; }
   if (t === 'carregando') h = `<div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Carregando…</p></div>`;
   if (t === 'boas') h = `<div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Organize a pelada, sorteie times equilibrados e acompanhe quem é o craque da galera.</p></div>
     ${respGuardada() ? `<div class="banner due"><span><b>Entre na sua conta para responder.</b><br>Assim que você entrar, sua resposta da pelada é registrada.</span></div>` : ls.get('pelada.convite') ? `<div class="banner due"><span><b>Você recebeu um convite!</b><br>Crie sua conta ou entre para participar.</span></div>` : ''}
@@ -425,9 +427,35 @@ function render() {
     <button class="btn block" data-sh="copiar-app">Copiar link</button>
     ${navigator.share ? '<button class="btn block" data-sh="share-app">Compartilhar…</button>' : ''}
     <p class="sub" style="margin:0">Para convidar alguém direto para a sua pelada, use o link ou o QR Code que ficam na ⚙️ engrenagem, dentro da pelada.</p>`;
-  el.innerHTML = `<div class="ob-in">${h}</div>`;
+  el.innerHTML = `<div class="ob-in${['boas', 'login', 'criar'].includes(t) ? ' ob-centro' : ''}">${h}</div>`;
 }
 const UIp = {};
+
+/* ================= Apresentação (antes do login) =================
+   Quem ainda não entrou (ou acabou de sair) vê, uma vez por abertura, o que o app faz. */
+let INTRO_VISTA = false, INTRO_T = null;
+const IC_INTRO = {
+  lista: '<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/></svg>',
+  times: '<svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>',
+  caixa: '<svg viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M2.5 10h19M6.5 15h4"/></svg>',
+  trofeu: '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>'
+};
+function telaIntro() {
+  const itens = [['lista', 'Lista de presença com um toque', 'A galera confirma pelo app, pelo link do WhatsApp ou pela notificação.'],
+    ['times', 'Times equilibrados', 'O sorteio usa a nota e a posição de cada jogador. Chega de time desequilibrado.'],
+    ['caixa', 'Caixa da pelada em dia', 'Mensalidade e diária por Pix, com a baixa feita sozinha e o caixa do mês.'],
+    ['trofeu', 'Craque da galera', 'Notas, gols, prêmios e ranking depois de cada pelada.']];
+  return `<div class="intro">
+    <div class="intro-topo"><span class="intro-marca">Pelota <span>FC</span></span><button class="intro-pular" data-sh="intro-seguir">Pular</button></div>
+    <h1 class="intro-titulo sobe" style="--d:150ms">O app da<br>sua pelada</h1>
+    <ul class="intro-lista">${itens.map(([ic, t, d], i) => `<li class="sobe" style="--d:${500 + i * 900}ms"><span class="intro-ic">${IC_INTRO[ic]}</span><span><b>${escH(t)}</b><span class="s">${escH(d)}</span></span></li>`).join('')}</ul>
+    <div class="intro-fim sobe" style="--d:${500 + itens.length * 900}ms"><div class="intro-barra"><i></i></div>
+      <button class="btn primary block" data-sh="intro-seguir">Continuar</button></div></div>`;
+}
+function iniciarIntro() { clearTimeout(INTRO_T); INTRO_T = setTimeout(seguirIntro, matchMedia('(prefers-reduced-motion: reduce)').matches ? 6000 : 9000); }
+function seguirIntro() { clearTimeout(INTRO_T); if (TELA !== 'intro') return; INTRO_VISTA = true; const r = $('shell').firstElementChild;
+  const vai = () => { if (TELA === 'intro') ir('boas'); };
+  if (r && !matchMedia('(prefers-reduced-motion: reduce)').matches) { r.classList.add('saindo'); setTimeout(vai, 280); } else vai(); }
 
 /* ================= Fluxos ================= */
 async function carregarPerfil() {
@@ -1198,6 +1226,7 @@ document.addEventListener('click', async e => {
   if (a === 'google') { try { await B.google(); } catch (err) { aviso(msgErro(err) + ' Se não abrir, use e-mail e senha.'); } }
   if (a === 'reset') { const em = ($('l-email') || {}).value || ''; if (!em) { aviso('Digite seu e-mail acima e toque de novo em "Esqueci minha senha".'); return; } try { await B.reset(em.trim()); aviso('Mandamos um link para criar uma nova senha no seu e-mail.'); } catch (err) { aviso(msgErro(err)); } }
   // sair pede um segundo toque (evita sair sem querer e cair na tela inicial)
+  if (a === 'intro-seguir') { seguirIntro(); return; }
   if (a === 'sair') {
     if (!b.dataset.certeza) { b.dataset.certeza = '1'; b.textContent = 'Toque de novo para sair da conta'; b.classList.add('danger');
       clearTimeout(b._t); b._t = setTimeout(() => { if (b.isConnected) { delete b.dataset.certeza; b.textContent = 'Sair da conta'; b.classList.remove('danger'); } }, 4000); return; }
@@ -1352,7 +1381,7 @@ document.addEventListener('submit', async e => {
   B.onAuth(async u => {
     const antes = EU && EU.uid;
     EU = u;
-    if (!u) { if (ABERTO || antes) { window.pararPelada(); if (unsubGrupo) unsubGrupo(); if (unsubPerfil) unsubPerfil(); ABERTO = null; PERFIL = null; GRUPOS = {}; } ir('boas'); return; }
+    if (!u) { if (ABERTO || antes) { window.pararPelada(); if (unsubGrupo) unsubGrupo(); if (unsubPerfil) unsubPerfil(); ABERTO = null; PERFIL = null; GRUPOS = {}; } INTRO_VISTA = false; ir('boas'); return; }
     if (antes === u.uid) return;
     enviarFilaErros();
     ir('carregando'); await depoisDoLogin();
