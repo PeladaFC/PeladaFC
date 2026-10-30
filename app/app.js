@@ -216,7 +216,15 @@ const pend = new URLSearchParams(location.search).get('c');
 const repUrl = (new URLSearchParams(location.search).get('rep') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
 if (repUrl.length >= 4) { ls.set('pelota.rep', JSON.stringify({ c: repUrl, t: Date.now() })); if (!pend) history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); }
 function repGuardado() { try { const r = JSON.parse(ls.get('pelota.rep') || 'null'); return r && r.c && Date.now() - r.t < 90 * 864e5 ? r.c : ''; } catch (e) { return ''; } }
-if (pend) { ls.set('pelada.convite', pend.toUpperCase()); history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); }
+// Link de presença do WhatsApp (?c=CÓDIGO&p=PELADA&r=sim|nao) ou da notificação (?g=GRUPO&p=PELADA&r=ver).
+// Abrir o endereço não registra nada: a resposta só é gravada pelo app, com a pessoa logada.
+const respUrl = (() => { const q = new URLSearchParams(location.search), p = q.get('p'), r = q.get('r');
+  if (!p || !/^[A-Za-z0-9_-]{1,64}$/.test(p) || !['sim', 'nao', 'ver'].includes(r)) return null;
+  const c = (q.get('c') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6), g = (q.get('g') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+  return { p, r, c: c || null, g: g || null, t: Date.now() }; })();
+if (respUrl) { ls.set('pelota.resp', JSON.stringify(respUrl)); history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); }
+function respGuardada() { try { const r = JSON.parse(ls.get('pelota.resp') || 'null'); return r && r.p && Date.now() - r.t < 30 * 60e3 ? r : null; } catch (e) { return null; } }
+if (pend && !respUrl) { ls.set('pelada.convite', pend.toUpperCase()); history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); }
 
 function mostrarCasca(on) {
   $('shell').hidden = !on; $('app').hidden = on; $('nav').hidden = on;
@@ -233,7 +241,7 @@ function render() {
   const t = TELA;
   if (t === 'carregando') h = `<div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Carregando…</p></div>`;
   if (t === 'boas') h = `<div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Organize a pelada, sorteie times equilibrados e acompanhe quem é o craque da galera.</p></div>
-    ${ls.get('pelada.convite') ? `<div class="banner due"><span><b>Você recebeu um convite!</b><br>Crie sua conta ou entre para participar.</span></div>` : ''}
+    ${respGuardada() ? `<div class="banner due"><span><b>Entre na sua conta para responder.</b><br>Assim que você entrar, sua resposta da pelada é registrada.</span></div>` : ls.get('pelada.convite') ? `<div class="banner due"><span><b>Você recebeu um convite!</b><br>Crie sua conta ou entre para participar.</span></div>` : ''}
     <button class="btn primary block" data-sh="ir" data-v="criar">Criar conta</button>
     <button class="btn block" data-sh="ir" data-v="login">Já tenho conta</button>
     <div class="ob-div">ou</div>
@@ -386,7 +394,7 @@ function render() {
     <form id="f-codigo" class="stack" novalidate><label class="field"><span>Código</span><input type="text" id="cod" maxlength="6" autocapitalize="characters" autocomplete="off" placeholder="Ex.: SAB8H2" style="text-transform:uppercase;font-size:22px;letter-spacing:.15em;text-align:center" value="${escH(ls.get('pelada.convite') || '')}"></label>
     <button class="btn block" type="submit">Buscar pelada</button></form>`;
   if (t === 'convite' && CONVITE) { const G = CONVITE.grupo; const pre = UIp.prefere || 'mensalista';
-    h = topo('minhas') + `<h2>Você foi convidado!</h2>
+    h = topo('minhas') + `${UIp.convResp ? '<div class="banner due" style="margin-bottom:10px"><span><b>Você ainda não faz parte desta pelada.</b><br>Peça para entrar: quando o administrador autorizar, você confirma presença por aqui.</span></div>' : ''}<h2>Você foi convidado!</h2>
     <div class="ob-inv"><div class="h"><span class="sub" style="color:inherit;opacity:.85">Convite para</span><b>${escH(G.nome || 'Pelada')}</b></div>
     <div class="b">${(G.dia != null || G.data || G.evento) ? `<div>${escH(quandoG(G))}${G.evento ? ' · <b>evento livre</b>' : ''}</div>` : ''}<div class="sub">Código ${escH(CONVITE.codigo)}</div></div></div>
     ${G.evento ? '<p class="sub" style="margin:0">É um evento livre, sem cobrança: o administrador marca as datas e você só confirma presença. Quem confirma primeiro garante a vaga.</p>' : `<div class="field"><span>Quero entrar como</span><div class="pick"><button data-sh="pref" data-v="mensalista" aria-pressed="${pre === 'mensalista'}">Mensalista</button><button data-sh="pref" data-v="diarista" aria-pressed="${pre === 'diarista'}">Diarista</button></div>
@@ -442,6 +450,9 @@ window.salvarMeuLocal = (id, L) => { if (!EU) return; PERFIL = PERFIL || {}; PER
 async function depoisDoLogin() {
   await carregarPerfil();
   if (!PERFIL || !PERFIL.apelido && !PERFIL.pos) { ir('perfil'); return; }
+  const rv = respGuardada();
+  if (rv) { ls.set('pelota.resp', null); await abrirResposta(rv); return; }
+  UIp.convResp = false;
   const conv = ls.get('pelada.convite');
   if (conv) { ls.set('pelada.convite', null); await buscarCodigo(conv); return; }
   // Voltando do Mercado Pago: reabre a pelada direto nos Ajustes.
@@ -451,6 +462,15 @@ async function depoisDoLogin() {
   ir('minhas');
   renovarPush();
 }
+// Link de presença: abre a pelada e o app registra a resposta (ou mostra as opções, vindo da notificação)
+async function abrirResposta(rv) {
+  let gid = rv.g;
+  if (!gid && rv.c) { try { const c = await B.get('codigos/' + rv.c); gid = c && c.gid; } catch (e) { console.warn(e); } }
+  if (gid && GRUPOS[gid]) { abrirGrupo(gid, { p: rv.p, r: rv.r }); renovarPush(); return; }
+  if (rv.c) { UIp.convResp = true; await buscarCodigo(rv.c); return; }
+  aviso('Você não faz parte desta pelada.'); ir('minhas');
+}
+if (MOCK) window.__resp = abrirResposta; // só no modo de teste
 async function buscarCodigo(cod) {
   cod = String(cod || '').trim().toUpperCase();
   if (cod.length !== 6) { aviso('O código tem 6 letras.'); ir('codigo'); return; }
@@ -520,10 +540,10 @@ const compartilhar = {
     setTimeout(() => URL.revokeObjectURL(a.href), 5000); return { status: 'saved' };
   }
 };
-function abrirGrupo(gid) {
+function abrirGrupo(gid, resp) {
   const G = GRUPOS[gid]; if (!G) { ir('minhas'); return; }
   ABERTO = gid; ls.set('pelada.ultimo', gid); mostrarCasca(false);
-  window.iniciarPelada({ db: makeDb(gid), uid: EU.uid, isAdmin: (G.admins || []).includes(EU.uid), grupo: { ...G }, gid, dl: compartilhar });
+  window.iniciarPelada({ db: makeDb(gid), uid: EU.uid, isAdmin: (G.admins || []).includes(EU.uid), grupo: { ...G }, gid, dl: compartilhar, resp: resp || null });
   if (unsubGrupo) unsubGrupo();
   unsubGrupo = B.listenDoc('grupos/' + gid, s => { if (!s.exists) { if (ABERTO === gid) { delete GRUPOS[gid]; aviso('Este grupo foi apagado.'); window.voltarGrupos(); } return; } GRUPOS[gid] = s.data; window.atualizarGrupo({ ...s.data }); }, e => console.warn(e));
 }
