@@ -45,6 +45,19 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Dúvidas de suporte: o administrador da pelada cria e acompanha as suas; o dono do app lê, responde e resolve.
+    match /suporte/{id} {
+      allow create: if logado() && request.resource.data.uid == eu() && admin(request.resource.data.gid)
+        && request.resource.data.status == 'aberto'
+        && request.resource.data.keys().hasOnly(['gid', 'grupo', 'uid', 'nome', 'tel', 'email', 'texto', 'em', 'status', 'respostas', 'lidoGrupo'])
+        && request.resource.data.texto is string && request.resource.data.texto.size() <= 1000;
+      allow read: if donoDoApp() || (logado() && resource.data.uid == eu());
+      allow update: if donoDoApp() || (logado() && resource.data.uid == eu()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['respostas', 'lidoGrupo', 'status'])
+        && request.resource.data.status == 'aberto');
+      allow delete: if donoDoApp();
+    }
+
     // Código do convite → pelada. Qualquer pessoa logada pode procurar um código.
     match /codigos/{codigo} {
       allow read: if logado();
