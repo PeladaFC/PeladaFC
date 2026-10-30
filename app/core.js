@@ -1140,10 +1140,11 @@ function renderTop(){
   const c=cfg();
   const nv=ready?nivelPelada():null;
   const nvTxt=nv!=null&&nivelVisivel()?` · <span class="nivel">${starsHTML(nv)} ${String(nv).replace('.',',')}${ADM()&&!c.nivelPublico?' (só você vê)':''}</span>`:'';
-  let h=`<div class="top"><button class="iconbtn" data-act="voltar-grupos" aria-label="Minhas peladas" style="flex:none">‹</button><div class="brand grow">${esc(c.nome)}<small>${ADM()?'Administrador':'Jogador'}${nvTxt}</small></div>`;
+  let h=`<div class="top"><button class="iconbtn" data-act="voltar-grupos" aria-label="Minhas peladas" style="flex:none">‹</button><div class="brand grow">${esc(c.nome)}<small>${SUP?'Suporte técnico':ADM()?'Administrador':'Jogador'}${nvTxt}</small></div>`;
   {const n=ready?naoLidas():0;
     h+=`<div class="row" style="flex-wrap:nowrap">${!demo&&GRUPO&&GRUPO.codigo?`<button class="iconbtn" data-act="qr-pelada" aria-label="Convidar para a pelada">${ICON.convidar}</button>`:''}<button class="iconbtn bell" data-act="notif" aria-label="Notificações${n?', '+n+' novas':''}">${ICON.bell}${n?`<span class="badge num">${n>9?'9+':n}</span>`:''}</button>${ADM()?`<button class="iconbtn" data-act="cfg" aria-label="Ajustes da pelada">${ICON.cfg}</button>`:!demo&&GRUPO?`<button class="iconbtn" data-act="menu-jog" aria-label="Opções do grupo">${ICON.cfg}</button>`:''}</div>`}
   h+='</div>';
+  h+=tagSuporte();
   if(demo)h+=`<div class="banner demo"><span><b>Demonstração.</b> ${UI.comoJogador?'Você está vendo o app como um jogador vê.':'Dados de exemplo. Nada aqui é salvo.'}</span><div class="row" style="gap:6px"><button class="btn sm" data-act="como-jogador">${UI.comoJogador?'Ver como administrador':'Ver como jogador'}</button></div></div>`;
   return h;
 }
@@ -1193,7 +1194,7 @@ function sheetMinhaPos(){const id=meuJogador();if(!id)return;const j=J(id);
     <div class="pick">${Object.entries(POS).map(([k,n])=>`<button data-act="minha-pos" data-v="${k}" aria-pressed="${j.pos===k}">${n}</button>`).join('')}</div></div>`)}
 /* --- Jogo --- */
 function tJogo(A){
-  const c=cfg();let h='';
+  const c=cfg();let h=bannerPedidoSuporte();
   if(!A&&euPendente())h+=bannerPendente().replace('margin-top:12px','margin:0 0 12px');
   if(!A){const pend=avalPendenteJogador();if(pend){const[pid,p]=pend,L=S.locais[p.localId],d=S.pres[myId]||{};
     h+=`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Como estava o campo?</h3></div>
@@ -1581,6 +1582,7 @@ function renderHist(A){
 
 /* ---------- responder presença (botões do app, link do WhatsApp e notificação) ---------- */
 let RESP_LINK=null;
+let SUP=false; // modo suporte: o dono do Pelota FC entrou com a autorização do administrador
 function euVou(pid,v,via){const doc=S.pres[myId];if(!doc)return null;const p=S.pel[pid];if(!p)return null;const prev=respDe(p,pid)[doc.jogador]?.s||null;
   if(prev===v)return{igual:true,s:v,texto:v==='sim'?'Você já tinha confirmado presença.':'Você já tinha avisado que não vai.'};
   const l0=lista(p,pid),jj=doc.jogador,cheia=v==='sim'&&J(jj).pos!=='GOL'&&!l0.escalados.includes(jj)&&l0.escalados.length>=l0.vagas;
@@ -2128,6 +2130,28 @@ function sheetMsg(tipo,ctx={}){
       ${ctx.aviso?`<button class="btn warn block" data-act="aviso-feito" data-a="${ctx.aviso}" data-key="${ctx.key}">Já mandei · tirar o alerta</button>`:''}
       <p class="sub" style="margin:0">"Enviar no app" chega como notificação para cada jogador. O WhatsApp é opcional: abre com o texto daqui, e você escolhe o grupo.</p></div>`);
 }
+/* Suporte do Pelota FC: o administrador libera por 24 horas; tudo o que o suporte fizer fica registrado */
+function supLiberado(){const su=(GRUPO&&GRUPO.suporte)||{};return(su.ate||0)>Date.now()?su:null}
+function supAtuando(){const su=supLiberado(),n=GRUPO&&GRUPO.suporteNaPelada;return!!(su&&n&&n>(su.em||0))}
+// tarja discreta no topo da pelada (só para o administrador) enquanto o suporte está liberado
+function tagSuporte(){if(demo||SUP||!isAdmin)return'';const su=supLiberado();if(!su)return'';
+  return`<button type="button" class="sup-tag" data-act="sup-painel">🛟 ${supAtuando()?'Suporte técnico atuando agora':'Suporte técnico liberado até '+esc(horaPedido(su.ate).slice(-5))}</button>`}
+// nos Ajustes: bloco fechado, só abre se o administrador precisar
+function painelSuporte(){const su=supLiberado();
+  return`<details class="panel sup-det" style="margin-top:14px"><summary><b>🛟 Suporte do Pelota FC</b>${su?' · <span class="sub">liberado</span>':''}</summary>
+    <div class="sub" style="margin:8px 0">${su?`Liberado até <b>${esc(horaPedido(su.ate))}</b>.`:'Quando você pedir ajuda, a equipe do Pelota FC manda um pedido de acesso, que aparece como aviso laranja. É só tocar em Liberar.'}</div>
+    ${su?'<button class="btn danger block" data-act="sup-encerrar">Encerrar o suporte agora</button>':''}
+    <button class="btn sm" style="margin-top:8px" data-act="sup-log">Ver as visitas do suporte</button></details>`}
+function sheetSuporteAdm(){const su=supLiberado();
+  openSheet('Suporte do Pelota FC',`<div class="stack">${su?`<p style="margin:0">${supAtuando()?'<b>O suporte técnico está atuando nesta pelada agora.</b>':'O suporte técnico está liberado.'} O acesso fecha sozinho às <b>${esc(horaPedido(su.ate).slice(-5))}</b> de ${esc(horaPedido(su.ate).slice(0,-6))}.</p>
+    <button class="btn danger block" data-act="sup-encerrar">Encerrar o suporte agora</button>`:'<p style="margin:0">O suporte não está liberado.</p>'}
+    <button class="btn block" data-act="sup-log">Ver as visitas do suporte</button></div>`)}
+function bannerPedidoSuporte(){if(demo||SUP||!isAdmin||!GRUPO||!window.pedidoSuporte||!window.pedidoSuporte(GRUPO))return'';
+  return`<div class="alerta-sup"><span class="ic">🛟</span><div class="grow"><b>O suporte do Pelota FC pediu acesso</b><span>Acesso por 24 horas, para te ajudar.</span>
+    <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm sup-sim" data-act="sup-aceitar">Liberar por 24 horas</button><button class="btn sm sup-nao" data-act="sup-recusar">Agora não</button></div></div></div>`}
+async function sheetLogSuporte(){openSheet('Visitas do suporte','<p class="sub">Carregando…</p>');let L=[];try{L=await window.suporteAdmin('log')}catch(e){toast('Não consegui carregar agora.');return}
+  const nomeOp={entrou:'🛟 Acessou a pelada',saiu:'↩️ Encerrou visita',marcou:'📅 Marcou pelada'};
+  openSheet('Visitas do suporte',(L.length?`<div class="list">${L.map(x=>`<div class="item"><div class="grow"><div class="name">${esc(x.texto||nomeOp[x.acao]||x.acao)}</div><div class="sub">${esc(horaPedido(x.em))}</div></div></div>`).join('')}</div>`:'<div class="empty">Nenhuma visita do suporte nos últimos 7 dias.</div>')+'<p class="sub" style="margin-top:10px">Cada registro some sozinho depois de 7 dias.</p>')}
 function sheetCfg(){
   const c=cfg();F={restr:(c.restr||[]).slice(),golSorteio:!!c.golSorteio};
   openSheet('Ajustes da pelada',`<div class="stack">
@@ -2182,7 +2206,8 @@ function sheetCfg(){
       <select id="r-b"><option value="">Jogador</option>${Object.keys(S.jog).map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('')}</select></div>
       <div class="row" style="margin-top:8px"><button class="btn sm" data-act="add-restr" data-v="separar">Separar</button><button class="btn sm" data-act="add-restr" data-v="juntar">Sempre juntos</button></div></div>
     <button class="btn primary block" data-act="save-cfg">Salvar ajustes</button>
-    ${!demo&&GRUPO?(GRUPO.dono===myId?`<div class="panel" style="margin-top:14px"><h3 style="margin-bottom:4px">Apagar grupo</h3><div class="sub" style="margin-bottom:8px">Apaga a pelada inteira para todo mundo: elenco, peladas, caixa, avisos e notas. Não dá para desfazer.</div><button class="btn danger block" data-act="apagar-grupo">Apagar este grupo</button></div>`
+    ${!demo&&!SUP&&GRUPO?painelSuporte():''}
+    ${!demo&&!SUP&&GRUPO?(GRUPO.dono===myId?`<div class="panel" style="margin-top:14px"><h3 style="margin-bottom:4px">Apagar grupo</h3><div class="sub" style="margin-bottom:8px">Apaga a pelada inteira para todo mundo: elenco, peladas, caixa, avisos e notas. Não dá para desfazer.</div><button class="btn danger block" data-act="apagar-grupo">Apagar este grupo</button></div>`
       :`<div class="panel" style="margin-top:14px"><h3 style="margin-bottom:4px">Sair do grupo</h3><div class="sub" style="margin-bottom:8px">Só quem criou o grupo pode apagá-lo. Você pode sair dele, e ele some da sua lista.</div><button class="btn danger block" data-act="sair-grupo">Sair deste grupo</button></div>`):''}</div>`);
   renderRestr();renderAdmins();
 }
@@ -2307,6 +2332,7 @@ document.addEventListener('click',e=>{
       const hi=document.getElementById('np-hora').value||cfg().hora;
       const ext0=!EV()&&UI.npTipo==='extra',mv=!EV()&&!ext0&&document.getElementById('np-mens')?.value,mensAte=mv?new Date(mv).getTime():null,nomeEv=(document.getElementById('np-nome')?.value||'').trim();
       put('peladas/'+id,{data,hora:hi,...(mensAte?{mensAte}:{}),...(nomeEv?{nome:nomeEv}:{}),horaFim:document.getElementById('np-fim').value||maisHora(hi,60),localId:UI.npLoc||null,local:(S.locais[UI.npLoc]||{}).nome||'',status:'aberta',resp:{},criadoEm:Date.now(),formato:document.getElementById('np-formato')?.value||cfg().formato||'conv',nTimes:Number(document.getElementById('np-times')?.value)||Number(cfg().times)||3,...(()=>{const ext=!EV()&&UI.npTipo==='extra',pa=EV()||ext,base=ext?{extra:true}:{};const cb=UI.npCobra??(pa?'nao':(precoD(data.slice(0,7))>0?'sim':'nao'));if(cb==='nao')return{...base,precoDiaria:0};if(Object.keys(UI.npDesc||{}).length)base.descontos={...UI.npDesc};const v=Number(String(document.getElementById('np-valor')?.value||'').replace(',','.'));if(!(v>0))return pa?{...base,precoDiaria:0}:base;if(!CX())patch('config/geral',{usarCaixa:true});return v===precoD(data.slice(0,7))&&!pa?base:{...base,precoDiaria:Math.round(v*100)/100}})()});
+      if(SUP&&window.suporteRegistro)window.suporteRegistro('marcou','📅 Marcou a pelada de '+dShort(data));
       if(UI.npLoc&&S.locais[UI.npLoc])put('locais/'+UI.npLoc,{...S.locais[UI.npLoc],usadoEm:Date.now()});
       UI.npLoc=undefined;UI.npData=UI.npHora=UI.npFim=UI.npTimes=UI.npFormato=UI.npCobra=UI.npValor=UI.npTipo=UI.npModo=UI.npTotal=UI.npDesc=UI.npQpAberta=UI.npMens=UI.npNome=null;UI.npFimManual=false;UI.sub='presenca';toast('Pelada marcada. Agora é só convocar.');break}
     case'cancel-pel':if(Object.values((S.pel[d.p]||{}).diarias||{}).some(pagoPorPix)){toast('Esta pelada já recebeu Pix pelo app e não pode ser apagada. Para devolver, lance uma saída no Caixa.');break}if(b.dataset.sure){del('peladas/'+d.p);toast('Pelada cancelada.')}else{b.dataset.sure='1';b.textContent='Toque de novo para cancelar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Cancelar esta pelada'}},3500)}break;
@@ -2315,6 +2341,11 @@ document.addEventListener('click',e=>{
       patch('peladas/'+d.p,{resp:{[d.j]:{s:v,t:now,esp:v==='sim'&&cheia}},aprov:{[d.j]:v==='sim'&&!cheia?now:null}});
       if(v==='sim'&&cheia)toast(`Lista cheia: ${nm(d.j)} foi para a espera.`);
       eventosPresenca(S.pel[d.p],before,lista(S.pel[d.p],d.p),d.j,cur,v);break}
+    case'sup-aceitar':window.suporteAdmin('liberar').then(()=>toast('Suporte liberado por 24 horas. Pode avisar o Pelota FC.'),e=>toast((e&&e.message)||'Não deu certo.'));break;
+    case'sup-recusar':window.suporteAdmin('recusar').then(()=>toast('Pedido recusado.'),e=>toast((e&&e.message)||'Não deu certo.'));break;
+    case'sup-encerrar':window.suporteAdmin('encerrar').then(()=>{toast('Suporte encerrado.');closeSheet()},e=>toast((e&&e.message)||'Não deu certo.'));break;
+    case'sup-log':sheetLogSuporte();break;
+    case'sup-painel':sheetSuporteAdm();break;
     case'eu-vou':{const r=euVou(d.p,d.v);if(r)toast(r.texto);break}
     case'resp-escolher':{const r=euVou(d.p,d.v,'link');if(r)sheetResp(d.p,r);else closeSheet();break}
     case'resp-desfazer':{const u=UI.respAnt;if(!u)return;const doc=S.pres[myId];if(!doc)return;const pel={...(doc.pel||{})};if(u.ant)pel[u.pid]=u.ant;else delete pel[u.pid];
@@ -2814,7 +2845,7 @@ function stopDemo(){if(!REAL||!db){if(window.voltarGrupos)window.voltarGrupos();
 window.iniciarPelada=function(ctx){
   window.pararPelada();
   S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};
-  demo=false;REAL=null;ready=false;loaded=0;db=ctx.db;myId=ctx.uid;isAdmin=!!ctx.isAdmin;dl=ctx.dl||null;GRUPO=ctx.grupo;GID=ctx.gid;RESP_LINK=ctx.resp||null;
+  demo=false;REAL=null;ready=false;loaded=0;db=ctx.db;myId=ctx.uid;isAdmin=!!ctx.isAdmin;dl=ctx.dl||null;GRUPO=ctx.grupo;GID=ctx.gid;RESP_LINK=ctx.resp||null;SUP=!!ctx.suporte;
   UI.tab='jogo';UI.sub='presenca';UI.npLoc=undefined;UI.comoJogador=false;PUSH_PRONTO=false;PUSH_VISTOS.clear();
   closeSheet();render();window.scrollTo(0,0);
   const N=11;const done=()=>{if(++loaded===N){ready=true;render();aplicarRespLink()}};
@@ -2834,8 +2865,8 @@ function ouvirVotos(){if(unsubVotos){try{unsubVotos()}catch(e){}unsubVotos=null}
   if(isAdmin)unsubVotos=db.collection('votos').onSnapshot(snap=>{const m={};snap.docs.forEach(x=>m[x.id]=x.data());S.votos=withPending('votos',m);fim()},e=>console.warn(e));
   else unsubVotos=db.doc('votos/'+myId).onSnapshot(snap=>{S.votos={...(S.votos||{}),[myId]:snap.exists?snap.data():undefined};if(!snap.exists)delete S.votos[myId];fim()},e=>console.warn(e))}
 window.pararPelada=function(){if(db&&db.unsubs)db.unsubs.splice(0).forEach(u=>{try{u()}catch(e){}});db=null;ready=false;demo=false;REAL=null};
-window.atualizarGrupo=function(g){GRUPO=g;const adm=!!(g&&(g.admins||[]).includes(myId));if(adm!==isAdmin){isAdmin=adm;ouvirVotos();if(!adm&&['avisos','caixa'].includes(UI.tab))UI.tab='jogo'}render();renderAdmins()};
-window.abrirDemo=function(){window.pararPelada();S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};myId=null;isAdmin=true;GRUPO={codigo:'DEMO01',admins:[]};ready=true;startDemo()};
+window.atualizarGrupo=function(g){GRUPO=g;const adm=SUP||!!(g&&(g.admins||[]).includes(myId));if(adm!==isAdmin){isAdmin=adm;ouvirVotos();if(!adm&&['avisos','caixa'].includes(UI.tab))UI.tab='jogo'}render();renderAdmins()};
+window.abrirDemo=function(){window.pararPelada();SUP=false;S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};myId=null;isAdmin=true;GRUPO={codigo:'DEMO01',admins:[]};ready=true;startDemo()};
 /* ---------- PDF da prestação de contas (gerador próprio, sem biblioteca) ---------- */
 const PDF_W={r:[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584],
   b:[278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584]};
