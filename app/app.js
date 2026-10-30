@@ -453,6 +453,14 @@ function telaIntro() {
     <div class="intro-fim sobe" style="--d:${400 + itens.length * 900}ms"><div class="intro-barra"><i></i></div>
       <button class="btn primary block" data-sh="intro-seguir">Continuar</button></div></div>`;
 }
+// Sem conta: toda vez que o app volta a ser aberto (ficou mais de 1 minuto em segundo plano), começa de novo pela apresentação.
+// Menos de 1 minuto não reinicia, para não apagar o que a pessoa digitava (ex.: foi copiar a senha em outro app).
+let SAIU_EM = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { SAIU_EM = Date.now(); return; }
+  const longe = SAIU_EM && Date.now() - SAIU_EM > 60e3; SAIU_EM = 0;
+  if (longe && !EU && ['boas', 'login', 'criar', 'intro'].includes(TELA)) { INTRO_VISTA = false; ir('boas'); }
+});
 function iniciarIntro() { clearTimeout(INTRO_T); INTRO_T = setTimeout(seguirIntro, matchMedia('(prefers-reduced-motion: reduce)').matches ? 6000 : 9000); }
 function seguirIntro() { clearTimeout(INTRO_T); if (TELA !== 'intro') return; INTRO_VISTA = true; const r = $('shell').firstElementChild;
   const vai = () => { if (TELA === 'intro') ir('boas'); };
