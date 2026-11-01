@@ -3035,3 +3035,17 @@ function abrirCidades(pre){const uf=(document.getElementById(pre+'-uf')||{}).val
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-cidpick]');if(b){e.preventDefault();e.stopPropagation();abrirCidades(b.dataset.cidpick)}},true);
 document.addEventListener('change',e=>{const s=e.target;if(!s.dataset||!s.dataset.ufcid)return;const pre=s.dataset.ufcid,c=(document.getElementById(pre+'-cidade')||{}).value||'';
   if(!s.value){cidPor(pre,'');return}if(!c){cidPor(pre,'');return}cidadesUF(s.value).then(l=>{if(l&&!l.some(x=>cidN(x)===cidN(c)))cidPor(pre,'')})});
+
+/* ---------- Confirmação no mesmo lugar ----------
+   Botões que pedem "toque de novo" não podem mudar de tamanho nem de lugar: guardamos o tamanho no toque e,
+   quando o texto vira a confirmação, o botão fica do mesmo tamanho (se o texto não couber, vira "Confirmar?"). */
+(function(){
+  const CONF=/^\s*(toque de novo|confirmar)/i;
+  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button');if(!b||b.dataset.travado)return;b._w=b.offsetWidth;b._h=b.offsetHeight;b._txt=(b.textContent||'').trim()},true);
+  const ajustar=b=>{if(b._mexendo)return;const t=b.textContent||'';
+    if(CONF.test(t)&&b._w&&!b.dataset.travado){b._mexendo=true;b.dataset.travado='1';b.style.width=b._w+'px';b.style.height=b._h+'px';b.classList.add('confirmando');
+      if(b.scrollWidth>b.clientWidth+1){b.dataset.longo=t;b.textContent=(b._txt||'Confirmar').replace(/^[^\wÀ-ú]+/,'').replace(/[.!?:]+$/,'')+'?';if(b.scrollWidth>b.clientWidth+1)b.style.fontSize='.85em'}b._mexendo=false}
+    else if(b.dataset.travado&&!CONF.test(t)&&t!==((b._txt||'Confirmar').replace(/^[^\wÀ-ú]+/,'').replace(/[.!?:]+$/,'')+'?')){b._mexendo=true;delete b.dataset.travado;delete b.dataset.longo;b.style.width='';b.style.height='';b.style.fontSize='';b.classList.remove('confirmando');b._mexendo=false}};
+  new MutationObserver(ms=>{for(const m of ms){const b=(m.target.nodeType===1?m.target:m.target.parentElement);const bt=b&&b.closest&&b.closest('button');if(bt)ajustar(bt)}})
+    .observe(document.body,{subtree:true,childList:true,characterData:true});
+})();
