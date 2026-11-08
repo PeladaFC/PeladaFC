@@ -662,12 +662,18 @@ function cartaAtleta(ola, eu) {
   const nome = (eu.apelido || eu.nome || 'Atleta').split(/\s+/)[0];
   const foto = eu.foto ? `style="background-image:url('${eu.foto}')"` : '';
   const tier = ovrG == null ? 'neutro' : ovrG >= 80 ? 'ouro' : ovrG >= 60 ? 'prata' : 'bronze';
+  const POSN = { GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral', VOL: 'Volante', MEI: 'Meio-campo', ATA: 'Atacante' };
+  // temporadas: soma dos números de cada ano em todas as peladas
+  const anos = {}; L.forEach(x => Object.entries(x.anos || {}).forEach(([y, v]) => { const a = anos[y] = anos[y] || { j: 0, g: 0, a: 0, mvp: 0 }; for (const k in a) a[k] += Number(v[k]) || 0; }));
+  const anoAtual = String(new Date().getFullYear()), lista = [...new Set([anoAtual, ...Object.keys(anos)])].sort().reverse(), ano = UIp.temporada && lista.includes(UIp.temporada) ? UIp.temporada : anoAtual;
+  const T = anos[ano] || { j: 0, g: 0, a: 0, mvp: 0 };
   return `<div class="atl-carta"><span class="hh-ola">${ola}${nome ? ', ' + escH(nome) : ''}.</span>
-    <div class="atl-corpo"><div class="atl-escudo ${tier}" title="${ovrG != null ? 'Nota geral ' + ovrG : ''}"><span class="atl-foto" ${foto}>${eu.foto ? '' : escH((nome[0] || '?').toUpperCase())}</span><span class="atl-pos">${escH(pos || '—')}</span></div>
-      <div class="atl-dir">${atr ? atr.map(([n, v]) => `<div class="atl-at"><b>${Math.max(0, Math.min(99, v))}</b><span>${n}</span></div>`).join('')
+    <div class="atl-corpo"><div class="atl-escudo ${tier}"><span class="atl-foto" ${foto}>${eu.foto ? '' : escH((nome[0] || '?').toUpperCase())}</span><span class="atl-pos">${escH(POSN[pos] || pos || '—')}</span></div>
+      <div class="atl-dir">${atr ? atr.map(([n, v]) => `<div class="atl-at"><span>${n}</span><b>${Math.max(0, Math.min(99, v))}</b></div>`).join('')
         : `<p class="atl-vazio">${L.length ? 'Seus números aparecem depois da primeira avaliação da galera.' : 'Sua carta de atleta aparece aqui depois que você entrar no elenco de uma pelada.'}</p>`}</div></div>
-    <div class="atl-stats"><div><b>${soma('j')}</b><span>jogos</span></div><div><b>${soma('g')}</b><span>gols</span></div><div><b>${soma('a')}</b><span>assist.</span></div><div><b>${soma('mvp')}</b><span>craque</span></div></div>
-    <span class="atl-rod">Classificação geral${L.length ? ` · ${L.length} pelada${L.length > 1 ? 's' : ''}` : ''}</span></div>`;
+    <div class="atl-meus"><span class="atl-tit">Meus números</span>
+      <div class="atl-stats"><div><b>${T.j}</b><span>jogos</span></div><div><b>${T.g}</b><span>gols</span></div><div><b>${T.a}</b><span>assist.</span></div><div><b>${T.mvp}</b><span>craque</span></div></div>
+      ${lista.length > 1 ? `<label class="atl-temp">Temporada <select data-temporada aria-label="Temporada">${lista.map(y => `<option value="${y}" ${y === ano ? 'selected' : ''}>${y.slice(2)}</option>`).join('')}</select> ▾</label>` : `<span class="atl-temp">Temporada ${ano.slice(2)}</span>`}</div></div>`;
 }
 let MINHAS_DUV = [], UNSUB_DUV = null, DUV_DONO = null, UNSUB_DUV_DONO = null;
 function ouvirMinhasDuvidas() {
@@ -1380,6 +1386,7 @@ function cartaoPush() {
 }
 
 /* ================= Eventos ================= */
+document.addEventListener('change', e => { if (e.target && e.target.matches && e.target.matches('[data-temporada]')) { UIp.temporada = e.target.value; render(); } });
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-sh]'); if (!b || !($('shell').contains(b) || $('leitor').contains(b))) return;
   const a = b.dataset.sh, v = b.dataset.v;

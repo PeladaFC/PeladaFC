@@ -1111,7 +1111,8 @@ function resumoAtleta(){const jid=meuJogador();if(!jid||!GRUPO)return null;const
   const vis=cfg().mostrarAval!==false&&!!j.critGalera,cr=critKey(j.pos),fonte=j.critGalera||j.crit||{};
   return{grupo:GRUPO.nome||cfg().nome||'Pelada',pos:j.pos||'MEI',kind:j.pos==='GOL'?'GOL':'linha',ovr:vis?ovr(notaAtual(jid)):null,
     crit:vis?Object.fromEntries(cr.map(([k])=>[k,Number(fonte[k]??3)])):null,j:st.j||0,g:st.g||0,a:st.a||0,mvp:st.mvp||0,
-    premios:(st.art||0)+(st.gar||0)+(st.def||0)+(st.gol||0)}}
+    premios:(st.art||0)+(st.gar||0)+(st.def||0)+(st.gol||0),anos:(()=>{const out={},anos=[...new Set(Object.values(S.pel).map(p=>String(p.data||'').slice(0,4)).filter(x=>/^\d{4}$/.test(x)))];
+      for(const y of anos){const t=(estatPeriodo(y+'-01-01',(Number(y)+1)+'-01-01')||{})[jid];if(t&&(t.j||t.g||t.a||t.mvp))out[y]={j:t.j||0,g:t.g||0,a:t.a||0,mvp:t.mvp||0}}return out})()}}
 function agendarAtleta(){if(demo||SUP||!ready||!window.salvarAtleta)return;clearTimeout(ATL_T);ATL_T=setTimeout(()=>{const r=resumoAtleta();if(!r)return;const k=JSON.stringify(r);if(k===ATL_ULT)return;ATL_ULT=k;window.salvarAtleta(GID,r)},3000)}
 function render(){
   agendarAtleta();
