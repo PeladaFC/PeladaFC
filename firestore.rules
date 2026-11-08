@@ -71,6 +71,11 @@ service cloud.firestore {
       allow create: if logado()
         && request.resource.data.dono == eu()
         && request.resource.data.admins == [eu()];
+      // o dono passa o grupo para outro administrador (ele mesmo continua administrador)
+      allow update: if logado() && resource.data.dono == eu()
+        && request.resource.data.dono in resource.data.admins && request.resource.data.dono != eu()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dono', 'donoDesde', 'donoAnterior'])
+        && request.resource.data.donoAnterior == eu();
       // o dono do app só pode registrar o pedido de suporte (o administrador libera ou recusa)
       allow update: if donoDoApp()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suportePedido']);

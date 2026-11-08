@@ -716,6 +716,14 @@ window.mudarAdmins = async admins => {
   if (!admins.length) { aviso('A pelada precisa de pelo menos um administrador.'); return; }
   try { await B.set('grupos/' + ABERTO, { admins }, { merge: true }); aviso('Administradores atualizados.'); } catch (e) { aviso(msgErro(e)); }
 };
+// Passar o grupo para outro administrador (só o dono). A cobrança da assinatura (fase 2) passa a ir para o novo dono, sem novo período grátis.
+window.passarDono = async uid => {
+  const G = GRUPOS[ABERTO]; if (!ABERTO || !G || G.dono !== EU.uid) throw new Error('Só o dono pode passar o grupo.');
+  if (!(G.admins || []).includes(uid)) throw new Error('A pessoa precisa ser administradora.');
+  const donoDesde = Date.now();
+  await B.set('grupos/' + ABERTO, { dono: uid, donoDesde, donoAnterior: EU.uid }, { merge: true });
+  GRUPOS[ABERTO] = { ...G, dono: uid, donoDesde, donoAnterior: EU.uid }; window.atualizarGrupo({ ...GRUPOS[ABERTO] });
+};
 // Apagar o grupo (só quem criou): limpa as coleções, o código do convite e o grupo.
 const COLS_GRUPO = ['config', 'jogadores', 'peladas', 'presencas', 'locais', 'caixa', 'avisos', 'mural', 'avaliacoes', 'notificacoes', 'membros', 'suporteLog'];
 window.apagarGrupo = async () => {

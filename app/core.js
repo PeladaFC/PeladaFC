@@ -2163,6 +2163,13 @@ function bannerPedidoSuporte(){if(demo||SUP||!isAdmin||!GRUPO||!window.pedidoSup
 async function sheetLogSuporte(){openSheet('Visitas do suporte','<p class="sub">Carregando…</p>');let L=[];try{L=await window.suporteAdmin('log')}catch(e){toast('Não consegui carregar agora.');return}
   const nomeOp={entrou:'🛟 Acessou a pelada',saiu:'↩️ Encerrou visita',marcou:'📅 Marcou pelada'};
   openSheet('Visitas do suporte',(L.length?`<div class="list">${L.map(x=>`<div class="item"><div class="grow"><div class="name">${esc(x.texto||nomeOp[x.acao]||x.acao)}</div><div class="sub">${esc(horaPedido(x.em))}</div></div></div>`).join('')}</div>`:'<div class="empty">Nenhuma visita do suporte nos últimos 7 dias.</div>')+'<p class="sub" style="margin-top:10px">Cada registro some sozinho depois de 7 dias.</p>')}
+/* Passar o grupo para outra pessoa (só o dono): ela precisa já ser administradora. O dono anterior continua administrador. */
+function nomeMembro(u){const m=(S.membros||{})[u];const j=S.pres[u]&&S.jog[S.pres[u].jogador];return(j&&(j.apelido||j.nome))||(m&&(m.apelido||m.nome))||'Sem nome'}
+function painelPassarDono(){const outros=((GRUPO&&GRUPO.admins)||[]).filter(u=>u!==myId);
+  return`<details class="panel times-nomes" style="margin-top:14px"><summary><b>Passar o grupo para outra pessoa</b><span class="sub">você é o dono</span></summary>
+    <div class="sub" style="margin:6px 0 8px">O novo dono passa a ser o responsável pelo grupo: só ele pode apagar o grupo ou passá-lo adiante. Você continua como administrador.</div>
+    ${outros.length?`<label class="field"><span>Novo dono</span><select id="novo-dono"><option value="">Escolha um administrador…</option>${outros.map(u=>`<option value="${u}">${esc(nomeMembro(u))}</option>`).join('')}</select></label>
+    <button class="btn block" style="margin-top:8px" data-act="passar-dono">Passar o grupo</button>`:'<div class="sub">Primeiro torne a pessoa <b>administradora</b> (em Administradores, logo acima). Depois ela aparece aqui.</div>'}</details>`}
 function sheetCfg(){
   const c=cfg();F={restr:(c.restr||[]).slice(),golSorteio:!!c.golSorteio};
   openSheet('Ajustes da pelada',`<div class="stack">
@@ -2219,6 +2226,7 @@ function sheetCfg(){
       <div class="row" style="margin-top:8px"><button class="btn sm" data-act="add-restr" data-v="separar">Separar</button><button class="btn sm" data-act="add-restr" data-v="juntar">Sempre juntos</button></div></div>
     <button class="btn primary block" data-act="save-cfg">Salvar ajustes</button>
     ${!demo&&!SUP&&GRUPO?painelSuporte():''}
+    ${!demo&&!SUP&&GRUPO&&GRUPO.dono===myId?painelPassarDono():''}
     ${!demo&&!SUP&&GRUPO?(GRUPO.dono===myId?`<div class="panel" style="margin-top:14px"><h3 style="margin-bottom:4px">Apagar grupo</h3><div class="sub" style="margin-bottom:8px">Apaga a pelada inteira para todo mundo: elenco, peladas, caixa, avisos e notas. Não dá para desfazer.</div><button class="btn danger block" data-act="apagar-grupo">Apagar este grupo</button></div>`
       :`<div class="panel" style="margin-top:14px"><h3 style="margin-bottom:4px">Sair do grupo</h3><div class="sub" style="margin-bottom:8px">Só quem criou o grupo pode apagá-lo. Você pode sair dele, e ele some da sua lista.</div><button class="btn danger block" data-act="sair-grupo">Sair deste grupo</button></div>`):''}</div>`);
   renderRestr();renderAdmins();
@@ -2396,6 +2404,8 @@ document.addEventListener('click',e=>{
     case'sair-grupo':openSheet('Sair do grupo?',`<div class="stack"><p style="margin:0">Você vai sair de <b>${esc((GRUPO||{}).nome||cfg().nome)}</b>. Para voltar, vai precisar do convite e da autorização de um administrador.</p>
       <button class="btn danger block" data-act="sair-grupo-ok">Sim, sair</button><button class="btn block" data-act="${ADM()?'cfg':'close'}">Cancelar</button></div>`);break;
     case'sair-grupo-ok':closeSheet();window.sairGrupo&&window.sairGrupo();break;
+    case'passar-dono':{const u=(document.getElementById('novo-dono')||{}).value;if(!u){toast('Escolha o novo dono.');break}if(!doisToques(b,'Toque de novo para passar'))break;
+      window.passarDono&&window.passarDono(u).then(()=>{toast('Pronto! '+nomeMembro(u)+' agora é o dono do grupo.');closeSheet()},e=>toast((e&&e.message)||'Não deu certo.'));break}
     case'adm-rem':window.mudarAdmins&&window.mudarAdmins((GRUPO.admins||[]).filter(x=>x!==d.u));break;
     case'aval-campo':{const v=Number(d.v);
       if(d.q==='adm'){patch('peladas/'+d.p,{avalCampo:{[d.c]:v}});break}
