@@ -23,6 +23,10 @@ service cloud.firestore {
       match /push/{id} {
         allow read, write: if logado() && eu() == uid;
       }
+      // Resumo do atleta em cada pelada (carta da tela inicial): só a própria pessoa lê e grava.
+      match /atleta/{gid} {
+        allow read, write: if logado() && eu() == uid;
+      }
     }
 
     // Chaves do servidor de notificações: só o servidor acessa (o app não lê nem grava).
@@ -40,6 +44,11 @@ service cloud.firestore {
         && request.resource.data.expiraEm is timestamp;
       allow read, delete: if donoDoApp();
       allow update: if false;
+    }
+    // Nota geral do app (calculada pelo servidor): só a própria pessoa lê.
+    match /notaGeral/{uid} {
+      allow read: if logado() && eu() == uid;
+      allow write: if false;
     }
     match /servidor/{doc} {
       allow read, write: if false;
@@ -71,6 +80,11 @@ service cloud.firestore {
       allow create: if logado()
         && request.resource.data.dono == eu()
         && request.resource.data.admins == [eu()];
+      // o dono passa o grupo para outro administrador (ele mesmo continua administrador)
+      allow update: if logado() && resource.data.dono == eu()
+        && request.resource.data.dono in resource.data.admins && request.resource.data.dono != eu()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dono', 'donoDesde', 'donoAnterior'])
+        && request.resource.data.donoAnterior == eu();
       // o dono do app só pode registrar o pedido de suporte (o administrador libera ou recusa)
       allow update: if donoDoApp()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suportePedido']);
@@ -133,9 +147,15 @@ service cloud.firestore {
         allow delete: if logado() && grupo(gid).dono == eu();
       }
 
+      // Notas dos jogadores para a nota geral do app e a nota sugerida: só administradores (e o servidor).
+      match /notas/{doc} {
+        allow read: if gestor(gid);
+        allow write: if doc == 'atual' && (adminDepois(gid) || suporte(gid));
+      }
+
       match /{colecao}/{doc} {
-        allow read: if colecao != 'votos' && colecao != 'segredos' && colecao != 'suporteLog' && (membro(gid) || gestor(gid));
-        allow write: if colecao != 'membros' && colecao != 'presencas' && colecao != 'votos' && colecao != 'segredos' && colecao != 'cobrancas' && colecao != 'suporteLog' && (adminDepois(gid) || suporte(gid));
+        allow read: if colecao != 'votos' && colecao != 'segredos' && colecao != 'suporteLog' && colecao != 'notas' && (membro(gid) || gestor(gid));
+        allow write: if colecao != 'membros' && colecao != 'presencas' && colecao != 'votos' && colecao != 'segredos' && colecao != 'cobrancas' && colecao != 'suporteLog' && colecao != 'notas' && (adminDepois(gid) || suporte(gid));
       }
     }
   }

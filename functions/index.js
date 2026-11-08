@@ -289,3 +289,51 @@ exports.pushPrazoPagamento = onSchedule({ schedule: 'every 5 minutes', timeZone:
     }
   }
 });
+
+/* ---------- Nota geral do app e nota sugerida para quem entra num grupo ----------
+   Uma vez por dia: junta as notas que cada grupo guarda (grupos/{gid}/notas/atual), descobre a régua de cada grupo
+   pelos jogadores que jogam em mais de um, grava a nota geral de cada pessoa (notaGeral/{uid}) e a nota sugerida
+   para quem ainda está esperando entrar no elenco (grupos/{gid}/notas/sugestoes). */
+const NG = require('./notageral');
+async function calcularNotaGeral() {
+  const [notas, pres] = await Promise.all([db.collectionGroup('notas').get(), db.collectionGroup('presencas').get()]);
+  const uidDe = {}; // gid → jid → uid
+  for (const d of pres.docs) { const gid = d.ref.parent.parent && d.ref.parent.parent.id, jid = d.get('jogador'); if (gid && jid) (uidDe[gid] = uidDe[gid] || {})[jid] = d.id; }
+  const obs = [];
+  for (const d of notas.docs) {
+    if (d.id !== 'atual') continue; const gid = d.ref.parent.parent.id, jog = d.get('jog') || {};
+    for (const [jid, x] of Object.entries(jog)) { const u = (uidDe[gid] || {})[jid]; if (!u || x == null || x.ovr == null) continue;
+      obs.push({ u, g: gid, kind: x.kind === 'GOL' ? 'GOL' : 'linha', pos: x.pos || 'MEI', ovr: Number(x.ovr) || 0, w: NG.pesoObs(x), crit: x.crit || {} }); }
+  }
+  const { porPessoa, gen } = NG.notasGerais(obs), agora = Date.now();
+  let bt = db.batch(), n = 0; const flush = async () => { if (n) { await bt.commit(); bt = db.batch(); n = 0; } };
+  for (const [u, r] of Object.entries(porPessoa)) { bt.set(db.doc('notaGeral/' + u), { ovr: r.ovr, kind: r.kind, pos: r.pos, crit: r.crit, grupos: r.grupos, em: agora }); if (++n >= 400) await flush(); }
+  await flush();
+  await db.doc('servidor/notaGeral').set({ gen, em: agora, pessoas: Object.keys(porPessoa).length, grupos: Object.keys(gen).length });
+  // sugestões para quem está pendente (entrou no grupo e ainda não está no elenco)
+  const membros = await db.collectionGroup('membros').get(), porGrupo = {};
+  for (const d of membros.docs) { const gid = d.ref.parent.parent.id, u = d.id; if ((uidDe[gid] || {}) && Object.values(uidDe[gid] || {}).includes(u)) continue;
+    const p = porPessoa[u]; if (!p) continue; (porGrupo[gid] = porGrupo[gid] || []).push(u); }
+  for (const [gid, us] of Object.entries(porGrupo)) {
+    const users = await Promise.all(us.map(u => db.doc('users/' + u).get())); const sg = {};
+    us.forEach((u, i) => { if (users[i].exists && users[i].get('compartilharNota') === false) return; sg[u] = NG.sugestao(porPessoa[u], gen[gid]); });
+    await db.doc(`grupos/${gid}/notas/sugestoes`).set(sg);
+  }
+  logger.info('nota geral', { pessoas: Object.keys(porPessoa).length, grupos: Object.keys(gen).length });
+}
+exports.notaGeralDiaria = onSchedule({ schedule: '30 4 * * *', timeZone: 'America/Recife', maxInstances: 1, memory: '512MiB', timeoutSeconds: 540 }, async () => { await calcularNotaGeral(); });
+// alguém entrou num grupo: já deixa a nota sugerida pronta para o administrador
+exports.sugestaoMembro = onDocumentCreated('grupos/{gid}/membros/{uid}', async ev => {
+  const { gid, uid } = ev.params;
+  const [ng, user, cal] = await Promise.all([db.doc('notaGeral/' + uid).get(), db.doc('users/' + uid).get(), db.doc('servidor/notaGeral').get()]);
+  if (!ng.exists || (user.exists && user.get('compartilharNota') === false)) return;
+  const gen = ((cal.exists && cal.get('gen')) || {})[gid] || 0, p = ng.data();
+  await db.doc(`grupos/${gid}/notas/sugestoes`).set({ [uid]: NG.sugestao({ ovr: p.ovr, crit: p.crit, grupos: p.grupos }, gen) }, { merge: true });
+});
+exports.notaGeralAgora = onRequest({ cors: true, maxInstances: 1, memory: '512MiB', timeoutSeconds: 300 }, async (req, res) => {
+  // só o dono do app: recalcula na hora (botão no Painel do dono)
+  try { const t = String(req.get('Authorization') || '').replace(/^Bearer /, ''); const u = await admin.auth().verifyIdToken(t);
+    const plat = (await db.doc('servidor/plataforma').get()).data() || {}; if (!(plat.emails || []).map(x => String(x).toLowerCase()).includes(String(u.email || '').toLowerCase())) return res.status(403).json({ erro: 'Só o dono do app.' });
+    await calcularNotaGeral(); const r = (await db.doc('servidor/notaGeral').get()).data() || {}; res.json({ ok: true, pessoas: r.pessoas || 0, grupos: r.grupos || 0 });
+  } catch (e) { logger.error(e); res.status(500).json({ erro: 'Não deu certo.' }); }
+});

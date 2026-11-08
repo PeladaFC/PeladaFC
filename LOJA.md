@@ -26,3 +26,9 @@ O servidor (`respostaPush`) já confere a chave de cada pessoa; só muda o canal
 - Política de privacidade: https://pelotafc.com.br/privacidade.html
 - Termos de uso: https://pelotafc.com.br/termos.html
 - Exclusão de conta dentro do app: já existe (Perfil → Excluir minha conta)
+
+## Lembrete antes de enviar para as lojas
+- [ ] **Atendimento por IA no WhatsApp** (pedido do Felipe em 02/11/2026): um bot que responde os clientes do Pelota FC
+  pelo WhatsApp (dúvidas de uso, convite, Pix, como confirmar presença), passando para o Felipe quando não souber.
+  Conversar sobre isso **antes** de enviar o app às lojas: número de WhatsApp da empresa (WhatsApp Business API),
+  custo por conversa, o que o bot pode responder e ligação com o Suporte técnico do Painel do dono.

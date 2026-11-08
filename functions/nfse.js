@@ -89,7 +89,7 @@ module.exports = (db, PAG) => {
       verAplic: VER_APLIC,
       servico: { cTribNac: cfg.cTribNac, ...(cfg.cNBS ? { cNBS: String(cfg.cNBS) } : {}), ...(cfg.cTribMun ? { cTribMun: String(cfg.cTribMun) } : {}), descricao: descricao(l, mes), codMunicipioPrestacao: codMun },
       valores: { vServ: Math.round(l.total * 100) / 100, ...(cfg.pTotTribSN != null ? { pTotTribSN: Number(cfg.pTotTribSN) } : {}), ...(cfg.aliqIss != null ? { aliqIss: Number(cfg.aliqIss) } : {}) },
-      tomador: { documento: l.doc.length === 14 ? { CNPJ: l.doc } : { CPF: l.doc }, nome: String(l.nome || '').slice(0, 300), ...(l.email ? { email: l.email } : {}) }
+      tomador: { documento: l.doc.length === 14 ? { CNPJ: l.doc } : { CPF: l.doc }, nome: String(l.nome || '').slice(0, 300) } // sem e-mail: a nota não é enviada ao grupo; a empresa entrega se pedirem
     };
   }
 

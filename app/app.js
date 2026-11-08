@@ -289,6 +289,7 @@ function render() {
       ${campoUFCidade('p', UIp.pcid ?? p.cidade ?? '', UIp.puf ?? p.uf ?? '')}
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
+      <label class="row" style="gap:8px;align-items:flex-start;flex-wrap:nowrap;font-size:14px"><input type="checkbox" id="p-compnota" ${p.compartilharNota !== false ? 'checked' : ''} style="margin-top:3px"><span>Usar minha nota das outras peladas quando eu entrar numa pelada nova <span class="sub" style="display:block">O administrador vê só uma nota sugerida, já ajustada ao nível da pelada.</span></span></label>
       <button class="btn primary block" type="submit">Salvar</button></form>
     ${EU ? `<button class="btn block" data-sh="sair">Sair da conta</button>${EU.email ? `<p class="sub" style="text-align:center">Você entrou como: <b>${escH(EU.email)}</b></p>` : ''}
       <p class="sub" style="text-align:center;margin:0"><a href="/termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="/privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
@@ -373,8 +374,9 @@ function render() {
     const hr = new Date().getHours(), ola = hr < 5 ? 'Boa noite' : hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
     const eu = PERFIL || {};
     h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELOTA FC</span><button class="eu-av" data-sh="ir" data-v="perfil" aria-label="Meu perfil" style="${eu.foto ? `background-image:url('${eu.foto}')` : ''}">${eu.foto ? '' : ini(eu.apelido || eu.nome)}</button></div>
-    ${prox ? `<button class="home-hero" data-sh="abrir" data-v="${prox.g}"><span class="hh-ola">${ola}${nomeEu ? ', ' + escH(nomeEu) : ''}.</span><span class="hh-q">${escH(falta(prox.d, true))}</span><span class="hh-n">${escH(GRUPOS[prox.g].nome || 'Pelada')}</span><span class="hh-ir">Abrir pelada</span></button>`
-      : `<div class="home-hero"><span class="hh-ola">${ola}${nomeEu ? ', ' + escH(nomeEu) : ''}.</span><span class="hh-q">${ids.length ? 'Sem jogo marcado' : 'Bora jogar?'}</span><span class="hh-n">${ids.length ? 'Quando marcarem a próxima, ela aparece aqui.' : 'Crie sua pelada ou entre com o código de um convite.'}</span></div>`}
+    ${cartaAtleta(ola, eu)}
+    ${prox ? `<button class="prox-linha" data-sh="abrir" data-v="${prox.g}"><span class="pl-ic">📅</span><span class="grow"><b>${escH(falta(prox.d, true))}</b> · ${escH(GRUPOS[prox.g].nome || 'Pelada')}</span><span class="seta" aria-hidden="true">›</span></button>`
+      : `<div class="prox-linha vazio"><span class="pl-ic">📅</span><span class="grow">${ids.length ? 'Sem jogo marcado por enquanto.' : 'Crie sua pelada ou entre com o código de um convite.'}</span></div>`}
     ${adm.filter(g => window.pedidoSuporte(GRUPOS[g])).map(g => `<div class="alerta-sup"><span class="ic">🛟</span><div class="grow"><b>O suporte do Pelota FC pediu acesso</b><span>${escH(GRUPOS[g].nome || 'Pelada')} · acesso por 24 horas</span>
       <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm sup-sim" data-sh="sup-aceitar" data-v="${g}">Liberar por 24 horas</button><button class="btn sm sup-nao" data-sh="sup-recusar" data-v="${g}">Agora não</button></div></div></div>`).join('')}
     ${ids.filter(avAb).map(g => `<button class="alerta-av" data-sh="avaliar" data-v="${g}"><span class="ic">⭐</span><span><b>Avaliação da galera aberta!</b>${escH(GRUPOS[g].nome || 'Pelada')} · dê sua nota para o elenco</span><span class="ir">Avaliar</span></button>`).join('')}
@@ -492,7 +494,7 @@ window.salvarMeuLocal = (id, L) => { if (!EU) return; PERFIL = PERFIL || {}; PER
 async function depoisDoLogin() {
   await carregarPerfil();
   if (!PERFIL || !PERFIL.apelido && !PERFIL.pos) { ir('perfil'); return; }
-  ouvirMinhasDuvidas();
+  ouvirMinhasDuvidas(); ouvirAtleta();
   const rv = respGuardada();
   if (rv) { ls.set('pelota.resp', null); await abrirResposta(rv); return; }
   UIp.convResp = false;
@@ -513,7 +515,7 @@ async function abrirResposta(rv) {
   if (rv.c) { UIp.convResp = true; await buscarCodigo(rv.c); return; }
   aviso('Você não faz parte desta pelada.'); ir('minhas');
 }
-if (MOCK) { window.__resp = abrirResposta; window.__sup = g => suporteDono(g); window.__gid = () => ABERTO; } // só no modo de teste
+if (MOCK) { window.__resp = abrirResposta; window.__sup = g => suporteDono(g); window.__gid = () => ABERTO; window.__mockGet = p => B.get(p); window.__mockSet = (p, d) => B.set(p, d); window.__uid = () => EU && EU.uid; } // só no modo de teste
 async function buscarCodigo(cod) {
   cod = String(cod || '').trim().toUpperCase();
   if (cod.length !== 6) { aviso('O código tem 6 letras.'); ir('codigo'); return; }
@@ -644,6 +646,41 @@ window.suporteAdmin = async (op, gid) => {
 /* ================= Dúvidas de suporte =================
    O administrador escreve a dúvida em Ajustes → Suporte do Pelota FC. Ela chega no Painel do dono → Suporte técnico
    (com número de pendentes). O dono responde pelo app ou pelo WhatsApp e marca "Dúvida resolvida", que tira do painel. */
+/* ================= Carta do atleta (tela inicial) ================= */
+let ATLETA = null, UNSUB_ATL = null, NGERAL = null, UNSUB_NG = null;
+function ouvirAtleta() {
+  if (UNSUB_ATL) { UNSUB_ATL(); UNSUB_ATL = null; } ATLETA = null; if (!EU) return;
+  if (UNSUB_NG) { UNSUB_NG(); UNSUB_NG = null; } NGERAL = null;
+  UNSUB_NG = B.listenDoc('notaGeral/' + EU.uid, s => { NGERAL = s.exists ? s.data : null; if (TELA === 'minhas') render(); }, e => console.warn(e));
+  UNSUB_ATL = B.listenCol('users/' + EU.uid + '/atleta', ds => { ATLETA = ds.map(x => ({ ...x.data, _gid: x.id })); if (TELA === 'minhas') render(); }, e => { console.warn(e); ATLETA = []; });
+}
+window.salvarAtleta = (gid, r) => { if (!EU || SUPORTE) return; B.set(`users/${EU.uid}/atleta/${gid}`, { ...r, em: Date.now() }).catch(e => console.warn(e)); };
+const ATR = { linha: [['tec', 'TEC'], ['fis', 'FÍS'], ['pas', 'PAS'], ['fin', 'FIN'], ['mar', 'DEF']], GOL: [['ref', 'REF'], ['posi', 'POS'], ['sai', 'SAÍ'], ['rep', 'REP'], ['com', 'COM']] };
+function cartaAtleta(ola, eu) {
+  const L = (ATLETA || []).filter(x => GRUPOS[x._gid]), vis = L.filter(x => x.ovr != null), w = x => 1 + (x.j || 0), soma = f => L.reduce((t, x) => t + (Number(x[f]) || 0), 0);
+  const peso = k => vis.filter(x => x.kind === k).reduce((t, x) => t + w(x), 0), kind = peso('GOL') > peso('linha') ? 'GOL' : 'linha', vk = vis.filter(x => x.kind === kind);
+  let ovrG = vis.length ? Math.round(vis.reduce((t, x) => t + x.ovr * w(x), 0) / vis.reduce((t, x) => t + w(x), 0)) : null;
+  const pos = (() => { const c = {}; L.forEach(x => { c[x.pos] = (c[x.pos] || 0) + w(x); }); return Object.entries(c).sort((a, b) => b[1] - a[1])[0]?.[0] || ''; })();
+  let atr = vk.length ? ATR[kind].map(([k, n]) => { const W = vk.reduce((t, x) => t + w(x), 0), v = vk.reduce((t, x) => t + (Number((x.crit || {})[k]) || 3) * w(x), 0) / W; return [n, Math.round(v * 20)]; }) : null;
+  // nota geral do app (mesma régua para todo mundo), quando o servidor já calculou e a pessoa tem avaliação visível
+  if (NGERAL && NGERAL.ovr != null && vis.length) { ovrG = NGERAL.ovr; const kg = NGERAL.kind === 'GOL' ? 'GOL' : 'linha'; atr = ATR[kg].map(([k, n]) => [n, Math.round(Number((NGERAL.crit || {})[k]) || 60)]); }
+  const posG = NGERAL && NGERAL.pos && vis.length ? NGERAL.pos : null;
+  const nome = (eu.apelido || eu.nome || 'Atleta').split(/\s+/)[0];
+  const foto = eu.foto ? `style="background-image:url('${eu.foto}')"` : '';
+  const tier = ovrG == null ? 'neutro' : ovrG >= 80 ? 'ouro' : ovrG >= 60 ? 'prata' : 'bronze';
+  const POSN = { GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral', VOL: 'Volante', MEI: 'Meio-campo', ATA: 'Atacante' };
+  // temporadas: soma dos números de cada ano em todas as peladas
+  const anos = {}; L.forEach(x => Object.entries(x.anos || {}).forEach(([y, v]) => { const a = anos[y] = anos[y] || { j: 0, g: 0, a: 0, mvp: 0 }; for (const k in a) a[k] += Number(v[k]) || 0; }));
+  const anoAtual = String(new Date().getFullYear()), lista = [...new Set([anoAtual, ...Object.keys(anos)])].sort().reverse(), ano = UIp.temporada && lista.includes(UIp.temporada) ? UIp.temporada : anoAtual;
+  const T = anos[ano] || { j: 0, g: 0, a: 0, mvp: 0 };
+  return `<div class="atl-carta"><span class="hh-ola">${ola}${nome ? ', ' + escH(nome) : ''}.</span>
+    <div class="atl-corpo"><div class="atl-escudo ${tier}"><span class="atl-foto" ${foto}>${eu.foto ? '' : escH((nome[0] || '?').toUpperCase())}</span><span class="atl-pos">${escH(POSN[posG || pos] || posG || pos || '—')}</span></div>
+      <div class="atl-dir">${atr ? atr.map(([n, v]) => `<div class="atl-at"><span>${n}</span><b>${Math.max(0, Math.min(99, v))}</b></div>`).join('')
+        : `<p class="atl-vazio">${L.length ? 'Seus números aparecem depois da primeira avaliação da galera.' : 'Sua carta de atleta aparece aqui depois que você entrar no elenco de uma pelada.'}</p>`}</div></div>
+    <div class="atl-meus"><span class="atl-tit">Meus números</span>
+      <div class="atl-stats"><div><b>${T.j}</b><span>jogos</span></div><div><b>${T.g}</b><span>gols</span></div><div><b>${T.a}</b><span>assist.</span></div><div><b>${T.mvp}</b><span>craque</span></div></div>
+      ${lista.length > 1 ? `<label class="atl-temp">Temporada <select data-temporada aria-label="Temporada">${lista.map(y => `<option value="${y}" ${y === ano ? 'selected' : ''}>${y.slice(2)}</option>`).join('')}</select> ▾</label>` : `<span class="atl-temp">Temporada ${ano.slice(2)}</span>`}</div></div>`;
+}
 let MINHAS_DUV = [], UNSUB_DUV = null, DUV_DONO = null, UNSUB_DUV_DONO = null;
 function ouvirMinhasDuvidas() {
   if (UNSUB_DUV) { UNSUB_DUV(); UNSUB_DUV = null; } MINHAS_DUV = [];
@@ -673,6 +710,7 @@ window.suporteDuvida = async (op, a) => {
     await B.set('suporte/' + d.id, { respostas: [...(d.respostas || []), { de: 'grupo', texto, em: Date.now() }], status: 'aberto', lidoGrupo: Date.now() }, { merge: true }); }
   if (op === 'lido') await B.set('suporte/' + d.id, { lidoGrupo: Date.now() }, { merge: true });
 };
+window.recalcNotaGeral = async () => { const t = await B.token(); const r = await fetch('https://southamerica-east1-pelada-fc-990d6.cloudfunctions.net/notaGeralAgora', { method: 'POST', headers: { Authorization: 'Bearer ' + t } }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.erro || 'Não deu certo.'); return j; };
 function telaDuvidasDono() {
   const L = DUV_DONO; if (!L) return '<h2>Suporte técnico</h2><p class="lead">Carregando as dúvidas…</p>';
   const hora = ms => { const d = new Date(ms); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
@@ -715,6 +753,14 @@ window.mudarAdmins = async admins => {
   admins = [...new Set(admins)];
   if (!admins.length) { aviso('A pelada precisa de pelo menos um administrador.'); return; }
   try { await B.set('grupos/' + ABERTO, { admins }, { merge: true }); aviso('Administradores atualizados.'); } catch (e) { aviso(msgErro(e)); }
+};
+// Passar o grupo para outro administrador (só o dono). A cobrança da assinatura (fase 2) passa a ir para o novo dono, sem novo período grátis.
+window.passarDono = async uid => {
+  const G = GRUPOS[ABERTO]; if (!ABERTO || !G || G.dono !== EU.uid) throw new Error('Só o dono pode passar o grupo.');
+  if (!(G.admins || []).includes(uid)) throw new Error('A pessoa precisa ser administradora.');
+  const donoDesde = Date.now();
+  await B.set('grupos/' + ABERTO, { dono: uid, donoDesde, donoAnterior: EU.uid }, { merge: true });
+  GRUPOS[ABERTO] = { ...G, dono: uid, donoDesde, donoAnterior: EU.uid }; window.atualizarGrupo({ ...GRUPOS[ABERTO] });
 };
 // Apagar o grupo (só quem criou): limpa as coleções, o código do convite e o grupo.
 const COLS_GRUPO = ['config', 'jogadores', 'peladas', 'presencas', 'locais', 'caixa', 'avisos', 'mural', 'avaliacoes', 'notificacoes', 'membros', 'suporteLog'];
@@ -1186,6 +1232,7 @@ function telaDono() { const P = UIp.painel || {}, D = P.dados;
       <div style="height:12px;border-radius:6px;background:var(--surface2,#e3e9df);overflow:hidden;margin-top:4px"><div style="height:100%;width:${Math.round((r[met] || 0) / max * 100)}%;background:${r.nome === 'Sem cidade informada' ? '#9AA79E' : 'var(--pitch,#1B6A36)'};border-radius:6px"></div></div>
       <div class="sub" style="margin-top:3px">${pl(r.grupos, 'grupo')} · ${pl(r.ativos, 'ativo')} · ${pl(r.jogadores, 'jogador', 'jogadores')} · ${pl(r.contas, 'conta')} · ${pl(r.pagantes, 'pagante')}</div></div>`).join('')}</div>` : '<p class="sub" style="margin:0">Nada ainda.</p>'; };
   return `<h2>Painel do dono</h2><p class="lead">Como o app está sendo usado. Só você e a empresa veem esta tela.</p>
+  <div class="panel" style="padding:10px 12px;margin-bottom:10px"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><span class="small">🌐 <b>Nota geral do app</b>: recalculada todo dia às 4h30, cruzando os grupos.</span><button class="btn sm" data-sh="nota-geral-agora">Recalcular agora</button></div></div>
   <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
     ${tile('Contas criadas', n(C.total), `+${n(C.novas30)} nos últimos 30 dias`)}
     ${tile('Contas ativas', n(C.ativas30), 'usaram nos últimos 30 dias')}
@@ -1347,6 +1394,7 @@ function cartaoPush() {
 }
 
 /* ================= Eventos ================= */
+document.addEventListener('change', e => { if (e.target && e.target.matches && e.target.matches('[data-temporada]')) { UIp.temporada = e.target.value; render(); } });
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-sh]'); if (!b || !($('shell').contains(b) || $('leitor').contains(b))) return;
   const a = b.dataset.sh, v = b.dataset.v;
@@ -1358,6 +1406,7 @@ document.addEventListener('click', async e => {
   // sair pede um segundo toque (evita sair sem querer e cair na tela inicial)
   if (a === 'intro-seguir') { seguirIntro(); return; }
   if (a === 'suporte-dono') { if (!doisToques(b, 'Toque de novo para confirmar')) return; await suporteDono(v); return; }
+  if (a === 'nota-geral-agora') { if (!doisToques(b, 'Toque de novo para recalcular')) return; aviso('Recalculando a nota geral…'); try { const r = await window.recalcNotaGeral(); aviso(`Nota geral atualizada: ${r.pessoas} pessoas em ${r.grupos} grupos.`); } catch (e) { aviso(msgErro(e)); } return; }
   if (a === 'dono-suporte') { ouvirDuvidasDono(); ir('donosuporte'); return; }
   if (a === 'duv-responder') { const t = ($('duv-r-' + v) || {}).value || '', d = (DUV_DONO || []).find(x => x.id === v); if (!d) return; if (!t.trim()) { aviso('Escreva a resposta.'); return; } if (!doisToques(b, 'Toque de novo para enviar')) return;
     try { await B.set('suporte/' + v, { respostas: [...(d.respostas || []), { de: 'dono', texto: t.trim().slice(0, 1000), em: Date.now() }] }, { merge: true }); aviso('Resposta enviada. O administrador recebe um aviso no celular.'); } catch (e) { aviso(msgErro(e)); } return; }
@@ -1458,8 +1507,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', e => {
   const t = e.target; if (t.id !== 'p-foto' || !t.files || !t.files[0]) return;
   const keep = { nome: $('p-nome').value, ap: $('p-ap').value, tel: $('p-tel').value };
-  aviso('Preparando a foto…');
-  window.redimFoto(t.files[0]).then(d => { UIp.foto = d; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }, () => aviso('Não consegui abrir essa foto. Tente outra.'));
+  window.redimFoto(t.files[0]).then(d => { UIp.foto = d; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }, e => { if (!e || e.code !== 'cancelado') aviso('Não consegui abrir essa foto. Tente outra.'); }); t.value = '';
 });
 ['input', 'change'].forEach(tipo => document.addEventListener(tipo, e => {
   const el = e.target.closest && e.target.closest('[data-gf]'); if (!el || TELA !== 'donogrupos') return;
@@ -1500,7 +1548,7 @@ document.addEventListener('submit', async e => {
     const pos = UIp.pos || (PERFIL && PERFIL.pos) || 'MEI';
     OCUPADO = true;
     const foto = UIp.foto !== undefined ? UIp.foto : ((PERFIL && PERFIL.foto) || null);
-    try { await B.set('users/' + EU.uid, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value, email: EU.email || '' }, { merge: true }); PERFIL = { ...(PERFIL || {}), nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value }; UIp.pcid = UIp.puf = undefined;
+    try { await B.set('users/' + EU.uid, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value, email: EU.email || '', compartilharNota: !!($('p-compnota') || { checked: true }).checked }, { merge: true }); PERFIL = { ...(PERFIL || {}), nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value }; UIp.pcid = UIp.puf = undefined;
       await Promise.all(Object.keys(GRUPOS).map(g => B.set(`grupos/${g}/membros/${EU.uid}`, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto }, { merge: true }).catch(e => console.warn(e))));
       UIp.foto = undefined; OCUPADO = false; await depoisDoLogin(); }
     catch (err) { aviso(msgErro(err)); OCUPADO = false; }
@@ -1520,7 +1568,7 @@ document.addEventListener('submit', async e => {
   B.onAuth(async u => {
     const antes = EU && EU.uid;
     EU = u;
-    if (!u) { if (ABERTO || antes) { window.pararPelada(); if (unsubGrupo) unsubGrupo(); if (unsubPerfil) unsubPerfil(); ABERTO = null; PERFIL = null; GRUPOS = {}; } if (UNSUB_DUV) { UNSUB_DUV(); UNSUB_DUV = null; } if (UNSUB_DUV_DONO) { UNSUB_DUV_DONO(); UNSUB_DUV_DONO = null; DUV_DONO = null; } INTRO_VISTA = false; ir('boas'); return; }
+    if (!u) { if (ABERTO || antes) { window.pararPelada(); if (unsubGrupo) unsubGrupo(); if (unsubPerfil) unsubPerfil(); ABERTO = null; PERFIL = null; GRUPOS = {}; } if (UNSUB_ATL) { UNSUB_ATL(); UNSUB_ATL = null; ATLETA = null; } if (UNSUB_NG) { UNSUB_NG(); UNSUB_NG = null; NGERAL = null; } if (UNSUB_DUV) { UNSUB_DUV(); UNSUB_DUV = null; } if (UNSUB_DUV_DONO) { UNSUB_DUV_DONO(); UNSUB_DUV_DONO = null; DUV_DONO = null; } INTRO_VISTA = false; ir('boas'); return; }
     if (antes === u.uid) return;
     enviarFilaErros();
     ir('carregando'); await depoisDoLogin();
