@@ -229,6 +229,7 @@ function respGuardada() { try { const r = JSON.parse(ls.get('pelota.resp') || 'n
 if (pend && !respUrl) { ls.set('pelada.convite', pend.toUpperCase()); history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); }
 
 function mostrarCasca(on) {
+  if (on && $('shell').hidden) $('shell').dataset.tela = ''; // voltou de dentro de uma pelada: a carta não anima
   $('shell').hidden = !on; $('app').hidden = on; $('nav').hidden = on;
   if (on) { $('push').hidden = true; document.title = 'Pelota FC'; }
 }
@@ -243,7 +244,7 @@ function render() {
   const el = $('shell'); let h = '';
   if (TELA === 'boas' && !INTRO_VISTA) TELA = 'intro';
   const t = TELA;
-  if (t === 'intro') { el.innerHTML = telaIntro(); iniciarIntro(); return; }
+  if (t === 'intro') { el.innerHTML = telaIntro(); el.dataset.tela = t; iniciarIntro(); return; }
   if (t === 'carregando') h = HERO_BOAS; // o mesmo cartão da tela inicial: nada pisca ao abrir
   if (t === 'boas') h = `${HERO_BOAS}
     ${respGuardada() ? `<div class="banner due"><span><b>Entre na sua conta para responder.</b><br>Assim que você entrar, sua resposta da pelada é registrada.</span></div>` : ls.get('pelada.convite') ? `<div class="banner due"><span><b>Você recebeu um convite!</b><br>Crie sua conta ou entre para participar.</span></div>` : ''}
@@ -437,7 +438,28 @@ function render() {
     <button class="btn block" data-sh="copiar-app">Copiar link</button>
     ${navigator.share ? '<button class="btn block" data-sh="share-app">Compartilhar…</button>' : ''}
     <p class="sub" style="margin:0">Para convidar alguém direto para a sua pelada, use o link ou o QR Code que ficam na ⚙️ engrenagem, dentro da pelada.</p>`;
+  // antes de trocar a tela: onde estava o cartão verde (carregando) ou a carta (re-desenho de Minhas peladas)
+  const velho = el.hidden || !['carregando', 'login', 'criar', 'minhas'].includes(el.dataset.tela) ? null : el.querySelector('.atl-carta') || el.querySelector('.ob-hero');
+  const de = velho ? { r: velho.getBoundingClientRect(), hero: velho.classList.contains('ob-hero'), html: velho.innerHTML } : null;
   el.innerHTML = `<div class="ob-in${['boas', 'login', 'criar'].includes(t) ? ' ob-centro-baixo' : ''}">${h}</div>`;
+  el.dataset.tela = t;
+  if (t === 'minhas' && de && de.r.height) animarCarta(el, de);
+}
+// A carta nasce do cartão verde: mesma posição e altura, e vai crescendo até caber as valências e os números.
+function animarCarta(el, de) {
+  const c = el.querySelector('.atl-carta');
+  if (!c || !c.animate || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const r = c.getBoundingClientRect(), dy = de.r.top - r.top, dh = Math.abs(de.r.height - r.height);
+  if (!de.hero && dh < 2 && Math.abs(dy) < 2) return; // nada mudou de tamanho: não anima
+  const ease = 'cubic-bezier(.22,.8,.24,1)', dur = de.hero ? 700 : 380;
+  c.animate([{ height: de.r.height + 'px', transform: `translateY(${dy}px)` }, { height: r.height + 'px', transform: 'none' }], { duration: dur, easing: ease });
+  if (!de.hero) return;
+  // o logo do cartão verde se desfaz devagar, sem sumir de uma vez
+  const lg = document.createElement('div'); lg.className = 'ob-hero atl-sai'; lg.innerHTML = de.html; c.appendChild(lg);
+  lg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, easing: 'ease-out', fill: 'forwards' }).onfinish = () => lg.remove();
+  // o conteúdo da carta aparece enquanto ela cresce; o resto da tela chega logo depois
+  [...c.children].filter(x => x !== lg).forEach((x, i) => x.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 420, delay: 160 + i * 90, easing: ease, fill: 'backwards' }));
+  [...c.parentElement.children].filter(x => x !== c).forEach(x => x.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, delay: x.compareDocumentPosition(c) & 2 ? 380 : 120, easing: 'ease-out', fill: 'backwards' }));
 }
 const UIp = {};
 
@@ -515,7 +537,7 @@ async function abrirResposta(rv) {
   if (rv.c) { UIp.convResp = true; await buscarCodigo(rv.c); return; }
   aviso('Você não faz parte desta pelada.'); ir('minhas');
 }
-if (MOCK) { window.__resp = abrirResposta; window.__sup = g => suporteDono(g); window.__gid = () => ABERTO; window.__mockGet = p => B.get(p); window.__mockSet = (p, d) => B.set(p, d); window.__uid = () => EU && EU.uid; } // só no modo de teste
+if (MOCK) { window.__resp = abrirResposta; window.__sup = g => suporteDono(g); window.__gid = () => ABERTO; window.__mockGet = p => B.get(p); window.__mockSet = (p, d) => B.set(p, d); window.__uid = () => EU && EU.uid; window.__ir = ir; } // só no modo de teste
 async function buscarCodigo(cod) {
   cod = String(cod || '').trim().toUpperCase();
   if (cod.length !== 6) { aviso('O código tem 6 letras.'); ir('codigo'); return; }

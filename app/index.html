@@ -311,12 +311,10 @@ input::-webkit-date-and-time-value{text-align:left}
 .enq-zoom{display:flex;align-items:center;gap:12px;width:min(100%,340px)}
 .enq-zoom span{font-size:20px;font-weight:700;opacity:.8;width:16px;text-align:center}
 .enq-zoom input{flex:1;accent-color:#fff}
-.atl-carta{position:relative;display:flex;flex-direction:column;gap:12px;color:#fff;border-radius:16px;padding:16px 16px 14px;margin-bottom:10px;overflow:hidden;
-  background:radial-gradient(120% 70% at 30% 30%,#1F6B3A 0%,#0F3E20 55%,#08251A 100%);clip-path:polygon(0 0,calc(100% - 22px) 0,100% 22px,100% 100%,22px 100%,0 calc(100% - 22px))}
-.atl-carta::before{content:'';position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(135deg,transparent 0 78%,rgba(255,255,255,.18) 78% 78.6%,transparent 78.6% 81%,rgba(255,255,255,.08) 81% 81.4%,transparent 81.4%),
-    linear-gradient(135deg,rgba(255,255,255,.07) 0 6%,transparent 6% 10%,rgba(255,255,255,.12) 10% 10.5%,transparent 10.5%),
-    repeating-linear-gradient(115deg,rgba(255,255,255,.025) 0 2px,transparent 2px 46px)}
+.atl-carta{position:relative;display:flex;flex-direction:column;gap:12px;color:#fff;border-radius:6px;padding:16px 16px 14px;margin-bottom:10px;overflow:hidden;
+  background:repeating-linear-gradient(-55deg,rgba(255,255,255,.07) 0 3px,transparent 3px 22px),radial-gradient(circle at 85% 10%,rgba(242,193,46,.35),transparent 45%),linear-gradient(135deg,var(--pitch),var(--pitch2));
+  clip-path:polygon(0 0,calc(100% - 28px) 0,100% 28px,100% 100%,28px 100%,0 calc(100% - 28px))}
+.atl-carta .atl-sai{position:absolute;left:0;top:0;width:100%;height:var(--h0,auto);background:none;clip-path:none;pointer-events:none;z-index:4}
 .atl-carta .hh-ola{font-size:14px;opacity:.9;position:relative}
 .atl-corpo{display:flex;gap:14px;align-items:center;position:relative}
 .atl-esc-wrap{flex:none;width:50%;max-width:210px;position:relative}
@@ -721,9 +719,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261108p"></script>
-<script src="br.js?v=20261108p"></script>
-<script src="core.js?v=20261108p"></script>
-<script type="module" src="app.js?v=20261108p"></script>
+<script src="qrcode.js?v=20261108q"></script>
+<script src="br.js?v=20261108q"></script>
+<script src="core.js?v=20261108q"></script>
+<script type="module" src="app.js?v=20261108q"></script>
 </body>
 </html>

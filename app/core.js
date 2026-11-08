@@ -1150,7 +1150,7 @@ let NOTAS_T=null,NOTAS_ULT='';
 function agendarNotas(){if(demo||SUP||!ready||!ADM()||!db)return;clearTimeout(NOTAS_T);NOTAS_T=setTimeout(()=>{const jog={};
     for(const jid of ativos()){const j=J(jid);if(j.semNota&&!j.critGalera)continue;const cr=critKey(j.pos),f=j.critGalera||j.crit||{};
       jog[jid]={ovr:Math.round(notaAtual(jid)*100)/10,kind:j.pos==='GOL'?'GOL':'linha',pos:j.pos||'MEI',aval:!!j.critGalera||historicoNotas(jid).length>0,j:historicoNotas(jid).length,crit:Object.fromEntries(cr.map(([k])=>[k,Number(f[k]??3)]))}}
-    const k=JSON.stringify(jog);if(k===NOTAS_ULT)return;NOTAS_ULT=k;db.doc('notas/atual').set({jog,em:Date.now()}).catch(e=>console.warn(e))},4000)}
+    if(!db)return;const k=JSON.stringify(jog);if(k===NOTAS_ULT)return;NOTAS_ULT=k;db.doc('notas/atual').set({jog,em:Date.now()}).catch(e=>console.warn(e))},4000)}
 // nota sugerida pelo Pelota para quem está entrando (calculada pelo servidor; só administradores leem)
 let SUGEST=null;function ouvirSugestoes(){SUGEST=null;if(demo||!db||!ADM())return;db.doc('notas/sugestoes').onSnapshot(sn=>{SUGEST=sn.exists?sn.data():{};render()},e=>console.warn(e))}
 function sugestaoDe(u){const x=SUGEST&&SUGEST[u];return x&&x.ovr!=null?x:null}
