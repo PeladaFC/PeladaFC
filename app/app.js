@@ -661,10 +661,11 @@ function cartaAtleta(ola, eu) {
   const atr = vk.length ? ATR[kind].map(([k, n]) => { const W = vk.reduce((t, x) => t + w(x), 0), v = vk.reduce((t, x) => t + (Number((x.crit || {})[k]) || 3) * w(x), 0) / W; return [n, Math.round(v * 20)]; }) : null;
   const nome = (eu.apelido || eu.nome || 'Atleta').split(/\s+/)[0];
   const foto = eu.foto ? `style="background-image:url('${eu.foto}')"` : '';
+  const tier = ovrG == null ? 'neutro' : ovrG >= 80 ? 'ouro' : ovrG >= 60 ? 'prata' : 'bronze';
   return `<div class="atl-carta"><span class="hh-ola">${ola}${nome ? ', ' + escH(nome) : ''}.</span>
-    <div class="atl-corpo"><div class="atl-esq"><span class="atl-ovr">${ovrG ?? '—'}</span><span class="atl-pos">${escH(pos || '—')}</span><span class="atl-foto" ${foto}>${eu.foto ? '' : escH((nome[0] || '?').toUpperCase())}</span></div>
-      <div class="atl-dir"><b class="atl-nome">${escH(nome)}</b>${atr ? atr.map(([n, v]) => `<div class="atl-at"><span>${n}</span><i><b style="width:${Math.max(4, Math.min(100, v))}%"></b></i><em>${v}</em></div>`).join('')
-        : `<p class="atl-vazio">${L.length ? 'Sua nota e seus atributos aparecem depois da primeira avaliação da galera.' : 'Sua carta de atleta aparece aqui depois que você entrar no elenco de uma pelada.'}</p>`}</div></div>
+    <div class="atl-corpo"><div class="atl-escudo ${tier}" title="${ovrG != null ? 'Nota geral ' + ovrG : ''}"><span class="atl-foto" ${foto}>${eu.foto ? '' : escH((nome[0] || '?').toUpperCase())}</span><span class="atl-pos">${escH(pos || '—')}</span></div>
+      <div class="atl-dir">${atr ? atr.map(([n, v]) => `<div class="atl-at"><b>${Math.max(0, Math.min(99, v))}</b><span>${n}</span></div>`).join('')
+        : `<p class="atl-vazio">${L.length ? 'Seus números aparecem depois da primeira avaliação da galera.' : 'Sua carta de atleta aparece aqui depois que você entrar no elenco de uma pelada.'}</p>`}</div></div>
     <div class="atl-stats"><div><b>${soma('j')}</b><span>jogos</span></div><div><b>${soma('g')}</b><span>gols</span></div><div><b>${soma('a')}</b><span>assist.</span></div><div><b>${soma('mvp')}</b><span>craque</span></div></div>
     <span class="atl-rod">Classificação geral${L.length ? ` · ${L.length} pelada${L.length > 1 ? 's' : ''}` : ''}</span></div>`;
 }

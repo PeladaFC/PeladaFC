@@ -302,16 +302,18 @@ input::-webkit-date-and-time-value{text-align:left}
 .atl-carta::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.05) 0 2px,transparent 2px 46px);pointer-events:none}
 .atl-carta .hh-ola{font-size:15px;opacity:.9}
 .atl-corpo{display:flex;gap:14px;align-items:stretch;position:relative}
-.atl-esq{display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:96px}
-.atl-ovr{font-family:var(--f-display);font-weight:800;font-size:46px;line-height:.9;color:#F2C12E}
-.atl-pos{font-family:var(--f-display);font-weight:800;font-size:16px;letter-spacing:.06em;color:#F2C12E}
-.atl-foto{width:80px;height:80px;border-radius:50%;margin-top:6px;background:#0F3E20 center/cover;border:3px solid #F2C12E;display:grid;place-items:center;font-weight:800;font-size:28px}
-.atl-dir{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;justify-content:center}
-.atl-nome{font-family:var(--f-display);font-weight:800;font-size:24px;text-transform:uppercase;letter-spacing:.02em;line-height:1;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.atl-at{display:grid;grid-template-columns:34px 1fr 26px;align-items:center;gap:6px;font-size:12px;font-weight:700}
-.atl-at i{height:6px;border-radius:6px;background:rgba(255,255,255,.18);overflow:hidden}
-.atl-at i b{display:block;height:100%;background:#F2C12E;border-radius:6px}
-.atl-at em{font-style:normal;text-align:right;font-variant-numeric:tabular-nums}
+.atl-escudo{flex:none;width:150px;height:184px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:22px;
+  clip-path:polygon(14% 0,86% 0,100% 10%,100% 72%,50% 100%,0 72%,0 10%);background:linear-gradient(160deg,#EEF1F4,#B9C1C9 55%,#E3E7EB);box-shadow:inset 0 0 0 3px rgba(255,255,255,.6)}
+.atl-escudo::before{content:'';position:absolute;inset:6px;clip-path:inherit;border:0;background:repeating-linear-gradient(120deg,rgba(255,255,255,.18) 0 2px,transparent 2px 12px);pointer-events:none}
+.atl-escudo.ouro{background:linear-gradient(160deg,#FFF2B8,#E3B53A 55%,#FCE38A)}
+.atl-escudo.bronze{background:linear-gradient(160deg,#F3D3B5,#B7773F 55%,#E7B387)}
+.atl-escudo.neutro{background:linear-gradient(160deg,#DDE8DF,#9FB8A6 55%,#D3E2D7)}
+.atl-foto{width:104px;height:104px;border-radius:50%;background:#0F3E20 center/cover;border:3px solid rgba(255,255,255,.85);display:grid;place-items:center;font-weight:800;font-size:36px;color:#fff;position:relative;box-shadow:0 4px 10px rgba(0,0,0,.25)}
+.atl-escudo .atl-pos{position:relative;margin-top:8px;font-family:var(--f-display);font-weight:800;font-size:26px;letter-spacing:.06em;color:#1A1F1C}
+.atl-dir{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.atl-at{display:flex;align-items:baseline;gap:8px;border-bottom:2px solid rgba(255,255,255,.22);padding-bottom:3px}
+.atl-at b{font-family:var(--f-display);font-weight:800;font-size:30px;line-height:1;color:#F2C12E;min-width:42px;font-variant-numeric:tabular-nums}
+.atl-at span{font-family:var(--f-display);font-weight:800;font-size:18px;letter-spacing:.05em}
 .atl-vazio{margin:0;font-size:13.5px;opacity:.9;line-height:1.35}
 .atl-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;position:relative;border-top:1px solid rgba(255,255,255,.18);padding-top:10px}
 .atl-stats div{display:flex;flex-direction:column;align-items:center}
@@ -689,9 +691,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261108e"></script>
-<script src="br.js?v=20261108e"></script>
-<script src="core.js?v=20261108e"></script>
-<script type="module" src="app.js?v=20261108e"></script>
+<script src="qrcode.js?v=20261108f"></script>
+<script src="br.js?v=20261108f"></script>
+<script src="core.js?v=20261108f"></script>
+<script type="module" src="app.js?v=20261108f"></script>
 </body>
 </html>
