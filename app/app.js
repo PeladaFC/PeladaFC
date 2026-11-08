@@ -244,8 +244,12 @@ function render() {
   const el = $('shell'); let h = '';
   if (TELA === 'boas' && !INTRO_VISTA) TELA = 'intro';
   const t = TELA;
-  if (t === 'intro') { el.innerHTML = telaIntro(); el.dataset.tela = t; iniciarIntro(); return; }
-  if (t === 'carregando') h = HERO_BOAS; // o mesmo cartão da tela inicial: nada pisca ao abrir
+  if (t === 'intro') { el.innerHTML = telaIntro(); el.dataset.tela = t; try { localStorage.setItem('pf_logado', '0'); } catch (e) {} iniciarIntro(); return; }
+  if (t === 'carregando') { // o mesmo cartão da tela inicial: nada pisca ao abrir
+    // quem já entrou antes vê o cartão na mesma altura da carta de Minhas peladas (a borda de cima não se mexe)
+    let logado = false; try { logado = localStorage.getItem('pf_logado') === '1'; } catch (e) {}
+    h = (logado ? '<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELOTA FC</span><span class="eu-av" style="visibility:hidden"></span></div>' : '') + HERO_BOAS;
+  }
   if (t === 'boas') h = `${HERO_BOAS}
     ${respGuardada() ? `<div class="banner due"><span><b>Entre na sua conta para responder.</b><br>Assim que você entrar, sua resposta da pelada é registrada.</span></div>` : ls.get('pelada.convite') ? `<div class="banner due"><span><b>Você recebeu um convite!</b><br>Crie sua conta ou entre para participar.</span></div>` : ''}
     <button class="btn primary block" data-sh="ir" data-v="criar">Criar conta</button>
@@ -443,6 +447,7 @@ function render() {
   const de = velho ? { r: velho.getBoundingClientRect(), hero: velho.classList.contains('ob-hero'), html: velho.innerHTML } : null;
   el.innerHTML = `<div class="ob-in${['boas', 'login', 'criar'].includes(t) ? ' ob-centro-baixo' : ''}">${h}</div>`;
   el.dataset.tela = t;
+  if (['minhas', 'boas', 'login', 'criar'].includes(t)) try { localStorage.setItem('pf_logado', t === 'minhas' ? '1' : '0'); } catch (e) {}
   if (t === 'minhas' && de && de.r.height) animarCarta(el, de);
 }
 // A carta nasce do cartão verde: mesma posição e altura, e vai crescendo até caber as valências e os números.
