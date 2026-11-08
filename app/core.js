@@ -1071,11 +1071,42 @@ async function sheetEscudoFundo(orig){openSheet('Tirar o fundo?','<div class="em
     <div class="esc-cmp">${prev(r.url,'Sem fundo','esc-sem',true)}${prev(orig,'Original','esc-orig',false)}</div>
     <p class="sub" style="margin:0">Se o escudo ficou com buracos ou o fundo não saiu direito, mantenha o original.</p></div>`}
 function salvarEscudo(d,msg){put('config/geral',{...(S.config||{}),escudo:d});if(window.sincronizarGrupo)window.sincronizarGrupo({escudo:d});UI.escOrig=UI.escSem=null;toast(msg||'Escudo salvo.');sheetCfg()}
-window.redimFoto=function(file,lado=384){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),im=new Image();
-  im.onload=()=>{const w=im.naturalWidth,h=im.naturalHeight,q0=Math.min(w,h),sx=(w-q0)/2,sy=(h-q0)/2,c=document.createElement('canvas');c.width=c.height=lado;const x=c.getContext('2d');
-    x.fillStyle='#fff';x.fillRect(0,0,lado,lado);x.drawImage(im,sx,sy,q0,q0,0,0,lado,lado);URL.revokeObjectURL(url);
-    let q=.8,d=c.toDataURL('image/jpeg',q);while(d.length>60000&&q>.35){q-=.1;d=c.toDataURL('image/jpeg',q)}res(d)};
-  im.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('foto'))};im.src=url})};
+/* foto: abre para enquadrar (arrastar e aproximar dentro do círculo, como no Turma em Dia) e devolve um quadrado.
+   Cancelar devolve um erro com code 'cancelado' (sem aviso de erro). */
+window.redimFoto=function(file,lado=384){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),img=new Image();
+  img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('foto'))};
+  img.onload=()=>{URL.revokeObjectURL(url);const W=img.naturalWidth,H=img.naturalHeight;
+    const el=document.createElement('div');el.className='enq';el.setAttribute('role','dialog');el.setAttribute('aria-label','Enquadrar a foto');
+    el.innerHTML=`<div class="enq-topo"><button type="button" class="enq-bt" data-e="cancela">Cancelar</button><span class="enq-tit">Enquadre o rosto</span><button type="button" class="enq-bt forte" data-e="ok">Pronto</button></div>
+      <div class="enq-area"><div class="enq-palco"><canvas></canvas><div class="enq-mascara" aria-hidden="true"></div></div></div>
+      <div class="enq-baixo"><span class="enq-dica">Arraste para posicionar · use dois dedos ou a barra para aproximar</span>
+        <div class="enq-zoom"><span aria-hidden="true">−</span><input type="range" min="1" max="4" step="0.01" value="1" aria-label="Aproximar"><span aria-hidden="true">+</span></div></div>`;
+    document.body.appendChild(el);
+    const palco=el.querySelector('.enq-palco'),cv=el.querySelector('canvas'),zr=el.querySelector('input[type=range]');
+    let S=300,z=1,ox=0,oy=0;
+    const base=()=>Math.max(S/W,S/H),esc_=()=>base()*z;
+    const prender=()=>{const w=W*esc_(),h=H*esc_();ox=Math.min(0,Math.max(S-w,ox));oy=Math.min(0,Math.max(S-h,oy))};
+    const desenhar=()=>{const dpr=Math.min(2,window.devicePixelRatio||1);cv.width=Math.round(S*dpr);cv.height=Math.round(S*dpr);cv.style.width=cv.style.height=S+'px';
+      const g=cv.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,cv.width,cv.height);g.drawImage(img,ox*dpr,oy*dpr,W*esc_()*dpr,H*esc_()*dpr)};
+    const medir=()=>{const a=el.querySelector('.enq-area');const novo=Math.max(160,Math.floor(Math.min(a.clientWidth-32,a.clientHeight-16)));
+      if(novo!==S){const f=novo/S;ox*=f;oy*=f;S=novo}palco.style.width=palco.style.height=S+'px';prender();desenhar()};
+    S=Math.max(160,Math.floor(Math.min(window.innerWidth-32,window.innerHeight*.6)));ox=(S-W*esc_())/2;oy=(S-H*esc_())*.3;medir();
+    const aoGirar=()=>medir();window.addEventListener('resize',aoGirar);
+    const zoom=(nz,px=S/2,py=S/2)=>{nz=Math.max(1,Math.min(4,nz));const k=nz/z;ox=px-(px-ox)*k;oy=py-(py-oy)*k;z=nz;zr.value=String(z);prender();desenhar()};
+    zr.addEventListener('input',()=>zoom(Number(zr.value)));
+    const dedos=new Map();let ini=null;
+    const estado=()=>{const p=[...dedos.values()];if(p.length>=2){const r=palco.getBoundingClientRect();return{d:Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y),mx:(p[0].x+p[1].x)/2-r.left,my:(p[0].y+p[1].y)/2-r.top,z}}return null};
+    palco.addEventListener('pointerdown',e=>{palco.setPointerCapture(e.pointerId);dedos.set(e.pointerId,{x:e.clientX,y:e.clientY});ini=estado();e.preventDefault()});
+    palco.addEventListener('pointermove',e=>{const a=dedos.get(e.pointerId);if(!a)return;
+      if(dedos.size===1){ox+=e.clientX-a.x;oy+=e.clientY-a.y;dedos.set(e.pointerId,{x:e.clientX,y:e.clientY});prender();desenhar();return}
+      dedos.set(e.pointerId,{x:e.clientX,y:e.clientY});const agora=estado();if(ini&&agora)zoom(ini.z*agora.d/ini.d,agora.mx,agora.my)});
+    const solta=e=>{dedos.delete(e.pointerId);ini=estado()};palco.addEventListener('pointerup',solta);palco.addEventListener('pointercancel',solta);
+    palco.addEventListener('wheel',e=>{e.preventDefault();const r=palco.getBoundingClientRect();zoom(z*(e.deltaY<0?1.08:.93),e.clientX-r.left,e.clientY-r.top)},{passive:false});
+    const fechar=()=>{window.removeEventListener('resize',aoGirar);el.remove()};
+    el.querySelector('[data-e="cancela"]').onclick=()=>{fechar();const x=new Error('cancelado');x.code='cancelado';rej(x)};
+    el.querySelector('[data-e="ok"]').onclick=()=>{const o=document.createElement('canvas'),k=lado/S;o.width=o.height=lado;const g=o.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,lado,lado);g.imageSmoothingQuality='high';
+      g.drawImage(img,ox*k,oy*k,W*esc_()*k,H*esc_()*k);fechar();let q=.82,d=o.toDataURL('image/jpeg',q);while(d.length>60000&&q>.35){q-=.1;d=o.toDataURL('image/jpeg',q)}res(d)};
+  };img.src=url})};
 function carregarImg(src){return new Promise(r=>{if(!src)return r(null);if(FOTO_CACHE[src])return r(FOTO_CACHE[src]);const im=new Image();im.onload=()=>{FOTO_CACHE[src]=im;r(im)};im.onerror=()=>r(null);im.src=src})}
 function imgDe(id){const f=fotoDe(id);return f?FOTO_CACHE[f]||null:null}
 function circFoto(ctx,img,cx,cy,r){ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();ctx.drawImage(img,cx-r,cy-r,r*2,r*2);ctx.restore()}
@@ -2766,7 +2797,7 @@ document.addEventListener('change',e=>{
   if(t.dataset.act==='premio'){patch('peladas/'+t.dataset.p,{premios:{[t.dataset.f]:t.value||null}})}
   if(t.dataset.act==='ano'){UI.ano=Number(t.value);render()}
   if(t.id==='c-escudo'&&t.files&&t.files[0]){window.redimEscudo(t.files[0]).then(d=>sheetEscudoFundo(d),()=>toast('Não consegui abrir essa imagem. Tente outra.'));return}
-  if(t.id==='f-foto'&&t.files&&t.files[0]&&F){toast('Preparando a foto…');window.redimFoto(t.files[0]).then(d=>{F.foto=d;renderJogForm()},()=>toast('Não consegui abrir essa foto. Tente outra.'))}
+  if(t.id==='f-foto'&&t.files&&t.files[0]&&F){window.redimFoto(t.files[0]).then(d=>{F.foto=d;renderJogForm()},e=>{if(!e||e.code!=='cancelado')toast('Não consegui abrir essa foto. Tente outra.')});t.value=''}
   if(t.dataset.f&&F){F[t.dataset.f]=t.value}
 });
 document.addEventListener('input',e=>{

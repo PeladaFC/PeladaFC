@@ -1498,8 +1498,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', e => {
   const t = e.target; if (t.id !== 'p-foto' || !t.files || !t.files[0]) return;
   const keep = { nome: $('p-nome').value, ap: $('p-ap').value, tel: $('p-tel').value };
-  aviso('Preparando a foto…');
-  window.redimFoto(t.files[0]).then(d => { UIp.foto = d; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }, () => aviso('Não consegui abrir essa foto. Tente outra.'));
+  window.redimFoto(t.files[0]).then(d => { UIp.foto = d; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }, e => { if (!e || e.code !== 'cancelado') aviso('Não consegui abrir essa foto. Tente outra.'); }); t.value = '';
 });
 ['input', 'change'].forEach(tipo => document.addEventListener(tipo, e => {
   const el = e.target.closest && e.target.closest('[data-gf]'); if (!el || TELA !== 'donogrupos') return;

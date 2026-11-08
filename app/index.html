@@ -297,6 +297,20 @@ input::-webkit-date-and-time-value{text-align:left}
 .tn-item{display:flex;align-items:center;gap:6px;min-width:0}
 .tn-item .sw{width:14px;height:14px;border-radius:4px;flex:none;border:1px solid var(--line)}
 .tn-item input{min-width:0;padding:7px 8px;font-size:14px;min-height:0}
+.enq{position:fixed;inset:0;z-index:120;background:#111;color:#fff;display:flex;flex-direction:column;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);touch-action:none;user-select:none;-webkit-user-select:none}
+.enq-topo{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px}
+.enq-tit{font-weight:700;font-size:15px;text-align:center;flex:1}
+.enq-bt{height:38px;padding:0 16px;border-radius:999px;border:0;background:rgba(255,255,255,.16);color:#fff;font-weight:700;font-size:14px}
+.enq-bt.forte{background:#fff;color:#111}
+.enq-area{flex:1;min-height:0;display:grid;place-items:center}
+.enq-palco{position:relative;overflow:hidden;border-radius:12px;touch-action:none;cursor:grab;background:#000}
+.enq-palco canvas{display:block}
+.enq-mascara{position:absolute;inset:6%;border-radius:50%;box-shadow:0 0 0 999px rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.9);pointer-events:none}
+.enq-baixo{display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px 20px 18px}
+.enq-dica{font-size:13px;opacity:.75;text-align:center}
+.enq-zoom{display:flex;align-items:center;gap:12px;width:min(100%,340px)}
+.enq-zoom span{font-size:20px;font-weight:700;opacity:.8;width:16px;text-align:center}
+.enq-zoom input{flex:1;accent-color:#fff}
 .atl-carta{position:relative;display:flex;flex-direction:column;gap:10px;color:#fff;border-radius:16px;padding:16px 16px 12px;margin-bottom:10px;
   background:linear-gradient(150deg,#1B6A36 0%,#15532B 55%,#0F3E20 100%);clip-path:polygon(0 0,calc(100% - 22px) 0,100% 22px,100% 100%,22px 100%,0 calc(100% - 22px));overflow:hidden}
 .atl-carta::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.05) 0 2px,transparent 2px 46px);pointer-events:none}
@@ -310,7 +324,7 @@ input::-webkit-date-and-time-value{text-align:left}
 .atl-escudo.neutro{background:linear-gradient(160deg,#DDE8DF,#9FB8A6 55%,#D3E2D7)}
 .atl-foto{position:absolute;inset:5px;clip-path:polygon(14% 0,86% 0,100% 10%,100% 72%,50% 100%,0 72%,0 10%);background:#0F3E20 center/cover;display:grid;place-items:center;font-weight:800;font-size:44px;color:#fff;padding-bottom:30px}
 .atl-escudo .atl-pos{position:absolute;left:0;right:0;bottom:18%;text-align:center;font-family:var(--f-display);font-weight:800;font-size:17px;letter-spacing:.04em;text-transform:uppercase;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.7);padding:4px 0;background:linear-gradient(transparent,rgba(0,0,0,.45) 35%,rgba(0,0,0,.45) 65%,transparent)}
-.atl-dir{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.atl-dir{flex:0 1 132px;min-width:0;margin:0 auto;display:flex;flex-direction:column;justify-content:center;gap:4px}
 .atl-at{display:flex;align-items:baseline;justify-content:space-between;gap:8px;border-bottom:1.5px solid rgba(255,255,255,.2);padding:2px 2px 4px}
 .atl-at span{font-family:var(--f-display);font-weight:800;font-size:18px;letter-spacing:.05em}
 .atl-at b{font-family:var(--f-display);font-weight:800;font-size:28px;line-height:1;color:#F2C12E;font-variant-numeric:tabular-nums}
@@ -698,9 +712,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261108g"></script>
-<script src="br.js?v=20261108g"></script>
-<script src="core.js?v=20261108g"></script>
-<script type="module" src="app.js?v=20261108g"></script>
+<script src="qrcode.js?v=20261108h"></script>
+<script src="br.js?v=20261108h"></script>
+<script src="core.js?v=20261108h"></script>
+<script type="module" src="app.js?v=20261108h"></script>
 </body>
 </html>
