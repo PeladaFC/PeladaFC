@@ -1157,9 +1157,29 @@ function sugestaoDe(u){const x=SUGEST&&SUGEST[u];return x&&x.ovr!=null?x:null}
 function aplicarSugestao(x){if(!x||!F)return;const cr=critKey(F.pos),forma=x.crit||{};const base=Object.fromEntries(cr.map(([k])=>[k,Number(forma[k]??3)]));
   const ovrDe=c=>sum(cr.map(([k])=>c[k]*pesoDe(F.pos,k,cr.length)))*20,d=(x.ovr-ovrDe(base))/20;
   F.crit=Object.fromEntries(cr.map(([k])=>[k,Math.max(1,Math.min(5,Math.round((base[k]+d)*10)/10))]))}
+/* Vínculo automático (feito pelo administrador, que é quem pode ligar uma conta a um jogador):
+   - quem pediu para entrar e tem exatamente o mesmo nome ou apelido de um único jogador livre do elenco é ligado a ele;
+   - o próprio administrador, se ainda não está no elenco, entra sozinho (com a nota sugerida pelo Pelota, ou neutra até ser avaliado).
+   Assim a carta de cada um se monta sem ninguém precisar tocar em nada. */
+let AUTOV='',EU_CTX=null;
+function autoVincular(){if(demo||SUP||!ready||!ADM()||!myId||AUTOV===GID)return;AUTOV=GID;const g0=GID;
+  setTimeout(()=>{if(!ready||demo||SUP||!ADM()||GID!==g0)return;
+    const livres=()=>Object.keys(S.jog).filter(id=>S.jog[id]&&S.jog[id].ativo!==false&&!Object.values(S.pres||{}).some(x=>x&&x.jogador===id));
+    const igual=m=>{const ns=[m.nome,m.apelido].map(semAc).filter(Boolean);if(!ns.length)return null;
+      const ok=livres().filter(id=>[S.jog[id].nome,S.jog[id].apelido].map(semAc).filter(Boolean).some(n=>ns.includes(n)));return ok.length===1?ok[0]:null};
+    for(const[u,m] of membrosSemCadastro()){const jid=igual(m||{});if(jid)put('presencas/'+u,{...(S.pres[u]||{pel:{}}),jogador:jid})}
+    if(meuJogador())return;
+    const m={...(EU_CTX||{}),...Object.fromEntries(Object.entries(S.membros[myId]||{}).filter(([,v])=>v))};
+    const nome=String(m.nome||m.apelido||'').trim();if(!nome)return;
+    const pos=POS[m.pos]?m.pos:'MEI';
+    const d={nome,apelido:String(m.apelido||'').trim(),tel:m.tel||'',pos,pos2:m.pos2||'',tipo:m.prefere==='diarista'?'diarista':'mensalista',conv:'',foto:m.foto||null,
+      crit:Object.fromEntries(critKey(pos).map(([k])=>[k,3])),ativo:true,criadoEm:Date.now(),semNota:true};
+    const sg=sugestaoDe(myId);if(sg){const F0=F;F=d;aplicarSugestao(sg);F=F0;d.semNota=false}
+    const id=uid('j');put('jogadores/'+id,d);put('presencas/'+myId,{...(S.pres[myId]||{pel:{}}),jogador:id});
+    toast('Você entrou no elenco desta pelada. Sua carta já começa a se montar.')},2500)}
 function agendarAtleta(){if(demo||SUP||!ready||!window.salvarAtleta)return;clearTimeout(ATL_T);ATL_T=setTimeout(()=>{const r=resumoAtleta();if(!r)return;const k=JSON.stringify(r);if(k===ATL_ULT)return;ATL_ULT=k;window.salvarAtleta(GID,r)},3000)}
 function render(){
-  agendarAtleta();agendarNotas();
+  agendarAtleta();agendarNotas();autoVincular();
   if(!demo&&ADM()&&S.config&&S.config.mpConectadoEm&&!S.config.mpConta&&!UI.mpInfo&&window.mpConta){UI.mpInfo=1;window.mpConta('info').catch(e=>console.warn(e))}
   if(window.__abrirCfgPix&&S.config&&ADM()){window.__abrirCfgPix=false;setTimeout(()=>{if(window.__mpConfirmar&&cfg().mpConectadoEm){window.__mpConfirmar=false;sheetConfirmaMP();return}sheetCfg();const e=document.querySelector('.mp-cfg');if(e)e.scrollIntoView({block:'center'})},80)}
   NOTA_CACHE=null;POS_IDX=null;consolidarAvaliacoes();consolidarRodadas();
@@ -2928,7 +2948,7 @@ function stopDemo(){if(!REAL||!db){if(window.voltarGrupos)window.voltarGrupos();
 window.iniciarPelada=function(ctx){
   window.pararPelada();
   S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};
-  demo=false;REAL=null;ready=false;loaded=0;db=ctx.db;myId=ctx.uid;isAdmin=!!ctx.isAdmin;dl=ctx.dl||null;GRUPO=ctx.grupo;GID=ctx.gid;RESP_LINK=ctx.resp||null;SUP=!!ctx.suporte;ATL_ULT='';NOTAS_ULT='';SUGEST=null;
+  demo=false;REAL=null;ready=false;loaded=0;db=ctx.db;myId=ctx.uid;isAdmin=!!ctx.isAdmin;dl=ctx.dl||null;GRUPO=ctx.grupo;GID=ctx.gid;RESP_LINK=ctx.resp||null;SUP=!!ctx.suporte;EU_CTX=ctx.eu||null;ATL_ULT='';NOTAS_ULT='';SUGEST=null;
   UI.tab='jogo';UI.sub='presenca';UI.npLoc=undefined;UI.comoJogador=false;PUSH_PRONTO=false;PUSH_VISTOS.clear();
   closeSheet();render();window.scrollTo(0,0);
   const N=11;const done=()=>{if(++loaded===N){ready=true;render();aplicarRespLink()}};

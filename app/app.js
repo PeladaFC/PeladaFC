@@ -701,7 +701,7 @@ function cartaAtleta(ola, eu) {
   const anoAtual = String(new Date().getFullYear()), lista = [...new Set([anoAtual, ...Object.keys(anos)])].sort().reverse(), ano = UIp.temporada && lista.includes(UIp.temporada) ? UIp.temporada : anoAtual;
   const T = anos[ano] || { j: 0, g: 0, a: 0, mvp: 0 };
   return `<div class="atl-carta"><span class="hh-ola">${ola}${nome ? ', ' + escH(nome) : ''}.</span>
-    <div class="atl-corpo"><div class="atl-esc-wrap"><div class="atl-escudo ${tier}"><span class="atl-foto" ${foto}>${eu.foto ? '' : escH((nome[0] || '?').toUpperCase())}</span>${ovrG != null ? `<span class="atl-nivel">${ovrG}</span>` : ''}</div><span class="atl-pos">${escH(POSN[posG || pos] || posG || pos || '—')}</span></div>
+    <div class="atl-corpo"><div class="atl-esc-wrap"><div class="atl-escudo ${tier}"><span class="atl-foto" ${foto}>${eu.foto ? '' : escH((nome[0] || '?').toUpperCase())}</span>${ovrG != null ? `<span class="atl-nivel">${ovrG}</span>` : ''}</div>${(posG || pos) ? `<span class="atl-pos">${escH(POSN[posG || pos] || posG || pos)}</span>` : ''}</div>
       <div class="atl-dir">${atr ? atr.map(([n, v]) => `<div class="atl-at"><span>${n}</span><b>${Math.max(0, Math.min(99, v))}</b></div>`).join('')
         : `<p class="atl-vazio">${L.length ? 'Seus números aparecem depois da primeira avaliação da galera.' : (Object.keys(GRUPOS).length ? 'Abra suas peladas para montar sua carta.' : 'Sua carta de atleta aparece aqui depois que você entrar no elenco de uma pelada.')}</p>`}</div></div>
     <div class="atl-meus"><div class="atl-meus-top"><span class="atl-tit">Meus números</span>${lista.length > 1 ? `<label class="atl-temp">Temporada <select data-temporada aria-label="Temporada">${lista.map(y => `<option value="${y}" ${y === ano ? 'selected' : ''}>${y.slice(2)}</option>`).join('')}</select><i aria-hidden="true">▾</i></label>` : `<span class="atl-temp">Temporada ${ano.slice(2)}</span>`}</div>
@@ -764,7 +764,7 @@ function abrirGrupo(gid, resp) {
   const G = GRUPOS[gid]; if (!G) { ir('minhas'); return; }
   ABERTO = gid; ls.set('pelada.ultimo', gid); mostrarCasca(false);
   const sup = !!(SUPORTE && SUPORTE.gid === gid); mostrarFaixaSuporte();
-  window.iniciarPelada({ db: makeDb(gid), uid: EU.uid, isAdmin: sup || (G.admins || []).includes(EU.uid), grupo: { ...G }, gid, dl: compartilhar, resp: resp || null, suporte: sup });
+  window.iniciarPelada({ eu: { nome: (PERFIL && PERFIL.nome) || EU.nome || '', apelido: (PERFIL && PERFIL.apelido) || '', pos: (PERFIL && PERFIL.pos) || '', foto: (PERFIL && PERFIL.foto) || null, tel: (PERFIL && PERFIL.tel) || '' }, db: makeDb(gid), uid: EU.uid, isAdmin: sup || (G.admins || []).includes(EU.uid), grupo: { ...G }, gid, dl: compartilhar, resp: resp || null, suporte: sup });
   if (unsubGrupo) unsubGrupo();
   unsubGrupo = B.listenDoc('grupos/' + gid, s => { if (sup && s.exists && !((s.data.suporte || {}).ate > Date.now())) { aviso('O administrador encerrou o suporte desta pelada.'); sairSuporte(); return; } if (!s.exists) { if (ABERTO === gid) { delete GRUPOS[gid]; aviso('Este grupo foi apagado.'); window.voltarGrupos(); } return; } GRUPOS[gid] = s.data; window.atualizarGrupo({ ...s.data }); }, e => console.warn(e));
 }
