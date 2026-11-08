@@ -23,6 +23,10 @@ service cloud.firestore {
       match /push/{id} {
         allow read, write: if logado() && eu() == uid;
       }
+      // Resumo do atleta em cada pelada (carta da tela inicial): só a própria pessoa lê e grava.
+      match /atleta/{gid} {
+        allow read, write: if logado() && eu() == uid;
+      }
     }
 
     // Chaves do servidor de notificações: só o servidor acessa (o app não lê nem grava).

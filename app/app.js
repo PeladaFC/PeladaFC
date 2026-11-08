@@ -373,8 +373,9 @@ function render() {
     const hr = new Date().getHours(), ola = hr < 5 ? 'Boa noite' : hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
     const eu = PERFIL || {};
     h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELOTA FC</span><button class="eu-av" data-sh="ir" data-v="perfil" aria-label="Meu perfil" style="${eu.foto ? `background-image:url('${eu.foto}')` : ''}">${eu.foto ? '' : ini(eu.apelido || eu.nome)}</button></div>
-    ${prox ? `<button class="home-hero" data-sh="abrir" data-v="${prox.g}"><span class="hh-ola">${ola}${nomeEu ? ', ' + escH(nomeEu) : ''}.</span><span class="hh-q">${escH(falta(prox.d, true))}</span><span class="hh-n">${escH(GRUPOS[prox.g].nome || 'Pelada')}</span><span class="hh-ir">Abrir pelada</span></button>`
-      : `<div class="home-hero"><span class="hh-ola">${ola}${nomeEu ? ', ' + escH(nomeEu) : ''}.</span><span class="hh-q">${ids.length ? 'Sem jogo marcado' : 'Bora jogar?'}</span><span class="hh-n">${ids.length ? 'Quando marcarem a próxima, ela aparece aqui.' : 'Crie sua pelada ou entre com o código de um convite.'}</span></div>`}
+    ${cartaAtleta(ola, eu)}
+    ${prox ? `<button class="prox-linha" data-sh="abrir" data-v="${prox.g}"><span class="pl-ic">📅</span><span class="grow"><b>${escH(falta(prox.d, true))}</b> · ${escH(GRUPOS[prox.g].nome || 'Pelada')}</span><span class="seta" aria-hidden="true">›</span></button>`
+      : `<div class="prox-linha vazio"><span class="pl-ic">📅</span><span class="grow">${ids.length ? 'Sem jogo marcado por enquanto.' : 'Crie sua pelada ou entre com o código de um convite.'}</span></div>`}
     ${adm.filter(g => window.pedidoSuporte(GRUPOS[g])).map(g => `<div class="alerta-sup"><span class="ic">🛟</span><div class="grow"><b>O suporte do Pelota FC pediu acesso</b><span>${escH(GRUPOS[g].nome || 'Pelada')} · acesso por 24 horas</span>
       <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm sup-sim" data-sh="sup-aceitar" data-v="${g}">Liberar por 24 horas</button><button class="btn sm sup-nao" data-sh="sup-recusar" data-v="${g}">Agora não</button></div></div></div>`).join('')}
     ${ids.filter(avAb).map(g => `<button class="alerta-av" data-sh="avaliar" data-v="${g}"><span class="ic">⭐</span><span><b>Avaliação da galera aberta!</b>${escH(GRUPOS[g].nome || 'Pelada')} · dê sua nota para o elenco</span><span class="ir">Avaliar</span></button>`).join('')}
@@ -492,7 +493,7 @@ window.salvarMeuLocal = (id, L) => { if (!EU) return; PERFIL = PERFIL || {}; PER
 async function depoisDoLogin() {
   await carregarPerfil();
   if (!PERFIL || !PERFIL.apelido && !PERFIL.pos) { ir('perfil'); return; }
-  ouvirMinhasDuvidas();
+  ouvirMinhasDuvidas(); ouvirAtleta();
   const rv = respGuardada();
   if (rv) { ls.set('pelota.resp', null); await abrirResposta(rv); return; }
   UIp.convResp = false;
@@ -644,6 +645,29 @@ window.suporteAdmin = async (op, gid) => {
 /* ================= Dúvidas de suporte =================
    O administrador escreve a dúvida em Ajustes → Suporte do Pelota FC. Ela chega no Painel do dono → Suporte técnico
    (com número de pendentes). O dono responde pelo app ou pelo WhatsApp e marca "Dúvida resolvida", que tira do painel. */
+/* ================= Carta do atleta (tela inicial) ================= */
+let ATLETA = null, UNSUB_ATL = null;
+function ouvirAtleta() {
+  if (UNSUB_ATL) { UNSUB_ATL(); UNSUB_ATL = null; } ATLETA = null; if (!EU) return;
+  UNSUB_ATL = B.listenCol('users/' + EU.uid + '/atleta', ds => { ATLETA = ds.filter(x => GRUPOS[x.id]).map(x => x.data); if (TELA === 'minhas') render(); }, e => { console.warn(e); ATLETA = []; });
+}
+window.salvarAtleta = (gid, r) => { if (!EU || SUPORTE) return; B.set(`users/${EU.uid}/atleta/${gid}`, { ...r, em: Date.now() }).catch(e => console.warn(e)); };
+const ATR = { linha: [['tec', 'TEC'], ['fis', 'FÍS'], ['pas', 'PAS'], ['fin', 'FIN'], ['mar', 'DEF']], GOL: [['ref', 'REF'], ['posi', 'POS'], ['sai', 'SAÍ'], ['rep', 'REP'], ['com', 'COM']] };
+function cartaAtleta(ola, eu) {
+  const L = ATLETA || [], vis = L.filter(x => x.ovr != null), w = x => 1 + (x.j || 0), soma = f => L.reduce((t, x) => t + (Number(x[f]) || 0), 0);
+  const peso = k => vis.filter(x => x.kind === k).reduce((t, x) => t + w(x), 0), kind = peso('GOL') > peso('linha') ? 'GOL' : 'linha', vk = vis.filter(x => x.kind === kind);
+  const ovrG = vis.length ? Math.round(vis.reduce((t, x) => t + x.ovr * w(x), 0) / vis.reduce((t, x) => t + w(x), 0)) : null;
+  const pos = (() => { const c = {}; L.forEach(x => { c[x.pos] = (c[x.pos] || 0) + w(x); }); return Object.entries(c).sort((a, b) => b[1] - a[1])[0]?.[0] || ''; })();
+  const atr = vk.length ? ATR[kind].map(([k, n]) => { const W = vk.reduce((t, x) => t + w(x), 0), v = vk.reduce((t, x) => t + (Number((x.crit || {})[k]) || 3) * w(x), 0) / W; return [n, Math.round(v * 20)]; }) : null;
+  const nome = (eu.apelido || eu.nome || 'Atleta').split(/\s+/)[0];
+  const foto = eu.foto ? `style="background-image:url('${eu.foto}')"` : '';
+  return `<div class="atl-carta"><span class="hh-ola">${ola}${nome ? ', ' + escH(nome) : ''}.</span>
+    <div class="atl-corpo"><div class="atl-esq"><span class="atl-ovr">${ovrG ?? '—'}</span><span class="atl-pos">${escH(pos || '—')}</span><span class="atl-foto" ${foto}>${eu.foto ? '' : escH((nome[0] || '?').toUpperCase())}</span></div>
+      <div class="atl-dir"><b class="atl-nome">${escH(nome)}</b>${atr ? atr.map(([n, v]) => `<div class="atl-at"><span>${n}</span><i><b style="width:${Math.max(4, Math.min(100, v))}%"></b></i><em>${v}</em></div>`).join('')
+        : `<p class="atl-vazio">${L.length ? 'Sua nota e seus atributos aparecem depois da primeira avaliação da galera.' : 'Sua carta de atleta aparece aqui depois que você entrar no elenco de uma pelada.'}</p>`}</div></div>
+    <div class="atl-stats"><div><b>${soma('j')}</b><span>jogos</span></div><div><b>${soma('g')}</b><span>gols</span></div><div><b>${soma('a')}</b><span>assist.</span></div><div><b>${soma('mvp')}</b><span>craque</span></div></div>
+    <span class="atl-rod">Classificação geral${L.length ? ` · ${L.length} pelada${L.length > 1 ? 's' : ''}` : ''}</span></div>`;
+}
 let MINHAS_DUV = [], UNSUB_DUV = null, DUV_DONO = null, UNSUB_DUV_DONO = null;
 function ouvirMinhasDuvidas() {
   if (UNSUB_DUV) { UNSUB_DUV(); UNSUB_DUV = null; } MINHAS_DUV = [];
@@ -1528,7 +1552,7 @@ document.addEventListener('submit', async e => {
   B.onAuth(async u => {
     const antes = EU && EU.uid;
     EU = u;
-    if (!u) { if (ABERTO || antes) { window.pararPelada(); if (unsubGrupo) unsubGrupo(); if (unsubPerfil) unsubPerfil(); ABERTO = null; PERFIL = null; GRUPOS = {}; } if (UNSUB_DUV) { UNSUB_DUV(); UNSUB_DUV = null; } if (UNSUB_DUV_DONO) { UNSUB_DUV_DONO(); UNSUB_DUV_DONO = null; DUV_DONO = null; } INTRO_VISTA = false; ir('boas'); return; }
+    if (!u) { if (ABERTO || antes) { window.pararPelada(); if (unsubGrupo) unsubGrupo(); if (unsubPerfil) unsubPerfil(); ABERTO = null; PERFIL = null; GRUPOS = {}; } if (UNSUB_ATL) { UNSUB_ATL(); UNSUB_ATL = null; ATLETA = null; } if (UNSUB_DUV) { UNSUB_DUV(); UNSUB_DUV = null; } if (UNSUB_DUV_DONO) { UNSUB_DUV_DONO(); UNSUB_DUV_DONO = null; DUV_DONO = null; } INTRO_VISTA = false; ir('boas'); return; }
     if (antes === u.uid) return;
     enviarFilaErros();
     ir('carregando'); await depoisDoLogin();

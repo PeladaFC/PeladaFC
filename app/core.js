@@ -1104,7 +1104,17 @@ function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GR
     ${outros.length?`<div class="row" style="margin-top:8px;flex-wrap:nowrap"><select id="adm-novo" class="grow"><option value="">Tornar administrador…</option>${outros.map(u=>`<option value="${u}">${esc(nome(u))}</option>`).join('')}</select><button class="btn sm primary" data-act="adm-add">Adicionar</button></div>`:'<div class="sub" style="margin-top:6px">Quem entrar pelo convite pode virar administrador aqui.</div>'}`}
 
 /* ---------- render ---------- */
+/* Carta do atleta na tela inicial: cada pelada guarda (na conta da própria pessoa) o resumo dela naquele grupo.
+   A tela inicial junta os resumos de todas as peladas. Nota e atributos só entram se o grupo mostra as avaliações. */
+let ATL_T=null,ATL_ULT='';
+function resumoAtleta(){const jid=meuJogador();if(!jid||!GRUPO)return null;const j=J(jid),st=(estatPeriodo(null,null)||{})[jid]||{};
+  const vis=cfg().mostrarAval!==false&&!!j.critGalera,cr=critKey(j.pos),fonte=j.critGalera||j.crit||{};
+  return{grupo:GRUPO.nome||cfg().nome||'Pelada',pos:j.pos||'MEI',kind:j.pos==='GOL'?'GOL':'linha',ovr:vis?ovr(notaAtual(jid)):null,
+    crit:vis?Object.fromEntries(cr.map(([k])=>[k,Number(fonte[k]??3)])):null,j:st.j||0,g:st.g||0,a:st.a||0,mvp:st.mvp||0,
+    premios:(st.art||0)+(st.gar||0)+(st.def||0)+(st.gol||0)}}
+function agendarAtleta(){if(demo||SUP||!ready||!window.salvarAtleta)return;clearTimeout(ATL_T);ATL_T=setTimeout(()=>{const r=resumoAtleta();if(!r)return;const k=JSON.stringify(r);if(k===ATL_ULT)return;ATL_ULT=k;window.salvarAtleta(GID,r)},3000)}
 function render(){
+  agendarAtleta();
   if(!demo&&ADM()&&S.config&&S.config.mpConectadoEm&&!S.config.mpConta&&!UI.mpInfo&&window.mpConta){UI.mpInfo=1;window.mpConta('info').catch(e=>console.warn(e))}
   if(window.__abrirCfgPix&&S.config&&ADM()){window.__abrirCfgPix=false;setTimeout(()=>{if(window.__mpConfirmar&&cfg().mpConectadoEm){window.__mpConfirmar=false;sheetConfirmaMP();return}sheetCfg();const e=document.querySelector('.mp-cfg');if(e)e.scrollIntoView({block:'center'})},80)}
   NOTA_CACHE=null;POS_IDX=null;consolidarAvaliacoes();consolidarRodadas();
@@ -2871,7 +2881,7 @@ function stopDemo(){if(!REAL||!db){if(window.voltarGrupos)window.voltarGrupos();
 window.iniciarPelada=function(ctx){
   window.pararPelada();
   S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};
-  demo=false;REAL=null;ready=false;loaded=0;db=ctx.db;myId=ctx.uid;isAdmin=!!ctx.isAdmin;dl=ctx.dl||null;GRUPO=ctx.grupo;GID=ctx.gid;RESP_LINK=ctx.resp||null;SUP=!!ctx.suporte;
+  demo=false;REAL=null;ready=false;loaded=0;db=ctx.db;myId=ctx.uid;isAdmin=!!ctx.isAdmin;dl=ctx.dl||null;GRUPO=ctx.grupo;GID=ctx.gid;RESP_LINK=ctx.resp||null;SUP=!!ctx.suporte;ATL_ULT='';
   UI.tab='jogo';UI.sub='presenca';UI.npLoc=undefined;UI.comoJogador=false;PUSH_PRONTO=false;PUSH_VISTOS.clear();
   closeSheet();render();window.scrollTo(0,0);
   const N=11;const done=()=>{if(++loaded===N){ready=true;render();aplicarRespLink()}};
