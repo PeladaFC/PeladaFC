@@ -45,6 +45,11 @@ service cloud.firestore {
       allow read, delete: if donoDoApp();
       allow update: if false;
     }
+    // Nota geral do app (calculada pelo servidor): só a própria pessoa lê.
+    match /notaGeral/{uid} {
+      allow read: if logado() && eu() == uid;
+      allow write: if false;
+    }
     match /servidor/{doc} {
       allow read, write: if false;
     }
@@ -142,9 +147,15 @@ service cloud.firestore {
         allow delete: if logado() && grupo(gid).dono == eu();
       }
 
+      // Notas dos jogadores para a nota geral do app e a nota sugerida: só administradores (e o servidor).
+      match /notas/{doc} {
+        allow read: if gestor(gid);
+        allow write: if doc == 'atual' && (adminDepois(gid) || suporte(gid));
+      }
+
       match /{colecao}/{doc} {
-        allow read: if colecao != 'votos' && colecao != 'segredos' && colecao != 'suporteLog' && (membro(gid) || gestor(gid));
-        allow write: if colecao != 'membros' && colecao != 'presencas' && colecao != 'votos' && colecao != 'segredos' && colecao != 'cobrancas' && colecao != 'suporteLog' && (adminDepois(gid) || suporte(gid));
+        allow read: if colecao != 'votos' && colecao != 'segredos' && colecao != 'suporteLog' && colecao != 'notas' && (membro(gid) || gestor(gid));
+        allow write: if colecao != 'membros' && colecao != 'presencas' && colecao != 'votos' && colecao != 'segredos' && colecao != 'cobrancas' && colecao != 'suporteLog' && colecao != 'notas' && (adminDepois(gid) || suporte(gid));
       }
     }
   }

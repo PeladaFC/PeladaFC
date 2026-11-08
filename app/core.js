@@ -1125,9 +1125,9 @@ function painelPendentes(){const adms=(GRUPO&&GRUPO.admins)||[];const ms=membros
 function painelMembros(){const ms=membrosSemCadastro();
   return`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Pendentes</h3><span class="cnt" style="font-size:12px;font-weight:700;background:var(--card);color:var(--card-ink);border-radius:10px;padding:2px 8px">${ms.length}</span></div>
     <div class="sub" style="margin-bottom:6px">Estão esperando sua autorização. Toque em Autorizar para colocar no elenco com a nota inicial, ou em Já está se a pessoa já foi cadastrada.</div><div class="list">
-    ${ms.map(([u,m])=>`<div class="item" style="flex-wrap:wrap"><div class="av bg-${m.pos||'MEI'}" style="${fotoStyle(m.foto)}">${m.foto?'':esc(initials(m.apelido||m.nome))}</div><div class="grow"><div class="name">${esc(m.apelido||m.nome||'Sem nome')}${u===myId?' (você)':''}</div><div class="sub">${esc([POS[m.pos]||'',m.prefere?'quer ser '+m.prefere:'',m.tel||''].filter(Boolean).join(' · '))}</div></div>
+    ${ms.map(([u,m])=>`<div class="item" style="flex-wrap:wrap"><div class="av bg-${m.pos||'MEI'}" style="${fotoStyle(m.foto)}">${m.foto?'':esc(initials(m.apelido||m.nome))}</div><div class="grow"><div class="name">${esc(m.apelido||m.nome||'Sem nome')}${u===myId?' (você)':''}</div><div class="sub">${esc([POS[m.pos]||'',m.prefere?'quer ser '+m.prefere:'',m.tel||''].filter(Boolean).join(' · '))}</div>${sugestaoDe(u)?`<div class="sug-chip">🌐 Nota sugerida pelo Pelota: <b>${Math.round(sugestaoDe(u).ovr)}</b></div>`:''}</div>
       <div class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm primary" data-act="membro-cad" data-u="${u}">${(GRUPO&&(GRUPO.admins||[]).includes(u))?'Entrar no elenco':'Autorizar'}</button><button class="btn sm" data-act="membro-vinc" data-u="${u}" aria-label="Já está no elenco">Já está</button></div>
-      ${(GRUPO&&(GRUPO.admins||[]).includes(u))?'':`<button class="btn sm" style="flex-basis:100%;margin-top:2px" data-act="membro-semnota" data-u="${u}">Autorizar sem nota (a galera avalia depois)</button>`}</div>`).join('')}</div></div>`}
+      ${(GRUPO&&(GRUPO.admins||[]).includes(u))?'':`<button class="btn sm" style="flex-basis:100%;margin-top:2px" data-act="membro-semnota" data-u="${u}">${sugestaoDe(u)?'Autorizar com a nota sugerida':'Autorizar sem nota (a galera avalia depois)'}</button>`}</div>`).join('')}</div></div>`}
 function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GRUPO)return;const adms=GRUPO.admins||[];
   const nome=u=>{const m=(S.membros||{})[u];const j=S.pres[u]&&S.jog[S.pres[u].jogador];return(j&&(j.apelido||j.nome))||(m&&(m.apelido||m.nome))||'Sem nome'};
   const outros=Object.keys(S.membros||{}).filter(u=>!adms.includes(u));
@@ -1144,9 +1144,22 @@ function resumoAtleta(){const jid=meuJogador();if(!jid||!GRUPO)return null;const
     crit:vis?Object.fromEntries(cr.map(([k])=>[k,Number(fonte[k]??3)])):null,j:st.j||0,g:st.g||0,a:st.a||0,mvp:st.mvp||0,
     premios:(st.art||0)+(st.gar||0)+(st.def||0)+(st.gol||0),anos:(()=>{const out={},anos=[...new Set(Object.values(S.pel).map(p=>String(p.data||'').slice(0,4)).filter(x=>/^\d{4}$/.test(x)))];
       for(const y of anos){const t=(estatPeriodo(y+'-01-01',(Number(y)+1)+'-01-01')||{})[jid];if(t&&(t.j||t.g||t.a||t.mvp))out[y]={j:t.j||0,g:t.g||0,a:t.a||0,mvp:t.mvp||0}}return out})()}}
+/* Nota geral do app: o administrador guarda (só para administradores e o servidor) a nota de cada jogador do grupo.
+   Todo dia o servidor cruza os grupos pelos jogadores que estão em mais de um e coloca todo mundo na mesma régua. */
+let NOTAS_T=null,NOTAS_ULT='';
+function agendarNotas(){if(demo||SUP||!ready||!ADM()||!db)return;clearTimeout(NOTAS_T);NOTAS_T=setTimeout(()=>{const jog={};
+    for(const jid of ativos()){const j=J(jid);if(j.semNota&&!j.critGalera)continue;const cr=critKey(j.pos),f=j.critGalera||j.crit||{};
+      jog[jid]={ovr:Math.round(notaAtual(jid)*100)/10,kind:j.pos==='GOL'?'GOL':'linha',pos:j.pos||'MEI',aval:!!j.critGalera||historicoNotas(jid).length>0,j:historicoNotas(jid).length,crit:Object.fromEntries(cr.map(([k])=>[k,Number(f[k]??3)]))}}
+    const k=JSON.stringify(jog);if(k===NOTAS_ULT)return;NOTAS_ULT=k;db.doc('notas/atual').set({jog,em:Date.now()}).catch(e=>console.warn(e))},4000)}
+// nota sugerida pelo Pelota para quem está entrando (calculada pelo servidor; só administradores leem)
+let SUGEST=null;function ouvirSugestoes(){SUGEST=null;if(demo||!db||!ADM())return;db.doc('notas/sugestoes').onSnapshot(sn=>{SUGEST=sn.exists?sn.data():{};render()},e=>console.warn(e))}
+function sugestaoDe(u){const x=SUGEST&&SUGEST[u];return x&&x.ovr!=null?x:null}
+function aplicarSugestao(x){if(!x||!F)return;const cr=critKey(F.pos),forma=x.crit||{};const base=Object.fromEntries(cr.map(([k])=>[k,Number(forma[k]??3)]));
+  const ovrDe=c=>sum(cr.map(([k])=>c[k]*pesoDe(F.pos,k,cr.length)))*20,d=(x.ovr-ovrDe(base))/20;
+  F.crit=Object.fromEntries(cr.map(([k])=>[k,Math.max(1,Math.min(5,Math.round((base[k]+d)*10)/10))]))}
 function agendarAtleta(){if(demo||SUP||!ready||!window.salvarAtleta)return;clearTimeout(ATL_T);ATL_T=setTimeout(()=>{const r=resumoAtleta();if(!r)return;const k=JSON.stringify(r);if(k===ATL_ULT)return;ATL_ULT=k;window.salvarAtleta(GID,r)},3000)}
 function render(){
-  agendarAtleta();
+  agendarAtleta();agendarNotas();
   if(!demo&&ADM()&&S.config&&S.config.mpConectadoEm&&!S.config.mpConta&&!UI.mpInfo&&window.mpConta){UI.mpInfo=1;window.mpConta('info').catch(e=>console.warn(e))}
   if(window.__abrirCfgPix&&S.config&&ADM()){window.__abrirCfgPix=false;setTimeout(()=>{if(window.__mpConfirmar&&cfg().mpConectadoEm){window.__mpConfirmar=false;sheetConfirmaMP();return}sheetCfg();const e=document.querySelector('.mp-cfg');if(e)e.scrollIntoView({block:'center'})},80)}
   NOTA_CACHE=null;POS_IDX=null;consolidarAvaliacoes();consolidarRodadas();
@@ -2298,6 +2311,7 @@ function renderJogForm(){
     ${EV()?'':`<div class="field"><span>Tipo</span><div class="pick"><button data-act="f-tipo" data-v="mensalista" aria-pressed="${F.tipo!=='diarista'}">Mensalista</button><button data-act="f-tipo" data-v="diarista" aria-pressed="${F.tipo==='diarista'}">Diarista</button></div></div>`}
     <label class="field"><span>Convidado por</span><select id="f-conv" data-f="conv"><option value="">—</option>${Object.keys(S.jog).filter(x=>x!==F._id).map(x=>`<option value="${x}" ${F.conv===x?'selected':''}>${esc(nm(x))}</option>`).join('')}</select></label>
     ${F.critGalera?'':`<div class="field"><span>Avaliação</span><div class="pick"><button data-act="f-depois" data-v="0" aria-pressed="${!F._depois}">Eu avalio agora</button><button data-act="f-depois" data-v="1" aria-pressed="${!!F._depois}">Avaliar depois</button></div></div>`}
+    ${F._sug&&!F._id?`<div class="sug-nota">🌐 <b>Nota sugerida pelo Pelota: ${Math.round(F._sug.ovr)}</b><span>Calculada pelas outras ${F._sug.n>1?F._sug.n+' peladas':'pelada'} do jogador no app, já ajustada ao nível desta pelada. Dá para mudar nos itens abaixo.</span></div>`:''}
     ${F._depois&&!F.critGalera?`<div class="panel"><h3 style="margin-bottom:4px">Avaliação depois</h3><div class="sub">O jogador entra com nota neutra e a etiqueta SEM NOTA. Antes do sorteio, aparece um aviso para você avaliar ou pedir para a galera avaliar.</div></div>`:`<div class="panel"><div class="row between"><h3>Avaliação inicial</h3><span class="nota num">${ovr(ini)}</span></div>
       <div class="sub" style="margin:4px 0 6px">${F._id&&encerradas().length?'Base da nota. Depois de cada pelada, a nota se ajusta com as avaliações do jogo.':'Quem convidou dá de 1 a 5 em cada item. O peso de cada item muda conforme a posição. Depois de cada pelada, a nota se ajusta com as avaliações do jogo.'}</div>
       ${cr.map(([k,n,d])=>`<div class="crit"><span>${n}${PESOS[F.pos]?` <small class="crit-p">${Math.round(pesoDe(F.pos,k,cr.length)*100)}%</small>`:''}<small class="crit-d">${d}</small></span><div class="dots">${[1,2,3,4,5].map(v=>`<button data-act="f-crit" data-k="${k}" data-v="${v}" class="${Number(F.crit[k]||3)>=v?'on':''}" aria-label="${n} ${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>`}
@@ -2431,7 +2445,7 @@ document.addEventListener('click',e=>{
       <p class="sub" style="margin:0;text-align:left">Quer mandar só o app, sem entrar na pelada? Toque em ‹, depois em <b>Convidar para o app</b>.</p></div>`);break}
     case'copiar-link':{const l=linkConvite();(navigator.clipboard?navigator.clipboard.writeText(l):Promise.reject()).then(()=>toast('Link copiado.'),()=>toast(l));break}
     case'membro-cad':{const m=S.membros[d.u]||{};
-      sheetJog(null);F.nome=m.nome||'';F.apelido=m.apelido||'';F.tel=m.tel||'';F.pos=m.pos||'MEI';F.pos2=m.pos2||'';F.tipo=m.prefere==='diarista'?'diarista':'mensalista';F.foto=m.foto||null;F._uid=d.u;renderJogForm();break}
+      sheetJog(null);F.nome=m.nome||'';F.apelido=m.apelido||'';F.tel=m.tel||'';F.pos=m.pos||'MEI';F.pos2=m.pos2||'';F.tipo=m.prefere==='diarista'?'diarista':'mensalista';F.foto=m.foto||null;F._uid=d.u;F._sug=sugestaoDe(d.u);if(F._sug)aplicarSugestao(F._sug);renderJogForm();break}
     case'membro-vinc':{const m=S.membros[d.u]||{};const ops=Object.keys(S.jog).filter(id=>!Object.values(S.pres).some(x=>x.jogador===id)).sort((a,b)=>nm(a).localeCompare(nm(b)));
       openSheet('Vincular '+(m.apelido||m.nome||''),`<div class="stack"><p class="sub" style="margin:0">Escolha quem é essa pessoa no elenco. Depois disso, ela confirma presença pelo próprio celular.</p>
         <select id="vinc-sel"><option value="">Jogador do elenco</option>${ops.map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('')}</select>
@@ -2587,9 +2601,10 @@ document.addEventListener('click',e=>{
       const{st}=temporada(UI.ano),aj=d.f==='g'?st[d.j].ajG:st[d.j].ajA;if(Number(d.d)<0&&(aj||0)<=0)return;
       cur[d.f]=(cur[d.f]||0)+Number(d.d);const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;patch('jogadores/'+d.j,{ajustes:{[k]:cur}});sheetVerJog(d.j);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc;break}
     case'membro-semnota':{const m=S.membros[d.u]||{};if(S.pres[d.u]&&S.jog[S.pres[d.u].jogador])return;
-      const id=uid('j'),pos=m.pos||'MEI',crit={};critKey(pos).forEach(([k])=>crit[k]=3);
-      put('jogadores/'+id,{nome:m.nome||m.apelido||'Sem nome',apelido:m.apelido||'',tel:m.tel||'',pos,pos2:'',tipo:m.prefere==='diarista'?'diarista':'mensalista',foto:m.foto||null,conv:'',crit,semNota:true,ativo:true,criadoEm:Date.now()});
-      put('presencas/'+d.u,{...(S.pres[d.u]||{pel:{}}),jogador:id});toast(`${m.apelido||m.nome||'Jogador'} entrou sem nota. Avalie antes do sorteio.`);break}
+      const id=uid('j'),pos=m.pos||'MEI',sg=sugestaoDe(d.u);let crit={};critKey(pos).forEach(([k])=>crit[k]=3);
+      if(sg){const F0=F;F={pos,crit:{}};aplicarSugestao(sg);crit=F.crit;F=F0}
+      put('jogadores/'+id,{nome:m.nome||m.apelido||'Sem nome',apelido:m.apelido||'',tel:m.tel||'',pos,pos2:'',tipo:m.prefere==='diarista'?'diarista':'mensalista',foto:m.foto||null,conv:'',crit,...(sg?{notaSugerida:Math.round(sg.ovr)}:{semNota:true}),ativo:true,criadoEm:Date.now()});
+      put('presencas/'+d.u,{...(S.pres[d.u]||{pel:{}}),jogador:id});toast(sg?`${m.apelido||m.nome||'Jogador'} entrou com a nota sugerida pelo Pelota (${Math.round(sg.ovr)}).`:`${m.apelido||m.nome||'Jogador'} entrou sem nota. Avalie antes do sorteio.`);break}
     case'av-prazo':{UI.avPrazo=Number(d.v);const sc=document.querySelector('.sheet').scrollTop;sheetAvAdmin();document.querySelector('.sheet').scrollTop=sc;break}
     case'av-semnota':{UI.avModo=null;UI.avSel=new Set(d.v.split(','));sheetAvAdmin();break}
     case'av-admin':UI.avModo=null;UI.avSel=null;sheetAvAdmin();break;
@@ -2913,7 +2928,7 @@ function stopDemo(){if(!REAL||!db){if(window.voltarGrupos)window.voltarGrupos();
 window.iniciarPelada=function(ctx){
   window.pararPelada();
   S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};
-  demo=false;REAL=null;ready=false;loaded=0;db=ctx.db;myId=ctx.uid;isAdmin=!!ctx.isAdmin;dl=ctx.dl||null;GRUPO=ctx.grupo;GID=ctx.gid;RESP_LINK=ctx.resp||null;SUP=!!ctx.suporte;ATL_ULT='';
+  demo=false;REAL=null;ready=false;loaded=0;db=ctx.db;myId=ctx.uid;isAdmin=!!ctx.isAdmin;dl=ctx.dl||null;GRUPO=ctx.grupo;GID=ctx.gid;RESP_LINK=ctx.resp||null;SUP=!!ctx.suporte;ATL_ULT='';NOTAS_ULT='';SUGEST=null;
   UI.tab='jogo';UI.sub='presenca';UI.npLoc=undefined;UI.comoJogador=false;PUSH_PRONTO=false;PUSH_VISTOS.clear();
   closeSheet();render();window.scrollTo(0,0);
   const N=11;const done=()=>{if(++loaded===N){ready=true;render();aplicarRespLink()}};
@@ -2924,7 +2939,7 @@ window.iniciarPelada=function(ctx){
     if(first){first=false;done()}else if(!demo)render()},e=>{onErr(e);if(first){first=false;done()}})};
   one('eventos/feed','feed');one('config/geral','config');one('mural/geral','mural');
   live('jogadores','jog');live('peladas','pel');live('caixa','caixa');live('avisos','avisos');live('presencas','pres');live('locais','locais');live('membros','membros');live('avaliacoes','avals');
-  ouvirVotos();
+  ouvirVotos();ouvirSugestoes();
 };
 // votos: o administrador lê todos (para apurar quando a avaliação fecha); o jogador lê só os dele
 let unsubVotos=null;
@@ -2934,7 +2949,7 @@ function ouvirVotos(){if(unsubVotos){try{unsubVotos()}catch(e){}unsubVotos=null}
   else unsubVotos=db.doc('votos/'+myId).onSnapshot(snap=>{S.votos={...(S.votos||{}),[myId]:snap.exists?snap.data():undefined};if(!snap.exists)delete S.votos[myId];fim()},e=>console.warn(e))}
 window.pararPelada=function(){if(db&&db.unsubs)db.unsubs.splice(0).forEach(u=>{try{u()}catch(e){}});db=null;ready=false;demo=false;REAL=null};
 window.atualizarDuvidas=function(){if(!ready)return;render();};
-window.atualizarGrupo=function(g){GRUPO=g;const adm=SUP||!!(g&&(g.admins||[]).includes(myId));if(adm!==isAdmin){isAdmin=adm;ouvirVotos();if(!adm&&['avisos','caixa'].includes(UI.tab))UI.tab='jogo'}render();renderAdmins()};
+window.atualizarGrupo=function(g){GRUPO=g;const adm=SUP||!!(g&&(g.admins||[]).includes(myId));if(adm!==isAdmin){isAdmin=adm;ouvirVotos();ouvirSugestoes();if(!adm&&['avisos','caixa'].includes(UI.tab))UI.tab='jogo'}render();renderAdmins()};
 window.abrirDemo=function(){window.pararPelada();SUP=false;S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};myId=null;isAdmin=true;GRUPO={codigo:'DEMO01',admins:[]};ready=true;startDemo()};
 /* ---------- PDF da prestação de contas (gerador próprio, sem biblioteca) ---------- */
 const PDF_W={r:[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584],
