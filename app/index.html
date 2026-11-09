@@ -336,7 +336,9 @@ input::-webkit-date-and-time-value{text-align:left}
 .atl-meus-top{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid rgba(255,255,255,.22);padding-bottom:6px}
 .atl-tit{font-family:var(--f-display);font-size:15px;text-transform:uppercase;letter-spacing:.06em;font-weight:800}
 .atl-temp{position:relative;font-family:var(--f-display);font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:4px}
-.atl-temp i{font-style:normal;font-size:11px}
+.atl-temp i{font-style:normal;font-size:12px;pointer-events:none;margin-left:2px}
+.atl-temp select{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.atl-priv{position:relative;margin:-4px 0 0;font-size:11px;line-height:1.35;opacity:.72;text-align:center}
 .atl-temp select{background:transparent;border:0;color:inherit;font:inherit;font-weight:800;padding:0;min-height:0;width:auto;-webkit-appearance:none;appearance:none}
 .atl-temp select option{color:#000}
 .atl-vazio{margin:0;font-size:13.5px;opacity:.9;line-height:1.35}
@@ -719,9 +721,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261108r"></script>
-<script src="br.js?v=20261108r"></script>
-<script src="core.js?v=20261108r"></script>
-<script type="module" src="app.js?v=20261108r"></script>
+<script src="qrcode.js?v=20261108s"></script>
+<script src="br.js?v=20261108s"></script>
+<script src="core.js?v=20261108s"></script>
+<script type="module" src="app.js?v=20261108s"></script>
 </body>
 </html>
