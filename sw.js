@@ -8,7 +8,7 @@ self.addEventListener('push', e => {
   e.waitUntil(Promise.all([self.registration.showNotification(d.title || 'Pelota FC', {
     body: d.body || 'Tem novidade na pelada.', tag: d.tag || undefined, icon: 'icon-192.png', badge: 'icon-192.png',
     // convocação: botões "Vou" e "Não vou" (aparecem no Android; no iPhone, tocar abre o jogo com as duas opções)
-    actions: Array.isArray(d.actions) && d.rsvp ? d.actions.slice(0, 2) : undefined,
+    actions: Array.isArray(d.actions) && (d.rsvp || d.pagar) ? d.actions.slice(0, 2) : undefined,
     data: { url: d.url || self.registration.scope + 'app/', rsvp: d.rsvp || null }
   }), somaContador()]));
 });

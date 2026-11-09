@@ -63,6 +63,9 @@ async function enviarPara(uids, aviso) {
   const base = { title: aviso.titulo, body: aviso.texto, tag: aviso.tag || undefined, url: aviso.url || URL_APP };
   // convocação: cada pessoa recebe os botões "Vou" e "Não vou" com uma chave só dela (vale só para essa pelada)
   const payloadDe = uid => {
+    // cobrança: tocar abre direto o pagamento com Pix daquela pelada (no Android aparece também o botão "Pagar com Pix")
+    if (aviso.pagar && !aviso.rsvp) return JSON.stringify({ ...base, url: `${URL_APP}?abrir=pagar&g=${encodeURIComponent(aviso.pagar)}`, pagar: true,
+      actions: [{ action: 'pagar', title: '💰 Pagar com Pix' }] });
     if (!aviso.rsvp) return JSON.stringify(base);
     const { g, p } = aviso.rsvp;
     return JSON.stringify({ ...base, url: `${URL_APP}?g=${encodeURIComponent(g)}&p=${encodeURIComponent(p)}&r=ver`,

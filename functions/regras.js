@@ -155,7 +155,7 @@ function avisosVencidos(p, pid, ctx, r) {
 function cobrancaConvocado(p, pid, jid, uid, ctx) {
   const cfg = ctx.cfg || {}; if (!p || ehPA(p, cfg) || !(p.conv || {})[jid] || !mpOn(cfg)) return [];
   const v = valorJog(p, cfg, jid); if (!(v > 0) || stPag0((p.diarias || {})[jid])) return [];
-  return [{ para: [uid], titulo: `💰 Pague em até 30 minutos · ${nomePelada(ctx)}`, texto: `Diária da pelada de ${dShort(p.data)}: ${BRL(v)}. Pague pelo app até ${horaMs(Date.now() + PRAZO_PAG)} para garantir sua vaga; depois disso ela é liberada para outro diarista.`, tag: 'pag30-' + pid }];
+  return [{ para: [uid], titulo: `💰 Pague em até 30 minutos · ${nomePelada(ctx)}`, texto: `Diária da pelada de ${dShort(p.data)}: ${BRL(v)}. Pague pelo app até ${horaMs(Date.now() + PRAZO_PAG)} para garantir sua vaga; depois disso ela é liberada para outro diarista.`, tag: 'pag30-' + pid, pagar: ctx.gid }];
 }
 /* ---------- cobranças ---------- */
 const stPag = x => !!x && (x === true || !!x.s);
@@ -195,9 +195,9 @@ function avisosCobranca(ctx, hoje) {
   const out = [], g = nomePelada(ctx), atraso = somaDias(hoje, -5);
   for (const c of devidas(ctx, hoje)) {
     const u = uidDoJogador(ctx, c.jid); if (!u) continue; const dono = linhaDono(ctx, u);
-    if (c.tipo === 'm' && hoje.slice(8) === '01' && c.ini === hoje) out.push({ para: [u], titulo: `💰 ${c.desc} · ${g}`, texto: `${BRL(c.v)}, vence dia ${dBR(c.venc)}. Pague pelo app com Pix.${dono}`, tag: 'cob-' + c.tipo + c.venc });
-    else if (c.venc === hoje) out.push({ para: [u], titulo: `⏰ Vence hoje · ${g}`, texto: `${c.desc}: ${BRL(c.v)} vence hoje. Pague pelo app com Pix e o Caixa confirma na hora.${dono}`, tag: 'cob-' + c.tipo + c.venc });
-    else if (c.venc === atraso) out.push({ para: [u], titulo: `🔴 Pagamento atrasado · ${g}`, texto: `${c.desc}: ${BRL(c.v)} venceu há 5 dias. Toque para pagar com Pix.${dono}`, tag: 'cob-' + c.tipo + c.venc });
+    if (c.tipo === 'm' && hoje.slice(8) === '01' && c.ini === hoje) out.push({ para: [u], titulo: `💰 ${c.desc} · ${g}`, texto: `${BRL(c.v)}, vence dia ${dBR(c.venc)}. Pague pelo app com Pix.${dono}`, tag: 'cob-' + c.tipo + c.venc, pagar: ctx.gid });
+    else if (c.venc === hoje) out.push({ para: [u], titulo: `⏰ Vence hoje · ${g}`, texto: `${c.desc}: ${BRL(c.v)} vence hoje. Pague pelo app com Pix e o Caixa confirma na hora.${dono}`, tag: 'cob-' + c.tipo + c.venc, pagar: ctx.gid });
+    else if (c.venc === atraso) out.push({ para: [u], titulo: `🔴 Pagamento atrasado · ${g}`, texto: `${c.desc}: ${BRL(c.v)} venceu há 5 dias. Toque para pagar com Pix.${dono}`, tag: 'cob-' + c.tipo + c.venc, pagar: ctx.gid });
   }
   return out;
 }
@@ -208,7 +208,7 @@ function extrasNovas(a, b, ctx) {
     if (!x || ea[xid] || !(Number(x.v) > 0)) continue;
     const venc = x.venc || x.d;
     for (const jid of x.quem || []) { const u = uidDoJogador(ctx, jid); if (!u || stPag((x.pag || {})[jid])) continue;
-      out.push({ para: [u], titulo: `💰 Nova cobrança · ${g}`, texto: `${x.nome || 'Cobrança'}: ${BRL(x.v)}${venc ? ', vence em ' + dBR(venc) : ''}. Pague pelo app com Pix.${linhaDono(ctx, u)}`, tag: 'x-' + xid }); }
+      out.push({ para: [u], titulo: `💰 Nova cobrança · ${g}`, texto: `${x.nome || 'Cobrança'}: ${BRL(x.v)}${venc ? ', vence em ' + dBR(venc) : ''}. Pague pelo app com Pix.${linhaDono(ctx, u)}`, tag: 'x-' + xid, pagar: ctx.gid }); }
   }
   return out;
 }
@@ -216,7 +216,7 @@ function extrasNovas(a, b, ctx) {
 function cobrancaEvento(p, pid, jid, uid, ctx) {
   if (!p || !ehPA(p, ctx.cfg) || (p.dividir && p.precoDiaria == null)) return [];
   const v = valorJog(p, ctx.cfg, jid); if (!(v > 0) || stPag((p.diarias || {})[jid])) return [];
-  return [{ para: [uid], titulo: `💰 ${p.extra ? (p.nome || 'Evento extra') : (p.nome || 'Evento')} de ${dBR(p.data)} · ${nomePelada(ctx)}`, texto: `${BRL(v)}, vence em ${dBR(p.data)}. Pague pelo app com Pix.${linhaDono(ctx, uid)}`, tag: 'cobev-' + pid }];
+  return [{ para: [uid], titulo: `💰 ${p.extra ? (p.nome || 'Evento extra') : (p.nome || 'Evento')} de ${dBR(p.data)} · ${nomePelada(ctx)}`, texto: `${BRL(v)}, vence em ${dBR(p.data)}. Pague pelo app com Pix.${linhaDono(ctx, uid)}`, tag: 'cobev-' + pid, pagar: ctx.gid }];
 }
 
 /* ---------- resposta pelo botão da notificação (Vou / Não vou) ---------- */

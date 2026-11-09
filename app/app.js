@@ -154,7 +154,7 @@ const ERROS = {
   'permission-denied': 'Sem permissão para isso.', 'unavailable': 'Sem conexão com o servidor. Tente de novo.'
 };
 const msgErro = e => { if (!ERROS[e && e.code]) registrarErro(e, 'tratado'); return ERROS[e && e.code] || 'Algo deu errado. Tente de novo.'; };
-function aviso(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(aviso.t); aviso.t = setTimeout(() => t.hidden = true, 3200); }
+function aviso(m) { const t = $('toast'); t.textContent = m; t.hidden = true; void t.offsetWidth; t.hidden = false; t.onclick = () => { t.hidden = true; }; clearTimeout(aviso.t); aviso.t = setTimeout(() => t.hidden = true, Math.min(9000, Math.max(4000, String(m).length * 70))); } // fica mais tempo quando o texto é longo
 
 /* ================= Link do app e QR Code ================= */
 const LINK_APP = location.origin + location.pathname;
@@ -1603,6 +1603,7 @@ document.addEventListener('submit', async e => {
     if (ABRIR === 'dono') { ABRIR = null; history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); aviso('Verificando o acesso ao painel…'); notasServidor('acesso').then(() => { ls.set('pelota.dono.' + EU.uid, '1'); UIp.notasOk = true; ir('dono'); carregarPainel(); }, e => alert(e && e.status === 403 ? 'A conta ' + (EU.email || '(sem e-mail)') + ' não está cadastrada como dona do app. Entre com o e-mail cadastrado ou cadastre este e-mail.' : 'Não consegui verificar: ' + ((e && e.message) || 'erro'))); }
     if (ABRIR === 'suporte') { ABRIR = null; history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); notasServidor('acesso').then(() => { UIp.notasOk = true; ouvirDuvidasDono(); ir('donosuporte'); }, () => { }); }
     if (ABRIR === 'duvida') { ABRIR = null; const g = new URLSearchParams(location.search).get('g'); history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); if (g && GRUPOS[g]) abrirGrupo(g, { sup: true }); }
+    if (ABRIR === 'pagar') { ABRIR = null; const g = new URLSearchParams(location.search).get('g'); history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); if (g && GRUPOS[g]) abrirGrupo(g, { pagar: true }); }
     if (ABRIR === 'erros') { ABRIR = null; history.replaceState(null, '', location.pathname + (MOCK ? '?mock=1' : '')); notasServidor('acesso').then(() => { ir('donoerros'); carregarErros(); }, () => { }); }
   });
 })();
