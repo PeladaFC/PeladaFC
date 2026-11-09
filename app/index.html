@@ -338,6 +338,12 @@ input::-webkit-date-and-time-value{text-align:left}
 .atl-temp{position:relative;font-family:var(--f-display);font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:4px}
 .atl-temp i{font-style:normal;font-size:12px;pointer-events:none;margin-left:2px}
 .atl-temp select{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.board-marcar{display:block;width:100%;text-align:left;border:0;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.board-marcar:active{transform:scale(.99)}
+.board-cta{position:relative;display:inline-block;margin-top:10px;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.18);font-weight:700;font-size:14px}
+.opc{font-weight:400;opacity:.65;text-transform:none;letter-spacing:0}
+.np-liq{display:grid;grid-template-columns:1fr auto;align-items:center;gap:0 10px;margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--soft,#E6F0E8);border:1px solid rgba(27,106,54,.18)}
+.np-liq span{font-weight:600}.np-liq b{font-size:20px;color:var(--pitch)}.np-liq small{grid-column:1/-1;opacity:.7;font-size:12px}
 .atl-priv{position:relative;margin:-4px 0 0;font-size:11px;line-height:1.35;opacity:.72;text-align:center}
 .atl-temp select{background:transparent;border:0;color:inherit;font:inherit;font-weight:800;padding:0;min-height:0;width:auto;-webkit-appearance:none;appearance:none}
 .atl-temp select option{color:#000}
@@ -721,9 +727,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261109a"></script>
-<script src="br.js?v=20261109a"></script>
-<script src="core.js?v=20261109a"></script>
-<script type="module" src="app.js?v=20261109a"></script>
+<script src="qrcode.js?v=20261109b"></script>
+<script src="br.js?v=20261109b"></script>
+<script src="core.js?v=20261109b"></script>
+<script type="module" src="app.js?v=20261109b"></script>
 </body>
 </html>

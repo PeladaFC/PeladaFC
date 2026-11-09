@@ -1249,7 +1249,11 @@ function renderTab(){
 }
 
 // guarda data e horários da próxima pelada; o término acompanha o início até ser mudado à mão
-function guardarNp(t){UI[t.dataset.np]=t.value;if((t.dataset.np==='npData'||t.dataset.np==='npHora')&&!UI.npMens){const m=document.getElementById('np-mens');if(m)m.value=mensPadrao(UI.npData||proximaData(),UI.npHora||cfg().hora)}
+/* Pix: quanto cada atleta paga (taxa repassada) ou quanto a pelada recebe (pelada assume a taxa) */
+function npLiq(v){v=Number(String(v??'').replace(',','.'))||0;const t=taxaTotal(),rep=cfg().pixRepassa!==false;
+  const x=rep?Math.ceil(v/(1-t)*100)/100:Math.floor(v*(1-t)*100)/100;
+  return`<span>${rep?'Cada atleta vai pagar':'A pelada recebe por atleta'}</span><b class="num">${v>0?BRL(x):'—'}</b><small>${rep?'valor + taxa do Pix':'valor − taxa do Pix'} (${pct(t)})</small>`}
+function guardarNp(t){UI[t.dataset.np]=t.value;if(t.dataset.np==='npValor'){const l=document.getElementById('np-liq');if(l)l.innerHTML=npLiq(t.value)}if((t.dataset.np==='npData'||t.dataset.np==='npHora')&&!UI.npMens){const m=document.getElementById('np-mens');if(m)m.value=mensPadrao(UI.npData||proximaData(),UI.npHora||cfg().hora)}
   if(t.dataset.np==='npFim')UI.npFimManual=true;
   if(t.dataset.np==='npHora'&&!UI.npFimManual&&t.value){const f=document.getElementById('np-fim');UI.npFim=maisHora(t.value,60);if(f)f.value=UI.npFim}}
 function bannerPendente(){return`<div class="banner due" style="margin-top:12px"><span><b>⏳ Sua entrada está esperando a autorização do administrador.</b><br>Assim que ele autorizar, seu nome entra no elenco e você já pode confirmar presença.</span></div>`}
@@ -1275,28 +1279,28 @@ function tJogo(A){
     h+=`<div class="panel" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>Como estava o campo?</h3></div>
       <div class="sub" style="margin-bottom:4px">${esc(L.nome)} · pelada de ${dShort(p.data)}</div>${formAvalCampo(pid,(d.avalCampo||{})[pid],'me')}
       <div class="sub" style="margin-top:4px">Sua avaliação ajuda a galera a escolher onde jogar.</div></div>`}}
-  if(A)h+=painelAvAdmin();
   h+=cartaoAvCompleta();
   h+=painelPosJogo();
   if(A)h+=painelAprovar();
   if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar: ${esc(AVISOS[v.a.tipo]?.n||'')}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
   const cur=atual();
   if(!cur){
-    h+=`<div class="board"><div class="when">Sem pelada<br>marcada</div><div class="where">${EV()?'Evento livre · marque a data da próxima':esc(DIAS[c.dia])+' das '+esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div></div>`;
-    if(A){
+    h+=A?`<button type="button" class="board board-marcar" data-act="np-abrir" aria-expanded="${!!UI.npAberto}"><div class="when">Sem pelada<br>marcada</div><div class="where">${EV()?'Evento livre':esc(DIAS[c.dia])+' das '+esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div><span class="board-cta">${UI.npAberto?'Marcando a pelada ▾':'＋ Toque para marcar a pelada'}</span></button>`
+      :`<div class="board"><div class="when">Sem pelada<br>marcada</div><div class="where">${EV()?'Evento livre · marque a data da próxima':esc(DIAS[c.dia])+' das '+esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div></div>`;
+    if(A&&UI.npAberto){
       if(UI.npLoc===undefined)UI.npLoc=(c.localId&&S.locais[c.localId])?c.localId:null;
       const L=UI.npLoc&&S.locais[UI.npLoc];
       h+=`<div class="panel stack" style="margin-top:12px"><h3>Marcar a próxima</h3>
-      <div class="field"><span><i class="stepn">1</i>Onde vai ser?</span>
-      ${L?`<div class="loccard"><div class="pin">📍</div><div class="grow"><div class="name">${esc(L.nome)}</div><div class="sub">${esc([L.end,L.tel].filter(Boolean).join(' · ')||'Sem endereço')}</div></div></div><div class="lado" style="margin-top:6px"><button class="btn sm" data-act="lp-abrir" data-v="np">Trocar local</button><button class="btn sm" data-act="edit-local" data-l="${UI.npLoc}">Editar informações</button></div>${L.end?blocoMapa(L.nome,L.end):''}`
-        :`<button class="btn primary block" data-act="lp-abrir" data-v="np">Escolher o local</button>`}
-      </div>
-      ${L?`<div class="field"><span><i class="stepn">2</i>Quando?</span>
+      <div class="field"><span><i class="stepn">1</i>Quando?</span>
       <label class="field"><span>Data</span><input type="date" id="np-data" data-np="npData" value="${UI.npData||proximaData()}"></label>
       <div class="lado"><label class="field"><span>Início</span><input type="time" id="np-hora" data-np="npHora" value="${esc(UI.npHora||c.hora)}"></label>
       <label class="field"><span>Término</span><input type="time" id="np-fim" data-np="npFim" value="${esc(UI.npFim||horaFimDe(null))}"></label></div>
       ${!EV()&&UI.npTipo!=='extra'?`<label class="field"><span>Mensalistas confirmam até</span><input type="datetime-local" id="np-mens" data-np="npMens" value="${esc(UI.npMens||mensPadrao(UI.npData||proximaData(),UI.npHora||c.hora))}"></label><div class="sub">Depois desse horário você convoca os diaristas, por ordem de pedido.</div>`:''}
 </div>
+      <div class="field"><span><i class="stepn">2</i>Onde vai ser? <small class="opc">(opcional)</small></span>
+      ${L?`<div class="loccard"><div class="pin">📍</div><div class="grow"><div class="name">${esc(L.nome)}</div><div class="sub">${esc([L.end,L.tel].filter(Boolean).join(' · ')||'Sem endereço')}</div></div></div><div class="lado" style="margin-top:6px"><button class="btn sm" data-act="lp-abrir" data-v="np">Trocar local</button><button class="btn sm" data-act="edit-local" data-l="${UI.npLoc}">Editar informações</button></div>${L.end?blocoMapa(L.nome,L.end):''}`
+        :`<button class="btn block" data-act="lp-abrir" data-v="np">Escolher o local</button><div class="sub" style="margin-top:4px">Pode deixar para depois: o local fica "a definir" e você escolhe quando quiser.</div>`}
+      </div>
       <div class="field"><span><i class="stepn">3</i>Como vai ser?</span>
       <div class="stack" style="gap:8px"><label class="field"><span>Times</span><select id="np-times" data-np="npTimes">${[2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}" ${Number(UI.npTimes||c.times||3)===n?'selected':''}>${n} times</option>`).join('')}</select></label>
       <label class="field"><span>Formato</span><select id="np-formato" data-np="npFormato">${Object.entries(FORMATOS).map(([k,n])=>`<option value="${k}" ${(UI.npFormato||c.formato||'conv')===k?'selected':''}>${n}</option>`).join('')}</select></label></div>
@@ -1306,19 +1310,18 @@ function tJogo(A){
           <div class="sub" style="margin:6px 0 10px">${ext?'<b>Evento extra:</b> fora da mensalidade. Se tiver valor, <b>todo mundo que confirmar paga</b>, mensalista também.':'<b>Pelada do mês:</b> mensalista já pagou na mensalidade e <b>não paga nada</b>. Só diarista paga a diária.'}</div>`;
         const nomeEv=pa?`<label class="field" style="margin-bottom:8px"><span>Nome do evento</span><input type="text" id="np-nome" data-np="npNome" maxlength="50" value="${esc(UI.npNome||'')}" placeholder="Ex.: Churrasco de fim de ano"></label>`:'';
         return`<div class="field"><span><i class="stepn">4</i>${EV()?'Vai ter cobrança?':'Que pelada é essa?'}</span>${tipo}${nomeEv}
-        <div class="seg"><button type="button" data-act="np-cobra" data-v="nao" aria-pressed="${cobra==='nao'}">Sem cobrança</button><button type="button" data-act="np-cobra" data-v="sim" aria-pressed="${cobra==='sim'}">${pa?'Com cobrança':'Cobrar diária'}</button></div>
+        <div class="seg"><button type="button" data-act="np-cobra" data-v="sim" aria-pressed="${cobra==='sim'}">${pa?'Com cobrança':'Cobrar diária'}</button><button type="button" data-act="np-cobra" data-v="nao" aria-pressed="${cobra==='nao'}">Sem cobrança</button></div>
         ${cobra==='sim'?`${pa?`<div class="seg" style="margin-top:8px"><button type="button" data-act="np-modo" data-v="atleta" aria-pressed="${UI.npModo!=='total'}">Valor por atleta</button><button type="button" data-act="np-modo" data-v="total" aria-pressed="${UI.npModo==='total'}">Dividir um total</button></div>`:''}
           ${pa&&UI.npModo==='total'?`<label class="field" style="margin-top:8px"><span>Total do evento (R$)</span><input type="number" id="np-total" data-np="npTotal" inputmode="decimal" min="0" step="0.01" value="${esc(UI.npTotal??'')}" placeholder="Ex.: 600"></label>
           <div class="sub" style="margin-top:4px">O total é dividido igualmente entre quem confirmar. O valor de cada um fecha quando a pelada for encerrada, ou quando você tocar em <b>Fechar divisão</b>.</div>`
-          :`<label class="field" style="margin-top:8px"><span>${pa?'Valor por atleta (R$)':'Diária do diarista nesta pelada (R$)'}</span><input type="number" id="np-valor" data-np="npValor" inputmode="decimal" min="0" step="0.01" value="${esc(UI.npValor??padrao)}" placeholder="Ex.: 25"></label>`}
+          :`<label class="field" style="margin-top:8px"><span>${pa?'Valor por atleta (R$)':'Diária do diarista nesta pelada (R$)'}</span><input type="number" id="np-valor" data-np="npValor" inputmode="decimal" min="0" step="0.01" value="${esc(UI.npValor??padrao)}" placeholder="Ex.: 25"></label>${cfg().mpConectadoEm?`<div class="np-liq" id="np-liq">${npLiq(UI.npValor??padrao)}</div>`:''}`}
           ${cfg().mpConectadoEm?`<div class="sub np-taxa">💳 ${cfg().pixRepassa!==false?'Cada jogador assume a taxa de pagamento':'A pelada assume a taxa de pagamento'} (${pct(taxaTotal())}). Você pode mudar isso em <b>Ajustes</b>.</div>`:''}
           ${(()=>{const n=Object.keys(UI.npDesc||{}).length;return`<div class="row between" style="margin-top:8px;gap:8px;flex-wrap:nowrap"><span class="sub">${pa?(UI.npModo==='total'?'Todos que confirmarem dividem igual.':'Todos que confirmarem pagam o mesmo valor.'):'Todo diarista que confirmar paga a diária.'} Para desconto ou isenção, toque em <b>Descontos</b> ao lado.${n?` <b>${n} ajuste${n>1?'s':''} feito${n>1?'s':''}.</b>`:''}</span><button type="button" class="btn sm" style="white-space:nowrap;flex:none" data-act="np-qp-abrir">${UI.npQpAberta?'Esconder ▴':'Descontos ▾'}</button></div>`})()}
           ${UI.npQpAberta?`<div id="np-qp">${htmlQuemPaga(ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>nm(a).localeCompare(nm(b))),UI.npDesc||{},Number(String(UI.npValor??padrao).replace(',','.'))||0,'npd')}</div>`:''}
           ${pa&&UI.npModo==='total'?'':'<div class="sub" style="margin-top:4px">O total é calculado depois que a galera confirmar.</div>'}`
           :`<div class="sub" style="margin-top:6px">${pa?'Ninguém paga nada por esta pelada.':'Nesta pelada o diarista também não paga.'}</div>`}</div>`})()}
-      <button class="btn primary block btn-grande" data-act="nova-pel">Abrir lista de presença</button>`
-      :`<p class="sub" style="margin:0">Depois de escolher o local, você define a data e o horário.</p>`}</div>`}
-    return h+renderHist(A);
+      <button class="btn primary block btn-grande" data-act="nova-pel">Abrir lista de presença</button></div>`}
+    return h+(A?painelAvAdmin():'')+renderHist(A);
   }
   const[pid,p]=cur,l=lista(p);
   h+=`<div class="board"><div class="when">${dShort(p.data)}<br>${esc(horaIniDe(p))}<small class="ate"> às ${esc(horaFimDe(p))}</small></div><div class="where row" style="gap:8px">${(()=>{const LL=localDe(p);return LL?`<span>📍 ${esc(LL.nome)}${LL.end?' · '+esc(LL.end):''}</span>${LL.end||LL.tel?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="como-chegar" data-p="${pid}">${LL.end?'🗺️ Como chegar':'📞 Contato'}</button>`:''}`:'Local a definir'})()}${A?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="trocar-local" data-p="${pid}">${localDe(p)?'Trocar local':'Definir local'}</button>`:''}</div>
@@ -1330,7 +1333,7 @@ function tJogo(A){
   if(UI.sub==='presenca')h+=subPresenca(pid,p,l,A);
   else if(UI.sub==='times')h+=subTimes(pid,p,l,A);
   else h+=subPos(pid,p,A);
-  return h+renderHist(A);
+  return h+(A?painelAvAdmin():'')+renderHist(A);
 }
 function rowPlayer(id,right,extra='',tipo,tag=''){
   const j=J(id);
@@ -2422,6 +2425,7 @@ document.addEventListener('click',e=>{
     case'ds-salvar':{const D=UI.dsc;if(!D)return;const m={...D.map};troca('peladas/'+D.pid,{descontos:Object.keys(m).length?m:null});closeSheet();toast('Quem paga: salvo.');break}
     case'fechar-div':{const p=S.pel[d.p];if(!aberto(p))return;patch('peladas/'+d.p,{precoDiaria:baseDivisao(p)});toast('Divisão fechada: '+BRL(baseDivisao(p))+' por atleta.');break}
     case'np-cobra':UI.npCobra=d.v;render();break;
+    case'np-abrir':UI.npAberto=!UI.npAberto;render();if(UI.npAberto)setTimeout(()=>{const f=document.getElementById('np-data');if(f)f.closest('.panel').scrollIntoView({behavior:'smooth',block:'start'})},60);break;
     case'np-modo':{const v=document.getElementById('np-valor'),t=document.getElementById('np-total');if(v)UI.npValor=v.value;if(t)UI.npTotal=t.value;UI.npModo=d.v;render();break}
     case'np-tipo':UI.npTipo=d.v;UI.npCobra=null;UI.npValor=null;render();break;
     case'nova-pel':{const data=document.getElementById('np-data').value;if(!data){toast('Escolha a data.');return}
