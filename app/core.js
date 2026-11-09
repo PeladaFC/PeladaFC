@@ -1676,7 +1676,11 @@ function euVou(pid,v,via){const doc=S.pres[myId];if(!doc)return null;const p=S.p
   return{s:v,ant,pedido:v==='sim'&&(cheia||ehDiarista(jj)),cheia,texto:v!=='sim'?'Resposta enviada: não vai.':(cheia||ehDiarista(jj))?'Pedido enviado. Agora é só aguardar o administrador liberar.':'Presença confirmada!'}}
 function inicioPel(p){return new Date(`${p.data}T${horaIniDe(p)}:00-03:00`).getTime()}
 // chegou pelo link: confere a pelada, o prazo e o vínculo; depois registra (ou só mostra as opções, vindo da notificação do iPhone)
-function aplicarRespLink(){const R=RESP_LINK;if(!R||!ready||demo)return;if(R.sup){RESP_LINK=null;return sheetSuporteAdm()}RESP_LINK=null;UI.tab='jogo';UI.sub='presenca';render();
+function aplicarRespLink(){const R=RESP_LINK;if(!R||!ready||demo)return;if(R.sup){RESP_LINK=null;return sheetSuporteAdm()}
+  if(R.pagar){RESP_LINK=null;UI.tab='jogo';render();const L=minhasPendencias(); // veio da notificação de cobrança
+    if(L.length===1)return sheetPix(L[0]);
+    if(!L.length)return toast('Você não tem nada para pagar nesta pelada. Tudo em dia!');
+    setTimeout(()=>{const e=document.querySelector('.pag-me,[data-act=pix-pagar]');if(e)(e.closest('.panel')||e).scrollIntoView({behavior:'smooth',block:'start'})},80);return}RESP_LINK=null;UI.tab='jogo';UI.sub='presenca';render();
   const p=S.pel[R.p];
   if(!p)return sheetRespAviso('Pelada cancelada','Essa pelada foi cancelada ou não existe mais. Veja a próxima na tela do jogo.');
   const q=`${dShort(p.data)} às ${horaIniDe(p)}`;
