@@ -707,7 +707,7 @@ function cartaAtleta(ola, eu) {
         : `<p class="atl-vazio">${L.length ? 'Seus números aparecem depois da primeira avaliação da galera.' : (Object.keys(GRUPOS).length ? 'Abra suas peladas para montar sua carta.' : 'Sua carta de atleta aparece aqui depois que você entrar no elenco de uma pelada.')}</p>`}</div></div>
     <div class="atl-meus"><div class="atl-meus-top"><span class="atl-tit">Meus números</span><label class="atl-temp"><span>${ano === 'todas' ? 'Todas as temporadas' : 'Temporada ' + ano.slice(2)}</span><i aria-hidden="true">▾</i><select data-temporada aria-label="Escolher temporada">${lista.map(y => `<option value="${y}" ${y === ano ? 'selected' : ''}>Temporada ${y.slice(2)}</option>`).join('')}<option value="todas" ${ano === 'todas' ? 'selected' : ''}>Todas as temporadas</option></select></label></div>
       <div class="atl-stats"><div><b>${T.j}</b><span>jogos</span></div><div><b>${T.g}</b><span>gols</span></div><div><b>${T.a}</b><span>assist.</span></div><div><b>${T.mvp}</b><span>craque</span></div></div>
-</div><p class="atl-priv">🔒 Só você vê sua carta. A nota cruza as avaliações de todos os jogadores do Pelota FC.</p></div>`;
+</div><p class="atl-priv">Só você vê sua carta. A nota é calculada com o cruzamento das avaliações de todos os jogadores do Pelota FC.</p></div>`;
 }
 let MINHAS_DUV = [], UNSUB_DUV = null, DUV_DONO = null, UNSUB_DUV_DONO = null;
 function ouvirMinhasDuvidas() {
