@@ -1138,12 +1138,12 @@ function renderAdmins(){const el=document.getElementById('adm-list');if(!el||!GR
 /* Carta do atleta na tela inicial: cada pelada guarda (na conta da própria pessoa) o resumo dela naquele grupo.
    A tela inicial junta os resumos de todas as peladas. Nota e atributos só entram se o grupo mostra as avaliações. */
 let ATL_T=null,ATL_ULT='';
-function resumoAtleta(){const jid=meuJogador();if(!jid||!GRUPO)return null;const j=J(jid),st=(estatPeriodo(null,null)||{})[jid]||{};
+function resumoAtleta(){const jid=meuJogador();if(!jid||!GRUPO)return null;const j=J(jid),st=((estatPeriodo(null,null)||{}).st||{})[jid]||{};
   const vis=cfg().mostrarAval!==false&&!!j.critGalera,cr=critKey(j.pos),fonte=j.critGalera||j.crit||{};
   return{grupo:GRUPO.nome||cfg().nome||'Pelada',pos:j.pos||'MEI',kind:j.pos==='GOL'?'GOL':'linha',ovr:vis?ovr(notaAtual(jid)):null,
     crit:vis?Object.fromEntries(cr.map(([k])=>[k,Number(fonte[k]??3)])):null,j:st.j||0,g:st.g||0,a:st.a||0,mvp:st.mvp||0,
     premios:(st.art||0)+(st.gar||0)+(st.def||0)+(st.gol||0),anos:(()=>{const out={},anos=[...new Set(Object.values(S.pel).map(p=>String(p.data||'').slice(0,4)).filter(x=>/^\d{4}$/.test(x)))];
-      for(const y of anos){const t=(estatPeriodo(y+'-01-01',(Number(y)+1)+'-01-01')||{})[jid];if(t&&(t.j||t.g||t.a||t.mvp))out[y]={j:t.j||0,g:t.g||0,a:t.a||0,mvp:t.mvp||0}}return out})()}}
+      for(const y of anos){const t=((estatPeriodo(y+'-01-01',(Number(y)+1)+'-01-01')||{}).st||{})[jid];if(t&&(t.j||t.g||t.a||t.mvp))out[y]={j:t.j||0,g:t.g||0,a:t.a||0,mvp:t.mvp||0}}return out})()}}
 /* Nota geral do app: o administrador guarda (só para administradores e o servidor) a nota de cada jogador do grupo.
    Todo dia o servidor cruza os grupos pelos jogadores que estão em mais de um e coloca todo mundo na mesma régua. */
 let NOTAS_T=null,NOTAS_ULT='';
