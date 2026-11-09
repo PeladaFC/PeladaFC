@@ -73,7 +73,7 @@ const initials=s=>String(s||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).joi
 const sum=a=>a.reduce((x,y)=>x+y,0);
 const isPlain=o=>o&&typeof o==='object'&&!Array.isArray(o);
 function merge(a,b){const o=isPlain(a)?{...a}:{};for(const k in b){o[k]=isPlain(b[k])&&isPlain(o[k])?merge(o[k],b[k]):b[k]}return o}
-function toast(m){const t=document.getElementById('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,2600)}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.hidden=true;void t.offsetWidth;t.hidden=false;t.onclick=()=>{t.hidden=true};clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,Math.min(9000,Math.max(3500,String(m).length*70)))}
 
 /* ---------- gravação ---------- */
 function slotGet(path){const[c,id]=path.split('/');return c==='config'?S.config:c==='eventos'?S.feed:S[COL[c]][id]}
