@@ -791,7 +791,7 @@ window.passarDono = async uid => {
   GRUPOS[ABERTO] = { ...G, dono: uid, donoDesde, donoAnterior: EU.uid }; window.atualizarGrupo({ ...GRUPOS[ABERTO] });
 };
 // Apagar o grupo (só quem criou): limpa as coleções, o código do convite e o grupo.
-const COLS_GRUPO = ['config', 'jogadores', 'peladas', 'presencas', 'locais', 'caixa', 'avisos', 'mural', 'avaliacoes', 'notificacoes', 'membros', 'suporteLog'];
+const COLS_GRUPO = ['config', 'jogadores', 'peladas', 'presencas', 'locais', 'caixa', 'avisos', 'mural', 'avaliacoes', 'notificacoes', 'notas', 'membros', 'suporteLog'];
 window.apagarGrupo = async () => {
   const gid = ABERTO, G = GRUPOS[gid]; if (!gid || !G || G.dono !== EU.uid) { aviso('Só quem criou o grupo pode apagá-lo.'); return; }
   try {
