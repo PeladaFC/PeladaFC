@@ -340,7 +340,11 @@ input::-webkit-date-and-time-value{text-align:left}
 .atl-temp select{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .board-marcar{display:block;width:100%;text-align:left;border:0;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .board-marcar:active{transform:scale(.99)}
-.board-cta{position:relative;display:inline-block;margin-top:10px;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.18);font-weight:700;font-size:14px}
+.board-cta{position:relative;z-index:2;display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:10px 16px;border-radius:999px;background:var(--hot);color:#fff;font-weight:800;font-size:15px;letter-spacing:.01em;box-shadow:0 3px 0 #B8461A,0 6px 16px rgba(240,102,42,.45)}
+.board-marcar[aria-expanded="false"] .board-cta{animation:ctaPulsa 2.4s ease-in-out infinite}
+.board-marcar:active .board-cta{transform:translateY(2px);box-shadow:0 1px 0 #B8461A,0 3px 8px rgba(240,102,42,.4)}
+@keyframes ctaPulsa{0%,100%{box-shadow:0 3px 0 #B8461A,0 6px 16px rgba(240,102,42,.45),0 0 0 0 rgba(240,102,42,.55)}50%{box-shadow:0 3px 0 #B8461A,0 6px 16px rgba(240,102,42,.45),0 0 0 9px rgba(240,102,42,0)}}
+@media (prefers-reduced-motion:reduce){.board-marcar .board-cta{animation:none!important}}
 .opc{font-weight:400;opacity:.65;text-transform:none;letter-spacing:0}
 .np-liq{display:grid;grid-template-columns:1fr auto;align-items:center;gap:0 10px;margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--soft,#E6F0E8);border:1px solid rgba(27,106,54,.18)}
 .np-liq span{font-weight:600}.np-liq b{font-size:20px;color:var(--pitch)}.np-liq small{grid-column:1/-1;opacity:.7;font-size:12px}
@@ -727,9 +731,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261109b"></script>
-<script src="br.js?v=20261109b"></script>
-<script src="core.js?v=20261109b"></script>
-<script type="module" src="app.js?v=20261109b"></script>
+<script src="qrcode.js?v=20261109c"></script>
+<script src="br.js?v=20261109c"></script>
+<script src="core.js?v=20261109c"></script>
+<script type="module" src="app.js?v=20261109c"></script>
 </body>
 </html>
