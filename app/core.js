@@ -3155,42 +3155,63 @@ document.addEventListener('change',e=>{const s=e.target;if(!s.dataset||!s.datase
 /* ===== Gestos =====
    1) Folha (aba que sobe de baixo): segurar no risquinho do topo (ou no título) e arrastar para baixo fecha.
       Também dá para puxar pelo conteúdo quando ele já está no topo.
-   2) Abas da pelada: deslizar a partir da beirada da tela troca de aba
-      (da beirada esquerda para a direita volta uma aba; da beirada direita para a esquerda avança). */
+   2) Abas da pelada: deslizar a partir da beirada da tela vira a página, como papel:
+      a página atual acompanha o dedo e a aba vizinha entra junto pelo lado.
+      Da beirada esquerda para a direita volta uma aba; da beirada direita para a esquerda avança. */
 (function gestos(){
   const reduz=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
   const ehCampo=t=>t.closest&&t.closest('input,select,textarea,[contenteditable],.enq,canvas');
+  const abas=()=>[...document.querySelectorAll('#nav [data-act=tab]')];
   let G=null;
   document.addEventListener('touchstart',e=>{
     if(e.touches.length!==1){G=null;return}
     const t=e.target,x=e.touches[0].clientX,y=e.touches[0].clientY,sh=t.closest&&t.closest('.sheet');
     if(sh){if(ehCampo(t))return;const topo=t.closest('.sheet-grab,.sheet-h');if(t.closest('button,a')&&!t.closest('.sheet-grab'))return;
       if(topo||sh.scrollTop<=0)G={tipo:'folha',sh,x,y,dy:0,t0:Date.now(),ok:!!topo};return}
-    if(document.querySelector('#sheet .sheet'))return;
-    const app=document.getElementById('app'),nav=document.getElementById('nav');
-    if(!app||app.hidden||!nav||!nav.querySelector('[data-act=tab]')||ehCampo(t))return;
-    const borda=28,W=innerWidth;if(x<=borda||x>=W-borda)G={tipo:'aba',lado:x<=borda?-1:1,x,y,dx:0,app};
+    if(document.querySelector('#sheet .sheet')||PAG)return;
+    const app=document.getElementById('app');
+    if(!app||app.hidden||!abas().length||ehCampo(t))return;
+    const borda=28,W=innerWidth;if(x<=borda||x>=W-borda)G={tipo:'aba',lado:x<=borda?-1:1,x,y,dx:0,app,t0:Date.now(),ini:false};
   },{passive:true});
   document.addEventListener('touchmove',e=>{if(!G)return;const p=e.touches[0],dx=p.clientX-G.x,dy=p.clientY-G.y;
     if(G.tipo==='folha'){
       if(!G.ok){if(Math.abs(dy)<8&&Math.abs(dx)<8)return;if(dy<=0||Math.abs(dx)>Math.abs(dy)||G.sh.scrollTop>0){G=null;return}G.ok=true;G.y=p.clientY;return}
       G.dy=Math.max(0,p.clientY-G.y);e.preventDefault();G.sh.style.transition='none';G.sh.style.transform=`translateY(${G.dy}px)`;
       const sc=G.sh.parentElement;if(sc&&sc.classList.contains('scrim'))sc.style.background=`rgba(5,12,8,${Math.max(0,.45*(1-G.dy/(G.sh.offsetHeight||600)))})`;return}
-    if(G.tipo==='aba'){if(Math.abs(dy)>40&&Math.abs(dy)>Math.abs(dx)){voltaAba();G=null;return}
-      if(Math.sign(dx)===-G.lado){G.dx=dx;e.preventDefault();G.app.style.transition='none';G.app.style.transform=`translateX(${dx*.35}px)`}}
+    if(G.tipo==='aba'){
+      if(!G.ini){if(Math.abs(dx)<8&&Math.abs(dy)<8)return;
+        if(Math.abs(dy)>Math.abs(dx)||Math.sign(dx)!==-G.lado){G=null;return}
+        if(!iniciaPagina(G)){G=null;return}}
+      e.preventDefault();G.dx=dx;G.ult=[p.clientX,Date.now()];moverPagina(G.dx)}
   },{passive:false});
-  function voltaAba(){if(G&&G.app){G.app.style.transition='transform .2s ease-out';G.app.style.transform='';setTimeout(()=>{if(G&&G.app)G.app.style.transition=''},220)}}
+  /* A virada de página: a foto da aba atual (cópia) fica por cima e anda com o dedo; a aba nova já desenhada entra pelo lado. */
+  let PAG=null;
+  function iniciaPagina(g){const bt=abas(),i=bt.findIndex(b=>b.getAttribute('aria-current')==='page'),j=i+(g.lado<0?-1:1);
+    if(i<0||j<0||j>=bt.length)return false;
+    const app=g.app,r=app.getBoundingClientRect(),W=innerWidth;
+    const capa=app.cloneNode(true);capa.removeAttribute('id');capa.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));
+    Object.assign(capa.style,{position:'fixed',left:r.left+'px',top:r.top+'px',width:r.width+'px',margin:'0',zIndex:'15',pointerEvents:'none',background:'var(--bg)',willChange:'transform',boxShadow:'0 0 28px rgba(0,0,0,.18)'});
+    const sombra=document.createElement('div');Object.assign(sombra.style,{position:'fixed',inset:'0',zIndex:'14',pointerEvents:'none',background:'rgba(5,12,8,.12)',opacity:'1'});
+    document.body.appendChild(sombra);document.body.appendChild(capa);
+    PAG={capa,sombra,W,i,j,bt,y0:scrollY};g.ini=true;
+    bt[j].click(); // desenha a aba nova por baixo (já no topo da página)
+    app.style.willChange='transform';return true}
+  function moverPagina(dx){if(!PAG)return;const W=PAG.W,f=Math.min(1,Math.abs(dx)/W);
+    PAG.capa.style.transform=`translateX(${dx}px)`;
+    G.app.style.transform=`translateX(${(dx<0?W:-W)*0.3*(1-f)}px)`; // a aba nova vem por baixo, com leve paralaxe
+    PAG.sombra.style.opacity=String(1-f)}
+  function terminaPagina(g,vai){const P=PAG;if(!P)return;const W=P.W,app=g.app,ease='cubic-bezier(.22,.8,.24,1)',ms=reduz()?0:260;
+    P.capa.style.transition=`transform ${ms}ms ${ease}`;app.style.transition=`transform ${ms}ms ${ease}`;P.sombra.style.transition=`opacity ${ms}ms ease-out`;
+    if(vai){P.capa.style.transform=`translateX(${g.dx<0?-W:W}px)`;app.style.transform='translateX(0)';P.sombra.style.opacity='0'}
+    else{P.capa.style.transform='translateX(0)';app.style.transform=`translateX(${(g.dx<0?W:-W)*0.3}px)`;P.sombra.style.opacity='1'}
+    setTimeout(()=>{if(!vai){P.bt=abas();(P.bt[P.i]||{click(){}}).click();window.scrollTo(0,P.y0)}
+      app.style.transition='';app.style.transform='';app.style.willChange='';P.capa.remove();P.sombra.remove();PAG=null},ms+20)}
   document.addEventListener('touchend',()=>{if(!G)return;const g=G;G=null;
     if(g.tipo==='folha'){const sh=g.sh,v=g.dy/Math.max(1,Date.now()-g.t0);
       if(g.dy>110||(g.dy>40&&v>.6)){sh.style.transition='transform .22s ease-in';sh.style.transform='translateY(110%)';
         setTimeout(()=>{const b=sh.querySelector('.sheet-h [data-act=close],.sheet-h button');if(b)b.click();else closeSheet()},200)}
       else{sh.style.transition='transform .25s cubic-bezier(.22,.8,.24,1)';sh.style.transform='';const sc=sh.parentElement;if(sc)sc.style.background='';setTimeout(()=>{sh.style.transition=''},260)}return}
-    if(g.tipo==='aba'){const app=g.app;app.style.transition='';app.style.transform='';
-      if(Math.abs(g.dx)<70)return;
-      const bt=[...document.querySelectorAll('#nav [data-act=tab]')],i=bt.findIndex(b=>b.getAttribute('aria-current')==='page'),j=i+(g.lado<0?-1:1);
-      if(i<0||j<0||j>=bt.length){if(!reduz()&&app.animate)app.animate([{transform:`translateX(${g.dx*.35}px)`},{transform:'none'}],{duration:220,easing:'ease-out'});return}
-      bt[j].click();
-      if(!reduz()&&app.animate)app.animate([{transform:`translateX(${g.lado*60}px)`,opacity:.2},{transform:'none',opacity:1}],{duration:260,easing:'cubic-bezier(.22,.8,.24,1)'})}
+    if(g.tipo==='aba'&&g.ini){const v=Math.abs(g.dx)/Math.max(1,Date.now()-g.t0);terminaPagina(g,Math.abs(g.dx)>PAG.W*.33||(Math.abs(g.dx)>50&&v>.45))}
   },{passive:true});
-  document.addEventListener('touchcancel',()=>{if(G&&G.tipo==='aba')voltaAba();if(G&&G.tipo==='folha'){G.sh.style.transform='';G.sh.style.transition=''}G=null},{passive:true});
+  document.addEventListener('touchcancel',()=>{if(G&&G.tipo==='aba'&&G.ini)terminaPagina(G,false);if(G&&G.tipo==='folha'){G.sh.style.transform='';G.sh.style.transition=''}G=null},{passive:true});
 })();
