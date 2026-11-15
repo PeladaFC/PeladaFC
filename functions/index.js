@@ -99,7 +99,15 @@ async function avisarErros() {
   if (!uids.length) return;
   await enviarPara(uids, { titulo: 'Pelota FC · erros no app', texto: `${n} erro${n === 1 ? '' : 's'} novo${n === 1 ? '' : 's'} desde ontem (${tipos} tipo${tipos === 1 ? '' : 's'}). Abra o Painel do dono → Erros.`, tag: 'erros-app', url: URL_APP + '?abrir=erros' });
 }
-async function enviarTodos(avisos) { for (const a of avisos) if (a && a.para && a.para.length) await enviarPara(a.para, a); }
+// Cada tipo de aviso automático pode ser desligado pelo administrador (config/geral.pushOff). O tipo sai do começo da tag.
+const TIPO_TAG = [['pel-', 'pelada'], ['mens15-', 'prazo15'], ['conv-', 'convocado'], ['lib-', 'convocado'], ['exp-', 'prazopix'], ['pres-', 'presenca'],
+  ['times-', 'times'], ['aval-', 'avaliar'], ['notas-', 'resultado'], ['lanc-', 'gols'], ['cob', 'cobranca'], ['x-', 'cobranca'], ['pag30-', 'cobranca'],
+  ['membro-', 'entrar'], ['mural-', 'mural'], ['rodada', 'votacao'], ['niver-', 'aniversario']];
+function tipoAviso(a) { if (a.tipo) return a.tipo; const t = String(a.tag || ''); const x = TIPO_TAG.find(([pre]) => t.startsWith(pre)); return x ? x[1] : ''; }
+async function enviarTodos(avisos, ctx) {
+  const off = (ctx && ctx.cfg && ctx.cfg.pushOff) || {};
+  for (const a of avisos) if (a && a.para && a.para.length && !off[tipoAviso(a)]) await enviarPara(a.para, a);
+}
 
 /* ---------- "Vou" / "Não vou" direto da notificação (Android) ----------
    A chave vai só no aviso que chega no celular daquela pessoa e vale só para aquela pelada.
@@ -159,21 +167,21 @@ async function contexto(gid, { jog = false, pres = false, membros = false, pel =
 exports.pushPeladaCriada = onDocumentCreated('grupos/{gid}/peladas/{pid}', async ev => {
   const p = ev.data && ev.data.data(); if (!p) return;
   const ctx = await contexto(ev.params.gid, { membros: true, jog: true, pres: true });
-  await enviarTodos(R.pelCriada(p, ev.params.pid, ctx));
+  await enviarTodos(R.pelCriada(p, ev.params.pid, ctx), ctx);
 });
 
 exports.pushPeladaAtualizada = onDocumentUpdated('grupos/{gid}/peladas/{pid}', async ev => {
   const a = ev.data.before.data() || {}, b = ev.data.after.data() || {};
   if (!R.pelMudouAlgo(a, b)) return;
   const ctx = await contexto(ev.params.gid, { pres: true });
-  await enviarTodos(R.pelAtualizada(a, b, ev.params.pid, ctx));
+  await enviarTodos(R.pelAtualizada(a, b, ev.params.pid, ctx), ctx);
 });
 
 exports.pushPresenca = onDocumentWritten('grupos/{gid}/presencas/{uid}', async ev => {
   const a = ev.data.before.exists ? ev.data.before.data() : null, b = ev.data.after.exists ? ev.data.after.data() : null;
   if (!b) return;
   const ctx = await contexto(ev.params.gid, { jog: true, pel: true });
-  await enviarTodos(R.presAtualizada(a, b, ev.params.uid, ctx));
+  await enviarTodos(R.presAtualizada(a, b, ev.params.uid, ctx), ctx);
 });
 
 // Dúvidas de suporte: avisa o dono do app quando chega dúvida (ou mensagem nova do grupo) e avisa o administrador quando o dono responde
@@ -194,20 +202,20 @@ exports.pushSuporte = onDocumentWritten('suporte/{id}', async ev => {
 exports.pushMembroNovo = onDocumentCreated('grupos/{gid}/membros/{uid}', async ev => {
   const m = ev.data && ev.data.data(); if (!m) return;
   const ctx = await contexto(ev.params.gid);
-  await enviarTodos(R.membroNovo(m, ev.params.uid, ctx));
+  await enviarTodos(R.membroNovo(m, ev.params.uid, ctx), ctx);
 });
 
 exports.pushMural = onDocumentWritten('grupos/{gid}/mural/{doc}', async ev => {
   const a = ev.data.before.exists ? ev.data.before.data() : null, b = ev.data.after.exists ? ev.data.after.data() : null;
   if (!b) return;
   const ctx = await contexto(ev.params.gid, { membros: true });
-  await enviarTodos(R.muralAtualizado(a, b, ctx));
+  await enviarTodos(R.muralAtualizado(a, b, ctx), ctx);
 });
 
 exports.pushAvaliacaoCompleta = onDocumentCreated('grupos/{gid}/avaliacoes/{rid}', async ev => {
   const r = ev.data && ev.data.data(); if (!r) return;
   const ctx = await contexto(ev.params.gid, { membros: true });
-  await enviarTodos(R.rodadaNova(r, ctx));
+  await enviarTodos(R.rodadaNova(r, ctx), ctx);
 });
 
 // Boas-vindas: confirma na hora que a notificação chegou no celular
@@ -233,7 +241,7 @@ exports.pushAvaliacao = onSchedule({ schedule: 'every 15 minutes', timeZone: 'Am
     const ctx = await contexto(g.id, { pres: true });
     for (const d of abrir) {
       await d.ref.update({ pushAvalEm: agora }); // marca antes de enviar: nunca avisa duas vezes
-      await enviarTodos(R.avisoAval(d.data(), d.id, ctx));
+      await enviarTodos(R.avisoAval(d.data(), d.id, ctx), ctx);
     }
   }
 });
@@ -244,7 +252,7 @@ exports.pushCobrancaExtra = onDocumentWritten('grupos/{gid}/caixa/{mes}', async 
   if (!b || !b.extras) return;
   const novas = Object.keys(b.extras).filter(k => !((a && a.extras) || {})[k]); if (!novas.length) return;
   const ctx = await contexto(ev.params.gid, { pres: true });
-  await enviarTodos(R.extrasNovas(a, b, ctx));
+  await enviarTodos(R.extrasNovas(a, b, ctx), ctx);
 });
 
 // A cada 15 minutos: 15 min antes do prazo dos mensalistas, lembra quem ainda não respondeu
@@ -256,7 +264,7 @@ exports.pushPrazoMensalistas = onSchedule({ schedule: 'every 15 minutes', timeZo
     const alvo = ps.docs.filter(d => R.prazoMensChegando(d.data(), agora + 5 * 60e3)); // agenda de 15 em 15: pega a janela
     if (!alvo.length) continue;
     const ctx = await contexto(g.id, { pres: true, jog: true, membros: true });
-    for (const d of alvo) { await d.ref.update({ pushMens15: agora }); await enviarTodos(R.lembreteMens(d.data(), d.id, ctx)); }
+    for (const d of alvo) { await d.ref.update({ pushMens15: agora }); await enviarTodos(R.lembreteMens(d.data(), d.id, ctx), ctx); }
   }
 });
 
@@ -268,7 +276,7 @@ exports.pushCobrancas = onSchedule({ schedule: '0 10 * * *', timeZone: 'America/
   try { await avisarErros(); } catch (e) { logger.error('aviso de erros', e.message); }
   const grupos = await db.collection('grupos').select().get();
   for (const g of grupos.docs) {
-    try { const ctx = await contexto(g.id, { pres: true, jog: true, pel: true, caixa: true }); await enviarTodos(R.avisosCobranca(ctx, hoje)); }
+    try { const ctx = await contexto(g.id, { pres: true, jog: true, pel: true, caixa: true, membros: true }); await enviarTodos(R.avisosCobranca(ctx, hoje), ctx); await enviarTodos(R.aniversarios(ctx, hoje), ctx); }
     catch (e) { logger.warn('cobrancas', g.id, e.message); }
   }
 });
@@ -288,7 +296,7 @@ exports.pushPrazoPagamento = onSchedule({ schedule: 'every 5 minutes', timeZone:
       const up = {}; for (const j of r.venc) { up['expirou.' + j] = agora; up['conv.' + j] = admin.firestore.FieldValue.delete(); up['aprov.' + j] = admin.firestore.FieldValue.delete(); }
       for (const j of r.prox) { up['conv.' + j] = agora; up['aprov.' + j] = agora; }
       await d.ref.update(up); // a convocação do próximo dispara o aviso dele (pushPeladaAtualizada)
-      await enviarTodos(R.avisosVencidos(p, d.id, ctx, r));
+      await enviarTodos(R.avisosVencidos(p, d.id, ctx, r), ctx);
     }
   }
 });

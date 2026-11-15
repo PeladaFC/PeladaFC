@@ -293,6 +293,7 @@ function render() {
       <label class="field"><span>Apelido</span><input type="text" id="p-ap" value="${escH(p.apelido || '')}" placeholder="Como te chamam no campo"></label>
       ${campoUFCidade('p', UIp.pcid ?? p.cidade ?? '', UIp.puf ?? p.uf ?? '')}
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>
+      <label class="field"><span>Data de nascimento</span><input type="date" id="p-nasc" value="${escH(p.nasc || '')}" min="1930-01-01" max="${new Date().toISOString().slice(0, 10)}" required><span class="sub" style="text-transform:none;letter-spacing:0;font-weight:400">No dia do seu aniversário, a galera das suas peladas recebe um aviso para te dar os parabéns. Para o grupo aparece só o dia e o mês.</span></label>
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
       <label class="row" style="gap:8px;align-items:flex-start;flex-wrap:nowrap;font-size:14px"><input type="checkbox" id="p-compnota" ${p.compartilharNota !== false ? 'checked' : ''} style="margin-top:3px"><span>Usar minha nota das outras peladas quando eu entrar numa pelada nova <span class="sub" style="display:block">O administrador vê só uma nota sugerida, já ajustada ao nível da pelada.</span></span></label>
       <button class="btn primary block" type="submit">Salvar</button></form>
@@ -560,7 +561,7 @@ async function aceitarConvite() {
   const { gid, codigo, grupo } = CONVITE, p = PERFIL || {};
   try {
     await B.batch([
-      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: grupo.evento ? null : (UIp.prefere || 'mensalista'), codigo, t: Date.now() } },
+      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { niver: p.niver || null, nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: grupo.evento ? null : (UIp.prefere || 'mensalista'), codigo, t: Date.now() } },
       { op: 'merge', path: 'users/' + EU.uid, data: { grupos: { [gid]: { t: Date.now() } } } }
     ]);
     GRUPOS[gid] = grupo; CONVITE = null; aviso('Pronto! Agora é só esperar o administrador autorizar sua entrada.');
@@ -577,7 +578,7 @@ async function criarGrupo(f) {
       { op: 'set', path: 'grupos/' + gid, data: { nome: f.nome, dia: f.dia, hora: f.hora, evento: !!f.evento, data: f.data || null, dono: EU.uid, admins: [EU.uid], codigo, criadoEm: now, ...(repGuardado() ? { rep: repGuardado() } : {}) } },
       { op: 'set', path: 'codigos/' + codigo, data: { gid } },
       { op: 'set', path: `grupos/${gid}/config/geral`, data: cfg },
-      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: f.evento ? null : 'mensalista', codigo, t: now } },
+      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { niver: p.niver || null, nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: f.evento ? null : 'mensalista', codigo, t: now } },
       { op: 'merge', path: 'users/' + EU.uid, data: { grupos: { [gid]: { t: now } } } }
     ]);
     GRUPOS[gid] = { nome: f.nome, dia: f.dia, hora: f.hora, evento: !!f.evento, data: f.data || null, dono: EU.uid, admins: [EU.uid], codigo };
@@ -1574,10 +1575,12 @@ document.addEventListener('submit', async e => {
     if (!val('p-nome')) { aviso('Coloque seu nome.'); return; }
     if (!val('p-cidade') || !$('p-uf').value) { aviso('Diga sua cidade e seu estado.'); return; }
     const pos = UIp.pos || (PERFIL && PERFIL.pos) || 'MEI';
+    const nasc = ($('p-nasc') || {}).value || '', niver = nasc ? nasc.slice(5, 10) : null;
+    if (!nasc) { aviso('Coloque sua data de nascimento.'); const c = $('p-nasc'); if (c) { c.scrollIntoView({ block: 'center', behavior: 'smooth' }); c.focus(); } return; }
     OCUPADO = true;
     const foto = UIp.foto !== undefined ? UIp.foto : ((PERFIL && PERFIL.foto) || null);
-    try { await B.set('users/' + EU.uid, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value, email: EU.email || '', compartilharNota: !!($('p-compnota') || { checked: true }).checked }, { merge: true }); PERFIL = { ...(PERFIL || {}), nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value }; UIp.pcid = UIp.puf = undefined;
-      await Promise.all(Object.keys(GRUPOS).map(g => B.set(`grupos/${g}/membros/${EU.uid}`, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto }, { merge: true }).catch(e => console.warn(e))));
+    try { await B.set('users/' + EU.uid, { nasc, niver, nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value, email: EU.email || '', compartilharNota: !!($('p-compnota') || { checked: true }).checked }, { merge: true }); PERFIL = { ...(PERFIL || {}), nasc, niver, nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value }; UIp.pcid = UIp.puf = undefined;
+      await Promise.all(Object.keys(GRUPOS).map(g => B.set(`grupos/${g}/membros/${EU.uid}`, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, niver }, { merge: true }).catch(e => console.warn(e))));
       UIp.foto = undefined; OCUPADO = false; await depoisDoLogin(); }
     catch (err) { aviso(msgErro(err)); OCUPADO = false; }
     return;
