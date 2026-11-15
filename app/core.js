@@ -752,10 +752,13 @@ const ART={bg1:'#0B3F20',bg2:'#17602F',chalk:'rgba(255,255,255,.13)',y:'#F2C12E'
 const POSCOR={GOL:'#C99A10',ZAG:'#3F7BC6',LAT:'#1A9393',VOL:'#5E8C1F',MEI:'#8E5FC0',ATA:'#D2533B'};
 const PREMIO={mvp:{t:'Craque da pelada',s:'CRAQUE'},art:{t:'Artilheiro',s:'ARTILHEIRO'},gar:{t:'Garçom',s:'GARÇOM'},def:{t:'Xerife',s:'XERIFE'},gol:{t:'Melhor goleiro',s:'GOLEIRO'}};
 const PREMIOS_ARTE=['mvp','art','gar','def','gol'];const POS_XERIFE=['ZAG','VOL'];
-async function fontsReady(){try{await Promise.all(['800 120px "Saira Condensed"','700 60px "Saira Condensed"','600 36px Figtree','500 30px Figtree'].map(f=>document.fonts.load(f)).concat([carregarImg(ICONE_APP)]))}catch(e){}}
+async function fontsReady(){try{await Promise.all(['800 120px "Saira Condensed"','700 60px "Saira Condensed"','600 36px Figtree','500 30px Figtree'].map(f=>document.fonts.load(f)).concat([carregarImg(ICONE_APP),carregarImg(MARCA_APP)]))}catch(e){}}
 /* marca do Pelota FC, bem discreta, no rodapé de todas as artes */
 const ICONE_APP='icon-192.png';
-function marcaApp(ctx,W,H){const im=FOTO_CACHE[ICONE_APP],s=38,txt='PELOTA FC';ctx.save();ctx.globalAlpha=.72;ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=6;
+const MARCA_APP='marca-branca.png';
+function marcaApp(ctx,W,H){const mk=FOTO_CACHE[MARCA_APP];
+  if(mk){const h=58,w=mk.width*h/mk.height;ctx.save();ctx.globalAlpha=.8;ctx.shadowColor='rgba(0,0,0,.4)';ctx.shadowBlur=8;ctx.drawImage(mk,(W-w)/2,H-34-h,w,h);ctx.restore();return}
+  const im=FOTO_CACHE[ICONE_APP],s=38,txt='PELOTA FC';ctx.save();ctx.globalAlpha=.72;ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=6;
   ctx.font='700 24px Figtree, sans-serif';const tw=ctx.measureText(txt).width+txt.length*2.5,tot=(im?s+12:0)+tw,x0=(W-tot)/2,y=H-30-s;
   if(im){ctx.save();ctx.beginPath();ctx.roundRect(x0,y,s,s,9);ctx.clip();ctx.drawImage(im,x0,y,s,s);ctx.restore()}
   ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';let x=(im?x0+s+12:x0);for(const ch of txt){ctx.fillText(ch,x,y+s/2+1);x+=ctx.measureText(ch).width+2.5}
