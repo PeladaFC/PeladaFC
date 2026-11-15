@@ -64,7 +64,7 @@ const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const parseD=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
 const dLong=s=>{const d=parseD(s);return DIAS[d.getDay()]+', '+pad(d.getDate())+'/'+pad(d.getMonth()+1)};
 const dShort=s=>{const d=parseD(s);return DIAS3[d.getDay()]+' '+pad(d.getDate())+'/'+pad(d.getMonth()+1)};
-const cfg=()=>Object.assign({},DEF_CFG,S.config||{});
+const cfg=()=>Object.assign({},DEF_CFG,{nome:(GRUPO&&GRUPO.nome)||DEF_CFG.nome},S.config||{}); // enquanto carrega, usa o nome do grupo aberto (nunca o padrão)
 let POS_IDX=null;
 function posIdx(){if(!POS_IDX){POS_IDX={};for(const d of Object.values(S.pres||{}))if(d&&d.jogador&&d.pos)POS_IDX[d.jogador]=d.pos}return POS_IDX}
 const J=id=>{const j=S.jog[id];if(!j)return{nome:'(removido)',pos:'MEI'};const o=posIdx()[id];return o&&o!==j.pos?{...j,pos:o,pos2:j.pos2===o?'':j.pos2}:j};
@@ -1942,26 +1942,28 @@ function tElenco(A){
 /* --- Avisos --- */
 /* tudo o que o servidor manda sozinho (functions/regras.js e index.js) */
 const AVISOS_AUTO=[
-  {e:'⚽',n:'Pelada nova',q:'quando você abre a lista de presença, com os botões Vou / Não vou',p:'todos'},
-  {e:'⏰',n:'Faltam 15 minutos',q:'15 min antes de fechar o prazo dos mensalistas',p:'mensalistas que não responderam',pa:1},
-  {e:'✅',n:'Convocado / vaga liberada',q:'quando o diarista é chamado da fila ou você libera a vaga',p:'o diarista'},
-  {e:'⌛',n:'Prazo do Pix do diarista',q:'30 min sem pagar: a vaga passa para o próximo da fila',p:'o diarista e o próximo',pa:1},
-  {e:'📋',n:'Presença',q:'quando alguém confirma, desiste ou pede vaga',p:'administradores'},
-  {e:'🎲',n:'Times sorteados',q:'quando você sorteia os times',p:'cada jogador, com o seu time'},
-  {e:'⭐',n:'Avalie a galera',q:'quando a pelada termina',p:'quem jogou'},
-  {e:'🏆',n:'Saiu o resultado',q:'quando a votação fecha',p:'quem jogou'},
-  {e:'⚽',n:'Gols para aprovar / aprovados',q:'quando um jogador lança gols e quando você aprova',p:'administradores e o jogador'},
-  {e:'💰',n:'Cobranças',q:'às 10h: mensalidade nova (dia 1º), vence hoje e 5 dias de atraso; cobrança extra nova; diária do evento ao confirmar. Tocar abre o Pix',p:'quem deve'},
-  {e:'👋',n:'Pedido para entrar',q:'quando alguém entra pelo convite',p:'administradores'},
-  {e:'📣',n:'Recado do mural',q:'quando você publica no mural',p:'todos'},
-  {e:'🗳️',n:'Votação do elenco aberta',q:'quando você abre a avaliação da galera',p:'todos'}];
+  {k:'pelada',e:'⚽',n:'Pelada nova',q:'quando você abre a lista de presença, com os botões Vou / Não vou',p:'todos'},
+  {k:'prazo15',e:'⏰',n:'Faltam 15 minutos',q:'15 min antes de fechar o prazo dos mensalistas',p:'mensalistas que não responderam',pa:1},
+  {k:'convocado',e:'✅',n:'Convocado / vaga liberada',q:'quando o diarista é chamado da fila ou você libera a vaga',p:'o diarista'},
+  {k:'prazopix',e:'⌛',n:'Prazo do Pix do diarista',q:'30 min sem pagar: a vaga passa para o próximo da fila',p:'o diarista e o próximo',pa:1},
+  {k:'presenca',e:'📋',n:'Presença',q:'quando alguém confirma, desiste ou pede vaga',p:'administradores'},
+  {k:'times',e:'🎲',n:'Times sorteados',q:'quando você sorteia os times',p:'cada jogador, com o seu time'},
+  {k:'avaliar',e:'⭐',n:'Avalie a galera',q:'quando a pelada termina',p:'quem jogou'},
+  {k:'resultado',e:'🏆',n:'Saiu o resultado',q:'quando a votação fecha',p:'quem jogou'},
+  {k:'gols',e:'⚽',n:'Gols para aprovar / aprovados',q:'quando um jogador lança gols e quando você aprova',p:'administradores e o jogador'},
+  {k:'cobranca',e:'💰',n:'Cobranças',q:'às 10h: mensalidade nova (dia 1º), vence hoje e 5 dias de atraso; cobrança extra nova; diária do evento ao confirmar. Tocar abre o Pix',p:'quem deve'},
+  {k:'aniversario',e:'🎂',n:'Aniversariante do dia',q:'às 10h, no dia do aniversário de quem informou a data no perfil',p:'todos'},
+  {k:'entrar',e:'👋',n:'Pedido para entrar',q:'quando alguém entra pelo convite',p:'administradores'},
+  {k:'mural',e:'📣',n:'Recado do mural',q:'quando você publica no mural',p:'todos'},
+  {k:'votacao',e:'🗳️',n:'Votação do elenco aberta',q:'quando você abre a avaliação da galera',p:'todos'}];
 function tAvisos(A){
   let h=`<h2 style="margin-bottom:12px">Avisos</h2>`;
   // 1) o que o app manda sozinho, por notificação no celular
-  const nAuto=AVISOS_AUTO.filter(x=>!x.pa||!EV()).length;
+  const LA=AVISOS_AUTO.filter(x=>!x.pa||!EV()),off=cfg().pushOff||{},nAuto=LA.length,nOff=LA.filter(x=>off[x.k]).length;
   h+=`<details class="panel av-auto"${UI.avAuto?' open':''} data-av-auto><summary><div class="panel-h" style="margin:0"><h3>🔔 Automáticos</h3><span class="av-tag auto">sozinho</span></div>
-    <p class="sub" style="margin:6px 0 0">${nAuto} notificações que o app manda sozinho para o celular de cada um. Você não precisa fazer nada. <b class="av-ver">${UI.avAuto?'Esconder':'Ver quais são'}</b></p></summary>
-    <div class="av-l">${AVISOS_AUTO.filter(x=>!x.pa||!EV()).map(x=>`<div class="av-i"><span class="av-e">${x.e}</span><div class="grow"><b>${x.n}</b><div class="sub">${x.q} · <i>${x.p}</i></div></div></div>`).join('')}</div></details>`;
+    <p class="sub" style="margin:6px 0 0">${nAuto} notificações que o app manda sozinho para o celular de cada um. Você não precisa fazer nada.${nOff?` <b style="color:var(--red)">${nOff} desligada${nOff>1?'s':''}.</b>`:''} <b class="av-ver">${UI.avAuto?'Esconder':A?'Ver e escolher':'Ver quais são'}</b></p></summary>
+    ${A?'<p class="sub" style="margin:8px 0 2px">Todas vêm ligadas e são recomendadas. Desligue só a que não fizer sentido para sua pelada: ela para de ser enviada para todos do grupo.</p>':''}
+    <div class="av-l">${LA.map(x=>`<div class="av-i${off[x.k]?' off':''}"><span class="av-e">${x.e}</span><div class="grow"><b>${x.n}</b> <span class="av-rec">recomendado</span><div class="sub">${x.q} · <i>${x.p}</i></div></div>${A?`<label class="sw" aria-label="${off[x.k]?'Ligar':'Desligar'} ${esc(x.n)}"><input type="checkbox" data-act="push-off" data-k="${x.k}" ${off[x.k]?'':'checked'}><span></span></label>`:''}</div>`).join('')}</div></details>`;
   // 2) agenda: lembretes para o administrador mandar
   h+=`<div class="panel av-agenda" style="margin-top:12px"><div class="panel-h"><h3>📅 Agenda</h3><span class="av-tag manual">você manda</span></div>
     <p class="sub" style="margin:6px 0 8px">Não vão sozinhos. No dia e hora marcados aparece um alerta amarelo no topo da aba Jogo com a mensagem pronta. Você confere e manda no app ou no WhatsApp. Repete toda semana até você pausar ou apagar.</p>
@@ -2678,6 +2680,7 @@ document.addEventListener('click',e=>{
       [['convocacao',w(-4),'09:00'],['cobrar',w(-2),'19:00'],['lista',w(-1),'20:00'],['times',dia,'07:00'],['resultado',dia,'12:00'],['pagamento',1,'10:00']]
         .forEach(([tipo,d2,hora])=>put('avisos/'+uid('a'),{tipo,dia:d2,hora,ativo:true}));toast('Agenda sugerida criada. Ajuste à vontade.');break}
     case'premio':break;
+    case'push-off':{const o={...(cfg().pushOff||{})};o[d.k]=!b.checked;patch('config/geral',{pushOff:o});toast(o[d.k]?'Desligado: esse aviso não vai mais ser enviado.':'Ligado de novo.');break}
     case'minha-pos-abrir':sheetMinhaPos();break;
     case'minha-pos':{const id=meuJogador();if(!id||!trocaPosAberta()){sheetMinhaPos();return}const de=J(id).pos;if(d.v===de){closeSheet();return}
       const pr=S.pres[myId]||{pel:{}};put('presencas/'+myId,{...pr,pos:d.v===S.jog[id].pos?null:d.v,posTroca:{de,para:d.v,t:Date.now()}});closeSheet();toast(`Pronto! Agora você joga de ${POS[d.v].toLowerCase()} neste grupo.`);break}

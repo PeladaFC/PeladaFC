@@ -223,6 +223,16 @@ function cobrancaEvento(p, pid, jid, uid, ctx) {
 // início da pelada em ms (Recife, UTC-3)
 function inicioMs(p, cfg) { return new Date(`${p.data}T${horaIni(p, cfg)}:00-03:00`).getTime(); }
 // mesma conta da lista do app: a pessoa que confirma agora entra na lista ou vai para a espera?
+// Aniversário: no dia, às 10h, avisa todo o grupo (a data fica só como dia e mês no perfil de quem quis informar)
+function aniversarios(ctx, hoje) {
+  const md = String(hoje).slice(5, 10), out = [];
+  for (const [u, m] of Object.entries(ctx.membros || {})) {
+    if (!m || m.niver !== md) continue; const nome = m.apelido || String(m.nome || '').split(' ')[0] || 'Alguém';
+    const para = todos(ctx); if (!para.length) continue;
+    out.push({ para, titulo: `🎂 Hoje é aniversário de ${nome}!`, texto: `${nomePelada(ctx)}: mande os parabéns para ${nome}. 🎉`, tag: 'niver-' + u + '-' + hoje });
+  }
+  return out;
+}
 function listaCheiaPara(p, pid, ctx, jid) {
   const cfg = ctx.cfg || {}, jog = ctx.jog || {}, J = id => jog[id] || {};
   const vagas = Math.max(2, Number(cfg.vagas) || (Number(cfg.times) || 2) * (Number(cfg.porTime) || 5));
@@ -237,4 +247,4 @@ function listaCheiaPara(p, pid, ctx, jid) {
   return elig.length >= vagas;
 }
 const ehDiaristaSrv = (ctx, jid) => !(ctx.cfg || {}).evento && ((ctx.jog || {})[jid] || {}).tipo === 'diarista';
-module.exports = { inicioMs, listaCheiaPara, ehDiaristaSrv, horaIni, nomePelada, aPagar, vencidosConv, avisosVencidos, cobrancaConvocado, devidas, avisosCobranca, extrasNovas, cobrancaEvento, prazoMensChegando, lembreteMens, rodadaNova, dShort, fimDe, janelaH, pelCriada, pelMudouAlgo, pelAtualizada, presAtualizada, membroNovo, muralAtualizado, avalAbriu, avisoAval, participantes, uidsDe };
+module.exports = { aniversarios, inicioMs, listaCheiaPara, ehDiaristaSrv, horaIni, nomePelada, aPagar, vencidosConv, avisosVencidos, cobrancaConvocado, devidas, avisosCobranca, extrasNovas, cobrancaEvento, prazoMensChegando, lembreteMens, rodadaNova, dShort, fimDe, janelaH, pelCriada, pelMudouAlgo, pelAtualizada, presAtualizada, membroNovo, muralAtualizado, avalAbriu, avisoAval, participantes, uidsDe };

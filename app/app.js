@@ -293,6 +293,8 @@ function render() {
       <label class="field"><span>Apelido</span><input type="text" id="p-ap" value="${escH(p.apelido || '')}" placeholder="Como te chamam no campo"></label>
       ${campoUFCidade('p', UIp.pcid ?? p.cidade ?? '', UIp.puf ?? p.uf ?? '')}
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>
+      ${(() => { const [nm0, nd0] = String(p.niver || '').split('-'); const MES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+        return `<div class="field"><span>Aniversário <small style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.7">(opcional)</small></span><div class="niver-l"><select id="p-niv-d" aria-label="Dia do aniversário"><option value="">Dia</option>${Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map(d => `<option ${d === nd0 ? 'selected' : ''}>${d}</option>`).join('')}</select><select id="p-niv-m" aria-label="Mês do aniversário"><option value="">Mês</option>${MES.map((m, i) => { const v = String(i + 1).padStart(2, '0'); return `<option value="${v}" ${v === nm0 ? 'selected' : ''}>${m}</option>`; }).join('')}</select></div><span class="sub" style="text-transform:none;letter-spacing:0;font-weight:400">Só dia e mês. No dia, a galera das suas peladas recebe um aviso para te dar os parabéns.</span></div>`; })()}
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
       <label class="row" style="gap:8px;align-items:flex-start;flex-wrap:nowrap;font-size:14px"><input type="checkbox" id="p-compnota" ${p.compartilharNota !== false ? 'checked' : ''} style="margin-top:3px"><span>Usar minha nota das outras peladas quando eu entrar numa pelada nova <span class="sub" style="display:block">O administrador vê só uma nota sugerida, já ajustada ao nível da pelada.</span></span></label>
       <button class="btn primary block" type="submit">Salvar</button></form>
@@ -560,7 +562,7 @@ async function aceitarConvite() {
   const { gid, codigo, grupo } = CONVITE, p = PERFIL || {};
   try {
     await B.batch([
-      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: grupo.evento ? null : (UIp.prefere || 'mensalista'), codigo, t: Date.now() } },
+      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { niver: p.niver || null, nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: grupo.evento ? null : (UIp.prefere || 'mensalista'), codigo, t: Date.now() } },
       { op: 'merge', path: 'users/' + EU.uid, data: { grupos: { [gid]: { t: Date.now() } } } }
     ]);
     GRUPOS[gid] = grupo; CONVITE = null; aviso('Pronto! Agora é só esperar o administrador autorizar sua entrada.');
@@ -577,7 +579,7 @@ async function criarGrupo(f) {
       { op: 'set', path: 'grupos/' + gid, data: { nome: f.nome, dia: f.dia, hora: f.hora, evento: !!f.evento, data: f.data || null, dono: EU.uid, admins: [EU.uid], codigo, criadoEm: now, ...(repGuardado() ? { rep: repGuardado() } : {}) } },
       { op: 'set', path: 'codigos/' + codigo, data: { gid } },
       { op: 'set', path: `grupos/${gid}/config/geral`, data: cfg },
-      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: f.evento ? null : 'mensalista', codigo, t: now } },
+      { op: 'set', path: `grupos/${gid}/membros/${EU.uid}`, data: { niver: p.niver || null, nome: p.nome || EU.nome || '', apelido: p.apelido || '', tel: p.tel || '', pos: p.pos || 'MEI', foto: p.foto || null, prefere: f.evento ? null : 'mensalista', codigo, t: now } },
       { op: 'merge', path: 'users/' + EU.uid, data: { grupos: { [gid]: { t: now } } } }
     ]);
     GRUPOS[gid] = { nome: f.nome, dia: f.dia, hora: f.hora, evento: !!f.evento, data: f.data || null, dono: EU.uid, admins: [EU.uid], codigo };
@@ -1576,8 +1578,10 @@ document.addEventListener('submit', async e => {
     const pos = UIp.pos || (PERFIL && PERFIL.pos) || 'MEI';
     OCUPADO = true;
     const foto = UIp.foto !== undefined ? UIp.foto : ((PERFIL && PERFIL.foto) || null);
-    try { await B.set('users/' + EU.uid, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value, email: EU.email || '', compartilharNota: !!($('p-compnota') || { checked: true }).checked }, { merge: true }); PERFIL = { ...(PERFIL || {}), nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value }; UIp.pcid = UIp.puf = undefined;
-      await Promise.all(Object.keys(GRUPOS).map(g => B.set(`grupos/${g}/membros/${EU.uid}`, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto }, { merge: true }).catch(e => console.warn(e))));
+    const nd = ($('p-niv-d') || {}).value || '', nmv = ($('p-niv-m') || {}).value || '', niver = nd && nmv ? nmv + '-' + nd : null;
+    if ((nd && !nmv) || (!nd && nmv)) { aviso('Escolha o dia e o mês do aniversário, ou deixe os dois em branco.'); return; }
+    try { await B.set('users/' + EU.uid, { niver, nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value, email: EU.email || '', compartilharNota: !!($('p-compnota') || { checked: true }).checked }, { merge: true }); PERFIL = { ...(PERFIL || {}), niver, nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value }; UIp.pcid = UIp.puf = undefined;
+      await Promise.all(Object.keys(GRUPOS).map(g => B.set(`grupos/${g}/membros/${EU.uid}`, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, niver }, { merge: true }).catch(e => console.warn(e))));
       UIp.foto = undefined; OCUPADO = false; await depoisDoLogin(); }
     catch (err) { aviso(msgErro(err)); OCUPADO = false; }
     return;
