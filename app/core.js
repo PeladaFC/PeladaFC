@@ -323,7 +323,10 @@ function premiosDe(p,pid){pid=pid||pidOf(p);const pr={...(p.premios||{})},cp=cra
   const st=p.stats||{},ids=jogaram(p).filter(id=>S.jog[id]),top=f=>{const r=ids.filter(id=>(st[id]?.[f]||0)>0).sort((a,b)=>(st[b][f]-st[a][f])||(notaJogo(p,pid,b)??0)-(notaJogo(p,pid,a)??0));return r[0]||null};
   if(!pr.art)pr.art=top('g');if(!pr.gar)pr.gar=top('a');
   if(!pr.def&&p.aval){const d=rankingNotas(p,pid).filter(x=>x.n!=null&&POS_XERIFE.includes(J(x.id).pos));if(d.length)pr.def=d[0].id}
+  if(!pr.gol&&p.aval){const d=rankingNotas(p,pid).filter(x=>x.n!=null&&J(x.id).pos==='GOL');if(d.length)pr.gol=d[0].id}
   return pr}
+// destaques que aparecem (o administrador pode esconder um prêmio, mas não trocar quem ganhou)
+function premiosVis(p,pid){const pr=premiosDe(p,pid),oc=p.ocultos||{};for(const k in oc)if(oc[k])delete pr[k];return pr}
 /* gols e assistências lançados pelo próprio jogador: ficam pendentes até um administrador aprovar */
 function lancStatus(p,u,L){if(!L)return null;if((p.lancOk||{})[u]>=L.t)return'ok';if((p.lancRec||{})[u]>=L.t)return'rec';return'pend'}
 function lancPendentes(){const out=[];for(const[u,d] of Object.entries(S.pres||{})){if(!d||!d.jogador||!S.jog[d.jogador])continue;
@@ -568,7 +571,7 @@ function msg0(tipo,ctx={}){
     const fe=J.filter(g=>!g.bye&&feito(g)),gols=sum(fe.map(g=>(g.ga||0)+(g.gb||0)));
     if(J.length){out.push('','📌 *RESUMO*',`Jogos disputados: ${fe.length} de ${J.filter(g=>!g.bye).length}`,`Gols: ${gols}${fe.length?` · média de ${(gols/fe.length).toFixed(1).replace('.',',')} por jogo`:''}`)}
     return out.join('\n')}
-  if(tipo==='resultado'){const pr=premiosDe(p),st=p.stats||{},out=[`🏁 *RESULTADO · ${dShort(p.data)}*`,''];
+  if(tipo==='resultado'){const pr=premiosVis(p),st=p.stats||{},out=[`🏁 *RESULTADO · ${dShort(p.data)}*`,''];
     {const cp=p.times?campeaoDe(p):null,vv=p.times?vitDe(p):[];if(cp!=null)out.push(`🏆 Campeão: ${CORES[p.times[cp].cor].e} ${nomeTime(p.times[cp].cor)}`);
       if(formatoDe(p)!=='conv'&&(p.jogos||[]).length){if(cp!=null)out.push('');out.push('⚽ JOGOS');let fa=null;for(const g of p.jogos){if(g.bye||!feito(g))continue;{const cab=g.fase==='liga'&&g.rd?g.rd+'ª rodada':(FASE_N[g.fase]||g.fase);if(cab!==fa){fa=cab;out.push(cab)}}const tn=i=>CORES[p.times[i].cor].e+' '+nomeTime(p.times[i].cor);out.push(`${tn(g.a)} ${g.ga} × ${g.gb} ${tn(g.b)}${g.pa!=null&&g.ga===g.gb?` (pên. ${g.pa}×${g.pb})`:''}`);if((g.gols||[]).length)out.push('   ⚽ '+g.gols.map(e=>nm(e.j)+(e.as?' ('+nm(e.as)+')':'')).join(', '))}out.push('')}
       else if(vv.some(v=>v>0)){p.times.forEach((t,i)=>out.push(`${CORES[t.cor].e} ${nomeTime(t.cor)}: ${vv[i]||0} vitória(s)`));out.push('')}else if(cp!=null)out.push('')}
@@ -749,7 +752,14 @@ const ART={bg1:'#0B3F20',bg2:'#17602F',chalk:'rgba(255,255,255,.13)',y:'#F2C12E'
 const POSCOR={GOL:'#C99A10',ZAG:'#3F7BC6',LAT:'#1A9393',VOL:'#5E8C1F',MEI:'#8E5FC0',ATA:'#D2533B'};
 const PREMIO={mvp:{t:'Craque da pelada',s:'CRAQUE'},art:{t:'Artilheiro',s:'ARTILHEIRO'},gar:{t:'Garçom',s:'GARÇOM'},def:{t:'Xerife',s:'XERIFE'},gol:{t:'Melhor goleiro',s:'GOLEIRO'}};
 const PREMIOS_ARTE=['mvp','art','gar','def','gol'];const POS_XERIFE=['ZAG','VOL'];
-async function fontsReady(){try{await Promise.all(['800 120px "Saira Condensed"','700 60px "Saira Condensed"','600 36px Figtree','500 30px Figtree'].map(f=>document.fonts.load(f)))}catch(e){}}
+async function fontsReady(){try{await Promise.all(['800 120px "Saira Condensed"','700 60px "Saira Condensed"','600 36px Figtree','500 30px Figtree'].map(f=>document.fonts.load(f)).concat([carregarImg(ICONE_APP)]))}catch(e){}}
+/* marca do Pelota FC, bem discreta, no rodapé de todas as artes */
+const ICONE_APP='icon-192.png';
+function marcaApp(ctx,W,H){const im=FOTO_CACHE[ICONE_APP],s=38,txt='PELOTA FC';ctx.save();ctx.globalAlpha=.72;ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=6;
+  ctx.font='700 24px Figtree, sans-serif';const tw=ctx.measureText(txt).width+txt.length*2.5,tot=(im?s+12:0)+tw,x0=(W-tot)/2,y=H-30-s;
+  if(im){ctx.save();ctx.beginPath();ctx.roundRect(x0,y,s,s,9);ctx.clip();ctx.drawImage(im,x0,y,s,s);ctx.restore()}
+  ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';let x=(im?x0+s+12:x0);for(const ch of txt){ctx.fillText(ch,x,y+s/2+1);x+=ctx.measureText(ch).width+2.5}
+  ctx.restore();ctx.textBaseline='alphabetic'}
 function fit(ctx,text,maxW,size,weight,fam){let s=size;do{ctx.font=`${weight} ${s}px ${fam}`;s-=4}while(ctx.measureText(text).width>maxW&&s>20);return s+4}
 function campo(ctx,W,H){
   const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,ART.bg1);g.addColorStop(1,ART.bg2);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
@@ -769,7 +779,7 @@ function campo(ctx,W,H){
   ctx.fillStyle=ART.y;ctx.beginPath();ctx.moveTo(W-40,40);ctx.lineTo(W-40,150);ctx.lineTo(W-150,40);ctx.closePath();ctx.fill();
   ctx.fillStyle='#F0662A';ctx.beginPath();ctx.moveTo(40,H-40);ctx.lineTo(40,H-130);ctx.lineTo(130,H-40);ctx.closePath();ctx.fill();
 }
-function premioStat(p,k){const id=premiosDe(p)[k],s=(p.stats||{})[id]||{};
+function premioStat(p,k){const id=premiosVis(p)[k],s=(p.stats||{})[id]||{};
   if(k==='art')return(s.g||0)+(s.g===1?' GOL':' GOLS');
   if(k==='gar')return(s.a||0)+(s.a===1?' ASSISTÊNCIA':' ASSISTÊNCIAS');
   const n=notaJogo(p,pidOf(p),id);return typeof n==='number'?'NOTA '+fmtN(n):'';
@@ -784,7 +794,7 @@ function arteGeral(p,story){
   campo(ctx,W,H);ctx.save();ctx.translate(0,oy);cabecalho(ctx,W,p);ctx.restore();
   ctx.fillStyle=ART.y;fit(ctx,'DESTAQUES',W-170,story?170:150,800,'"Saira Condensed", Impact, sans-serif');ctx.fillText('DESTAQUES',86,290+oy);
   ctx.fillStyle=ART.w;ctx.font=`700 ${story?66:58}px "Saira Condensed", Impact, sans-serif`;ctx.fillText('DA PELADA',92,(story?370:355)+oy);
-  const PR=premiosDe(p),ks=PREMIOS_ARTE.filter(k=>PR[k]);
+  const PR=premiosVis(p),ks=PREMIOS_ARTE.filter(k=>PR[k]);
   const top=(story?470:430)+oy,rowH=Math.min(story?250:210,(H-top-(story?260:110))/Math.max(1,ks.length));
   ks.forEach((k,i)=>{const y=top+i*rowH,id=PR[k],j=J(id);
     ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.roundRect(80,y,W-160,rowH-24,22);ctx.fill();
@@ -797,7 +807,7 @@ function arteGeral(p,story){
     ctx.fillStyle=ART.w;fit(ctx,nm(id).toUpperCase(),W-160-28-(tx-80)-sw-50,78,800,'"Saira Condensed", Impact, sans-serif');ctx.fillText(nm(id).toUpperCase(),tx,cy+42);
     if(stat){ctx.fillStyle=ART.y;ctx.font='800 46px "Saira Condensed", Impact, sans-serif';ctx.textAlign='right';ctx.fillText(stat,W-80-28,cy+40);ctx.textAlign='left'}
   });
-  return cv;
+  marcaApp(ctx,W,H);return cv;
 }
 function arteIndividual(p,k){
   const W=1080,H=1350,cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
@@ -814,7 +824,7 @@ function arteIndividual(p,k){
   if(stat){ctx.font=`800 84px ${FAM}`;const sw=ctx.measureText(stat).width+90;
     ctx.fillStyle=ART.y;ctx.beginPath();ctx.roundRect(W/2-sw/2,1080,sw,120,18);ctx.fill();
     ctx.fillStyle='#1E1700';ctx.fillText(stat,W/2,1168)}
-  ctx.textAlign='left';return cv;
+  ctx.textAlign='left';marcaApp(ctx,W,H);return cv;
 }
 /* escudo da pelada: imagem enviada pelo admin ou escudo com as iniciais */
 const ESC_CORES=['#1B6A36','#C0392B','#2F6FD0','#7E57C2','#E8742A','#0E7C7B','#9A6B00'];
@@ -862,7 +872,7 @@ function artePoster(p,k,story){
   ctx.textAlign='center';ctx.fillStyle='#FFFFFF';
   if(L.nome){ctx.font=`700 40px ${FAM}`;espacado(ctx,L.nome.toUpperCase(),W/2,H-Y.rod,8)}
   if(L.end){ctx.fillStyle='rgba(255,255,255,.8)';ctx.font=`600 32px ${FAM}`;const e='📍 '+L.end.toUpperCase();espacado(ctx,e.length>58?e.slice(0,56)+'…':e,W/2,H-Y.rod+52,4)}
-  ctx.textAlign='left';return cv}
+  ctx.textAlign='left';marcaApp(ctx,W,H);return cv}
 /* arte de convocação: estádio à noite, escudo no centro, faixa com a data */
 /* cores do escudo: as duas cores mais fortes da imagem (ignora fundo transparente, branco e preto) */
 let CORES_ESC=null;
@@ -925,7 +935,7 @@ function arteConvocacao(p,story){
   ctx.fillStyle='rgba(255,255,255,.85)';ctx.font=`600 36px ${FAM}`;
   const lin=[L.end?L.end.toUpperCase():'',`${vagasCfg()} VAGAS NA LINHA`,'CONFIRME SUA PRESENÇA NO APP'].filter(Boolean);
   for(const t of lin){espacado(ctx,t.length>48?t.slice(0,46)+'…':t,W/2,y,4);y+=story?54:48}
-  ctx.textAlign='left';return cv}
+  ctx.textAlign='left';marcaApp(ctx,W,H);return cv}
 async function sheetConvocArte(pid){const p=S.pel[pid];if(!p)return;
   openSheet('Arte de convocação','<div class="empty">Desenhando a arte…</div>');
   await fontsReady();if(cfg().escudo)await carregarImg(cfg().escudo);
@@ -938,25 +948,43 @@ async function sheetConvocArte(pid){const p=S.pel[pid];if(!p)return;
   body.innerHTML=`<div class="stack">${ADM()?`<div class="panel"><div class="panel-h"><h3>Cores das faixas</h3>${cfg().artCores?`<button class="btn sm" data-act="convoc-cor-auto" data-p="${pid}">Usar do escudo</button>`:''}</div>${linha('a','Cor 1')}${linha('b','Cor 2')}<div class="sub" style="margin-top:6px">${det.length?'As primeiras cores vieram do seu escudo.':'Suba um escudo nos Ajustes para o app sugerir as cores dele.'} A escolha fica salva para as próximas artes.</div></div>`:''}
     <div class="arts">${ARTS.map((a,i)=>`<figure><img src="${a.url}" alt="Arte de convocação, ${a.label}"><figcaption>${a.label}</figcaption>${btn(i)}</figure>`).join('')}</div>
     <p class="sub" style="margin:0">${dl?'"Salvar imagem" abre o compartilhamento: dá para mandar direto para o WhatsApp ou o Instagram.':'Toque e segure a imagem para salvar.'} Usa o escudo, a data, o horário e o local desta pelada.</p></div>`}
-async function sheetArtes(pid){
-  const p=S.pel[pid],PR=premiosDe(p,pid),ks=PREMIOS_ARTE.filter(k=>PR[k]);
-  if(!ks.length){toast('Escolha os prêmios antes de gerar as artes.');return}
-  openSheet('Artes da pelada','<div class="empty">Desenhando as artes…</div>');
+/* Destaques da pelada: as artes em destaque e, com um toque, postar no Instagram.
+   - O administrador vê todas as artes e pode só esconder um prêmio (quem ganhou sai da votação e dos gols, ninguém troca).
+   - Cada jogador vê a arte geral e as artes dos prêmios que ele ganhou, e também pode postar. */
+const NOME_ARQ={mvp:'craque',art:'artilheiro',gar:'garcom',def:'xerife',gol:'goleiro'};
+let DQ=null;
+function sheetArtes(pid){return sheetDestaques(pid)}
+async function sheetDestaques(pid){
+  const p=S.pel[pid];if(!p)return;const A=ADM(),me=meuJogador(),PR=premiosVis(p,pid),todos=premiosDe(p,pid);
+  const ks=PREMIOS_ARTE.filter(k=>PR[k]&&S.jog[PR[k]]),meus=A?ks:ks.filter(k=>PR[k]===me);
+  const lista=A?painelDestaquesAdm(pid,p):'';
+  if(!ks.length){openSheet('Destaques · '+dShort(p.data),`<div class="stack"><div class="empty">${PREMIOS_ARTE.some(k=>todos[k])?'Todos os destaques desta pelada estão escondidos.':!p.aval&&Date.now()<fimAval(p)?`Os destaques saem quando a votação fechar (${quandoCurto(fimAval(p))}).`:'Ainda não tem destaques nesta pelada. Eles saem da votação da galera e dos gols lançados.'}</div>${lista}</div>`);return}
+  openSheet('Destaques · '+dShort(p.data),'<div class="empty">Desenhando as artes…</div>');
   await fontsReady();await Promise.all(ks.map(k=>carregarImg(fotoDe(PR[k]))).concat(cfg().escudo?[carregarImg(cfg().escudo)]:[]));
   ARTS.forEach(a=>URL.revokeObjectURL(a.url));ARTS=[];
-  const mk=async(cv,nome,label)=>{const blob=await new Promise(r=>cv.toBlob(r,'image/png'));ARTS.push({blob,url:URL.createObjectURL(blob),nome,label})};
-  await mk(arteGeral(p),`destaques-${p.data}.png`,'Destaques');
-  const STO=[];{const cv=arteGeral(p,true);const blob=await new Promise(r=>cv.toBlob(r,'image/png'));STO.push({blob,url:URL.createObjectURL(blob),nome:`story-destaques-${p.data}.png`,label:'Story · Destaques'})}
-  for(const k of ks){const cv=artePoster(p,k,true);const blob=await new Promise(r=>cv.toBlob(r,'image/png'));STO.push({blob,url:URL.createObjectURL(blob),nome:`story-${k==='mvp'?'craque':k==='art'?'artilheiro':k==='gar'?'garcom':k==='def'?'xerife':'goleiro'}-${p.data}.png`,label:'Story · '+PREMIO[k].t+' · '+nm(PR[k])})}
-  for(const k of ks)await mk(artePoster(p,k),`${k==='mvp'?'craque':k==='art'?'artilheiro':k==='gar'?'garcom':k==='def'?'xerife':'goleiro'}-${p.data}.png`,PREMIO[k].t+' · '+nm(PR[k]));
-  const nInd=ARTS.length;ARTS.push(...STO);
-  const body=document.getElementById('sheet-body');if(!body)return;
-  const btn=i=>dl?`<button class="btn sm ${i===0?'primary':''}" data-act="salvar-arte" data-i="${i}">Salvar imagem</button>`:'';
-  body.innerHTML=`<div class="stack"><div class="art-main"><img src="${ARTS[0].url}" alt="Arte com os destaques da pelada">${btn(0)}</div>
-    <h3>Individuais (feed)</h3><div class="arts">${ARTS.slice(1,nInd).map((a,i)=>`<figure><img src="${a.url}" alt="${esc(a.label)}"><figcaption>${esc(a.label)}</figcaption>${btn(i+1)}</figure>`).join('')}</div>
-    <h3>Stories</h3><div class="arts">${ARTS.slice(nInd).map((a,i)=>`<figure><img src="${a.url}" alt="${esc(a.label)}"><figcaption>${esc(a.label)}</figcaption>${btn(nInd+i)}</figure>`).join('')}</div>
-    <p class="sub" style="margin:0">${dl?'No celular, "Salvar imagem" abre o compartilhamento: dá para mandar direto para o Instagram ou WhatsApp.':'Toque e segure a imagem para salvar.'} Feed em 1080×1350 e stories em 1080×1920, nos tamanhos do Instagram.</p></div>`;
-}
+  const mk=async(cv,nome,label,fmt,k)=>{const blob=await new Promise(r=>cv.toBlob(r,'image/png'));ARTS.push({blob,url:URL.createObjectURL(blob),nome,label,fmt,k})};
+  await mk(arteGeral(p),`destaques-${p.data}.png`,'Destaques','feed','geral');
+  await mk(arteGeral(p,true),`story-destaques-${p.data}.png`,'Destaques','story','geral');
+  for(const k of meus){await mk(artePoster(p,k),`${NOME_ARQ[k]}-${p.data}.png`,PREMIO[k].t,'feed',k);await mk(artePoster(p,k,true),`story-${NOME_ARQ[k]}-${p.data}.png`,PREMIO[k].t,'story',k)}
+  DQ={pid,fmt:DQ&&DQ.pid===pid?DQ.fmt:'feed',k:DQ&&DQ.pid===pid&&ARTS.some(a=>a.k===DQ.k)?DQ.k:'geral',lista};
+  desenharDq()}
+function desenharDq(){const body=document.getElementById('sheet-body');if(!body||!DQ)return;const p=S.pel[DQ.pid];
+  const i=ARTS.findIndex(a=>a.fmt===DQ.fmt&&a.k===DQ.k),a=ARTS[i];if(!a)return;
+  const thumbs=ARTS.filter(x=>x.fmt===DQ.fmt);
+  body.innerHTML=`<div class="stack dq">
+    <div class="seg dq-fmt"><button type="button" data-act="dq-fmt" data-v="feed" aria-pressed="${DQ.fmt==='feed'}">Feed</button><button type="button" data-act="dq-fmt" data-v="story" aria-pressed="${DQ.fmt==='story'}">Story</button></div>
+    <div class="dq-arte ${DQ.fmt}"><img src="${a.url}" alt="${esc(a.label)}"></div>
+    ${thumbs.length>1?`<div class="dq-thumbs">${thumbs.map(x=>`<button type="button" class="dq-th${x===a?' on':''}" data-act="dq-sel" data-v="${x.k}" aria-label="${esc(x.label)}"><img src="${x.url}" alt=""><span>${esc(x.k==='geral'?'Geral':PREMIO[x.k].s.charAt(0)+PREMIO[x.k].s.slice(1).toLowerCase())}</span></button>`).join('')}</div>`:''}
+    <button class="btn block btn-grande btn-insta" data-act="insta-arte" data-i="${i}">📸 Postar no Instagram</button>
+    <div class="dq-acoes"><button class="btn" data-act="salvar-arte" data-i="${i}">⬇️ Salvar imagem</button><button class="btn" data-act="dq-legenda">📋 Copiar legenda</button></div>
+    <p class="sub" style="margin:0">${DQ.fmt==='feed'?'Ao tocar em Postar, a legenda com o resultado já vai copiada: no Instagram, é só colar no campo da legenda.':'O story vai no tamanho certo (1080×1920). No Instagram, escolha Story.'}</p>
+    ${DQ.lista}</div>`}
+function legendaDq(){const p=S.pel[DQ.pid];return msg('resultado',{pel:p}).replace(/\n{3,}/g,'\n\n').trim()+'\n\n#PelotaFC #pelada #futebol'}
+function painelDestaquesAdm(pid,p){const pr=premiosDe(p,pid),oc=p.ocultos||{},ks=[...PREMIOS_ARTE,'per'].filter(k=>pr[k]&&S.jog[pr[k]]);
+  const EMO={mvp:'🏆',art:'⚽',gar:'🅰️',def:'🛡️',gol:'🧤',per:'🐢'},TIT={mvp:'Craque',art:'Artilheiro',gar:'Garçom',def:'Xerife',gol:'Goleiro',per:'Pereba'};
+  if(!ks.length)return'';
+  return`<div class="panel dq-quem"><div class="panel-h"><h3>Quem aparece</h3></div><div class="sub" style="margin-bottom:6px">Os destaques saem da votação da galera e dos gols lançados. Você pode só esconder algum.</div>
+    ${ks.map(k=>`<div class="dq-l${oc[k]?' off':''}"><span class="dq-e">${EMO[k]}</span><div class="grow"><b>${TIT[k]}</b><div class="sub">${esc(nm(pr[k]))}</div></div><button type="button" class="btn sm" data-act="pr-oculto" data-p="${pid}" data-f="${k}">${oc[k]?'👁️ Mostrar':'Não mostrar'}</button></div>`).join('')}</div>`}
 
 /* ---------- carta do jogador ---------- */
 const TIERS=[{min:8,n:'OURO',a:'#7A5A0C',b:'#F3D27A',c:'#FFF4CF',ink:'#2B1E00'},{min:6,n:'PRATA',a:'#5E6873',b:'#C9D1D8',c:'#F2F5F7',ink:'#1C232A'},{min:0,n:'BRONZE',a:'#5C3418',b:'#C98A55',c:'#F1D2B4',ink:'#2A1607'}];
@@ -1021,7 +1049,7 @@ function arteCarta(id){
     const star=(x,y)=>{ctx.beginPath();for(let k=0;k<10;k++){const rr=k%2?r0*.45:r0,a=-Math.PI/2+k*Math.PI/5;ctx.lineTo(x+rr*Math.cos(a),y+rr*Math.sin(a))}ctx.closePath()};
     for(let i=0;i<5;i++){const x=x0+i*gap;ctx.fillStyle='rgba(0,0,0,.18)';star(x,y0);ctx.fill();
       const f=Math.max(0,Math.min(1,nv-i));if(f>0){ctx.save();ctx.beginPath();ctx.rect(x-r0,y0-r0,2*r0*f,2*r0);ctx.clip();ctx.fillStyle=t.ink;star(x,y0);ctx.fill();ctx.restore()}}}
-  ctx.textAlign='left';return cv;
+  ctx.textAlign='left';marcaApp(ctx,W,H);return cv;
 }
 async function sheetCarta(id){
   openSheet('Carta de '+nm(id),'<div class="empty">Desenhando a carta…</div>');
@@ -1536,7 +1564,8 @@ function blocoTimes(pid,p,A){let h='<div class="teams">';
   const gx=(p.goleiros||[]).filter(id=>S.jog[id]);if(gx.length)h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>🧤 Goleiros</h3><span class="sub">extra · fora do sorteio</span></div><div class="list">${gx.map(id=>`<div class="item">${avHTML(id)}<div class="grow name">${esc(nm(id))}</div><span class="num muted small">${ovrTxt(id)}</span></div>`).join('')}</div></div>`;
   return h}
 function quandoCurto(t){const d=new Date(t);return`${DIAS3[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`}
-function sheetPremios(pid){const p=S.pel[pid];if(!p)return;const ids=jogaram(p).filter(id=>S.jog[id]),pr=premiosDe(p,pid),st=p.stats||{},gks=ids.filter(id=>J(id).pos==='GOL');
+function sheetPremios(pid){return sheetDestaques(pid)}
+function sheetPremiosAntigo(pid){const p=S.pel[pid];if(!p)return;const ids=jogaram(p).filter(id=>S.jog[id]),pr=premiosDe(p,pid),st=p.stats||{},gks=ids.filter(id=>J(id).pos==='GOL');
   const opts=(list,v)=>'<option value="">—</option>'+list.map(id=>`<option value="${id}" ${v===id?'selected':''}>${esc(nm(id))}</option>`).join('');
   const sel=(k,lbl,list)=>`<div class="award"><label for="hp-${k}">${lbl}</label><select id="hp-${k}" data-act="premio" data-p="${pid}" data-f="${k}">${opts(list,pr[k])}</select></div>`;
   openSheet('Prêmios · '+dShort(p.data),`<div class="stack"><p class="sub" style="margin:0">Craque, pereba e xerife (melhor zagueiro ou volante) saem dos votos; artilheiro e garçom, dos gols e assistências. Você pode trocar qualquer um.</p>
@@ -1556,7 +1585,7 @@ function tabelaNotas(pid,p,A,draft){const st=draft||p.stats||{},pr=premiosDe(p,p
       <div class="sub">${[x.n!=null?(x.a?x.a.n+' voto'+(x.a.n>1?'s':''):''):(x.a?`só ${x.a.n} voto, não conta`:'sem votos'),A?'':`⚽ ${s.g||0} · 🅰️ ${s.a||0}`].filter(Boolean).join(' · ')}</div></div>
       ${A?`<div class="row" style="gap:6px">${step('g','Gols',s.g||0)}${step('a','Assist.',s.a||0)}</div>`:''}<span class="nota num" style="min-width:44px;text-align:right">${x.n!=null?fmtN(x.n):'—'}</span></div>`}).join('')}</div>`}
 /* destaques de uma pelada (prêmio, jogador e o número que deu o prêmio) */
-function destaquesDe(p,pid){const pr=premiosDe(p,pid),stt=p.stats||{},EMO={mvp:'🏆',art:'⚽',gar:'🅰️',def:'🛡️',gol:'🧤',per:'🐢'},TIT={mvp:'Craque',art:'Artilheiro',gar:'Garçom',def:'Xerife',gol:'Goleiro',per:'Pereba'};
+function destaquesDe(p,pid){const pr=premiosVis(p,pid),stt=p.stats||{},EMO={mvp:'🏆',art:'⚽',gar:'🅰️',def:'🛡️',gol:'🧤',per:'🐢'},TIT={mvp:'Craque',art:'Artilheiro',gar:'Garçom',def:'Xerife',gol:'Goleiro',per:'Pereba'};
   const det=k=>{const id=pr[k],x=stt[id]||{};if(k==='art')return(x.g||0)+(x.g===1?' gol':' gols');if(k==='gar')return(x.a||0)+(x.a===1?' assist.':' assist.');const n=notaJogo(p,pid,id);return n!=null?'nota '+fmtN(n):''};
   return[...PREMIOS_ARTE,'per'].filter(k=>pr[k]&&S.jog[pr[k]]).map(k=>({k,id:pr[k],e:EMO[k],t:TIT[k],d:det(k)}))}
 function destaquesMini(pid,p){const L=destaquesDe(p,pid);if(!L.length)return'';
@@ -1589,13 +1618,15 @@ function sheetEditarPelada(pid){const p=S.pel[pid];if(!p)return;
     ${p.times&&formatoDe(p)!=='conv'&&E.jogos.length?`<div class="panel"><div class="panel-h"><h3>Jogos</h3><span class="sub">${FORMATOS[formatoDe(p)]}</span></div>${htmlJogos(pid,{...p,jogos:E.jogos},true,E.jogos,'ed-jg')}</div>`:''}
     ${p.times&&p.times.length&&(formatoDe(p)==='conv'||!E.jogos.length)?`<div class="panel"><div class="panel-h"><h3>Vitórias</h3></div><div class="ed-lista">${p.times.map((t,i)=>`<div class="ed-l"><span class="grow"><b>${(CORES[t.cor]||{}).e||''} ${esc(nomeTime(t.cor))}</b></span>${step('ed-vit',`data-i="${i}"`,E.vit[i]||0,'Vitórias')}</div>`).join('')}</div></div>`:''}
     <div class="panel"><div class="panel-h"><h3>Gols e assistências</h3></div><div class="ed-lista">${ids.map(id=>{const x=E.st[id]||{};return`<div class="ed-j"><div class="ed-who">${avHTML(id)}<span class="name">${esc(nm(id))}</span></div><div class="ed-st">${step('ed-st',`data-j="${id}" data-f="g"`,x.g||0,'Gols')}${step('ed-st',`data-j="${id}" data-f="a"`,x.a||0,'Assist.')}</div></div>`}).join('')||'<div class="empty">Ninguém jogou nesta pelada.</div>'}</div></div>
-    <div class="panel"><div class="panel-h"><h3>Prêmios</h3></div><div class="awards">${PRS.map(([k,l,list])=>`<div class="award"><label for="ed-${k}">${l}</label><select id="ed-${k}" data-act="ed-pr" data-f="${k}">${opts(k,list)}</select></div>`).join('')}</div><div class="sub" style="margin-top:6px">"Automático" usa os votos da galera e os gols lançados.</div></div>
+    <div class="sub">Os destaques (craque, artilheiro, garçom…) saem da votação e dos gols lançados. Para esconder algum, use ⭐ Destaques.</div>
     <div class="lado notas-acoes"><button class="btn" data-act="ed-cancelar">Cancelar</button><button class="btn primary" data-act="ed-salvar" data-p="${pid}">Salvar</button></div>
     <p class="sub" style="margin:0">Nada muda até você tocar em Salvar.</p></div>`)}
 function sheetNotasPelada(pid,edit){const p=S.pel[pid];if(!p)return;const A0=ADM(),A=A0&&!!edit,ids=jogaram(p);
   if(A&&(!UI.rasc||UI.rasc.pid!==pid))UI.rasc={pid,st:JSON.parse(JSON.stringify(p.stats||{}))};if(!A)UI.rasc=null;
   const stt=p.stats||{};
-  openSheet('Pelada de '+dShort(p.data),`<div class="stack"><div class="sub">${statusVotacao(p,pid,ids)}</div>
+  const cp=p.times?campeaoDe(p):null;
+  openSheet('Notas e resultado · '+dShort(p.data),`<div class="stack">${cp!=null&&p.times[cp]?`<div class="res-camp">🏆 Campeão: <b>${CORES[p.times[cp].cor].e} ${esc(nomeTime(p.times[cp].cor))}</b></div>`:''}${destaquesDe(p,pid).length?`<div class="res-dq">${destaquesDe(p,pid).map(x=>`<span>${x.e} ${x.t}: <b>${esc(nm(x.id))}</b>${x.d?` <i>(${x.d})</i>`:''}</span>`).join('')}</div>`:''}
+    ${A0?`<button class="btn block" data-act="msg" data-v="resultado" data-p="${pid}">📲 Mandar resultado no WhatsApp</button>`:''}<div class="sub">${statusVotacao(p,pid,ids)}</div>
     ${p.aval||A0||Object.keys(stt).length?`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Gols e assistências'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div>${tabelaNotas(pid,p,A,A?UI.rasc.st:null)}</div>`:''}
     ${A?`<div class="lado notas-acoes"><button class="btn" data-act="notas-pel" data-p="${pid}">Cancelar</button><button class="btn primary" data-act="notas-salvar" data-p="${pid}">Salvar</button></div><p class="sub" style="margin:0">Nada muda até você tocar em Salvar.</p>`:A0?`<button class="btn block" data-act="editar-pel" data-p="${pid}">✏️ Editar pelada</button>`:''}</div>`)}
 function subPos(pid,p,A){
@@ -1611,19 +1642,14 @@ function subPos(pid,p,A){
   const sugArt=ids.slice().sort((a,b)=>(st[b]?.g||0)-(st[a]?.g||0))[0],sugGar=ids.slice().sort((a,b)=>(st[b]?.a||0)-(st[a]?.a||0))[0];
   const gks=ids.filter(id=>J(id).pos==='GOL');
   const auto=k=>!manual[k]&&pr[k]?'<div class="sub">Pelos votos da galera</div>':(k==='mvp'||k==='per'||k==='def')&&!p.aval?'<div class="sub">Sai pelos votos quando a avaliação fechar</div>':'';
-  h+=`<div class="panel" style="margin-top:12px"><h3 style="margin-bottom:10px">Prêmios</h3><div class="awards">
-    <div class="award"><label for="pr-mvp">🏆 Craque</label>${A?`<select id="pr-mvp" data-act="premio" data-p="${pid}" data-f="mvp">${opts(ids,pr.mvp)}</select>${auto('mvp')}`:esc(pr.mvp?nm(pr.mvp):'—')}</div>
-    <div class="award"><label for="pr-per">🐢 Pereba</label>${A?`<select id="pr-per" data-act="premio" data-p="${pid}" data-f="per">${opts(ids,pr.per)}</select>${auto('per')}`:esc(pr.per?nm(pr.per):'—')}</div>
-    <div class="award"><label for="pr-art">⚽ Artilheiro</label>${A?`<select id="pr-art" data-act="premio" data-p="${pid}" data-f="art">${opts(ids,pr.art)}</select>${!pr.art&&st[sugArt]?.g?`<div class="sub">Sugestão: ${esc(nm(sugArt))}</div>`:''}`:esc(pr.art?nm(pr.art):'—')}</div>
-    <div class="award"><label for="pr-gar">🅰️ Garçom</label>${A?`<select id="pr-gar" data-act="premio" data-p="${pid}" data-f="gar">${opts(ids,pr.gar)}</select>${!pr.gar&&st[sugGar]?.a?`<div class="sub">Sugestão: ${esc(nm(sugGar))}</div>`:''}`:esc(pr.gar?nm(pr.gar):'—')}</div>
-    <div class="award"><label for="pr-def">🛡️ Xerife</label>${A?`<select id="pr-def" data-act="premio" data-p="${pid}" data-f="def">${opts(ids.filter(id=>POS_XERIFE.includes(J(id).pos)).length?ids.filter(id=>POS_XERIFE.includes(J(id).pos)):ids,pr.def)}</select>${auto('def')}`:esc(pr.def?nm(pr.def):'—')}</div>
-    <div class="award"><label for="pr-gol">🧤 Goleiro</label>${A?`<select id="pr-gol" data-act="premio" data-p="${pid}" data-f="gol">${opts(gks.length?gks:ids,pr.gol)}</select>`:esc(pr.gol?nm(pr.gol):'—')}</div></div></div>`;
+  {const L=destaquesDe(p,pid);h+=A?`<div style="margin-top:12px">${painelDestaquesAdm(pid,p)||`<div class="panel"><h3>Destaques</h3><div class="sub">${!p.aval&&Date.now()<fimAval(p)?`O craque, o xerife e o goleiro saem quando a votação fechar (${quandoCurto(fimAval(p))}). Artilheiro e garçom saem dos gols lançados.`:'Lance os gols e as assistências para sair o artilheiro e o garçom.'}</div></div>`}</div>`
+    :L.length?`<div class="panel" style="margin-top:12px"><h3 style="margin-bottom:8px">Destaques</h3><div class="res-dq">${L.map(x=>`<span>${x.e} ${x.t}: <b>${esc(nm(x.id))}</b></span>`).join('')}</div></div>`:''}
   {const LL=p.localId&&S.locais[p.localId];if(LL)h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Avalie o campo</h3><span class="sub">${esc(LL.nome)}</span></div>
     ${A?formAvalCampo(pid,p.avalCampo,'adm'):'<div class="sub">O administrador avalia aqui. Você avalia pelo cartão na aba Jogo depois da pelada.</div>'}
     ${notaCampoHTML(p.localId)?`<div class="sub" style="margin-top:6px">Nota geral do campo: ${notaCampoHTML(p.localId)}</div>`:''}</div>`}
   if(A){
-    const temPremio=PREMIOS_ARTE.some(k=>pr[k]);
-    h+=`<div class="stack" style="margin-top:12px"><button class="btn warn" data-act="arte" data-p="${pid}" ${temPremio?'':'disabled'}>Gerar artes dos destaques</button>${temPremio?'':`<div class="sub" style="margin-top:-6px">${!p.aval&&Date.now()<fimAval(p)?`O craque sai quando a votação fechar (${quandoCurto(fimAval(p))}). Antes disso, escolha os prêmios no quadro acima ou lance os gols.`:'Escolha os prêmios no quadro acima ou lance os gols e assistências.'}</div>`}<button class="btn" data-act="msg" data-v="resultado">Mandar resultado no WhatsApp</button>`;
+    const temPremio=PREMIOS_ARTE.some(k=>premiosVis(p,pid)[k]);
+    h+=`<div class="stack" style="margin-top:12px"><button class="btn warn" data-act="destaques-pel" data-p="${pid}" ${temPremio?'':'disabled'}>⭐ Destaques e artes</button><button class="btn" data-act="msg" data-v="resultado">📲 Mandar resultado no WhatsApp</button>`;
     h+=UI.confirmEnd?`<div class="confirm"><b>Encerrar a pelada de ${dShort(p.data)}?</b><span class="small">A pelada vai para o histórico e libera para marcar a próxima. ${!p.aval&&Date.now()<fimAval(p)?`A votação do pós-jogo continua aberta até ${quandoCurto(fimAval(p))}.`:'A votação do pós-jogo já está fechada.'}</span><div class="row"><button class="btn primary" data-act="encerrar" data-p="${pid}">Encerrar</button><button class="btn" data-act="confirm-end" data-v="0">Voltar</button></div></div>`
       :`<button class="btn primary" data-act="confirm-end" data-v="1">Encerrar pelada</button><div class="sub" style="margin-top:-6px">Arquiva esta pelada em "Últimas peladas" e libera para marcar a próxima. ${!p.aval&&Date.now()<fimAval(p)?`A votação continua aberta até ${quandoCurto(fimAval(p))}.`:''} Prêmios e artes continuam disponíveis depois.</div>`;
     h+='</div>'}
@@ -1657,7 +1683,7 @@ function renderHist(A){
   let h=destaquesMini(enc[0][0],enc[0][1])+`<div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Últimas peladas</h3></div>`;
   for(const[pid,p] of show){const pr=premiosDe(p,pid);
     const vAb=A&&!p.aval&&Date.now()<fimAval(p);
-    h+=`<div class="hist"><div class="grow"><div class="row" style="gap:8px;align-items:center"><b class="num">${dShort(p.data)}</b>${vAb?`<button class="btn sm warn vt-chip" data-act="votacao-pel" data-p="${pid}">Votação aberta</button>`:''}${A?`<button class="btn sm ed-chip" data-act="editar-pel" data-p="${pid}">✏️ Editar</button>`:''}</div><div class="sub">${jogaram(p).length} jogadores</div></div><div class="row hist-bt" style="gap:6px;grid-template-columns:repeat(${A?4:2},1fr)"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button>${A?`<button class="btn sm" data-act="premios-pel" data-p="${pid}">Prêmios</button>`:''}<button class="btn sm" data-act="equipes-pel" data-p="${pid}">Equipes</button>${A?`<button class="btn sm" data-act="msg" data-v="resultado" data-p="${pid}">Resultado</button>`:''}</div></div>`}
+    h+=`<div class="hist"><div class="grow"><div class="row" style="gap:8px;align-items:center"><b class="num">${dShort(p.data)}</b>${vAb?`<button class="btn sm warn vt-chip" data-act="votacao-pel" data-p="${pid}">Votação aberta</button>`:''}${A?`<button class="btn sm ed-chip" data-act="editar-pel" data-p="${pid}">✏️ Editar</button>`:''}</div><div class="sub">${jogaram(p).length} jogadores</div></div>${(()=>{const dq=A||PREMIOS_ARTE.some(k=>premiosVis(p,pid)[k]);return`<div class="row hist-bt" style="gap:6px;grid-template-columns:repeat(${dq?3:2},1fr)"><button class="btn sm" data-act="notas-pel" data-p="${pid}">Notas</button><button class="btn sm" data-act="equipes-pel" data-p="${pid}">Times</button>${dq?`<button class="btn sm dq-bt" data-act="destaques-pel" data-p="${pid}">⭐ Destaques</button>`:''}</div>`})()}</div>`}
   if(enc.length>3)h+=`<button class="btn sm block" style="margin-top:8px" data-act="hist">${UI.showHist?'Mostrar menos':'Ver todas ('+enc.length+')'}</button>`;
   return h+'</div>';
 }
@@ -2558,7 +2584,21 @@ document.addEventListener('click',e=>{
     case'convoc-arte':sheetConvocArte(d.p);break;
     case'convoc-cor':{const cur=coresConvoc();patch('config/geral',{artCores:{...cur,[d.k]:d.v}});const sc=document.querySelector('.sheet')?.scrollTop||0;sheetConvocArte(d.p).then(()=>{const sh=document.querySelector('.sheet');if(sh)sh.scrollTop=sc});break}
     case'convoc-cor-auto':{patch('config/geral',{artCores:null});sheetConvocArte(d.p);break}
-    case'arte-sem':sheetPremios(d.p);toast('Escolha os prêmios para gerar as artes.');break;
+    case'arte-sem':sheetDestaques(d.p);break;
+    case'destaques-pel':sheetDestaques(d.p);break;
+    case'dq-fmt':if(DQ){DQ.fmt=d.v;desenharDq()}break;
+    case'dq-sel':if(DQ){DQ.k=d.v;desenharDq()}break;
+    case'dq-legenda':if(DQ){const t=legendaDq();navigator.clipboard?.writeText(t).then(()=>toast('Legenda copiada. No Instagram, é só colar.'),()=>toast('Não deu para copiar a legenda.'))}break;
+    case'insta-arte':{const a=ARTS[Number(d.i)];if(!a)return;
+      // 1 toque: copia a legenda (feed) e abre o compartilhar do celular com a imagem; lá é só escolher o Instagram
+      if(a.fmt==='feed'&&navigator.clipboard)navigator.clipboard.writeText(legendaDq()).catch(()=>{});
+      const f=new File([a.blob],a.nome,{type:'image/png'});
+      if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f]}).then(()=>{},e=>{if(e&&e.name!=='AbortError')toast('Não deu para abrir. Use "Salvar imagem".')});
+        toast(a.fmt==='feed'?'Escolha o Instagram. A legenda já está copiada: é só colar.':'Escolha o Instagram e depois "Story".')}
+      else{if(dl)dl.save({filename:a.nome,data:a.blob});toast('Imagem salva. Abra o Instagram e escolha ela na galeria.'+(a.fmt==='feed'?' A legenda já está copiada.':''))}
+      break}
+    case'pr-oculto':{const p=S.pel[d.p];if(!p)return;const oc={...(p.ocultos||{})};oc[d.f]=!oc[d.f];patch('peladas/'+d.p,{ocultos:oc});
+      toast(oc[d.f]?'Esse destaque não vai aparecer.':'Esse destaque voltou a aparecer.');if(DQ&&DQ.pid===d.p&&document.querySelector('.dq, .dq-quem'))setTimeout(()=>sheetDestaques(d.p),80);break}
     case'carta':sheetCarta(d.j);break;
     case'salvar-arte':{const a=ARTS[Number(d.i)];if(!a||!dl)return;
       dl.save({filename:a.nome,data:a.blob}).then(r=>{if(r&&r.status==='saved')toast('Imagem pronta.')},e=>{if(e&&e.name!=='AbortError')toast('Não deu para salvar. Toque e segure a imagem.')});break}
