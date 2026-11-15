@@ -1940,12 +1940,35 @@ function tElenco(A){
 }
 
 /* --- Avisos --- */
+/* tudo o que o servidor manda sozinho (functions/regras.js e index.js) */
+const AVISOS_AUTO=[
+  {e:'⚽',n:'Pelada nova',q:'quando você abre a lista de presença, com os botões Vou / Não vou',p:'todos'},
+  {e:'⏰',n:'Faltam 15 minutos',q:'15 min antes de fechar o prazo dos mensalistas',p:'mensalistas que não responderam',pa:1},
+  {e:'✅',n:'Convocado / vaga liberada',q:'quando o diarista é chamado da fila ou você libera a vaga',p:'o diarista'},
+  {e:'⌛',n:'Prazo do Pix do diarista',q:'30 min sem pagar: a vaga passa para o próximo da fila',p:'o diarista e o próximo',pa:1},
+  {e:'📋',n:'Presença',q:'quando alguém confirma, desiste ou pede vaga',p:'administradores'},
+  {e:'🎲',n:'Times sorteados',q:'quando você sorteia os times',p:'cada jogador, com o seu time'},
+  {e:'⭐',n:'Avalie a galera',q:'quando a pelada termina',p:'quem jogou'},
+  {e:'🏆',n:'Saiu o resultado',q:'quando a votação fecha',p:'quem jogou'},
+  {e:'⚽',n:'Gols para aprovar / aprovados',q:'quando um jogador lança gols e quando você aprova',p:'administradores e o jogador'},
+  {e:'💰',n:'Cobranças',q:'às 10h: mensalidade nova (dia 1º), vence hoje e 5 dias de atraso; cobrança extra nova; diária do evento ao confirmar. Tocar abre o Pix',p:'quem deve'},
+  {e:'👋',n:'Pedido para entrar',q:'quando alguém entra pelo convite',p:'administradores'},
+  {e:'📣',n:'Recado do mural',q:'quando você publica no mural',p:'todos'},
+  {e:'🗳️',n:'Votação do elenco aberta',q:'quando você abre a avaliação da galera',p:'todos'}];
 function tAvisos(A){
-  let h=`<div class="row between" style="margin-bottom:6px"><h2>Avisos</h2>${A?'<button class="btn primary" data-act="add-aviso">+ Aviso</button>':''}</div>
-    <p class="small muted" style="margin:0 0 12px">No horário programado, o app mostra um alerta no topo da aba Jogo com a mensagem pronta para mandar no grupo.</p>`;
+  let h=`<h2 style="margin-bottom:12px">Avisos</h2>`;
+  // 1) o que o app manda sozinho, por notificação no celular
+  const nAuto=AVISOS_AUTO.filter(x=>!x.pa||!EV()).length;
+  h+=`<details class="panel av-auto"${UI.avAuto?' open':''} data-av-auto><summary><div class="panel-h" style="margin:0"><h3>🔔 Automáticos</h3><span class="av-tag auto">sozinho</span></div>
+    <p class="sub" style="margin:6px 0 0">${nAuto} notificações que o app manda sozinho para o celular de cada um. Você não precisa fazer nada. <b class="av-ver">${UI.avAuto?'Esconder':'Ver quais são'}</b></p></summary>
+    <div class="av-l">${AVISOS_AUTO.filter(x=>!x.pa||!EV()).map(x=>`<div class="av-i"><span class="av-e">${x.e}</span><div class="grow"><b>${x.n}</b><div class="sub">${x.q} · <i>${x.p}</i></div></div></div>`).join('')}</div></details>`;
+  // 2) agenda: lembretes para o administrador mandar
+  h+=`<div class="panel av-agenda" style="margin-top:12px"><div class="panel-h"><h3>📅 Agenda</h3><span class="av-tag manual">você manda</span></div>
+    <p class="sub" style="margin:6px 0 8px">Não vão sozinhos. No dia e hora marcados aparece um alerta amarelo no topo da aba Jogo com a mensagem pronta. Você confere e manda no app ou no WhatsApp. Repete toda semana até você pausar ou apagar.</p>
+    ${A?'<button class="btn primary block" data-act="add-aviso" style="margin-bottom:8px">+ Novo lembrete</button>':''}`;
   const prox=proximosAvisos();
-  if(!prox.length)h+=`<div class="panel empty">Nenhum aviso programado.${A?'<br><br><button class="btn sm" data-act="avisos-padrao">Usar sugestão de agenda</button>':''}</div>`;
-  else{h+='<div class="panel"><div class="list">';
+  if(!prox.length)h+=`<div class="empty">Nenhum lembrete na agenda.${A?'<br><br><button class="btn sm" data-act="avisos-padrao">Usar sugestão de agenda</button>':''}</div></div>`;
+  else{h+='<div class="list">';
     for(const{id,a,when} of prox){const t=AVISOS[a.tipo]||{n:a.tipo,d:''};const past=when<new Date();
       h+=`<div class="item"><div style="width:52px;text-align:center;flex:none"><div style="font-family:var(--f-display);font-weight:800;font-size:18px;line-height:1">${DIAS3[a.dia]}</div><div class="num small">${esc(a.hora)}</div></div>
         <div class="grow"><div class="name">${esc(t.n)}</div><div class="sub">${esc(t.d)} · <span style="${past?'color:var(--red);font-weight:600':''}">${past?'pendente':relTempo(when)}</span></div></div>
@@ -3214,6 +3237,7 @@ document.addEventListener('change',e=>{const s=e.target;if(!s.dataset||!s.datase
   const ehCampo=t=>t.closest&&t.closest('input,select,textarea,[contenteditable],.enq,canvas');
   const abas=()=>[...document.querySelectorAll('#nav [data-act=tab]')];
   let G=null;
+  document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.matches&&d.matches('[data-av-auto]')){UI.avAuto=d.open;const v=d.querySelector('.av-ver');if(v)v.textContent=d.open?'Esconder':'Ver quais são'}},true);
   document.addEventListener('touchstart',e=>{
     if(e.touches.length!==1){G=null;return}
     const t=e.target,x=e.touches[0].clientX,y=e.touches[0].clientY,sh=t.closest&&t.closest('.sheet');
