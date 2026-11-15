@@ -752,16 +752,13 @@ const ART={bg1:'#0B3F20',bg2:'#17602F',chalk:'rgba(255,255,255,.13)',y:'#F2C12E'
 const POSCOR={GOL:'#C99A10',ZAG:'#3F7BC6',LAT:'#1A9393',VOL:'#5E8C1F',MEI:'#8E5FC0',ATA:'#D2533B'};
 const PREMIO={mvp:{t:'Craque da pelada',s:'CRAQUE'},art:{t:'Artilheiro',s:'ARTILHEIRO'},gar:{t:'Garçom',s:'GARÇOM'},def:{t:'Xerife',s:'XERIFE'},gol:{t:'Melhor goleiro',s:'GOLEIRO'}};
 const PREMIOS_ARTE=['mvp','art','gar','def','gol'];const POS_XERIFE=['ZAG','VOL'];
-async function fontsReady(){try{await Promise.all(['800 120px "Saira Condensed"','700 60px "Saira Condensed"','600 36px Figtree','500 30px Figtree'].map(f=>document.fonts.load(f)).concat([carregarImg(ICONE_APP),carregarImg(MARCA_APP)]))}catch(e){}}
+async function fontsReady(){try{await Promise.all(['800 120px "Saira Condensed"','700 60px "Saira Condensed"','600 36px Figtree','500 30px Figtree'].map(f=>document.fonts.load(f)).concat([carregarImg(ICONE_APP)]))}catch(e){}}
 /* marca do Pelota FC, bem discreta, no rodapé de todas as artes */
 const ICONE_APP='icon-192.png';
-const MARCA_APP='marca-branca.png';
-function marcaApp(ctx,W,H){const mk=FOTO_CACHE[MARCA_APP];
-  if(mk){const h=58,w=mk.width*h/mk.height;ctx.save();ctx.globalAlpha=.8;ctx.shadowColor='rgba(0,0,0,.4)';ctx.shadowBlur=8;ctx.drawImage(mk,(W-w)/2,H-34-h,w,h);ctx.restore();return}
-  const im=FOTO_CACHE[ICONE_APP],s=38,txt='PELOTA FC';ctx.save();ctx.globalAlpha=.72;ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=6;
-  ctx.font='700 24px Figtree, sans-serif';const tw=ctx.measureText(txt).width+txt.length*2.5,tot=(im?s+12:0)+tw,x0=(W-tot)/2,y=H-30-s;
-  if(im){ctx.save();ctx.beginPath();ctx.roundRect(x0,y,s,s,9);ctx.clip();ctx.drawImage(im,x0,y,s,s);ctx.restore()}
-  ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';let x=(im?x0+s+12:x0);for(const ch of txt){ctx.fillText(ch,x,y+s/2+1);x+=ctx.measureText(ch).width+2.5}
+function marcaApp(ctx,W,H){const im=FOTO_CACHE[ICONE_APP],s=56,txt='PELOTA FC';ctx.save();ctx.globalAlpha=.72;ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=6;
+  ctx.font='700 34px Figtree, sans-serif';const tw=ctx.measureText(txt).width+txt.length*3.5,tot=(im?s+16:0)+tw,x0=(W-tot)/2,y=H-32-s;
+  if(im){ctx.save();ctx.beginPath();ctx.roundRect(x0,y,s,s,13);ctx.clip();ctx.drawImage(im,x0,y,s,s);ctx.restore()}
+  ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';let x=(im?x0+s+16:x0);for(const ch of txt){ctx.fillText(ch,x,y+s/2+1);x+=ctx.measureText(ch).width+3.5}
   ctx.restore();ctx.textBaseline='alphabetic'}
 function fit(ctx,text,maxW,size,weight,fam){let s=size;do{ctx.font=`${weight} ${s}px ${fam}`;s-=4}while(ctx.measureText(text).width>maxW&&s>20);return s+4}
 function campo(ctx,W,H){
@@ -975,7 +972,7 @@ function desenharDq(){const body=document.getElementById('sheet-body');if(!body|
   const i=ARTS.findIndex(a=>a.fmt===DQ.fmt&&a.k===DQ.k),a=ARTS[i];if(!a)return;
   const thumbs=ARTS.filter(x=>x.fmt===DQ.fmt);
   body.innerHTML=`<div class="stack dq">
-    <div class="seg dq-fmt"><button type="button" data-act="dq-fmt" data-v="feed" aria-pressed="${DQ.fmt==='feed'}">Feed</button><button type="button" data-act="dq-fmt" data-v="story" aria-pressed="${DQ.fmt==='story'}">Story</button></div>
+    <div class="field dq-fmt"><span>Formato da arte</span><div class="seg"><button type="button" data-act="dq-fmt" data-v="feed" aria-pressed="${DQ.fmt==='feed'}">🖼️ Feed<small>1080×1350</small></button><button type="button" data-act="dq-fmt" data-v="story" aria-pressed="${DQ.fmt==='story'}">📱 Story<small>1080×1920</small></button></div></div>
     <div class="dq-arte ${DQ.fmt}"><img src="${a.url}" alt="${esc(a.label)}"></div>
     ${thumbs.length>1?`<div class="dq-thumbs">${thumbs.map(x=>`<button type="button" class="dq-th${x===a?' on':''}" data-act="dq-sel" data-v="${x.k}" aria-label="${esc(x.label)}"><img src="${x.url}" alt=""><span>${esc(x.k==='geral'?'Geral':PREMIO[x.k].s.charAt(0)+PREMIO[x.k].s.slice(1).toLowerCase())}</span></button>`).join('')}</div>`:''}
     <button class="btn block btn-grande btn-insta" data-act="insta-arte" data-i="${i}">📸 Postar no Instagram</button>
@@ -1628,8 +1625,15 @@ function sheetNotasPelada(pid,edit){const p=S.pel[pid];if(!p)return;const A0=ADM
   if(A&&(!UI.rasc||UI.rasc.pid!==pid))UI.rasc={pid,st:JSON.parse(JSON.stringify(p.stats||{}))};if(!A)UI.rasc=null;
   const stt=p.stats||{};
   const cp=p.times?campeaoDe(p):null;
-  openSheet('Notas e resultado · '+dShort(p.data),`<div class="stack">${cp!=null&&p.times[cp]?`<div class="res-camp">🏆 Campeão: <b>${CORES[p.times[cp].cor].e} ${esc(nomeTime(p.times[cp].cor))}</b></div>`:''}${destaquesDe(p,pid).length?`<div class="res-dq">${destaquesDe(p,pid).map(x=>`<span>${x.e} ${x.t}: <b>${esc(nm(x.id))}</b>${x.d?` <i>(${x.d})</i>`:''}</span>`).join('')}</div>`:''}
-    ${A0?`<button class="btn block" data-act="msg" data-v="resultado" data-p="${pid}">📲 Mandar resultado no WhatsApp</button>`:''}<div class="sub">${statusVotacao(p,pid,ids)}</div>
+  const txt=A0?msg('resultado',{pel:p}):'';if(A0)MSG_ORIG=txt;
+  openSheet('Notas e resultado · '+dShort(p.data),`<div class="stack">${A0?`<div class="panel res-msg"><div class="panel-h"><h3>Resultado</h3><button class="btn sm" data-act="msg-reset">Restaurar texto</button></div>
+      <div class="sub" style="margin-bottom:6px">✎ Toque no texto para editar do seu jeito</div>
+      <textarea id="msg-text" rows="${txt.split(String.fromCharCode(10)).length+1}" class="num" style="resize:none;overflow:hidden" aria-label="Texto do resultado, editável">${esc(txt)}</textarea>
+      <div class="stack" style="margin-top:10px"><button class="btn primary block" data-act="enviar-app" data-titulo="Resultado e prêmios">Enviar no app para todos</button>
+        <a class="btn block" id="wa-link" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">Abrir no WhatsApp</a>
+        <button class="btn block" data-act="copy">Copiar mensagem</button></div></div>`
+    :`${cp!=null&&p.times[cp]?`<div class="res-camp">🏆 Campeão: <b>${CORES[p.times[cp].cor].e} ${esc(nomeTime(p.times[cp].cor))}</b></div>`:''}${destaquesDe(p,pid).length?`<div class="res-dq">${destaquesDe(p,pid).map(x=>`<span>${x.e} ${x.t}: <b>${esc(nm(x.id))}</b>${x.d?` <i>(${x.d})</i>`:''}</span>`).join('')}</div>`:''}`}
+    <div class="sub">${statusVotacao(p,pid,ids)}</div>
     ${p.aval||A0||Object.keys(stt).length?`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Gols e assistências'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div>${tabelaNotas(pid,p,A,A?UI.rasc.st:null)}</div>`:''}
     ${A?`<div class="lado notas-acoes"><button class="btn" data-act="notas-pel" data-p="${pid}">Cancelar</button><button class="btn primary" data-act="notas-salvar" data-p="${pid}">Salvar</button></div><p class="sub" style="margin:0">Nada muda até você tocar em Salvar.</p>`:A0?`<button class="btn block" data-act="editar-pel" data-p="${pid}">✏️ Editar pelada</button>`:''}</div>`)}
 function subPos(pid,p,A){

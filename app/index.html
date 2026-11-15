@@ -362,7 +362,10 @@ input::-webkit-date-and-time-value{text-align:left}
 .sheet-grab::before{content:"";display:block;height:28px;margin:-12px -40px 0}
 .sheet-h{touch-action:pan-x}
 /* Destaques */
-.dq-fmt{max-width:260px;margin:0 auto}
+.dq-fmt{margin:0}.dq-fmt .seg{width:100%}
+.dq-fmt .seg button{display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.15}
+.dq-fmt .seg small{font-size:11px;font-weight:600;opacity:.7}
+.res-msg textarea{width:100%}
 .dq-arte{display:flex;justify-content:center}
 .dq-arte img{display:block;width:100%;max-width:440px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 .dq-arte.story img{max-width:300px}
@@ -761,9 +764,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261115b"></script>
-<script src="br.js?v=20261115b"></script>
-<script src="core.js?v=20261115b"></script>
-<script type="module" src="app.js?v=20261115b"></script>
+<script src="qrcode.js?v=20261115c"></script>
+<script src="br.js?v=20261115c"></script>
+<script src="core.js?v=20261115c"></script>
+<script type="module" src="app.js?v=20261115c"></script>
 </body>
 </html>
