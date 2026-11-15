@@ -293,8 +293,7 @@ function render() {
       <label class="field"><span>Apelido</span><input type="text" id="p-ap" value="${escH(p.apelido || '')}" placeholder="Como te chamam no campo"></label>
       ${campoUFCidade('p', UIp.pcid ?? p.cidade ?? '', UIp.puf ?? p.uf ?? '')}
       <label class="field"><span>WhatsApp</span><input type="tel" id="p-tel" value="${escH(p.tel || '')}" placeholder="(81) 99999-9999"></label>
-      ${(() => { const [nm0, nd0] = String(p.niver || '').split('-'); const MES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-        return `<div class="field"><span>Aniversário <small style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.7">(opcional)</small></span><div class="niver-l"><select id="p-niv-d" aria-label="Dia do aniversário"><option value="">Dia</option>${Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map(d => `<option ${d === nd0 ? 'selected' : ''}>${d}</option>`).join('')}</select><select id="p-niv-m" aria-label="Mês do aniversário"><option value="">Mês</option>${MES.map((m, i) => { const v = String(i + 1).padStart(2, '0'); return `<option value="${v}" ${v === nm0 ? 'selected' : ''}>${m}</option>`; }).join('')}</select></div><span class="sub" style="text-transform:none;letter-spacing:0;font-weight:400">Só dia e mês. No dia, a galera das suas peladas recebe um aviso para te dar os parabéns.</span></div>`; })()}
+      <label class="field"><span>Data de nascimento</span><input type="date" id="p-nasc" value="${escH(p.nasc || '')}" min="1930-01-01" max="${new Date().toISOString().slice(0, 10)}" required><span class="sub" style="text-transform:none;letter-spacing:0;font-weight:400">No dia do seu aniversário, a galera das suas peladas recebe um aviso para te dar os parabéns. Para o grupo aparece só o dia e o mês.</span></label>
       <div class="field"><span>Posição principal</span><div class="pick">${Object.entries(POSN).map(([k, n]) => `<button type="button" data-sh="pos" data-v="${k}" aria-pressed="${pos === k}">${n}</button>`).join('')}</div></div>
       <label class="row" style="gap:8px;align-items:flex-start;flex-wrap:nowrap;font-size:14px"><input type="checkbox" id="p-compnota" ${p.compartilharNota !== false ? 'checked' : ''} style="margin-top:3px"><span>Usar minha nota das outras peladas quando eu entrar numa pelada nova <span class="sub" style="display:block">O administrador vê só uma nota sugerida, já ajustada ao nível da pelada.</span></span></label>
       <button class="btn primary block" type="submit">Salvar</button></form>
@@ -1576,11 +1575,11 @@ document.addEventListener('submit', async e => {
     if (!val('p-nome')) { aviso('Coloque seu nome.'); return; }
     if (!val('p-cidade') || !$('p-uf').value) { aviso('Diga sua cidade e seu estado.'); return; }
     const pos = UIp.pos || (PERFIL && PERFIL.pos) || 'MEI';
+    const nasc = ($('p-nasc') || {}).value || '', niver = nasc ? nasc.slice(5, 10) : null;
+    if (!nasc) { aviso('Coloque sua data de nascimento.'); const c = $('p-nasc'); if (c) { c.scrollIntoView({ block: 'center', behavior: 'smooth' }); c.focus(); } return; }
     OCUPADO = true;
     const foto = UIp.foto !== undefined ? UIp.foto : ((PERFIL && PERFIL.foto) || null);
-    const nd = ($('p-niv-d') || {}).value || '', nmv = ($('p-niv-m') || {}).value || '', niver = nd && nmv ? nmv + '-' + nd : null;
-    if ((nd && !nmv) || (!nd && nmv)) { aviso('Escolha o dia e o mês do aniversário, ou deixe os dois em branco.'); return; }
-    try { await B.set('users/' + EU.uid, { niver, nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value, email: EU.email || '', compartilharNota: !!($('p-compnota') || { checked: true }).checked }, { merge: true }); PERFIL = { ...(PERFIL || {}), niver, nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value }; UIp.pcid = UIp.puf = undefined;
+    try { await B.set('users/' + EU.uid, { nasc, niver, nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value, email: EU.email || '', compartilharNota: !!($('p-compnota') || { checked: true }).checked }, { merge: true }); PERFIL = { ...(PERFIL || {}), nasc, niver, nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, cidade: val('p-cidade'), uf: $('p-uf').value }; UIp.pcid = UIp.puf = undefined;
       await Promise.all(Object.keys(GRUPOS).map(g => B.set(`grupos/${g}/membros/${EU.uid}`, { nome: val('p-nome'), apelido: val('p-ap'), tel: val('p-tel'), pos, foto, niver }, { merge: true }).catch(e => console.warn(e))));
       UIp.foto = undefined; OCUPADO = false; await depoisDoLogin(); }
     catch (err) { aviso(msgErro(err)); OCUPADO = false; }

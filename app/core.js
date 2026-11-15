@@ -983,8 +983,8 @@ function legendaDq(){const p=S.pel[DQ.pid];return msg('resultado',{pel:p}).repla
 function painelDestaquesAdm(pid,p){const pr=premiosDe(p,pid),oc=p.ocultos||{},ks=[...PREMIOS_ARTE,'per'].filter(k=>pr[k]&&S.jog[pr[k]]);
   const EMO={mvp:'🏆',art:'⚽',gar:'🅰️',def:'🛡️',gol:'🧤',per:'🐢'},TIT={mvp:'Craque',art:'Artilheiro',gar:'Garçom',def:'Xerife',gol:'Goleiro',per:'Pereba'};
   if(!ks.length)return'';
-  return`<div class="panel dq-quem"><div class="panel-h"><h3>Quem aparece</h3></div><div class="sub" style="margin-bottom:6px">Os destaques saem da votação da galera e dos gols lançados. Você pode só esconder algum.</div>
-    ${ks.map(k=>`<div class="dq-l${oc[k]?' off':''}"><span class="dq-e">${EMO[k]}</span><div class="grow"><b>${TIT[k]}</b><div class="sub">${esc(nm(pr[k]))}</div></div><button type="button" class="btn sm" data-act="pr-oculto" data-p="${pid}" data-f="${k}">${oc[k]?'👁️ Mostrar':'Não mostrar'}</button></div>`).join('')}</div>`}
+  return`<div class="panel dq-quem"><div class="panel-h"><h3>Quem aparece</h3></div><div class="sub" style="margin-bottom:6px">Os destaques saem da votação da galera e dos gols lançados. Desligue a chave para esconder algum.</div>
+    ${ks.map(k=>`<div class="dq-l${oc[k]?' off':''}"><span class="dq-e">${EMO[k]}</span><div class="grow"><b>${TIT[k]}</b><div class="sub">${esc(nm(pr[k]))}</div></div><label class="sw" aria-label="${oc[k]?'Mostrar':'Esconder'} ${TIT[k]}"><input type="checkbox" data-act="pr-oculto" data-p="${pid}" data-f="${k}" ${oc[k]?'':'checked'}><span></span></label></div>`).join('')}</div>`}
 
 /* ---------- carta do jogador ---------- */
 const TIERS=[{min:8,n:'OURO',a:'#7A5A0C',b:'#F3D27A',c:'#FFF4CF',ink:'#2B1E00'},{min:6,n:'PRATA',a:'#5E6873',b:'#C9D1D8',c:'#F2F5F7',ink:'#1C232A'},{min:0,n:'BRONZE',a:'#5C3418',b:'#C98A55',c:'#F1D2B4',ink:'#2A1607'}];
@@ -1963,7 +1963,7 @@ function tAvisos(A){
   h+=`<details class="panel av-auto"${UI.avAuto?' open':''} data-av-auto><summary><div class="panel-h" style="margin:0"><h3>🔔 Automáticos</h3><span class="av-tag auto">sozinho</span></div>
     <p class="sub" style="margin:6px 0 0">${nAuto} notificações que o app manda sozinho para o celular de cada um. Você não precisa fazer nada.${nOff?` <b style="color:var(--red)">${nOff} desligada${nOff>1?'s':''}.</b>`:''} <b class="av-ver">${UI.avAuto?'Esconder':A?'Ver e escolher':'Ver quais são'}</b></p></summary>
     ${A?'<p class="sub" style="margin:8px 0 2px">Todas vêm ligadas e são recomendadas. Desligue só a que não fizer sentido para sua pelada: ela para de ser enviada para todos do grupo.</p>':''}
-    <div class="av-l">${LA.map(x=>`<div class="av-i${off[x.k]?' off':''}"><span class="av-e">${x.e}</span><div class="grow"><b>${x.n}</b> <span class="av-rec">recomendado</span><div class="sub">${x.q} · <i>${x.p}</i></div></div>${A?`<label class="sw" aria-label="${off[x.k]?'Ligar':'Desligar'} ${esc(x.n)}"><input type="checkbox" data-act="push-off" data-k="${x.k}" ${off[x.k]?'':'checked'}><span></span></label>`:''}</div>`).join('')}</div></details>`;
+    <div class="av-l">${LA.map(x=>`<div class="av-i${off[x.k]?' off':''}"><span class="av-e">${x.e}</span><div class="grow"><b>${x.n}</b><div class="sub">${x.q} · <i>${x.p}</i></div></div>${A?`<label class="sw" aria-label="${off[x.k]?'Ligar':'Desligar'} ${esc(x.n)}"><input type="checkbox" data-act="push-off" data-k="${x.k}" ${off[x.k]?'':'checked'}><span></span></label>`:''}</div>`).join('')}</div></details>`;
   // 2) agenda: lembretes para o administrador mandar
   h+=`<div class="panel av-agenda" style="margin-top:12px"><div class="panel-h"><h3>📅 Agenda</h3><span class="av-tag manual">você manda</span></div>
     <p class="sub" style="margin:6px 0 8px">Não vão sozinhos. No dia e hora marcados aparece um alerta amarelo no topo da aba Jogo com a mensagem pronta. Você confere e manda no app ou no WhatsApp. Repete toda semana até você pausar ou apagar.</p>
