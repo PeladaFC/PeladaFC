@@ -1381,7 +1381,7 @@ function tJogo(A){
   if(UI.sub==='presenca')h+=subPresenca(pid,p,l,A);
   else if(UI.sub==='times')h+=subTimes(pid,p,l,A);
   else h+=subPos(pid,p,A);
-  return h;
+  return h+(A?painelAvAdmin():'')+renderHist(A);
 }
 function rowPlayer(id,right,extra='',tipo,tag=''){
   const j=J(id);
@@ -1942,7 +1942,7 @@ function tElenco(A){
   let h=`<div class="row between" style="margin-bottom:10px"><h2>Elenco <span class="muted num">${ativos().length}</span></h2>${A?'<button class="btn primary" data-act="add-jog">+ Jogador</button>':''}</div>
     <input type="text" id="busca" placeholder="Buscar jogador" value="${esc(UI.busca)}" data-in="busca" style="margin-bottom:10px">
     <div class="pick filtros1" style="margin-bottom:12px">${[['todos','Todos'],...(EV()?[]:[['mensalista','Mensalistas'],['diarista','Diaristas']])].map(([k,n])=>`<button data-act="filtro" data-v="${k}" aria-pressed="${UI.filtro===k}">${n}</button>`).join('')}<select id="filtro-mais" aria-label="Filtrar por posição" class="${Object.keys(POS).includes(UI.filtro)||UI.filtro==='inativos'?'on':''}"><option value="">Posição</option>${Object.entries(POS).map(([k,n])=>`<option value="${k}" ${UI.filtro===k?'selected':''}>${n}</option>`).join('')}<option value="inativos" ${UI.filtro==='inativos'?'selected':''}>Inativos</option></select></div>`;
-  if(A)h+=painelAvAdmin();
+  if(A){const ra=rodadaAberta();h+=`<button class="btn block ${ra?'':'warn'}" data-act="${ra?'av-admin':'av-novo'}" style="margin-bottom:12px">${ra?`⭐ Avaliação completa aberta · até ${quandoFim(ra[1].fim)}`:'⭐ Abrir avaliação da galera'}</button>`}
   h+=cartaoAvCompleta();
   if(membrosSemCadastro().length&&!demo)h+=A?painelMembros():painelPendentes();
   if(!A&&euPendente())h=bannerPendente().replace('margin-top:12px','margin:0 0 12px')+h;
@@ -2025,8 +2025,7 @@ function periodo(){const hoje=new Date();if(!UI.ref)UI.ref={y:hoje.getFullYear()
 function navPeriodo(d){const per=UI.per||'mes';let{y,m}=UI.ref;
   if(per==='mes'){m+=d;if(m<1){m=12;y--}if(m>12){m=1;y++}}else if(per==='sem'){m=(m<=6?1:7)+d*6;if(m<1){m=7;y--}if(m>12){m=1;y++}}else y+=d;
   UI.ref={y,m}}
-function tRanking(){return tRanking0()+renderHist(ADM())}
-function tRanking0(){
+function tRanking(){
   const P=periodo(),{st,total}=estatPeriodo(P.ini,P.fim),rk=UI.rk||'nota';
   const md=id=>st[id].media;
   const filtro={nota:id=>md(id)!=null,g:id=>st[id].g>0,a:id=>st[id].a>0,pr:id=>st[id].mvp+st[id].art+st[id].gar+st[id].def+st[id].gol+st[id].per>0,j:id=>st[id].j>0}[rk];
