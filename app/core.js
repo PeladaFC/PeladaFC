@@ -55,7 +55,7 @@ let db=null, isAdmin=false, demo=false, ready=false, loaded=0;
 let UI={tab:'jogo',sub:'presenca',filtro:'todos',busca:'',rk:'nota',ano:new Date().getFullYear(),mes:null,sel:null,confirmEnd:false,showHist:false};
 try{const t=localStorage.getItem('pelada.tab');if(t)UI.tab=t}catch(e){}
 const pending={}, timers={}, queues={};
-const COL={jogadores:'jog',peladas:'pel',caixa:'caixa',avisos:'avisos',presencas:'pres',locais:'locais',membros:'membros',votos:'votos',avaliacoes:'avals'};
+const COL={jogadores:'jog',peladas:'pel',caixa:'caixa',avisos:'avisos',presencas:'pres',locais:'locais',membros:'membros',votos:'votos',avaliacoes:'avals',respExtras:'resp'};
 let myId=null;
 const ADM=()=>demo?!UI.comoJogador:isAdmin;
 
@@ -81,8 +81,8 @@ function merge(a,b){const o=isPlain(a)?{...a}:{};for(const k in b){o[k]=isPlain(
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.hidden=true;void t.offsetWidth;t.hidden=false;t.onclick=()=>{t.hidden=true};clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,Math.min(9000,Math.max(3500,String(m).length*70)))}
 
 /* ---------- gravação ---------- */
-function slotGet(path){const[c,id]=path.split('/');return c==='config'?S.config:c==='eventos'?S.feed:S[COL[c]][id]}
-function slotSet(path,v){const[c,id]=path.split('/');if(c==='config')S.config=v;else if(c==='eventos')S.feed=v;else if(v==null)delete S[COL[c]][id];else S[COL[c]][id]=v}
+function slotGet(path){const[c,id]=path.split('/');return c==='config'?S.config:c==='eventos'?S.feed:(S[COL[c]]||{})[id]}
+function slotSet(path,v){const[c,id]=path.split('/');if(c==='config')S.config=v;else if(c==='eventos')S.feed=v;else{const k=COL[c];S[k]=S[k]||{};if(v==null)delete S[k][id];else S[k][id]=v}}
 function chain(path,fn){queues[path]=(queues[path]||Promise.resolve()).then(fn).catch(e=>writeErr(e,path));return queues[path]}
 function writeErr(e,path){console.warn(e);if(e&&e.code==='permission-denied'&&String(path||'').startsWith('votos/')){toast(ADM()?'Seu voto não foi salvo: as regras do Firebase precisam ser atualizadas.':'Seu voto não foi salvo. Avise o administrador para liberar a votação no app.');return}toast(e&&(e.code==='invalid_argument'||e.code==='permission-denied')?(ADM()?'Não foi possível salvar. Verifique a conexão.':'Só o administrador pode alterar isso.'):e&&e.code==='quota_exceeded'?'O banco da pelada encheu. Apague registros antigos.':'Não foi possível salvar. Tente de novo.')}
 function put(path,data){slotSet(path,data);render();if(demo||!db)return;delete pending[path];const d0=db;return chain(path,()=>d0.doc(path).set(data))}
@@ -1288,7 +1288,7 @@ function renderTab(){
     <div class="row" style="gap:6px;margin-top:8px"><button class="btn sm" data-act="notas-pel" data-p="${UI.recemEnc}">Ver notas</button><button class="btn sm" data-act="fechar-enc">Ok</button></div></div></div>`:'';
   const pendN=A&&!demo&&UI.tab!=='elenco'?membrosSemCadastro().filter(([u])=>!((GRUPO&&GRUPO.admins)||[]).includes(u)):[];
   const banPend=pendN.length?`<button class="pag-alerta" style="display:flex;width:100%;align-items:center;gap:10px;text-align:left;border:0;cursor:pointer" data-act="tab" data-v="elenco"><span class="pag-ic">👋</span><span class="grow"><b style="font-size:15px">${pendN.length===1?esc(pendN[0][1].apelido||pendN[0][1].nome||'Alguém')+' quer entrar':pendN.length+' pessoas querem entrar'}</b><span class="pag-s" style="display:block">Esperando sua autorização no Elenco.</span></span><b>Ver ›</b></button>`:'';
-  return ban+banPend+(UI.tab==='jogo'?painelMeusPag():'')+({jogo:tJogo,elenco:tElenco,avisos:tAvisos,ranking:tRanking,caixa:tCaixa}[UI.tab]||tJogo)(A);
+  return ban+banPend+(UI.tab==='jogo'?painelMeusPag()+painelForms():'')+({jogo:tJogo,elenco:tElenco,avisos:tAvisos,ranking:tRanking,caixa:tCaixa}[UI.tab]||tJogo)(A);
 }
 
 // guarda data e horários da próxima pelada; o término acompanha o início até ser mudado à mão
@@ -2129,8 +2129,9 @@ function tCaixa(A){
   {const X=extrasDe(m);h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Cobranças extras</h3>${A?`<button class="btn sm primary" data-act="x-nova" data-m="${m}">+ Nova</button>`:''}</div>`;
     if(!X.length)h+=`<div class="empty">Ex.: churrasco, camisa nova, evento extra. Quem estiver na lista vê a cobrança no app.</div>`;
     for(const[xid,x] of X){const ids=(x.quem||[]).filter(id=>S.jog[id]).sort((a,b)=>nm(a).localeCompare(nm(b))),pg=ids.filter(id=>stPag((x.pag||{})[id])).length,falta=ids.length-pg;
-      h+=`<div class="row between" style="margin-top:10px;gap:6px"><span class="sub"><b style="font-weight:700">${esc(x.nome)}</b> · <b class="num">${BRL(x.v)}</b> por pessoa${x.d?' · '+dShort(x.d):''} · <span class="num">${pg}/${ids.length}</span></span>${A?`<div class="row" style="gap:4px">${falta?`<button class="btn sm" data-act="x-todos" data-m="${m}" data-x="${xid}">Todos pagos</button>`:''}<button class="btn sm" data-act="x-editar" data-m="${m}" data-x="${xid}" aria-label="Editar cobrança">✎</button></div>`:''}</div><div class="list">`;
-      for(const id of ids){const v0=(x.pag||{})[id],st=stPag(v0),sb=[notaValor(st,Number(x.v)),st&&st.obs?esc(st.obs):''].filter(Boolean).join(' · ');h+=`<div class="item"><div class="grow"><div class="name">${esc(nm(id))}</div>${sb?`<div class="sub">${sb}</div>`:''}</div>${botaoPag(v0,'pagou-x',`data-m="${m}" data-x="${xid}" data-j="${id}"`,A)}</div>`}
+      h+=`<div class="row between" style="margin-top:10px;gap:6px"><span class="sub"><b style="font-weight:700">${esc(x.nome)}</b> · <b class="num">${BRL(x.v)}</b> por pessoa${x.d?' · '+dShort(x.d):''} · <span class="num">${pg}/${ids.length}</span></span>${A?`<div class="row" style="gap:4px">${(x.campos||[]).length?`<button class="btn sm" data-act="xr-ver" data-m="${m}" data-x="${xid}">📋 Respostas</button>`:''}${falta?`<button class="btn sm" data-act="x-todos" data-m="${m}" data-x="${xid}">Todos pagos</button>`:''}<button class="btn sm" data-act="x-editar" data-m="${m}" data-x="${xid}" aria-label="Editar cobrança">✎</button></div>`:''}</div><div class="list">`;
+      if(A&&(x.campos||[]).length){const rs=resumoCampos(m+'~'+xid,x,ids);if(rs)h+=`<div class="sub xr-res">${rs}</div>`}
+      for(const id of ids){const v0=(x.pag||{})[id],st=stPag(v0),sb=[notaValor(st,Number(x.v)),st&&st.obs?esc(st.obs):'',A?respLinha(m+'~'+xid,id):''].filter(Boolean).join(' · ');h+=`<div class="item"><div class="grow"><div class="name">${esc(nm(id))}</div>${sb?`<div class="sub">${sb}</div>`:''}</div>${botaoPag(v0,'pagou-x',`data-m="${m}" data-x="${xid}" data-j="${id}"`,A)}</div>`}
       if(!ids.length)h+='<div class="empty">Ninguém na lista.</div>';
       h+='</div>'}
     h+='</div>'}
@@ -2175,11 +2176,79 @@ function donoSugerido(){const c=cfg();if(!c.mpConta||!c.mpConta.nome||c.mpDonoJi
 function donoJid(){const j=cfg().mpDonoJid;return j&&S.jog[j]?j:null}
 function ehDono(jid){return!!jid&&jid===donoJid()}
 function pagarDono(x){const dt=iso(new Date());gravarPag(x.tipo,x.ref,x.jid,{s:'pago',d:dt,v:x.v,obs:'Dono da conta (sem Pix)'});toast(nm(x.jid)+': marcado como pago.')}
+/* ---------- campos das cobranças extras (tamanho, texto, foto, arquivo): cada jogador preenche o seu ----------
+   respostas leves em respExtras/{uid} ({"mês~id": {j, c:{campo: valor}}}); fotos e arquivos em arqExtras/{uid~mês~id~campo}, abertos só quando alguém toca */
+const TIPOS_CAMPO={esc:{n:'Tamanho',e:'👕',d:'Cada um escolhe uma das opções'},txt:{n:'Texto curto',e:'✍️',d:'Ex.: nome e número na camisa'},foto:{n:'Foto',e:'📷',d:'Cada um manda uma imagem'},arq:{n:'Arquivo',e:'📎',d:'PDF, documento ou imagem (até 700 KB)'}};
+const TAM_PADRAO=['PP','P','M','G','GG','GGG'],ARQ_MAX=700*1024,ARQ_MEM={};
+let unsubResp=null;
+function ouvirResp(){if(unsubResp){try{unsubResp()}catch(e){}unsubResp=null}if(!db||demo)return;
+  if(isAdmin)unsubResp=db.collection('respExtras').onSnapshot(snap=>{const m={};snap.docs.forEach(x=>m[x.id]=x.data());S.resp=withPending('respExtras',m);render()},e=>console.warn(e));
+  else unsubResp=db.doc('respExtras/'+myId).onSnapshot(snap=>{S.resp={...(S.resp||{})};if(snap.exists)S.resp[myId]=snap.data();else delete S.resp[myId];render()},e=>console.warn(e))}
+const uidEu=()=>myId||'demo';
+function extraDe(ref){const[m,xid]=String(ref).split('~');return((S.caixa[m]||{}).extras||{})[xid]||null}
+function respInfo(ref,jid){for(const[uid,d] of Object.entries(S.resp||{})){const r=d&&d[ref];if(r&&r.j===jid)return{uid,c:r.c||{}}}return{uid:null,c:{}}}
+const obrig=c=>c.obr!=null?!!c.obr:c.t==='esc';
+const vazioCampo=v=>v==null||v===''||(typeof v==='object'&&!v.nome);
+function camposFalta(ref,jid){const x=extraDe(ref);if(!x||!(x.campos||[]).length)return[];const r=respInfo(ref,jid).c;return x.campos.filter(c=>obrig(c)&&vazioCampo(r[c.id]))}
+const valCampo=(c,v)=>vazioCampo(v)?'':typeof v==='object'?(c.t==='foto'?'📷 foto':'📎 '+v.nome):String(v);
+function respLinha(ref,jid){const x=extraDe(ref);if(!x||!(x.campos||[]).length)return'';const r=respInfo(ref,jid).c;
+  const f=x.campos.filter(c=>obrig(c)&&vazioCampo(r[c.id]));return f.length?`<span class="xr-falta">📝 falta: ${f.map(c=>esc(c.n)).join(', ')}</span>`:x.campos.map(c=>esc(valCampo(c,r[c.id]))).filter(Boolean).join(' · ')}
+// linha do jogador no aviso de pagamento: o que falta preencher ou o que ele escolheu
+function linhaCampos(x){if(x.tipo!=='x')return'';const e=extraDe(x.ref);if(!e||!(e.campos||[]).length)return'';const f=camposFalta(x.ref,x.jid);
+  return`<span class="pag-s xr-l" style="display:block">${f.length?`📝 Falta preencher: <b>${f.map(c=>esc(c.n)).join(', ')}</b>`:`📝 ${respLinha(x.ref,x.jid)||'preenchido'} · <button class="xr-ed" data-act="xr-abrir" data-r="${esc(x.ref)}" data-j="${x.jid}">editar</button>`}</span>`}
+// cobranças já pagas (ou sem Pix) em que o jogador ainda não preencheu os campos
+function painelForms(){const j=meuJogador();if(!j||!CX())return'';const m=mesAtual(),lim0=iso(new Date(Date.now()-62*864e5)).slice(0,7),out=[];const pend=new Set(minhasPendencias().map(x=>x.ref));
+  for(const mx of Object.keys(S.caixa).filter(k=>k>=lim0&&k<=m).sort())for(const[xid,x] of extrasDe(mx)){const ref=mx+'~'+xid;if((x.quem||[]).includes(j)&&!pend.has(ref)&&camposFalta(ref,j).length)out.push({ref,x})}
+  if(!out.length)return'';
+  return`<div class="pag-alerta"><div class="pag-h"><span class="pag-ic">📝</span><b class="grow">Falta preencher</b></div>${out.map(({ref,x})=>`<div class="pag-it"><span class="grow name">${esc(x.nome)}<span class="pag-s" style="display:block">${camposFalta(ref,j).map(c=>esc(c.n)).join(', ')}</span></span><button class="btn sm pag-bt" data-act="xr-abrir" data-r="${esc(ref)}" data-j="${j}">Preencher</button></div>`).join('')}</div>`}
+function sheetResp(ref,jid){const x=extraDe(ref);if(!x)return;UI.xr={ref,jid,v:{...respInfo(ref,jid).c},arq:{}};desenhaResp()}
+function desenhaResp(){const R=UI.xr,x=R&&extraDe(R.ref);if(!x)return;const paga=x.v>0&&!stPag((x.pag||{})[R.jid]);
+  openSheet(x.nome,`<div class="stack"><p class="sub" style="margin:0">Preencha para o administrador saber o que é seu.${paga&&mpOn()?' Depois disso o Pix é liberado.':''}</p>
+    ${(x.campos||[]).map(c=>{const v=R.v[c.id],lab=`<span>${TIPOS_CAMPO[c.t].e} ${esc(c.n)}${obrig(c)?'':' <i class="opc">opcional</i>'}</span>`;
+      if(c.t==='esc')return`<div class="field">${lab}<div class="pick xr-ops">${(c.op||[]).map(o=>`<button type="button" data-act="xr-op" data-c="${c.id}" data-v="${esc(o)}" aria-pressed="${v===o}">${esc(o)}</button>`).join('')}</div></div>`;
+      if(c.t==='txt')return`<label class="field">${lab}<input type="text" maxlength="60" data-xr="${c.id}" value="${esc(typeof v==='string'?v:'')}"></label>`;
+      const nA=(R.arq[c.id]&&R.arq[c.id].nome)||(v&&v.nome);
+      return`<div class="field">${lab}<label class="btn block xr-file${nA?' ok':''}">${nA?'✓ '+esc(nA)+' · trocar':c.t==='foto'?'📷 Escolher foto':'📎 Escolher arquivo'}<input type="file" hidden data-xrf="${c.id}" data-t="${c.t}" accept="${c.t==='foto'?'image/*':'image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt'}"></label>${c.t==='arq'?'<p class="sub" style="margin:4px 0 0">Até 700 KB. Foto é reduzida sozinha.</p>':''}</div>`}).join('')}
+    <button class="btn primary block btn-grande" data-act="xr-salvar">Salvar</button></div>`)}
+function xrLer(){const R=UI.xr;if(!R)return;document.querySelectorAll('[data-xr]').forEach(i=>{R.v[i.dataset.xr]=i.value.trim()})}
+// reduz a imagem até caber (jpeg)
+function imgReduzida(file,lado,max){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),im=new Image();
+  im.onload=()=>{URL.revokeObjectURL(url);let L=lado,q=.85,d;do{const k=Math.min(1,L/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.naturalWidth*k));c.height=Math.max(1,Math.round(im.naturalHeight*k));
+    const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);d=c.toDataURL('image/jpeg',q);L=Math.round(L*.85);q=Math.max(.6,q-.05)}while(d.length>max&&L>200);res(d)};
+  im.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('img'))};im.src=url})}
+function lerDataURL(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
+async function xrArquivo(inp){const R=UI.xr,f=inp.files&&inp.files[0];if(!R||!f)return;const cid=inp.dataset.xrf,foto=inp.dataset.t==='foto';
+  try{let dados,nome=f.name||'arquivo',tipo=f.type||'';
+    if(tipo.startsWith('image/')){dados=await imgReduzida(f,foto?1280:1600,foto?260000:900000);tipo='image/jpeg';nome=nome.replace(/\.[^.]+$/,'')+'.jpg'}
+    else{if(f.size>ARQ_MAX){toast('Arquivo grande demais. O limite é 700 KB.');inp.value='';return}dados=await lerDataURL(f)}
+    xrLer();R.arq[cid]={nome,tipo,dados,tam:Math.round(dados.length*.75)};desenhaResp()}
+  catch(e){console.warn(e);toast('Não deu para abrir esse arquivo.')}}
+function salvarArq(id,data){if(demo||!db){ARQ_MEM[id]=data;return Promise.resolve()}return db.doc('arqExtras/'+id).set(data)}
+function lerArq(id){if(demo||!db)return Promise.resolve(ARQ_MEM[id]||null);return db.doc('arqExtras/'+id).get().then(s=>s.exists?s.data():null)}
+function abrirDados(d){try{const[h,b64]=d.dados.split(','),mime=(h.match(/data:([^;]+)/)||[])[1]||'application/octet-stream',bin=atob(b64),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+  const url=URL.createObjectURL(new Blob([u8],{type:mime})),a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';if(!mime.startsWith('image/')&&mime!=='application/pdf')a.download=d.nome||'arquivo';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}
+  catch(e){toast('Não deu para abrir o arquivo.')}}
+// resumo para o administrador: contagem de cada opção e quantos faltam
+function resumoCampos(ref,x,ids){const L=[];for(const c of(x.campos||[])){if(c.t!=='esc')continue;const n={};ids.forEach(id=>{const v=respInfo(ref,id).c[c.id];if(!vazioCampo(v))n[v]=(n[v]||0)+1});
+    const t=(c.op||[]).filter(o=>n[o]).map(o=>`${esc(o)} <b class="num">${n[o]}</b>`);if(t.length)L.push(`${esc(c.n)}: ${t.join(' · ')}`)}
+  const f=ids.filter(id=>camposFalta(ref,id).length).length;if(f)L.push(`<span class="xr-falta">${f} ainda não preench${f>1?'eram':'eu'}</span>`);
+  return L.join('<br>')}
+function textoRespostas(ref,x,ids){const out=[`*${x.nome}*`,''];ids.forEach(id=>{const r=respInfo(ref,id).c;out.push(`• ${nm(id)}: ${(x.campos||[]).map(c=>valCampo(c,r[c.id])||'—').join(' · ')}`)});
+  for(const c of(x.campos||[]))if(c.t==='esc'){const n={};ids.forEach(id=>{const v=respInfo(ref,id).c[c.id];if(!vazioCampo(v))n[v]=(n[v]||0)+1});out.push('',`*${c.n}*: `+((c.op||[]).filter(o=>n[o]).map(o=>`${o} ${n[o]}`).join(' · ')||'—'))}
+  return out.join('\n')}
+function sheetRespostas(m,xid){const x=((S.caixa[m]||{}).extras||{})[xid];if(!x)return;const ref=m+'~'+xid,ids=(x.quem||[]).filter(id=>S.jog[id]).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  const txt=textoRespostas(ref,x,ids);
+  openSheet('Respostas · '+x.nome,`<div class="stack"><div class="sub">${resumoCampos(ref,x,ids)||'Ninguém respondeu ainda.'}</div>
+    <div class="list">${ids.map(id=>{const{uid,c:r}=respInfo(ref,id);return`<div class="item" style="align-items:flex-start"><div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub">${(x.campos||[]).map(c=>{const v=r[c.id];if(vazioCampo(v))return obrig(c)?`${esc(c.n)}: <span class="xr-falta">—</span>`:`${esc(c.n)}: —`;
+      if(typeof v==='object')return`${esc(c.n)}: <button class="xr-ed" data-act="xr-arq" data-id="${esc(uid+'~'+ref+'~'+c.id)}">${c.t==='foto'?'📷 ver foto':'📎 '+esc(v.nome)}</button>`;return`${esc(c.n)}: <b>${esc(v)}</b>`}).join(' · ')}</div></div></div>`}).join('')}</div>
+    <a class="btn block" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">Abrir lista no WhatsApp</a>
+    <button class="btn block" data-act="xr-copiar" data-m="${m}" data-x="${xid}">Copiar lista</button>
+    <p class="sub" style="margin:0">Só os administradores veem as respostas, fotos e arquivos.</p></div>`)}
 function painelMeusPag(){const L=minhasPendencias();if(!L.length)return'';const c=cfg(),auto=mpOn(),tot=L.reduce((a,x)=>a+x.v,0);
   const dono=auto&&ehDono(L[0].jid);
-  const bt=x=>dono?`<div class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm pag-bt" data-act="pix-pagar" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pix</button>${ADM()?`<button class="btn sm" data-act="dono-pago" data-t="${x.tipo}" data-r="${esc(x.ref)}">Marcar pago</button>`:''}</div>`:auto?`<button class="btn sm pag-bt" data-act="pix-pagar" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pagar com Pix</button>`:'';
+  const bt=x=>x.tipo==='x'&&camposFalta(x.ref,x.jid).length?`<button class="btn sm pag-bt" data-act="xr-abrir" data-r="${esc(x.ref)}" data-j="${x.jid}">Preencher</button>`:dono?`<div class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sm pag-bt" data-act="pix-pagar" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pix</button>${ADM()?`<button class="btn sm" data-act="dono-pago" data-t="${x.tipo}" data-r="${esc(x.ref)}">Marcar pago</button>`:''}</div>`:auto?`<button class="btn sm pag-bt" data-act="pix-pagar" data-t="${x.tipo}" data-r="${esc(x.ref)}" data-j="${x.jid}">Pagar com Pix</button>`:'';
   return`<div class="pag-alerta"><div class="pag-h"><span class="pag-ic">💰</span><b class="grow">Você tem ${BRL(tot)} para pagar</b></div>
-    ${L.map(x=>`<div class="pag-it"><span class="grow name">${esc(x.desc)}${x.ate?`<span class="pag-s" style="display:block;font-weight:700">⏳ pague até ${pad(new Date(x.ate).getHours())}:${pad(new Date(x.ate).getMinutes())} ou a vaga vai para o próximo</span>`:x.venc?`<span class="pag-s" style="display:block;font-weight:500">${x.venc<iso(new Date())?'⚠️ venceu '+dBR(x.venc):x.venc===iso(new Date())?'vence hoje':'vence '+dBR(x.venc)}</span>`:''}</span><span class="num">${BRL(x.v)}</span>${bt(x)}</div>`).join('')}
+    ${L.map(x=>`<div class="pag-it"><span class="grow name">${esc(x.desc)}${linhaCampos(x)}${x.ate?`<span class="pag-s" style="display:block;font-weight:700">⏳ pague até ${pad(new Date(x.ate).getHours())}:${pad(new Date(x.ate).getMinutes())} ou a vaga vai para o próximo</span>`:x.venc?`<span class="pag-s" style="display:block;font-weight:500">${x.venc<iso(new Date())?'⚠️ venceu '+dBR(x.venc):x.venc===iso(new Date())?'vence hoje':'vence '+dBR(x.venc)}</span>`:''}</span><span class="num">${BRL(x.v)}</span>${bt(x)}</div>`).join('')}
     <div class="pag-s" style="margin-top:6px">${dono?`A conta do Mercado Pago que recebe é <b>sua</b>: o Pix tem que sair de <b>outra conta</b> (outro CPF). ${ADM()?'Ou marque como pago e acerte no caixa.':'Ou peça ao administrador para marcar como pago.'}`:auto?'Confirmado na hora, sem comprovante.':'O pagamento pelo app ainda não foi ligado. Avise o administrador.'}</div></div>`}
 function sheetNaHora(){const m=mesAtual(),ids=ativos().sort((a,b)=>nm(a).localeCompare(nm(b))),L=ids.map(id=>[id,pendenciasDe(id)]).filter(([,x])=>x.length);
   openSheet('Cobrar na hora',`<div class="stack"><p class="sub" style="margin:0">Escolha quem vai pagar. Abre um QR Code só dele e o Caixa marca PAGO sozinho quando o Pix cair.</p>
@@ -2251,19 +2320,26 @@ function sheetComoMP(){const c=cfg();openSheet('Como funciona o Pix automático'
   <p class="sub" style="margin:0">O app só consegue <b>criar cobranças</b> para a sua conta; ninguém consegue tirar dinheiro dela. Dá para desconectar quando quiser. A conta precisa estar com a identidade confirmada no Mercado Pago.</p>
   <button class="btn block" data-act="cfg">Voltar aos ajustes</button></div>`)}
 /* cobrança extra: churrasco, camisa, evento… (fica em caixa/{mês}.extras) */
+function xcRedesenha(){const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetExtra();const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc}
 function sheetExtra(){const X=UI.xc;if(!X)return;const e=X.xid?(((S.caixa[X.m]||{}).extras||{})[X.xid]||{}):{};
+  if(!X.campos)X.campos=(e.campos||[]).map(c=>{const o={id:c.id,t:c.t,n:c.n,obr:obrig(c)};if(c.op)o.op=[...c.op];return o});
   const ids=ativos().sort((a,b)=>nm(a).localeCompare(nm(b))),sel=new Set(X.sel),at=atual(),conf=at?(()=>{const l=lista(at[1],at[0]);return[...l.escalados,...l.gks]})():[];
   openSheet(X.xid?'Editar cobrança':'Nova cobrança',`<div class="stack">
     <label class="field"><span>O que é</span><input type="text" id="xc-nome" maxlength="60" value="${esc(X.nome??e.nome??'')}" placeholder="Ex.: Churrasco de fim de ano, camisa nova"></label>
     <div class="grid2"><label class="field"><span>Valor por pessoa (R$)</span><input type="number" id="xc-v" inputmode="decimal" min="0" step="0.01" value="${X.v??e.v??''}"></label><label class="field"><span>Vence em</span><input type="date" id="xc-venc" value="${X.venc??e.venc??e.d??dataLanc(X.m)}"></label></div>
     <input type="hidden" id="xc-d" value="${X.d??e.d??dataLanc(X.m)}">
+    <div class="field"><span>Cada um preenche <i class="opc">opcional</i></span>
+      ${X.campos.map((c,i)=>`<div class="xc-campo"><span class="xc-ce">${TIPOS_CAMPO[c.t].e}</span><div class="grow stack" style="gap:4px"><input type="text" data-xcc="n" data-i="${i}" maxlength="30" value="${esc(c.n)}" aria-label="Nome do campo">${c.t==='esc'?`<input type="text" data-xcc="op" data-i="${i}" value="${esc((c.op||[]).join(', '))}" aria-label="Opções separadas por vírgula"><span class="sub">Opções separadas por vírgula</span>`:`<span class="sub">${TIPOS_CAMPO[c.t].d}</span>`}<label class="row sub" style="gap:6px"><input type="checkbox" data-xcc="obr" data-i="${i}" ${obrig(c)?'checked':''}> Obrigatório (só paga depois de preencher)</label></div><button type="button" class="btn sm" data-act="xc-campo-del" data-i="${i}" aria-label="Tirar este campo">✕</button></div>`).join('')}
+      <div class="pick"><button type="button" data-act="xc-campo-add" data-v="esc">+ 👕 Tamanho</button><button type="button" data-act="xc-campo-add" data-v="txt">+ ✍️ Texto</button><button type="button" data-act="xc-campo-add" data-v="foto">+ 📷 Foto</button><button type="button" data-act="xc-campo-add" data-v="arq">+ 📎 Arquivo</button></div>
+      <p class="sub" style="margin:4px 0 0">Ex.: tamanho da camisa. Cada um preenche o seu no app. Campo obrigatório: só dá para pagar pelo Pix depois de preencher.</p></div>
     <div class="field"><span>Quem paga <b class="num">${sel.size}</b></span><div class="pick"><button type="button" data-act="xc-quick" data-v="todos">Todos</button>${conf.length?`<button type="button" data-act="xc-quick" data-v="conf">Confirmados ${dShort(at[1].data)}</button>`:''}${EV()?'':`<button type="button" data-act="xc-quick" data-v="mensal">Mensalistas</button>`}<button type="button" data-act="xc-quick" data-v="ninguem">Ninguém</button></div></div>
     <div class="list xc-list">${ids.map(id=>`<label class="item" style="cursor:pointer"><input type="checkbox" data-act="xc-sel" data-j="${id}" ${sel.has(id)?'checked':''}><div class="grow name">${esc(nm(id))}</div></label>`).join('')}</div>
     <button class="btn primary block" data-act="xc-salvar">${X.xid?'Salvar':'Criar cobrança'}</button>
     ${X.xid?`<button class="btn danger block" data-act="xc-apagar">Apagar cobrança</button>`:''}
     <p class="sub" style="margin:0">Cada pessoa da lista vê a cobrança no app${mpOn()?' e pode pagar com Pix':''}. Entra no saldo do mês quando for paga.</p></div>`);
   UI.xc.conf=conf}
-function xcLer(){const X=UI.xc;if(!X)return;const g=id=>document.getElementById(id);if(g('xc-venc'))X.venc=g('xc-venc').value;if(g('xc-nome'))X.nome=g('xc-nome').value;if(g('xc-v'))X.v=g('xc-v').value;if(g('xc-d'))X.d=g('xc-d').value}
+function xcLer(){const X=UI.xc;if(!X)return;const g=id=>document.getElementById(id);
+  document.querySelectorAll('[data-xcc]').forEach(i=>{const c=(X.campos||[])[Number(i.dataset.i)];if(!c)return;if(i.dataset.xcc==='n')c.n=i.value;else if(i.dataset.xcc==='obr')c.obr=i.checked;else c.op=i.value.split(',').map(t=>t.trim()).filter(Boolean)});if(g('xc-venc'))X.venc=g('xc-venc').value;if(g('xc-nome'))X.nome=g('xc-nome').value;if(g('xc-v'))X.v=g('xc-v').value;if(g('xc-d'))X.d=g('xc-d').value}
 /* lista "quem paga" + total (com e sem a taxa do Pix). act: prefixo das ações (npd = formulário, ds = folha) */
 function htmlQuemPaga(ids,map,base,act,conf){conf=conf||new Set();const t=taxaTotal(),vv=id=>{const d=map[id];return d&&d.isento?0:d&&Number(d.v)>0?Number(d.v):Math.round((base||0)*(1-(Number(d&&d.pct)||0))*100)/100};
   const pag=ids.filter(id=>vv(id)>0&&conf.has(id)),tot=pag.reduce((a,id)=>a+vv(id),0),comTaxa=pag.reduce((a,id)=>a+Math.ceil(vv(id)/(1-t)*100)/100,0);
@@ -2478,7 +2554,7 @@ function sheetAviso(id,pre){
 }
 
 /* ---------- ações ---------- */
-document.addEventListener('click',e=>{
+document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
   const act=b.dataset.act,d=b.dataset;
   if(act==='close-bg'&&e.target!==b)return;
@@ -2824,7 +2900,21 @@ document.addEventListener('click',e=>{
       g.gols=g.gols.filter((_,i)=>i!==Number(d.i));const k=e.s==='a'?'ga':'gb';g[k]=Math.max(0,(g[k]||0)-1);
       if(ed){const st=UI.ed.st;st[e.j]={...(st[e.j]||{}),g:Math.max(0,((st[e.j]||{}).g||0)-1)};if(e.as)st[e.as]={...(st[e.as]||{}),a:Math.max(0,((st[e.as]||{}).a||0)-1)};const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetEditarPelada(d.p);const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc}
       else{const s0=p.stats||{},up={[e.j]:{g:Math.max(0,((s0[e.j]||{}).g||0)-1)}};if(e.as)up[e.as]={...(up[e.as]||{}),a:Math.max(0,((s0[e.as]||{}).a||0)-1)};patch('peladas/'+d.p,{jogos:J0,stats:up});toast('Gol apagado.')}break}
-    case'pix-pagar':{const L=minhasPendencias(),x=L.find(y=>y.tipo===d.t&&y.ref===d.r&&y.jid===d.j);if(x)sheetPix(x);break}
+    case'pix-pagar':{const L=minhasPendencias(),x=L.find(y=>y.tipo===d.t&&y.ref===d.r&&y.jid===d.j);if(x&&x.tipo==='x'&&camposFalta(x.ref,x.jid).length){toast('Preencha primeiro.');sheetResp(x.ref,x.jid);break}if(x)sheetPix(x);break}
+    case'xr-abrir':sheetResp(d.r,d.j);break;
+    case'xr-op':{const R=UI.xr;if(!R)return;xrLer();R.v[d.c]=d.v;document.querySelectorAll(`[data-act="xr-op"][data-c="${d.c}"]`).forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===d.v));break}
+    case'xr-salvar':{const R=UI.xr,x=R&&extraDe(R.ref);if(!x)return;xrLer();
+      const falta=(x.campos||[]).filter(c=>obrig(c)&&vazioCampo(R.v[c.id])&&!R.arq[c.id]);if(falta.length){toast('Falta: '+falta.map(c=>c.n).join(', '));return}
+      const uid=uidEu();b.disabled=true;b.textContent='Salvando…';
+      try{for(const[cid,a] of Object.entries(R.arq)){await salvarArq(uid+'~'+R.ref+'~'+cid,{uid,ref:R.ref,c:cid,j:R.jid,nome:a.nome,tipo:a.tipo,dados:a.dados,em:Date.now()});R.v[cid]={nome:a.nome,tipo:a.tipo,tam:a.tam}}}
+      catch(e){console.warn(e);b.disabled=false;b.textContent='Salvar';toast(e&&e.code==='permission-denied'?'Não deu para enviar: as regras do Firebase precisam ser atualizadas. Avise o administrador.':'Não deu para enviar o arquivo. Tente de novo.');return}
+      const cur=(S.resp||{})[uid]||{};put('respExtras/'+uid,{...cur,[R.ref]:{j:R.jid,c:R.v,em:Date.now()}});UI.xr=null;closeSheet();
+      toast(x.v>0&&!stPag((x.pag||{})[R.jid])&&mpOn()?'Pronto! Agora é só pagar com Pix.':'Pronto! Respostas salvas.');break}
+    case'xr-ver':sheetRespostas(d.m,d.x);break;
+    case'xr-arq':{b.disabled=true;lerArq(d.id).then(a=>{b.disabled=false;if(!a){toast('Arquivo não encontrado.');return}abrirDados(a)}).catch(e=>{b.disabled=false;console.warn(e);toast('Não deu para abrir o arquivo.')});break}
+    case'xr-copiar':{const x=((S.caixa[d.m]||{}).extras||{})[d.x];if(!x)return;const t=textoRespostas(d.m+'~'+d.x,x,(x.quem||[]).filter(id=>S.jog[id]).sort((a,c)=>nm(a).localeCompare(nm(c))));navigator.clipboard?.writeText(t).then(()=>toast('Lista copiada.'),()=>toast('Não deu para copiar.'));break}
+    case'xc-campo-add':{const X=UI.xc;if(!X)return;xcLer();const c={id:'c'+Date.now().toString(36),t:d.v,obr:d.v==='esc',n:{esc:'Tamanho',txt:'Nome na camisa',foto:'Foto',arq:'Arquivo'}[d.v]};if(d.v==='esc')c.op=[...TAM_PADRAO];X.campos.push(c);xcRedesenha();break}
+    case'xc-campo-del':{const X=UI.xc;if(!X)return;xcLer();X.campos.splice(Number(d.i),1);xcRedesenha();break}
     case'pix-copiar':{const t=document.getElementById('pix-cod');if(!t)return;navigator.clipboard?.writeText(t.value).then(()=>toast('Código copiado. Agora cole no app do banco.'),()=>{t.select();toast('Selecione e copie o código.')})||(t.select(),toast('Selecione e copie o código.'));break}
     case'pix-demo-pagar':{const x=UI.pixAberto;if(!x)return;const val={s:'pago',d:iso(new Date()),v:x.v,obs:'Pix automático',via:'pix'};if(x.tipo==='x'){const[mx,xid]=x.ref.split('~'),e=((S.caixa[mx]||{}).extras||{})[xid];if(e)gravarExtra(mx,xid,{...e,pag:{...(e.pag||{}),[x.jid]:val}})}else if(x.tipo==='m'){const cx=S.caixa[x.ref]||{mens:{},desp:[]};put('caixa/'+x.ref,{...cx,mens:{...(cx.mens||{}),[x.jid]:val}})}else patch('peladas/'+x.ref,{diarias:{[x.jid]:val}});break}
     case'mp-antes':if(demo){toast('Na demonstração não dá para conectar uma conta.');return}sheetAntesMP();break;
@@ -2844,13 +2934,14 @@ document.addEventListener('click',e=>{
     case'x-todos':{const e=((S.caixa[d.m]||{}).extras||{})[d.x];if(!e)return;const dt=dataLanc(d.m),pg={...(e.pag||{})};let n=0;for(const id of e.quem||[])if(S.jog[id]&&!stPag(pg[id])){pg[id]={s:'pago',d:dt,v:Number(e.v)||0};n++}gravarExtra(d.m,d.x,{...e,pag:pg});toast(`${n} pagamento(s) marcados em ${dBR(dt)}.`);break}
     case'x-nova':UI.xc={m:d.m,xid:null,sel:ativos()};sheetExtra();break;
     case'x-editar':{const e=((S.caixa[d.m]||{}).extras||{})[d.x];if(!e)return;UI.xc={m:d.m,xid:d.x,sel:(e.quem||[]).filter(id=>S.jog[id])};sheetExtra();break}
-    case'xc-sel':{const X=UI.xc;if(!X)return;const on=b.checked;X.sel=on?[...new Set([...X.sel,d.j])]:X.sel.filter(x=>x!==d.j);const lb=document.querySelector('.sheet .field b.num');if(lb)lb.textContent=X.sel.length;return}
+    case'xc-sel':{const X=UI.xc;if(!X)return;const on=b.checked;X.sel=on?[...new Set([...X.sel,d.j])]:X.sel.filter(x=>x!==d.j);const lb=document.querySelector('.sheet .field span b.num');if(lb)lb.textContent=X.sel.length;return}
     case'xc-quick':{const X=UI.xc;if(!X)return;xcLer();X.sel=d.v==='todos'?ativos():d.v==='ninguem'?[]:d.v==='mensal'?ativos().filter(id=>J(id).tipo==='mensalista'):(X.conf||[]).filter(id=>S.jog[id]);const sh=document.querySelector('.sheet'),sc=sh?sh.scrollTop:0;sheetExtra();const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollTop=sc;break}
     case'xc-salvar':{const X=UI.xc;if(!X)return;xcLer();const nome=(X.nome||'').trim(),v=Number(String(X.v||'').replace(',','.'));
       if(!nome){toast('Diga o que é a cobrança.');return}if(!(v>=0)||String(X.v||'').trim()===''){toast('Coloque o valor por pessoa.');return}if(!X.sel.length){toast('Escolha quem paga.');return}
       const e=X.xid?(((S.caixa[X.m]||{}).extras||{})[X.xid]||{}):{},xid=X.xid||('x'+Date.now().toString(36)),mx=(X.d||'').slice(0,7)||X.m;
       const fixos=Object.keys(e.pag||{}).filter(k=>pagoPorPix(e.pag[k])&&!X.sel.includes(k));const avisoPix=fixos.length?' '+fixos.map(nm).join(', ')+' já pagou por Pix e continua na lista.':'';if(fixos.length)X.sel=[...X.sel,...fixos];
-      const novo={...e,nome,v:Math.round(v*100)/100,d:X.d||dataLanc(X.m),venc:X.venc||X.d||dataLanc(X.m),quem:X.sel,pag:Object.fromEntries(Object.entries(e.pag||{}).filter(([k])=>X.sel.includes(k))),criadoEm:e.criadoEm||Date.now()};
+      const campos=(X.campos||[]).map(c=>({...c,n:String(c.n||'').trim()||TIPOS_CAMPO[c.t].n}));if(campos.some(c=>c.t==='esc'&&!(c.op||[]).length)){toast('Coloque as opções do campo '+(campos.find(c=>c.t==='esc'&&!(c.op||[]).length).n)+'.');return}
+      const novo={...e,campos,nome,v:Math.round(v*100)/100,d:X.d||dataLanc(X.m),venc:X.venc||X.d||dataLanc(X.m),quem:X.sel,pag:Object.fromEntries(Object.entries(e.pag||{}).filter(([k])=>X.sel.includes(k))),criadoEm:e.criadoEm||Date.now()};
       if(X.xid&&mx!==X.m)gravarExtra(X.m,X.xid,null);gravarExtra(mx,xid,novo);if(mx!==UI.mes&&mx!==X.m)UI.mes=mx;closeSheet();toast((X.xid?'Cobrança atualizada.':`Cobrança criada para ${novo.quem.length} pessoa(s).`)+avisoPix);break}
     case'xc-apagar':{const X=UI.xc;if(!X||!X.xid)return;if(Object.values((((S.caixa[X.m]||{}).extras||{})[X.xid]||{}).pag||{}).some(pagoPorPix)){toast('Esta cobrança já recebeu Pix pelo app e não pode ser apagada. Para devolver, lance uma saída.');return}if(!b.dataset.sure){b.dataset.sure=1;b.textContent='Toque de novo para apagar';setTimeout(()=>{if(b.isConnected){delete b.dataset.sure;b.textContent='Apagar cobrança'}},3500);return}
       gravarExtra(X.m,X.xid,null);closeSheet();toast('Cobrança apagada.');break}
@@ -2955,6 +3046,7 @@ function npQpAtualiza(){const box=document.getElementById('np-qp'),v=document.ge
   box.innerHTML=htmlQuemPaga(ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>nm(a).localeCompare(nm(b))),UI.npDesc||{},Number(String(v.value).replace(',','.'))||0,'npd')}
 document.addEventListener('input',e=>{if(e.target&&e.target.id==='np-valor')npQpAtualiza();if(e.target&&e.target.id==='aj-saldo')ajDif()});
 document.addEventListener('change',e=>{
+  if(e.target.dataset&&e.target.dataset.xrf){xrArquivo(e.target);return}
   if(e.target.id==='filtro-mais'){UI.filtro=e.target.value||'todos';render();return}
   if(e.target.id==='a-tipo'){const o=document.getElementById('a-outro');if(o)o.hidden=e.target.value!=='outro'}
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
@@ -3112,7 +3204,7 @@ window.iniciarPelada=function(ctx){
     if(first){first=false;done()}else if(!demo)render()},e=>{onErr(e);if(first){first=false;done()}})};
   one('eventos/feed','feed');one('config/geral','config');one('mural/geral','mural');
   live('jogadores','jog');live('peladas','pel');live('caixa','caixa');live('avisos','avisos');live('presencas','pres');live('locais','locais');live('membros','membros');live('avaliacoes','avals');
-  ouvirVotos();ouvirSugestoes();
+  ouvirVotos();ouvirSugestoes();ouvirResp();
 };
 // votos: o administrador lê todos (para apurar quando a avaliação fecha); o jogador lê só os dele
 let unsubVotos=null;
@@ -3122,7 +3214,7 @@ function ouvirVotos(){if(unsubVotos){try{unsubVotos()}catch(e){}unsubVotos=null}
   else unsubVotos=db.doc('votos/'+myId).onSnapshot(snap=>{S.votos={...(S.votos||{}),[myId]:snap.exists?snap.data():undefined};if(!snap.exists)delete S.votos[myId];fim()},e=>console.warn(e))}
 window.pararPelada=function(){if(db&&db.unsubs)db.unsubs.splice(0).forEach(u=>{try{u()}catch(e){}});db=null;ready=false;demo=false;REAL=null};
 window.atualizarDuvidas=function(){if(!ready)return;render();};
-window.atualizarGrupo=function(g){GRUPO=g;const adm=SUP||!!(g&&(g.admins||[]).includes(myId));if(adm!==isAdmin){isAdmin=adm;ouvirVotos();ouvirSugestoes();if(!adm&&['avisos','caixa'].includes(UI.tab))UI.tab='jogo'}render();renderAdmins()};
+window.atualizarGrupo=function(g){GRUPO=g;const adm=SUP||!!(g&&(g.admins||[]).includes(myId));if(adm!==isAdmin){isAdmin=adm;ouvirVotos();ouvirResp();ouvirSugestoes();if(!adm&&['avisos','caixa'].includes(UI.tab))UI.tab='jogo'}render();renderAdmins()};
 window.abrirDemo=function(){window.pararPelada();SUP=false;S={config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null,membros:{},votos:{},avals:{}};myId=null;isAdmin=true;GRUPO={codigo:'DEMO01',admins:[]};ready=true;startDemo()};
 /* ---------- PDF da prestação de contas (gerador próprio, sem biblioteca) ---------- */
 const PDF_W={r:[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584],
