@@ -658,6 +658,38 @@ nav.tabs button:active svg{transform:scale(.9)}
 .ed-st{display:flex;justify-content:space-around;margin-top:6px}
 .jg-fase{font-family:var(--f-display);font-style:italic;text-transform:uppercase;font-size:15px;margin:12px 0 4px;color:var(--pitch)}
 .seg .seg-longo{font-size:14px;letter-spacing:-.01em;white-space:nowrap;padding-inline:4px}
+/* placar da pelada enxuto */
+.board-pel .when{font-size:34px}
+.board-pel .when .ate{font-size:.42em;margin-top:2px}
+.board .stats.st4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.board .stats.st4 .stat{min-width:0;padding:5px 9px 4px}
+.board .stats.st4 .stat b{font-size:22px}
+.board .stats.st4 .stat span{font-size:9.5px;letter-spacing:.05em;white-space:nowrap}
+.bd-din{margin-top:10px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.bd-txt{opacity:.92}
+.bd-bts{display:flex;gap:6px;flex-wrap:wrap}
+.board .bd-bt{background:rgba(255,255,255,.16);border-color:transparent;color:inherit}
+/* barra Presença · Times · Jogo grudada no topo ao rolar, com pontinho na fase atual */
+.subtabs{position:sticky;top:calc(env(safe-area-inset-top,0px) + 6px);z-index:30;box-shadow:0 4px 14px rgba(0,0,0,.10)}
+.fase-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--card);margin-left:6px;vertical-align:middle;box-shadow:0 0 0 2px rgba(242,193,46,.35)}
+/* gols lançados */
+.gols-l{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.gol-chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 10px;font-size:13px;font-weight:600}
+/* escolha da mensagem do WhatsApp */
+.wa-op{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px}
+.wa-op span{font-size:12px;font-weight:500;color:var(--muted)}
+/* caixa: partes que abrem e fecham */
+.cx-data>summary,.cx-ext>summary,.cx-pagos>summary{cursor:pointer;list-style:none}
+.cx-data>summary::-webkit-details-marker,.cx-ext>summary::-webkit-details-marker,.cx-pagos>summary::-webkit-details-marker{display:none}
+.cx-sum{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cx-sum::after{content:'▾';color:var(--muted)}.cx-data[open] .cx-sum::after{content:'▴'}
+.cx-pagos{margin-top:4px;border-top:1px solid var(--line)}
+.cx-pagos>summary{padding:10px 0 4px;font-weight:700;color:var(--pitch)}
+.cx-pagos>summary::after{content:' ▾'}.cx-pagos[open]>summary::after{content:' ▴'}
+/* elenco: filtros numa linha */
+.filtros1{flex-wrap:nowrap;align-items:stretch}
+.filtros1 select{width:auto;flex:1;min-width:0;min-height:0;padding:6px 8px;font-size:13px;font-weight:600;border-radius:5px}
+.filtros1 select.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .jg-fim-l{grid-column:1/-1;display:flex;justify-content:center;margin-top:4px}.jg-fim{border:1px dashed var(--line);background:var(--surface);color:var(--muted);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}.jg-fim.on{border-style:solid;border-color:var(--pitch);background:var(--pitch);color:var(--pitch-ink)}
 .jg-fase~.jg-fase{border-top:1px solid var(--line);padding-top:12px;margin-top:14px}
 .jg{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px;padding:8px;border:1px solid var(--line);border-radius:10px;margin-top:6px;background:var(--surface)}
@@ -781,9 +813,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261116a"></script>
-<script src="br.js?v=20261116a"></script>
-<script src="core.js?v=20261116a"></script>
-<script type="module" src="app.js?v=20261116a"></script>
+<script src="qrcode.js?v=20261116b"></script>
+<script src="br.js?v=20261116b"></script>
+<script src="core.js?v=20261116b"></script>
+<script type="module" src="app.js?v=20261116b"></script>
 </body>
 </html>

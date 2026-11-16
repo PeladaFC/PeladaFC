@@ -384,6 +384,9 @@ function repasses(){const out=[],cur=atual();
   const rec=Object.entries(S.pel).filter(([,p])=>p&&p.aval&&!(p.rep||{}).resultado&&Date.now()-new Date(String(p.data).slice(0,10)+'T12:00')<4*864e5).sort((a,b)=>String(b[1].data).localeCompare(String(a[1].data)))[0];
   if(rec)out.push({k:'resultado',n:'Resultado e prêmios',pid:rec[0]});
   return out}
+// em que fase a pelada está: antes do sorteio é Presença; com times é Times; a partir de 1 h antes do início é Jogo e pós-jogo
+function faseDe(p){const ini=new Date(String(p.data).slice(0,10)+'T'+(horaIniDe(p)||'00:00'));
+  if(!isNaN(ini)&&Date.now()>=ini-36e5)return'pos';return p.times?'times':'presenca'}
 function relTempo(d){const ms=d-new Date(),h=Math.round(Math.abs(ms)/36e5);
   if(ms<0)return h<1?'agora':'há '+h+'h';if(h<1)return'em menos de 1h';if(h<36)return'em '+h+'h';return'em '+Math.round(h/24)+' dias'}
 
@@ -1365,16 +1368,20 @@ function tJogo(A){
     return h+(A?painelAvAdmin():'')+renderHist(A);
   }
   const[pid,p]=cur,l=lista(p);
-  h+=`<div class="board"><div class="when">${dShort(p.data)}<br>${esc(horaIniDe(p))}<small class="ate"> às ${esc(horaFimDe(p))}</small></div><div class="where row" style="gap:8px">${(()=>{const LL=localDe(p);return LL?`<span>📍 ${esc(LL.nome)}${LL.end?' · '+esc(LL.end):''}</span>${LL.end||LL.tel?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="como-chegar" data-p="${pid}">${LL.end?'🗺️ Como chegar':'📞 Contato'}</button>`:''}`:'Local a definir'})()}${A?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="trocar-local" data-p="${pid}">${localDe(p)?'Trocar local':'Definir local'}</button>`:''}</div>
-    <div class="stats${A?' com-arte':''}"><div class="stat"><b class="num">${l.escalados.length}/${l.vagas}</b><span>Linha</span></div><div class="stat"><b class="num">${l.gks.length}</b><span>Goleiros</span></div><div class="stat"><b class="num">${l.espera.length}</b><span>Espera</span></div><div class="stat"><b class="num">${l.pend.length}</b><span>Sem resposta</span></div>${A?`<button class="btn sm warn stat-arte" data-act="convoc-arte" data-p="${pid}">🎨 Arte de convocação</button>`:''}</div></div>`;
-  if(CX()&&valorTxt(p)&&(PA(p)||A||ehDiarista(meuJogador()||'')))h+=`<div class="row between" style="margin-top:8px;gap:8px"><span class="sub">💰 <b class="num">${valorTxt(p)}</b>${p.extra?' · evento extra: mensalista também paga':PA(p)?'':' · mensalista já paga na mensalidade'}</span>${A?`<div class="row" style="gap:4px">${aberto(p)?`<button class="btn sm" data-act="fechar-div" data-p="${pid}">Fechar divisão</button>`:''}<button class="btn sm" data-act="pel-desc" data-p="${pid}">👥 Quem paga</button><button class="btn sm" data-act="preco-pel" data-p="${pid}">Valor</button></div>`:''}</div>`;
-  else if(A&&CX()&&EV())h+=`<div class="row between" style="margin-top:8px;gap:8px"><span class="sub">Sem cobrança nesta pelada</span><button class="btn sm" data-act="preco-pel" data-p="${pid}">Cobrar por atleta</button></div>`;
-  h+=`<div class="seg" style="margin-block:12px" role="group">${[['presenca','Presença'],['times','Times'],['pos','Jogo e pós‑jogo']].map(([k,n])=>`<button data-act="sub" data-v="${k}" aria-pressed="${UI.sub===k}"${k==='pos'?' class="seg-longo"':''}>${n}</button>`).join('')}</div>`;
+  h+=`<div class="board board-pel"><div class="when">${dShort(p.data)} <span class="hr">${esc(horaIniDe(p))}</span><small class="ate">até ${esc(horaFimDe(p))}</small></div><div class="where row" style="gap:8px">${(()=>{const LL=localDe(p);return LL?`<span>📍 ${esc(LL.nome)}${LL.end?' · '+esc(LL.end):''}</span>${LL.end||LL.tel?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="como-chegar" data-p="${pid}">${LL.end?'🗺️ Como chegar':'📞 Contato'}</button>`:''}`:'Local a definir'})()}${A?`<button class="btn sm" style="background:rgba(255,255,255,.16);border-color:transparent;color:inherit" data-act="trocar-local" data-p="${pid}">${localDe(p)?'Trocar local':'Definir local'}</button>`:''}</div>
+    <div class="stats st4"><div class="stat"><b class="num">${l.escalados.length}/${l.vagas}</b><span>Linha</span></div><div class="stat"><b class="num">${l.gks.length}</b><span>Goleiros</span></div><div class="stat"><b class="num">${l.espera.length}</b><span>Espera</span></div><div class="stat"><b class="num">${l.pend.length}</b><span>Sem resp.</span></div></div>
+    ${(()=>{const bb='class="btn sm bd-bt"';let din='',bts='';
+      if(CX()&&valorTxt(p)&&(PA(p)||A||ehDiarista(meuJogador()||''))){din=`💰 <b class="num">${valorTxt(p)}</b>${p.extra?' · mensalista também paga':PA(p)?'':' · mensalista não paga'}`;
+        if(A)bts=`${aberto(p)?`<button ${bb} data-act="fechar-div" data-p="${pid}">Fechar divisão</button>`:''}<button ${bb} data-act="preco-pel" data-p="${pid}">Valor</button><button ${bb} data-act="pel-desc" data-p="${pid}">👥 Quem paga</button>`}
+      else if(A&&CX()&&EV()){din='Sem cobrança nesta pelada';bts=`<button ${bb} data-act="preco-pel" data-p="${pid}">Cobrar por atleta</button>`}
+      if(A)bts+=`<button class="btn sm warn bd-arte" data-act="convoc-arte" data-p="${pid}">🎨 Arte</button>`;
+      return din||bts?`<div class="bd-din">${din?`<span class="bd-txt">${din}</span>`:''}${bts?`<div class="bd-bts">${bts}</div>`:''}</div>`:''})()}</div>`;
+  {const fs=faseDe(p);h+=`<div class="seg subtabs" style="margin-block:12px" role="group">${[['presenca','Presença'],['times','Times'],['pos','Jogo e pós‑jogo']].map(([k,n])=>`<button data-act="sub" data-v="${k}" aria-pressed="${UI.sub===k}"${k==='pos'?' class="seg-longo"':''}>${n}${fs===k?'<i class="fase-dot" aria-label="(agora)"></i>':''}</button>`).join('')}</div>`}
   if(!A)h+=painelJogador(pid,p,l);
   if(UI.sub==='presenca')h+=subPresenca(pid,p,l,A);
   else if(UI.sub==='times')h+=subTimes(pid,p,l,A);
   else h+=subPos(pid,p,A);
-  return h+(A?painelAvAdmin():'')+renderHist(A);
+  return h;
 }
 function rowPlayer(id,right,extra='',tipo,tag=''){
   const j=J(id);
@@ -1403,8 +1410,8 @@ function subPresenca(pid,p,l,A){
     diaL=[...diaS.filter(pediu).sort((a,b)=>(resp[a].t||0)-(resp[b].t||0)||abc(a,b)),...diaS.filter(id=>!pediu(id)).sort(abc)],order=[...golL,...mensL,...diaL],grupos=[[golL,'Goleiros',cfg().golSorteio?'1 por time · não ocupam vaga da linha':'não ocupam vaga'],[mensL,'Mensalistas',''],[diaL,'Diaristas','']].filter(g=>g[0].length);
   // prioridade de quem ficou fora da lista (espera, pediu vaga, perdeu o prazo): só o administrador vê
   const ordPed={};l.espera.forEach((id,i)=>ordPed[id]=i+1);
-  let h=`<div class="panel"><div class="panel-h"><h3>Quem vai?</h3>${A?'<div class="row"><button class="btn sm" data-act="msg" data-v="convocacao">Convocar</button><button class="btn sm" data-act="msg" data-v="cobrar">Cobrar</button><button class="btn sm primary" data-act="msg" data-v="lista">Lista</button></div>':''}</div>`;
-  if(A)h+=`<button class="btn block" style="margin-bottom:10px" data-act="msg" data-v="convocacao">📲 Mandar no WhatsApp · links “Vou” e “Não vou”</button>`;
+  let h=`<div class="panel"><div class="panel-h"><h3>Quem vai?</h3></div>`;
+  if(A)h+=`<button class="btn block" style="margin-bottom:10px" data-act="wa-pres" data-p="${pid}">📲 Mandar no WhatsApp ▾</button>`;
   if(!PA(p)&&p.mensAte)h+=`<div class="sub" style="margin:-4px 0 8px">⏳ Mensalistas confirmam até <b>${prazoMensTxt(p)}</b>${Date.now()<p.mensAte?'':' · prazo encerrado'}.</div>`;
   if(A&&!PA(p)&&ativos().some(id=>J(id).tipo==='diarista')){const np=l.aguardando.filter(id=>ehDiarista(id)).length;h+=`<button class="btn block${p.mensAte&&Date.now()>=p.mensAte&&np?' primary':''}" style="margin-bottom:10px" data-act="cv-abrir" data-p="${pid}">📣 Convocar diaristas${np?` · ${np} pediram vaga`:''}</button>`}
   if(!order.length)h+=`<div class="empty">Ninguém no elenco ainda.${A?' <button class="btn sm" data-act="add-jog">Adicionar jogador</button>':''}</div>`;
@@ -1591,12 +1598,12 @@ function statusVotacao(p,pid,ids){const f=fimDe(p).getTime(),n=Date.now(),fa=fim
   if(n<fa)return`Avaliação aberta até ${quandoCurto(fa)}. Os votos são secretos e as notas só aparecem quando ela fechar.${cont}`;
   return'Avaliação encerrada. As notas aparecem assim que um administrador abrir o app.'+cont}
 // relação das notas de uma pelada, da maior para a menor
-function tabelaNotas(pid,p,A,draft){const st=draft||p.stats||{},pr=premiosDe(p,pid),r=rankingNotas(p,pid);let pos=0;
+function tabelaNotas(pid,p,A,draft,semPasso){const st=draft||p.stats||{},pr=premiosDe(p,pid),r=rankingNotas(p,pid);let pos=0;
   return`<div class="list">${r.map(x=>{const s=st[x.id]||{};if(x.n!=null)pos++;
     const sa=draft?'stat-rasc':'stat',step=(f,lbl,v)=>A?`<div class="stepbox"><div class="step"><button data-act="${sa}" data-p="${pid}" data-j="${x.id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${v}</output><button data-act="${sa}" data-p="${pid}" data-j="${x.id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`:'';
     return`<div class="item" style="flex-wrap:wrap"><span class="pos num" style="width:22px;text-align:center;font-weight:800">${x.n!=null?(pos<=3?['🥇','🥈','🥉'][pos-1]:pos+'º'):'–'}</span>${avHTML(x.id)}<div class="grow" style="min-width:110px"><div class="name">${esc(nm(x.id))}${pr.mvp===x.id?' 🏆':''}${pr.per===x.id?' 🐢':''}</div>
-      <div class="sub">${[x.n!=null?(x.a?x.a.n+' voto'+(x.a.n>1?'s':''):''):(x.a?`só ${x.a.n} voto, não conta`:'sem votos'),A?'':`⚽ ${s.g||0} · 🅰️ ${s.a||0}`].filter(Boolean).join(' · ')}</div></div>
-      ${A?`<div class="row" style="gap:6px">${step('g','Gols',s.g||0)}${step('a','Assist.',s.a||0)}</div>`:''}<span class="nota num" style="min-width:44px;text-align:right">${x.n!=null?fmtN(x.n):'—'}</span></div>`}).join('')}</div>`}
+      <div class="sub">${[x.n!=null?(x.a?x.a.n+' voto'+(x.a.n>1?'s':''):''):(x.a?`só ${x.a.n} voto, não conta`:'sem votos'),A&&!semPasso?'':(s.g||s.a||!A?`⚽ ${s.g||0} · 🅰️ ${s.a||0}`:'')].filter(Boolean).join(' · ')}</div></div>
+      ${A&&!semPasso?`<div class="row" style="gap:6px">${step('g','Gols',s.g||0)}${step('a','Assist.',s.a||0)}</div>`:''}<span class="nota num" style="min-width:44px;text-align:right">${x.n!=null?fmtN(x.n):'—'}</span></div>`}).join('')}</div>`}
 /* destaques de uma pelada (prêmio, jogador e o número que deu o prêmio) */
 function destaquesDe(p,pid){const pr=premiosVis(p,pid),stt=p.stats||{},EMO={mvp:'🏆',art:'⚽',gar:'🅰️',def:'🛡️',gol:'🧤',per:'🐢'},TIT={mvp:'Craque',art:'Artilheiro',gar:'Garçom',def:'Xerife',gol:'Goleiro',per:'Pereba'};
   const det=k=>{const id=pr[k],x=stt[id]||{};if(k==='art')return(x.g||0)+(x.g===1?' gol':' gols');if(k==='gar')return(x.a||0)+(x.a===1?' assist.':' assist.');const n=notaJogo(p,pid,id);return n!=null?'nota '+fmtN(n):''};
@@ -1657,7 +1664,11 @@ function subPos(pid,p,A){
   else if(p.times&&A){h+=`<div class="panel" style="margin-bottom:12px"><h3 style="margin-bottom:8px">Vitórias por time</h3><div class="row" style="gap:16px">`;
     p.times.forEach((t,i)=>{const v=(p.vit||[])[i]||0;h+=`<div class="stepbox"><div class="step"><button data-act="vit" data-p="${pid}" data-i="${i}" data-d="-1" aria-label="Menos">−</button><output class="num">${v}</output><button data-act="vit" data-p="${pid}" data-i="${i}" data-d="1" aria-label="Mais">+</button></div><span class="lbl">${esc(nomeTime(t.cor))}</span></div>`});
     h+='</div></div>'}
-  h+=`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Avaliação da galera'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div><div class="sub" style="margin-bottom:6px">${statusVotacao(p,pid,ids)}</div>${tabelaNotas(pid,p,A)}</div>`;
+  if(A){const gl=ids.filter(id=>(st[id]?.g||0)+(st[id]?.a||0)>0).sort((a,b)=>(st[b].g||0)-(st[a].g||0)||(st[b].a||0)-(st[a].a||0));
+    h+=`<div class="panel" style="margin-bottom:12px"><div class="panel-h"><h3>Gols</h3><span class="sub num">${ids.reduce((t,id)=>t+(st[id]?.g||0),0)} no total</span></div>
+      <button class="btn primary block" data-act="gol-abrir" data-p="${pid}">⚽ Lançar gol</button>
+      ${gl.length?`<div class="gols-l">${gl.map(id=>`<button class="gol-chip" data-act="gol-abrir" data-p="${pid}">${esc(nm(id))} <b class="num">${st[id].g?'⚽'+st[id].g:''}${st[id].a?' 🅰️'+st[id].a:''}</b></button>`).join('')}</div>`:'<div class="sub" style="margin-top:6px">Ninguém marcou ainda. Toque em Lançar gol a cada gol: escolha quem fez e quem deu o passe.</div>'}</div>`}
+  h+=`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Avaliação da galera'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div><div class="sub" style="margin-bottom:6px">${statusVotacao(p,pid,ids)}</div>${tabelaNotas(pid,p,A,null,true)}</div>`;
   const opts=(list,v)=>'<option value="">—</option>'+list.map(id=>`<option value="${id}" ${v===id?'selected':''}>${esc(nm(id))}</option>`).join('');
   const sugArt=ids.slice().sort((a,b)=>(st[b]?.g||0)-(st[a]?.g||0))[0],sugGar=ids.slice().sort((a,b)=>(st[b]?.a||0)-(st[a]?.a||0))[0];
   const gks=ids.filter(id=>J(id).pos==='GOL');
@@ -1675,6 +1686,16 @@ function subPos(pid,p,A){
     h+='</div>'}
   return h;
 }
+// janela para lançar um gol (quem fez + quem deu o passe) e corrigir os números já lançados
+function sheetGol(pid){const p=S.pel[pid];if(!p)return;const ids=jogaram(p).slice().sort((a,b)=>nm(a).localeCompare(nm(b))),st=p.stats||{};
+  const op=vz=>`<option value="">${vz}</option>`+ids.map(id=>`<option value="${id}">${esc(nm(id))}</option>`).join('');
+  const gl=ids.filter(id=>(st[id]?.g||0)+(st[id]?.a||0)>0);
+  const stp=(id,f,lbl)=>`<div class="stepbox"><div class="step"><button data-act="gol-step" data-p="${pid}" data-j="${id}" data-f="${f}" data-d="-1" aria-label="Menos ${lbl}">−</button><output class="num">${st[id]?.[f]||0}</output><button data-act="gol-step" data-p="${pid}" data-j="${id}" data-f="${f}" data-d="1" aria-label="Mais ${lbl}">+</button></div><span class="lbl">${lbl}</span></div>`;
+  openSheet('Lançar gol',`<div class="stack">
+    <label class="field"><span>⚽ Quem fez o gol?</span><select id="gol-g">${op('Escolha o jogador')}</select></label>
+    <label class="field"><span>🅰️ Quem deu o passe? <i class="opc">opcional</i></span><select id="gol-a">${op('Ninguém / não sei')}</select></label>
+    <button class="btn primary block btn-grande" data-act="gol-salvar" data-p="${pid}">Salvar gol</button>
+    ${gl.length?`<div><h3 style="margin:6px 0 2px">Já lançados</h3><div class="sub" style="margin-bottom:4px">Lançou errado? Corrija aqui com − e +.</div><div class="list">${gl.map(id=>`<div class="item" style="flex-wrap:wrap">${avHTML(id)}<div class="grow name" style="min-width:90px">${esc(nm(id))}</div><div class="row" style="gap:6px">${stp(id,'g','Gols')}${stp(id,'a','Assist.')}</div></div>`).join('')}</div></div>`:''}</div>`)}
 /* cartão do jogador depois do término: avaliar a galera e lançar seus gols e assistências */
 function posJogoMeu(){const j=meuJogador();if(!j)return null;
   return Object.entries(S.pel).filter(([,p])=>jogaram(p).includes(j)&&posAberto(p)).sort((a,b)=>fimDe(b[1])-fimDe(a[1]))[0]||null}
@@ -1920,8 +1941,8 @@ function tElenco(A){
   ids.sort((a,b)=>notaAtual(b)-notaAtual(a));
   let h=`<div class="row between" style="margin-bottom:10px"><h2>Elenco <span class="muted num">${ativos().length}</span></h2>${A?'<button class="btn primary" data-act="add-jog">+ Jogador</button>':''}</div>
     <input type="text" id="busca" placeholder="Buscar jogador" value="${esc(UI.busca)}" data-in="busca" style="margin-bottom:10px">
-    <div class="pick" style="margin-bottom:12px">${[['todos','Todos'],...Object.keys(POS).map(k=>[k,k]),...(EV()?[]:[['mensalista','Mensalistas'],['diarista','Diaristas']]),['inativos','Inativos']].map(([k,n])=>`<button data-act="filtro" data-v="${k}" aria-pressed="${UI.filtro===k}">${n}</button>`).join('')}</div>`;
-  if(A){const ra=rodadaAberta();h+=`<button class="btn block ${ra?'':'warn'}" data-act="${ra?'av-admin':'av-novo'}" style="margin-bottom:12px">${ra?`⭐ Avaliação completa aberta · até ${quandoFim(ra[1].fim)}`:'⭐ Abrir avaliação da galera'}</button>`}
+    <div class="pick filtros1" style="margin-bottom:12px">${[['todos','Todos'],...(EV()?[]:[['mensalista','Mensalistas'],['diarista','Diaristas']])].map(([k,n])=>`<button data-act="filtro" data-v="${k}" aria-pressed="${UI.filtro===k}">${n}</button>`).join('')}<select id="filtro-mais" aria-label="Filtrar por posição" class="${Object.keys(POS).includes(UI.filtro)||UI.filtro==='inativos'?'on':''}"><option value="">Posição</option>${Object.entries(POS).map(([k,n])=>`<option value="${k}" ${UI.filtro===k?'selected':''}>${n}</option>`).join('')}<option value="inativos" ${UI.filtro==='inativos'?'selected':''}>Inativos</option></select></div>`;
+  if(A)h+=painelAvAdmin();
   h+=cartaoAvCompleta();
   if(membrosSemCadastro().length&&!demo)h+=A?painelMembros():painelPendentes();
   if(!A&&euPendente())h=bannerPendente().replace('margin-top:12px','margin:0 0 12px')+h;
@@ -2004,7 +2025,8 @@ function periodo(){const hoje=new Date();if(!UI.ref)UI.ref={y:hoje.getFullYear()
 function navPeriodo(d){const per=UI.per||'mes';let{y,m}=UI.ref;
   if(per==='mes'){m+=d;if(m<1){m=12;y--}if(m>12){m=1;y++}}else if(per==='sem'){m=(m<=6?1:7)+d*6;if(m<1){m=7;y--}if(m>12){m=1;y++}}else y+=d;
   UI.ref={y,m}}
-function tRanking(){
+function tRanking(){return tRanking0()+renderHist(ADM())}
+function tRanking0(){
   const P=periodo(),{st,total}=estatPeriodo(P.ini,P.fim),rk=UI.rk||'nota';
   const md=id=>st[id].media;
   const filtro={nota:id=>md(id)!=null,g:id=>st[id].g>0,a:id=>st[id].a>0,pr:id=>st[id].mvp+st[id].art+st[id].gar+st[id].def+st[id].gol+st[id].per>0,j:id=>st[id].j>0}[rk];
@@ -2074,18 +2096,23 @@ function tCaixa(A){
       <div class="cx-l cx-fim"><span><b>Saldo em conta</b> <span class="sub">vai para ${nomeMes(mesProx(m))}</span></span><b class="num" style="color:${fim<0?'var(--red)':'var(--pitch)'}">${BRL(fim)}</b></div>
       ${A?`<button class="btn sm" style="margin-top:8px" data-act="aj-novo" data-m="${m}">⚖️ Ajuste de saldo</button>`:''}</div>`})()}`;
   if(isentos)h+=`<div class="sub" style="margin-top:6px">${isentos} isenç${isentos>1?'ões':'ão'} neste mês (não entram no saldo).</div>`;
-  if(A)h+=`<div class="panel cx-data" style="margin-top:12px"><label class="row between" style="gap:10px;flex-wrap:nowrap"><span><b>Data dos lançamentos</b><span class="sub" style="display:block">Tudo que você marcar agora entra com esta data.</span></span><input type="date" id="cx-data" value="${dl}" min="${m}-01" max="${m}-31"></label>
+  if(A)h+=`<details class="panel cx-data" style="margin-top:12px" data-ui="cxCfg"${UI.cxCfg?' open':''}><summary class="cx-sum"><span><b>✎ Data e valores do mês</b><span class="sub" style="display:block">Lançando em ${dBR(dl)||dl}${EV()?'':` · mensalidade ${BRL(precoM(m))} · diária ${BRL(precoD(m))}`}</span></span></summary><label class="row between" style="gap:10px;flex-wrap:nowrap;margin-top:10px"><span><b>Data dos lançamentos</b><span class="sub" style="display:block">Tudo que você marcar agora entra com esta data.</span></span><input type="date" id="cx-data" value="${dl}" min="${m}-01" max="${m}-31"></label>
       ${EV()?'':`<div class="cx-precos"><label class="field"><span>Mensalidade de ${MESES[mm-1].toLowerCase()}</span><input type="number" id="cx-pm" data-m="${m}" inputmode="decimal" min="0" step="0.01" value="${precoM(m)}"></label><label class="field"><span>Diária de ${MESES[mm-1].toLowerCase()}</span><input type="number" id="cx-pd" data-m="${m}" inputmode="decimal" min="0" step="0.01" value="${precoD(m)}"></label></div>
-      <div class="sub" style="margin-top:4px">Mudou o campo ou o preço? Ajuste aqui. Vale só para este mês. Coloque <b>0</b> para não cobrar neste mês.</div>`}</div>
+      <div class="sub" style="margin-top:4px">Mudou o campo ou o preço? Ajuste aqui. Vale só para este mês. Coloque <b>0</b> para não cobrar neste mês.</div>`}</details>
     <div class="lado" style="margin-top:10px"><button class="btn warn" data-act="msg" data-v="pagamento" data-m="${m}">Cobrar pendências</button><button class="btn" data-act="msg" data-v="prestacao" data-m="${m}">Prestação de contas</button></div>
     <button class="btn primary block" style="margin-top:8px" data-act="nahora-lista">📱 Cobrar na hora com QR Code</button>`;
   if(!EV()&&!(precoM(m)>0))h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Mensalidades</h3><span class="sub">sem cobrança</span></div><div class="empty">Sem mensalidade em ${MESES[mm-1].toLowerCase()}. Ninguém aparece devendo.</div></div>`;
   else if(!EV()){h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Mensalidades</h3><span class="sub num">${pagosM.length}/${mensal.length} · ${BRL(precoM(m))}</span></div><div class="list">`;
     if(!mensal.length)h+='<div class="empty">Nenhum mensalista.</div>';
-    for(const id of mensal.slice().sort((a,b)=>nm(a).localeCompare(nm(b)))){const x=(cx.mens||{})[id],st=stPag(x);
+    const linM=id=>{const x=(cx.mens||{})[id],st=stPag(x);
       const sb=[notaValor(st,precoM(m)),st&&st.obs?esc(st.obs):''].filter(Boolean).join(' · ');
-      h+=`<div class="item"><div class="grow"><div class="name">${esc(nm(id))}</div>${sb?`<div class="sub">${sb}</div>`:''}</div>${botaoPag(x,'pagou-m',`data-m="${m}" data-j="${id}"`,A)}</div>`}
-    h+='</div></div>'}
+      return`<div class="item"><div class="grow"><div class="name">${esc(nm(id))}</div>${sb?`<div class="sub">${sb}</div>`:''}</div>${botaoPag(x,'pagou-m',`data-m="${m}" data-j="${id}"`,A)}</div>`};
+    // quem deve primeiro; quem já pagou fica guardado (toque para ver)
+    const abcM=mensal.slice().sort((a,b)=>nm(a).localeCompare(nm(b))),devM=abcM.filter(id=>!stPag((cx.mens||{})[id])),okM=abcM.filter(id=>stPag((cx.mens||{})[id]));
+    h+=devM.map(linM).join('')+(mensal.length&&!devM.length?'<div class="sub" style="padding:6px 0">✅ Todo mundo pagou.</div>':'');
+    h+='</div>';
+    if(okM.length)h+=`<details class="cx-pagos" data-ui="cxPagos"${UI.cxPagos?' open':''}><summary>✅ ${okM.length} pago${okM.length>1?'s':''}</summary><div class="list">${okM.map(linM).join('')}</div></details>`;
+    h+='</div>'}
   {const pelsV=pels.filter(([,p])=>!PA(p)||precoDP(p)>0);
   if(!EV()||pelsV.length){h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>${EV()?'Pagamentos dos eventos':'Diárias e eventos'}</h3><span class="sub">${EV()?'por atleta':precoD(m)>0?BRL(precoD(m))+' por jogo':'sem cobrança'}</span></div>`;
   let any=false;
@@ -2123,9 +2150,9 @@ function tCaixa(A){
     <div class="lado"><button class="btn" data-act="add-lanc" data-t="ent" data-m="${m}">+ Entrada</button><button class="btn primary" data-act="add-lanc" data-t="sai" data-m="${m}">− Saída</button></div></div>`}
   h+='</div>';
   // extrato
-  if(mov.length){h+=`<div class="panel" style="margin-top:12px"><div class="panel-h"><h3>Extrato do mês</h3></div><div class="list">`;
+  if(mov.length){h+=`<details class="panel cx-ext" style="margin-top:12px" data-ui="cxExt"${UI.cxExt?' open':''}><summary><div class="panel-h" style="margin:0"><h3>Extrato do mês</h3><span class="sub num">${mov.length} lançamento${mov.length>1?'s':''} ▾</span></div></summary><div class="list">`;
     mov.forEach(x=>{h+=`<div class="item cx-ex"><span class="cx-dt num">${dBR(x.d)||'—'}</span><div class="grow"><div class="name">${x.tipo==='aj'?'⚖️ Ajuste de saldo':x.quem?esc(nm(x.quem)):esc(x.cat)}</div>${x.tipo==='aj'?`<div class="sub">${esc(x.obs)}</div>`:x.quem?`<div class="sub">${esc(x.cat)}${x.obs?' · '+esc(x.obs):''}</div>`:''}</div>${x.tipo==='isento'?'<span class="paid isento">ISENTO</span>':x.tipo==='aj'?`<b class="num" style="color:${x.v<0?'var(--red)':'var(--pitch)'}">${sinal(x.v)}</b>`:`<b class="num" style="color:${x.tipo==='sai'?'var(--red)':'var(--pitch)'}">${x.tipo==='sai'?'−':'+'} ${BRL(x.v)}</b>`}</div>`});
-    h+=`</div></div>`}
+    h+=`</div></details>`}
   return h;
 }
 /* ---------- Pix automático: o que o jogador logado deve ---------- */
@@ -2460,7 +2487,8 @@ document.addEventListener('click',e=>{
   const A=ADM();
   switch(act){
     case'tab':UI.tab=d.v;UI.sel=null;try{localStorage.setItem('pelada.tab',d.v)}catch(_){};render();window.scrollTo(0,0);break;
-    case'sub':UI.sub=d.v;UI.sel=null;UI.confirmEnd=false;render();break;
+    case'sub':{UI.sub=d.v;UI.sel=null;UI.confirmEnd=false;const s0=document.querySelector('.subtabs'),y0=s0?s0.getBoundingClientRect().top+window.scrollY-12:0,colado=s0&&window.scrollY>y0;render();
+      if(colado){const s1=document.querySelector('.subtabs');if(s1)window.scrollTo(0,s1.getBoundingClientRect().top+window.scrollY-12)}break}
     case'filtro':UI.filtro=d.v;render();break;
     case'rk':UI.rk=d.v;render();break;
     case'per':UI.per=d.v;render();break;
@@ -2674,6 +2702,17 @@ document.addEventListener('click',e=>{
     case'stat':{const p=S.pel[d.p],s=p.stats?.[d.j]||{},dl=Number(d.d);let v;
       if(d.f==='n')v=s.n==null?6:Math.min(10,Math.max(0,s.n+dl*.5));else v=Math.max(0,(s[d.f]||0)+dl);
       patch('peladas/'+d.p,{stats:{[d.j]:{[d.f]:v}}});break}
+    case'wa-pres':{const p=S.pel[d.p];if(!p)return;const l=lista(p);
+      openSheet('Mandar no WhatsApp',`<div class="stack"><p class="sub" style="margin:0">Escolha a mensagem. Ela abre pronta para você conferir e mandar.</p>
+        <button class="btn block wa-op" data-act="msg" data-v="convocacao"><b>📣 Convocação</b><span>Chama todo mundo, com os links “Vou” e “Não vou”</span></button>
+        <button class="btn block wa-op" data-act="msg" data-v="cobrar"><b>⏰ Cobrar respostas</b><span>${l.pend.length?l.pend.length+' ainda não responderam':'Todo mundo já respondeu'}</span></button>
+        <button class="btn block wa-op" data-act="msg" data-v="lista"><b>📋 Lista de presença</b><span>Confirmados, goleiros e espera</span></button></div>`);break}
+    case'gol-abrir':sheetGol(d.p);break;
+    case'gol-salvar':{const p=S.pel[d.p],g=document.getElementById('gol-g').value,a=document.getElementById('gol-a').value;if(!p)return;
+      if(!g){toast('Escolha quem fez o gol.');return}if(a===g){toast('Quem deu o passe tem que ser outro jogador.');return}
+      const st=p.stats||{},up={[g]:{g:(st[g]?.g||0)+1}};if(a)up[a]={a:(st[a]?.a||0)+1};
+      patch('peladas/'+d.p,{stats:up});toast('Gol de '+nm(g)+(a?' com passe de '+nm(a):'')+' lançado.');setTimeout(()=>sheetGol(d.p),60);break}
+    case'gol-step':{const p=S.pel[d.p],v=Math.max(0,((p.stats||{})[d.j]?.[d.f]||0)+Number(d.d));patch('peladas/'+d.p,{stats:{[d.j]:{[d.f]:v}}});setTimeout(()=>sheetGol(d.p),60);break}
     case'vit':{const p=S.pel[d.p],vit=(p.vit||p.times.map(()=>0)).slice();vit[d.i]=Math.max(0,(vit[d.i]||0)+Number(d.d));patch('peladas/'+d.p,{vit});break}
     case'confirm-end':UI.confirmEnd=d.v==='1';render();break;
     case'encerrar':{const p=S.pel[d.p],app=document.getElementById('app'),calmo=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2917,6 +2956,7 @@ function npQpAtualiza(){const box=document.getElementById('np-qp'),v=document.ge
   box.innerHTML=htmlQuemPaga(ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>nm(a).localeCompare(nm(b))),UI.npDesc||{},Number(String(v.value).replace(',','.'))||0,'npd')}
 document.addEventListener('input',e=>{if(e.target&&e.target.id==='np-valor')npQpAtualiza();if(e.target&&e.target.id==='aj-saldo')ajDif()});
 document.addEventListener('change',e=>{
+  if(e.target.id==='filtro-mais'){UI.filtro=e.target.value||'todos';render();return}
   if(e.target.id==='a-tipo'){const o=document.getElementById('a-outro');if(o)o.hidden=e.target.value!=='outro'}
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
   const t=e.target;
@@ -3268,6 +3308,7 @@ document.addEventListener('change',e=>{const s=e.target;if(!s.dataset||!s.datase
   const ehCampo=t=>t.closest&&t.closest('input,select,textarea,[contenteditable],.enq,canvas');
   const abas=()=>[...document.querySelectorAll('#nav [data-act=tab]')];
   let G=null;
+  document.addEventListener('toggle',e=>{const u=e.target&&e.target.dataset&&e.target.dataset.ui;if(u)UI[u]=e.target.open},true);
   document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.matches&&d.matches('[data-av-auto]')){UI.avAuto=d.open;const v=d.querySelector('.av-ver');if(v)v.textContent=d.open?'Esconder':'Ver quais são'}},true);
   document.addEventListener('touchstart',e=>{
     if(e.touches.length!==1){G=null;return}
