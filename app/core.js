@@ -107,7 +107,9 @@ const ovr=n=>Math.round((Number(n)||0)*10);
 function podeVerAval(id){if(ADM())return true;if(cfg().mostrarAval===false)return false;return!!(J(id)||{}).critGalera}
 function ovrTxt(id){return podeVerAval(id)?String(ovr(notaAtual(id))):'—'}
 const semAvaliacao=id=>{const j=J(id)||{};return!!j.semNota&&!j.critGalera};
-function nomeTime(cor){const v=((cfg().nomesTimes||[])[cor]||'').trim();return v||(CORES[cor]||{n:'Time'}).n}
+// nome padrão do time: a cor (Laranja, Azul…) ou a letra (Time A, Time B…), conforme os Ajustes do grupo; o nome personalizado vence os dois
+function nomePadrao(cor,tipo){return(tipo||cfg().nomesTipo)==='letras'?'Time '+String.fromCharCode(65+Number(cor)):(CORES[cor]||{n:'Time'}).n}
+function nomeTime(cor){const v=((cfg().nomesTimes||[])[cor]||'').trim();return v||nomePadrao(cor)}
 /* evento livre: sem cobrança e sem dia fixo; o administrador marca cada pelada na data que quiser.
    Sem mensalista nem diarista: todo mundo confirma direto e quem passa das vagas vai para a espera.
    O grupo nunca é apagado: ao encerrar uma pelada ela vai para o histórico e o grupo segue para os próximos eventos. */
@@ -700,7 +702,7 @@ function itensJogador(){
       if(!r||!r.s||r.t<last.getTime())out.push({id:'lem'+pid+aid+iso(last),tipo:'convoca',titulo:'Lembrete',texto:`Você ainda não confirmou a pelada de ${q}. ${l.vagas>l.escalados.length?'Restam '+(l.vagas-l.escalados.length)+' vaga(s).':'Lista cheia, ainda dá para entrar na espera.'}`,t:last.getTime(),act:'tab-jogo'})}
     const ap=(p.aprov||{})[j];if(ap&&r&&r.s==='sim'&&l.escalados.concat(l.gks).includes(j))out.push({id:'lib'+pid+ap,tipo:'convoca',titulo:'Vaga liberada ✅',texto:`O administrador liberou sua vaga na pelada de ${q}.`,t:ap});
     if(timesPub(p)&&p.sorteadoEm){const ti=p.times.findIndex(tm=>tm.gk===j||tm.ids.includes(j));
-      if(ti>=0)out.push({id:'times'+pid+(p.publicadoEm||p.sorteadoEm),tipo:'convoca',titulo:'Times sorteados',texto:`Você está no time ${nomeTime(p.times[ti].cor)} ${CORES[p.times[ti].cor].e} na pelada de ${q}.`,t:p.sorteadoEm})}}
+      if(ti>=0)out.push({id:'times'+pid+(p.publicadoEm||p.sorteadoEm),tipo:'convoca',titulo:'Times sorteados',texto:`Você está ${/^time /i.test(nomeTime(p.times[ti].cor))?'no':'no time'} ${nomeTime(p.times[ti].cor)} ${CORES[p.times[ti].cor].e} na pelada de ${q}.`,t:p.sorteadoEm})}}
   const pa=avalPendenteJogador();if(pa){const[pid,p]=pa;if(p.encerradaEm)out.push({id:'aval'+pid,tipo:'convoca',titulo:'Avalie o campo',texto:`Como estava o ${S.locais[p.localId].nome} na pelada de ${dShort(p.data)}? Avalie gramado, atendimento, ambiente, banheiros e tamanho.`,t:p.encerradaEm+2})}
   return out.filter(x=>x.t).sort((a,b)=>b.t-a.t);
 }
@@ -2475,9 +2477,10 @@ function sheetCfg(){
     <div class="panel"><h3 style="margin-bottom:6px">Convite</h3><div class="sub">Link para a galera entrar na pelada</div><div class="num" style="font-weight:700;word-break:break-all;margin:4px 0">${esc(linkConvite())}</div><div class="sub">Código: <b>${esc((GRUPO||{}).codigo||'')}</b></div>
       <div class="row" style="margin-top:8px"><button class="btn sm" data-act="msg" data-v="convite">Mensagem de convite</button><button class="btn sm" data-act="copiar-link">Copiar link</button><button class="btn sm" data-act="qr-pelada">QR Code</button></div></div>
     <div class="panel"><h3 style="margin-bottom:6px">Administradores</h3><div id="adm-list"></div></div>
-    ${(()=>{const nt=(c.nomesTimes||[]).filter(x=>x&&String(x).trim()).length;return`<details class="panel times-nomes"><summary><b>Nomes dos times</b><span class="sub">${nt?`${nt} personalizado${nt>1?'s':''}`:'usando as cores'}</span></summary>
-      <div class="sub" style="margin:6px 0 8px">Deixe em branco para usar o nome da cor.</div>
-      <div class="tn-grade">${CORES.map((co,i)=>`<label class="tn-item"><span class="sw" style="background:${co.c}"></span><input type="text" id="c-tn${i}" maxlength="24" placeholder="${co.n}" value="${esc((c.nomesTimes||[])[i]||'')}"></label>`).join('')}</div></details>`})()}
+    ${(()=>{const nt=(c.nomesTimes||[]).filter(x=>x&&String(x).trim()).length;return`<details class="panel times-nomes"><summary><b>Nomes dos times</b><span class="sub">${nt?`${nt} personalizado${nt>1?'s':''}`:c.nomesTipo==='letras'?'usando letras':'usando as cores'}</span></summary>
+      <label class="field" style="margin-top:8px"><span>Nome padrão</span><select id="c-tntipo"><option value="cores" ${c.nomesTipo==='letras'?'':'selected'}>Cores (Laranja, Azul, Branco…)</option><option value="letras" ${c.nomesTipo==='letras'?'selected':''}>Letras (Time A, Time B, Time C…)</option></select></label>
+      <div class="sub" style="margin:6px 0 8px">Quer outro nome (ex.: Cobra, Lagartixa)? Escreva abaixo. Em branco usa o nome padrão. A cor continua aparecendo como marca do colete.</div>
+      <div class="tn-grade">${CORES.map((co,i)=>`<label class="tn-item"><span class="sw" style="background:${co.c}"></span><input type="text" id="c-tn${i}" maxlength="24" placeholder="${nomePadrao(i,c.nomesTipo)}" value="${esc((c.nomesTimes||[])[i]||'')}"></label>`).join('')}</div></details>`})()}
     <div class="panel"><h3 style="margin-bottom:4px">Avaliação pós-jogo</h3><div class="sub" style="margin-bottom:8px">Depois do término, a galera vota em segredo. Quando fecha, saem as notas, o craque e o pereba.</div>
       <div class="field"><span>Fica aberta por</span><div class="relogio">
         <div class="stepbox"><div class="step"><button type="button" data-act="jan" data-f="h" data-d="-1" aria-label="Menos uma hora">−</button><input type="number" id="c-jan-h" min="0" max="168" inputmode="numeric" value="${Math.floor(janelaH())}" aria-label="Horas"><button type="button" data-act="jan" data-f="h" data-d="1" aria-label="Mais uma hora">+</button></div><span class="lbl">horas</span></div>
@@ -2885,8 +2888,8 @@ document.addEventListener('click',async e=>{
     case'av-ir':UI.avi=Number(d.v);sheetAvaliar();document.querySelector('.sheet').scrollTop=0;break;
     case'av-voto':{const v=Number(d.v);votarAv(d.j,cur=>{const n={...cur};delete n.ns;n[d.c]=n[d.c]===v?0:v;return n});sheetAvaliar();break}
     case'av-ns':votarAv(d.j,cur=>cur.ns?{}:{ns:true});sheetAvaliar();break;
-    case'time-nome':{const cor=Number(d.c);openSheet('Nome do time',`<div class="stack"><div class="row" style="gap:8px;flex-wrap:nowrap"><span class="sw" style="background:${CORES[cor].c};width:22px;height:22px;border-radius:6px;flex:none;border:1px solid var(--line)"></span><input type="text" id="tn-in" maxlength="24" placeholder="${CORES[cor].n}" value="${esc((cfg().nomesTimes||[])[cor]||'')}"></div>
-      <p class="sub" style="margin:0">Ex.: Cobra, Lagartixa. Em branco volta a ser "${CORES[cor].n}". Vale para as próximas peladas também.</p><button class="btn primary block" data-act="time-nome-ok" data-c="${cor}">Salvar nome</button></div>`);setTimeout(()=>document.getElementById('tn-in')?.focus(),50);break}
+    case'time-nome':{const cor=Number(d.c);openSheet('Nome do time',`<div class="stack"><div class="row" style="gap:8px;flex-wrap:nowrap"><span class="sw" style="background:${CORES[cor].c};width:22px;height:22px;border-radius:6px;flex:none;border:1px solid var(--line)"></span><input type="text" id="tn-in" maxlength="24" placeholder="${nomePadrao(cor)}" value="${esc((cfg().nomesTimes||[])[cor]||'')}"></div>
+      <p class="sub" style="margin:0">Ex.: Cobra, Lagartixa. Em branco volta a ser "${nomePadrao(cor)}". Vale para as próximas peladas também. Para trocar todos de cores para letras: ⚙️ Ajustes → Nomes dos times.</p><button class="btn primary block" data-act="time-nome-ok" data-c="${cor}">Salvar nome</button></div>`);setTimeout(()=>document.getElementById('tn-in')?.focus(),50);break}
     case'time-nome-ok':{const cor=Number(d.c),v=document.getElementById('tn-in').value.trim(),arr=CORES.map((_,i)=>(cfg().nomesTimes||[])[i]||'');arr[cor]=v;
       put('config/geral',{...(S.config||{}),nomesTimes:arr});closeSheet();toast('Nome do time salvo.');break}
     case'notas-pel':sheetNotasPelada(d.p);break;
@@ -3008,7 +3011,7 @@ document.addEventListener('click',async e=>{
     case'save-cfg':{const g=id=>document.getElementById(id).value;
       const ev=g('c-tipo')==='evento',dataEv=null,diaEv=Number(g('c-dia'));
       {const nt=Number(g('c-times'));if(nt&&nt!==Number(cfg().times))for(const[pid,p] of Object.entries(S.pel))if(!p.times&&p.status!=='encerrada'&&p.nTimes)patch('peladas/'+pid,{nTimes:null})}
-      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,cidade:(g('c-cidade')||'').trim(),uf:g('c-uf')||'',dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),usarCaixa:!!document.getElementById('c-caixa')?.checked,...(document.getElementById('c-mpdono')?{mpDonoJid:g('c-mpdono')||null}:{}),convAuto:g('c-convauto')==='1',vencMens:Math.min(28,Math.max(1,Number(g('c-vencmens'))||10)),pixRepassa:!!document.getElementById('c-pixrepassa')?.checked,formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
+      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,cidade:(g('c-cidade')||'').trim(),uf:g('c-uf')||'',dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),usarCaixa:!!document.getElementById('c-caixa')?.checked,...(document.getElementById('c-mpdono')?{mpDonoJid:g('c-mpdono')||null}:{}),convAuto:g('c-convauto')==='1',vencMens:Math.min(28,Math.max(1,Number(g('c-vencmens'))||10)),pixRepassa:!!document.getElementById('c-pixrepassa')?.checked,formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),nomesTipo:g('c-tntipo')||'cores',restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',evento:ev,data:dataEv});
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':case'pagou-d':{const kind=d.act==='pagou-m'?'m':'d',key=kind==='m'?d.m:d.p,src=kind==='m'?((S.caixa[key]||{}).mens||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[d.j]);
@@ -3053,6 +3056,7 @@ function npQpAtualiza(){const box=document.getElementById('np-qp'),v=document.ge
   box.innerHTML=htmlQuemPaga(ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>nm(a).localeCompare(nm(b))),UI.npDesc||{},Number(String(v.value).replace(',','.'))||0,'npd')}
 document.addEventListener('input',e=>{if(e.target&&e.target.id==='np-valor')npQpAtualiza();if(e.target&&e.target.id==='aj-saldo')ajDif()});
 document.addEventListener('change',e=>{
+  if(e.target.id==='c-tntipo'){CORES.forEach((_,i)=>{const x=document.getElementById('c-tn'+i);if(x)x.placeholder=nomePadrao(i,e.target.value)});return}
   if(e.target.id==='filtro-mais'){UI.filtro=e.target.value||'todos';render();return}
   if(e.target.id==='a-tipo'){const o=document.getElementById('a-outro');if(o)o.hidden=e.target.value!=='outro'}
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);

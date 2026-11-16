@@ -124,4 +124,9 @@ t('nome do time personalizado aparece no aviso do sorteio', () => {
   const av = R.pelAtualizada({ data: '2026-10-10' }, { data: '2026-10-10', sorteadoEm: 5, times: [{ cor: 0, ids: ['jA'] }, { cor: 1, ids: ['jB'] }] }, 'p1', c2);
   assert.match(av[0].texto, /time Cobra/); assert.match(av[1].texto, /time Azul/);
 });
+t('times com letras: "Você está no Time B"; nome personalizado continua vencendo', () => {
+  const c2 = { ...ctx, cfg: { ...ctx.cfg, nomesTipo: 'letras', nomesTimes: ['Cobra', ''] } };
+  const av = R.pelAtualizada({ data: '2026-10-10' }, { data: '2026-10-10', sorteadoEm: 5, times: [{ cor: 0, ids: ['jA'] }, { cor: 1, ids: ['jB'] }] }, 'p1', c2);
+  assert.match(av[0].texto, /no time Cobra/); assert.match(av[1].texto, /Você está no Time B /);
+});
 console.log(`\n${n} testes passaram.`);

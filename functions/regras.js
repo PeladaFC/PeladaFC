@@ -66,8 +66,8 @@ function pelMudouAlgo(a, b) {
 function pelAtualizada(a, b, pid, ctx) {
   const out = [], quando = dShort(b.data);
   if (b.times && (a.sorteadoEm || 0) !== (b.sorteadoEm || 0)) {
-    b.times.forEach(t => { const [n0, e] = CORES[t.cor] || ['?', '']; const n = String(((ctx.cfg || {}).nomesTimes || [])[t.cor] || '').trim() || n0; const js = (t.gk ? [t.gk] : []).concat(t.ids || []);
-      const us = uidsDe(ctx, js); if (us.length) out.push({ para: us, titulo: `🎲 Times sorteados · ${quando}`, texto: `Você está no time ${n} ${e}. Bom jogo!`, tag: 'times-' + pid }); });
+    b.times.forEach(t => { const [nc, e] = CORES[t.cor] || ['?', '']; const n0 = (ctx.cfg || {}).nomesTipo === 'letras' ? 'Time ' + String.fromCharCode(65 + Number(t.cor)) : nc; const n = String(((ctx.cfg || {}).nomesTimes || [])[t.cor] || '').trim() || n0; const js = (t.gk ? [t.gk] : []).concat(t.ids || []);
+      const us = uidsDe(ctx, js); if (us.length) out.push({ para: us, titulo: `🎲 Times sorteados · ${quando}`, texto: `Você está ${/^time /i.test(n) ? 'no ' + n : 'no time ' + n} ${e}. Bom jogo!`, tag: 'times-' + pid }); });
     const gx = uidsDe(ctx, b.goleiros || []); if (gx.length) out.push({ para: gx, titulo: `🎲 Times sorteados · ${quando}`, texto: 'Os times saíram. Você joga no gol como extra. Bom jogo!', tag: 'times-' + pid });
   }
   if (!a.avalEm && b.avalEm) out.push({ para: uidsDe(ctx, participantes(b, pid, ctx)), titulo: `🏆 Saiu o resultado · ${nomePelada(ctx)}`, texto: `A votação da pelada de ${quando} terminou. Veja o craque, as notas e os prêmios.`, tag: 'notas-' + pid });
