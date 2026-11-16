@@ -385,7 +385,7 @@ function render() {
       : `<div class="prox-linha vazio"><span class="pl-ic">📅</span><span class="grow">${ids.length ? 'Sem jogo marcado por enquanto.' : 'Crie sua pelada ou entre com o código de um convite.'}</span></div>`}
     ${adm.filter(g => window.pedidoSuporte(GRUPOS[g])).map(g => `<div class="alerta-sup"><span class="ic">🛟</span><div class="grow"><b>O suporte do Pelota FC pediu acesso</b><span>${escH(GRUPOS[g].nome || 'Pelada')} · acesso por 24 horas</span>
       <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm sup-sim" data-sh="sup-aceitar" data-v="${g}">Liberar por 24 horas</button><button class="btn sm sup-nao" data-sh="sup-recusar" data-v="${g}">Agora não</button></div></div></div>`).join('')}
-    ${ids.filter(avAb).map(g => `<button class="alerta-av" data-sh="avaliar" data-v="${g}"><span class="ic">⭐</span><span><b>Avaliação da galera aberta!</b>${escH(GRUPOS[g].nome || 'Pelada')} · dê sua nota para o elenco</span><span class="ir">Avaliar</span></button>`).join('')}
+    ${ids.filter(avAb).map(g => `<button class="alerta-av" data-sh="avaliar" data-v="${g}"><span class="ic">⭐</span><span><b>Avaliação geral do elenco aberta!</b>${escH(GRUPOS[g].nome || 'Pelada')} · dê sua nota para o elenco</span><span class="ir">Avaliar</span></button>`).join('')}
     ${cartaoPush()}
     ${adm.length ? `<h3 class="home-sec">Você administra</h3>${adm.map(g => card(g, true)).join('')}` : ''}
     ${jog.length ? `<h3 class="home-sec">Você joga</h3>${jog.map(g => card(g, false)).join('')}` : ''}

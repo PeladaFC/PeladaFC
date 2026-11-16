@@ -3,7 +3,7 @@
    [{ para: [uid, ...], titulo, texto, tag }] */
 'use strict';
 const DIAS3 = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-const CORES = [['Laranja', '🟠'], ['Azul', '🔵'], ['Branco', '⚪'], ['Preto', '⚫']];
+const CORES = [['Laranja', '🟠'], ['Azul', '🔵'], ['Branco', '⚪'], ['Preto', '⚫'], ['Verde', '🟢'], ['Vermelho', '🔴'], ['Amarelo', '🟡'], ['Roxo', '🟣'], ['Marrom', '🟤'], ['Cinza', '🔘'], ['Rosa', '🩷'], ['Celeste', '🩵'], ['Vinho', '🍷'], ['Turquesa', '🌊'], ['Dourado', '⭐'], ['Limão', '🍋']];
 const pad = n => String(n).padStart(2, '0');
 const parseD = s => { const [y, m, d] = String(s).split('-').map(Number); return new Date(Date.UTC(y, m - 1, d, 12)); };
 const dShort = s => { const d = parseD(s); return `${DIAS3[d.getUTCDay()]} ${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}`; };
@@ -117,13 +117,13 @@ function avalAbriu(p, cfg, agora) { if (!p || !p.data || p.pushAvalEm || p.aval)
 function avisoAval(p, pid, ctx) {
   const loc = new Date(fimDe(p, ctx.cfg) + janelaH(ctx.cfg) * 36e5 - 3 * 36e5); // horário de Recife
   const ate = `${DIAS3[loc.getUTCDay()]} ${pad(loc.getUTCHours())}:${pad(loc.getUTCMinutes())}`;
-  return [{ para: uidsDe(ctx, participantes(p, pid, ctx)), titulo: `⭐ Avalie a galera · ${nomePelada(ctx)}`, texto: `Como foi a pelada de ${dShort(p.data)}? Dê suas estrelas até ${ate}. O voto é secreto.`, tag: 'aval-' + pid }];
+  return [{ para: uidsDe(ctx, participantes(p, pid, ctx)), titulo: `⭐ Dar notas da pelada · ${nomePelada(ctx)}`, texto: `Como foi a pelada de ${dShort(p.data)}? Dê suas estrelas até ${ate}. O voto é secreto.`, tag: 'aval-' + pid }];
 }
 function rodadaNova(r, ctx) {
   if (!r || r.status !== 'aberta') return [];
   const n = (r.alvos || []).length, loc = new Date((r.fim || Date.now()) - 3 * 36e5);
   const ate = `${DIAS3[loc.getUTCDay()]} ${pad(loc.getUTCDate())}/${pad(loc.getUTCMonth() + 1)} ${pad(loc.getUTCHours())}:${pad(loc.getUTCMinutes())}`;
-  return [{ para: todos(ctx), titulo: `⭐ Votação do elenco aberta · ${nomePelada(ctx)}`, texto: `Avalie ${n} jogador${n === 1 ? '' : 'es'} da galera nos 5 critérios até ${ate}. O voto é secreto.`, tag: 'rodada' }];
+  return [{ para: todos(ctx), titulo: `⭐ Avaliação geral do elenco aberta · ${nomePelada(ctx)}`, texto: `Avalie ${n} jogador${n === 1 ? '' : 'es'} da galera nos 5 critérios até ${ate}. O voto é secreto.`, tag: 'rodada' }];
 }
 /* ---------- diarista convocado: 30 minutos para pagar ---------- */
 const PRAZO_PAG = 30 * 60e3;

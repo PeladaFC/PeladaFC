@@ -9,7 +9,7 @@ const DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 const DIAS3=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
 const UFS=['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const CORES=[{n:'Laranja',c:'#E8742A',e:'🟠'},{n:'Azul',c:'#2F6FD0',e:'🔵'},{n:'Branco',c:'#F4F4F0',e:'⚪'},{n:'Preto',c:'#22262A',e:'⚫'},{n:'Verde',c:'#2E9E4F',e:'🟢'},{n:'Vermelho',c:'#D23B32',e:'🔴'},{n:'Amarelo',c:'#F2C12E',e:'🟡'},{n:'Roxo',c:'#7E57C2',e:'🟣'},{n:'Marrom',c:'#8B5A2B',e:'🟤'},{n:'Cinza',c:'#8A8F98',e:'🔘'}];
+const CORES=[{n:'Laranja',c:'#E8742A',e:'🟠'},{n:'Azul',c:'#2F6FD0',e:'🔵'},{n:'Branco',c:'#F4F4F0',e:'⚪'},{n:'Preto',c:'#22262A',e:'⚫'},{n:'Verde',c:'#2E9E4F',e:'🟢'},{n:'Vermelho',c:'#D23B32',e:'🔴'},{n:'Amarelo',c:'#F2C12E',e:'🟡'},{n:'Roxo',c:'#7E57C2',e:'🟣'},{n:'Marrom',c:'#8B5A2B',e:'🟤'},{n:'Cinza',c:'#8A8F98',e:'🔘'},{n:'Rosa',c:'#E85D9B',e:'🩷'},{n:'Celeste',c:'#5BB8E8',e:'🩵'},{n:'Vinho',c:'#7B1E3A',e:'🍷'},{n:'Turquesa',c:'#16A6A0',e:'🌊'},{n:'Dourado',c:'#C9A227',e:'⭐'},{n:'Limão',c:'#A8C43A',e:'🍋'}];
 const MAX_TIMES=CORES.length;
 const AVISOS={
   convocacao:{n:'Convocação',d:'Abre a lista e chama todo mundo'},
@@ -1248,7 +1248,7 @@ function popupAval(){const pd=avPendente(),sh=document.getElementById('sheet');
   if(!pd)return;
   if(window.__abrirAval){window.__abrirAval=false;AV_POP.add(pd.rid);abrirAvaliar();return}
   if(AV_POP.has(pd.rid)||!sh||sh.innerHTML)return;AV_POP.add(pd.rid);
-  openSheet('',`<div class="avpop"><div class="avpop-ic">⭐</div><h2>Avaliação da galera aberta!</h2>
+  openSheet('',`<div class="avpop"><div class="avpop-ic">⭐</div><h2>Avaliação geral do elenco aberta!</h2>
     <p>${pd.feitos?`Faltam <b>${pd.total-pd.feitos}</b> de ${pd.total} jogadores.`:`Dê sua nota para <b>${pd.total}</b> jogador${pd.total>1?'es':''} nos 5 critérios.`} É secreto: ninguém vê o seu voto.</p>
     <p class="sub">Aberta até ${quandoFim(pd.r.fim)}</p>
     <button class="btn primary block btn-grande" data-act="av-abrir">${pd.feitos?'Continuar avaliando':'Avaliar'}</button>
@@ -1376,12 +1376,13 @@ function tJogo(A){
       else if(A&&CX()&&EV()){din='Sem cobrança nesta pelada';bts=`<button ${bb} data-act="preco-pel" data-p="${pid}">Cobrar por atleta</button>`}
       if(A)bts+=`<button class="btn sm warn bd-arte" data-act="convoc-arte" data-p="${pid}">🎨 Arte</button>`;
       return din||bts?`<div class="bd-din">${din?`<span class="bd-txt">${din}</span>`:''}${bts?`<div class="bd-bts">${bts}</div>`:''}</div>`:''})()}</div>`;
+  if(A)h+=`<div style="margin-top:12px">${painelAvAdmin()}</div>`;
   {const fs=faseDe(p);h+=`<div class="seg subtabs" style="margin-block:12px" role="group">${[['presenca','Presença'],['times','Times'],['pos','Jogo e pós‑jogo']].map(([k,n])=>`<button data-act="sub" data-v="${k}" aria-pressed="${UI.sub===k}"${k==='pos'?' class="seg-longo"':''}>${n}${fs===k?'<i class="fase-dot" aria-label="(agora)"></i>':''}</button>`).join('')}</div>`}
   if(!A)h+=painelJogador(pid,p,l);
   if(UI.sub==='presenca')h+=subPresenca(pid,p,l,A);
   else if(UI.sub==='times')h+=subTimes(pid,p,l,A);
   else h+=subPos(pid,p,A);
-  return h+(A?painelAvAdmin():'')+renderHist(A);
+  return h+renderHist(A);
 }
 function rowPlayer(id,right,extra='',tipo,tag=''){
   const j=J(id);
@@ -1555,8 +1556,8 @@ function subTimes(pid,p,l,A){
   sec.formato=painelFormato(pid,p);
   // 3. sortear
   sec.sortear=`<div class="panel stack"><div class="row between"><div><b>${l.escalados.length} na linha · ${l.gks.length} goleiro(s)</b><div class="sub">${c.golSorteio?'Goleiros entram no sorteio':'Goleiros ficam fora do sorteio (extra)'} · equilibra por nota e posição${(c.restr||[]).length?' · respeita '+c.restr.length+' regra(s)':''}</div></div>
-    <div class="row"><select id="nt" data-p="${pid}" aria-label="Número de times" style="width:auto">${[2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
-    <button class="btn primary" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div>
+    <div class="row" style="width:100%;flex-wrap:nowrap"><select id="nt" data-p="${pid}" aria-label="Número de times" style="width:auto;flex:none">${Array.from({length:MAX_TIMES-1},(_,i)=>i+2).map(n=>`<option value="${n}" ${(p.nTimes||c.times)==n?'selected':''}>${n} times</option>`).join('')}</select>
+    <button class="btn primary" style="flex:1" data-act="sortear" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>${p.times?'Sortear de novo':'Sortear'}</button></div></div>
     <button class="btn block" data-act="montar" data-p="${pid}" ${l.escalados.length<2?'disabled':''}>✋ ${p.times?'Ajustar os times na mão':'Montar os times na mão'}</button>
     ${p.times?`<button class="btn sm danger" style="align-self:flex-start" data-act="apagar-sorteio" data-p="${pid}">Apagar sorteio</button><div class="sub" style="margin-top:-4px">Com o sorteio feito, os jogadores não podem trocar de posição. Apagando, a troca abre de novo.</div>`:'<div class="sub" style="margin-top:-4px">Até o sorteio, cada jogador pode trocar a própria posição.</div>'}</div>`;
   if(p.times){
@@ -1668,7 +1669,7 @@ function subPos(pid,p,A){
     h+=`<div class="panel" style="margin-bottom:12px"><div class="panel-h"><h3>Gols</h3><span class="sub num">${ids.reduce((t,id)=>t+(st[id]?.g||0),0)} no total</span></div>
       <button class="btn primary block" data-act="gol-abrir" data-p="${pid}">⚽ Lançar gol</button>
       ${gl.length?`<div class="gols-l">${gl.map(id=>`<button class="gol-chip" data-act="gol-abrir" data-p="${pid}">${esc(nm(id))} <b class="num">${st[id].g?'⚽'+st[id].g:''}${st[id].a?' 🅰️'+st[id].a:''}</b></button>`).join('')}</div>`:'<div class="sub" style="margin-top:6px">Ninguém marcou ainda. Toque em Lançar gol a cada gol: escolha quem fez e quem deu o passe.</div>'}</div>`}
-  h+=`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Avaliação da galera'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div><div class="sub" style="margin-bottom:6px">${statusVotacao(p,pid,ids)}</div>${tabelaNotas(pid,p,A,null,true)}</div>`;
+  h+=`<div class="panel"><div class="panel-h"><h3>${p.aval?'Notas da pelada':'Dar notas da pelada'}</h3>${p.aval?'<span class="sub">0 a 10</span>':''}</div><div class="sub" style="margin-bottom:6px">${statusVotacao(p,pid,ids)}</div>${tabelaNotas(pid,p,A,null,true)}</div>`;
   const opts=(list,v)=>'<option value="">—</option>'+list.map(id=>`<option value="${id}" ${v===id?'selected':''}>${esc(nm(id))}</option>`).join('');
   const sugArt=ids.slice().sort((a,b)=>(st[b]?.g||0)-(st[a]?.g||0))[0],sugGar=ids.slice().sort((a,b)=>(st[b]?.a||0)-(st[a]?.a||0))[0];
   const gks=ids.filter(id=>J(id).pos==='GOL');
@@ -1846,11 +1847,11 @@ function listaVotantes(rid,r){const vs=votantesRodada(rid,r);if(!vs.length)retur
     <div class="sub vt-nota">Só os admins veem. As notas continuam secretas.</div></details>`}
 function painelAvAdmin(){if(!ativos().length)return'';const ra=rodadaAberta();
   if(!ra){const semAv=ativos().filter(x=>!S.jog[x].critGalera);
-    return`<div class="panel stack avadm" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Avaliação da galera</h3><span class="pill-off">FECHADA</span></div>
+    return`<div class="panel stack avadm" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Avaliação geral</h3><span class="pill-off">FECHADA</span></div>
     <div class="sub" style="margin-top:-4px">Quando você abrir, a galera recebe um <b>alerta amarelo</b> para dar as notas nos 5 critérios. Antes disso, nada aparece para eles.${semAv.length?` <b>${semAv.length}</b> jogador${semAv.length>1?'es ainda não têm':' ainda não tem'} nota da galera.`:''}</div>
-    <button class="btn primary block btn-grande" data-act="av-novo">Abrir avaliação</button></div>`}
+    <button class="btn primary block btn-grande" data-act="av-novo">Abrir avaliação geral</button></div>`}
   const[rid,r]=ra,{ids,concluiram}=statsRodada(rid,r),parcial=ids.length<ativos().length;
-  return`<div class="panel stack avadm on" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Avaliação da galera</h3><span class="pill-on">ABERTA</span></div>
+  return`<div class="panel stack avadm on" style="margin-bottom:12px"><div class="panel-h"><h3>⭐ Avaliação geral</h3><span class="pill-on">ABERTA</span></div>
     <div class="sub" style="margin-top:-4px">Até <b>${quandoFim(r.fim)}</b> · ${parcial?`<b>${ids.length} de ${ativos().length}</b> jogadores em avaliação`:'todo o elenco em avaliação'} · <b>${concluiram}</b> pessoa${concluiram===1?'':'s'} já terminaram.</div>
     ${parcial?`<button class="btn warn block" data-act="av-incluir">Incluir todo o elenco (${ativos().length})</button>`:''}
     <button class="btn primary block" data-act="av-encerrar-p" data-r="${rid}">Encerrar agora e calcular as notas</button>
@@ -1862,7 +1863,7 @@ function cartaoAvCompleta(){const ra=rodadaAberta();if(!ra)return'';const[rid,r]
   const parcial=alvosDe(r).length<ativos().length,adm='';
   if(!total)return'';
   const ok=feitos>=total;
-  return`<div class="panel stack" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>⭐ ${ADM()?'Seu voto':'Avaliação completa'}</h3><span class="sub num">${feitos}/${total}</span></div>
+  return`<div class="panel stack" style="margin-bottom:12px;border-color:var(--card)"><div class="panel-h"><h3>⭐ ${ADM()?'Seu voto':'Avaliação geral do elenco'}</h3><span class="sub num">${feitos}/${total}</span></div>
     <div class="sub" style="margin-top:-4px">${ok?'✓ Você já avaliou todo mundo. Pode rever até o prazo.':`${parcial?`Nesta rodada, o administrador escolheu <b>${alvosDe(r).length} de ${ativos().length}</b> jogadores do elenco. Avalie os ${total} abaixo`:`Avalie <b>todo o elenco</b> (${total} jogador${total>1?'es':''}, menos você)`} nos 5 critérios. 🔒 Secreto. Até ${quandoFim(r.fim)}.`}</div>
     <div class="row" style="gap:4px;flex-wrap:nowrap;overflow:hidden">${paraMimAvaliar(r).slice(0,8).map(id=>avHTML(id)).join('')}${total>8?`<span class="sub">+${total-8}</span>`:''}</div>
     <button class="btn ${ok?'':'primary'} block" data-act="av-abrir">${ok?'Rever minhas avaliações':feitos?'Continuar avaliando':'Avaliar agora'}</button>${adm}</div>`}
@@ -1870,7 +1871,7 @@ function cartaoAvCompleta(){const ra=rodadaAberta();if(!ra)return'';const[rid,r]
 /* tela de avaliar: um jogador por vez, com foto grande */
 function sheetAvaliar(){const ra=rodadaAberta();if(!ra){closeSheet();toast('A avaliação já fechou.');return}const[rid,r]=ra,ids=paraMimAvaliar(r);if(!ids.length){closeSheet();return}
   UI.avi=Math.max(0,Math.min(ids.length-1,UI.avi||0));const id=ids[UI.avi],mv=meusAv(rid),v=mv[id]||{},{feitos,total}=progressoAv(rid,r),j=J(id);
-  openSheet('Avaliação completa',`<div class="stack">
+  openSheet('Avaliação geral do elenco',`<div class="stack">
     <div class="avstrip">${ids.map((x,i)=>`<button class="avthumb ${i===UI.avi?'on':''}" data-act="av-ir" data-v="${i}" aria-label="${esc(nm(x))}">${avHTML(x)}${feitoAv(x,mv[x])?'<span class="ok">✓</span>':''}</button>`).join('')}</div>
     <div class="sub" style="text-align:center">${feitos} de ${total} avaliados · até ${quandoFim(r.fim)}</div>
     <div style="display:flex;flex-direction:column;align-items:center;gap:6px">${avG(id,112)}<div style="font-family:var(--f-display);font-weight:800;font-size:24px;text-transform:uppercase">${esc(nm(id))}</div>
@@ -1890,7 +1891,7 @@ function votarAv(jid,patchV){const ra=rodadaAberta();if(!ra){toast('A avaliaçã
 function sheetAvAdmin(){const ra=rodadaAberta();
   if(ra){const[rid,r]=ra,ids=alvosDe(r),vs=Object.entries(S.votos||{}).filter(([,d])=>d&&d.av&&d.av[rid]);
     const comecaram=vs.length,concluiram=vs.filter(([u,d])=>{const jog=d.jogador||(S.pres[u]||{}).jogador;const alvo=ids.filter(x=>x!==jog);return alvo.length&&alvo.every(x=>feitoAv(x,d.av[rid][x]))}).length;
-    openSheet('Avaliação completa',`<div class="stack"><div class="banner due"><span><b>Aberta até ${quandoFim(r.fim)}</b><br>${ids.length} jogador${ids.length>1?'es':''} em avaliação · ${comecaram} pessoa(s) começaram · ${concluiram} concluíram</span></div>
+    openSheet('Avaliação geral do elenco',`<div class="stack"><div class="banner due"><span><b>Aberta até ${quandoFim(r.fim)}</b><br>${ids.length} jogador${ids.length>1?'es':''} em avaliação · ${comecaram} pessoa(s) começaram · ${concluiram} concluíram</span></div>
       <div class="avgrid">${ids.map(id=>`<div class="avcard on">${avG(id,56)}<b>${esc(nm(id))}</b><span class="chip p-${J(id).pos}">${J(id).pos}</span></div>`).join('')}</div>
       ${ids.length<ativos().length?`<button class="btn warn block" data-act="av-incluir">Incluir todo o elenco (${ativos().length} jogadores)</button>`:''}
       <button class="btn primary block" data-act="av-encerrar" data-r="${rid}">Encerrar agora e calcular</button>
@@ -1899,12 +1900,12 @@ function sheetAvAdmin(){const ra=rodadaAberta();
   if(!UI.avSel)UI.avSel=new Set();const sel=UI.avSel;if(!UI.avPrazo)UI.avPrazo=24;
   const prazo=`<div class="field"><span>Por quanto tempo a votação fica aberta?</span><div class="pick">${[[12,'12 horas'],[24,'24 horas'],[48,'2 dias'],[72,'3 dias'],[168,'7 dias']].map(([h,n])=>`<button data-act="av-prazo" data-v="${h}" aria-pressed="${UI.avPrazo===h}">${n}</button>`).join('')}</div><div class="sub" style="margin-top:6px">Fecha ${quandoFim(Date.now()+UI.avPrazo*36e5)}. Você pode encerrar antes, se todo mundo já tiver votado.</div></div>`;
   if(UI.avModo==='todos'){const ids=ativos();
-    openSheet('Abrir avaliação para todos',`<div class="stack"><p style="margin:0">Cada pessoa do grupo vai dar nota para <b>todos os outros ${ids.length>1?ids.length-1:''} jogadores</b> nos 5 critérios. É secreto.</p>
+    openSheet('Abrir avaliação geral',`<div class="stack"><p style="margin:0">Cada pessoa do grupo vai dar nota para <b>todos os outros ${ids.length>1?ids.length-1:''} jogadores</b> nos 5 critérios. É secreto.</p>
       <p class="sub" style="margin:0">Assim que você abrir, aparece um <b>alerta amarelo</b> para todo mundo quando entrar no app.</p>
       ${prazo}
       <button class="btn primary block btn-grande" data-act="av-criar">Abrir avaliação agora</button><button class="btn block" data-act="fechar-sheet">Cancelar</button></div>`);return}
   const ids=ativos().sort((a,b)=>(!!S.jog[a].critGalera)-(!!S.jog[b].critGalera)||nm(a).localeCompare(nm(b)));
-  openSheet('Abrir avaliação',`<div class="stack"><p style="margin:0"><b>Quem vai ser avaliado?</b> Cada pessoa do grupo dá nota para os escolhidos, menos para si mesma.</p><p class="sub" style="margin:0">Os marcados com <b>NOVO</b> ainda não têm avaliação da galera.</p>
+  openSheet('Abrir avaliação geral',`<div class="stack"><p style="margin:0"><b>Quem vai ser avaliado?</b> Cada pessoa do grupo dá nota para os escolhidos, menos para si mesma.</p><p class="sub" style="margin:0">Os marcados com <b>NOVO</b> ainda não têm avaliação da galera.</p>
     <div class="row" style="gap:6px"><button class="btn sm ${sel.size===ativos().length?'primary':''}" data-act="av-sel" data-v="todos">Avaliar todos</button><button class="btn sm" data-act="av-sel" data-v="novos">Só os novos</button><button class="btn sm" data-act="av-sel" data-v="nenhum">Limpar</button></div>
     <div class="avgrid">${ids.map(id=>`<button class="avcard ${sel.has(id)?'on':''}" data-act="av-tog" data-j="${id}" aria-pressed="${sel.has(id)}">${avG(id,56)}<b>${esc(nm(id))}</b><span class="chip p-${J(id).pos}">${J(id).pos}</span>${S.jog[id].critGalera?'':'<span class="novo">NOVO</span>'}${sel.has(id)?'<span class="ok">✓</span>':''}</button>`).join('')}</div>
     ${prazo}
@@ -1923,7 +1924,7 @@ function radarSVG(labels,series){const W=300,H=260,cx=150,cy=136,R=92,n=labels.l
   return s+'</svg>'}
 function painelEstrela(id){const j=J(id),labels=critDe(id).map(([,n])=>n),cmp=UI.cmp&&S.jog[UI.cmp]&&UI.cmp!==id&&critKey(J(UI.cmp).pos)===critKey(j.pos)?UI.cmp:null;
   const series=[{vals:valoresCrit(id),cor:'#1B6A36'}];if(cmp)series.push({vals:valoresCrit(cmp),cor:'#E8742A'});
-  const fonte=j.critGalera?`Avaliação da galera · ${j.critN||''} voto(s) · ${new Date(j.critEm).toLocaleDateString('pt-BR',{month:'short',year:'numeric'})}`:'Avaliação inicial do cadastro';
+  const fonte=j.critGalera?`Avaliação geral do elenco · ${j.critN||''} voto(s) · ${new Date(j.critEm).toLocaleDateString('pt-BR',{month:'short',year:'numeric'})}`:'Avaliação inicial do cadastro';
   const outros=ativos().filter(x=>x!==id&&critKey(J(x).pos)===critKey(j.pos)&&podeVerAval(x)).sort((a,b)=>nm(a).localeCompare(nm(b)));
   return`<div class="panel"><div class="panel-h"><h3>⭐ Estrela</h3><span class="sub">${esc(fonte)}</span></div>${radarSVG(labels,series)}
     <div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center"><span class="legenda" style="--c:#1B6A36">${esc(nm(id))}</span>${cmp?`<span class="legenda" style="--c:#E8742A">${esc(nm(cmp))}</span>`:''}</div>
@@ -1942,7 +1943,7 @@ function tElenco(A){
   let h=`<div class="row between" style="margin-bottom:10px"><h2>Elenco <span class="muted num">${ativos().length}</span></h2>${A?'<button class="btn primary" data-act="add-jog">+ Jogador</button>':''}</div>
     <input type="text" id="busca" placeholder="Buscar jogador" value="${esc(UI.busca)}" data-in="busca" style="margin-bottom:10px">
     <div class="pick filtros1" style="margin-bottom:12px">${[['todos','Todos'],...(EV()?[]:[['mensalista','Mensalistas'],['diarista','Diaristas']])].map(([k,n])=>`<button data-act="filtro" data-v="${k}" aria-pressed="${UI.filtro===k}">${n}</button>`).join('')}<select id="filtro-mais" aria-label="Filtrar por posição" class="${Object.keys(POS).includes(UI.filtro)||UI.filtro==='inativos'?'on':''}"><option value="">Posição</option>${Object.entries(POS).map(([k,n])=>`<option value="${k}" ${UI.filtro===k?'selected':''}>${n}</option>`).join('')}<option value="inativos" ${UI.filtro==='inativos'?'selected':''}>Inativos</option></select></div>`;
-  if(A){const ra=rodadaAberta();h+=`<button class="btn block ${ra?'':'warn'}" data-act="${ra?'av-admin':'av-novo'}" style="margin-bottom:12px">${ra?`⭐ Avaliação completa aberta · até ${quandoFim(ra[1].fim)}`:'⭐ Abrir avaliação da galera'}</button>`}
+  if(A){const ra=rodadaAberta();h+=`<button class="btn block ${ra?'':'warn'}" data-act="${ra?'av-admin':'av-novo'}" style="margin-bottom:12px">${ra?`⭐ Avaliação geral aberta · até ${quandoFim(ra[1].fim)}`:'⭐ Abrir avaliação geral do elenco'}</button>`}
   h+=cartaoAvCompleta();
   if(membrosSemCadastro().length&&!demo)h+=A?painelMembros():painelPendentes();
   if(!A&&euPendente())h=bannerPendente().replace('margin-top:12px','margin:0 0 12px')+h;
@@ -2452,7 +2453,7 @@ function sheetCfg(){
     <label class="field"><span>Formato padrão das peladas</span><select id="c-formato">${Object.entries(FORMATOS).map(([k,n])=>`<option value="${k}" ${(c.formato||'conv')===k?'selected':''}>${n}</option>`).join('')}</select></label>
     <label class="row" id="cfg-iv" style="gap:8px" ${['liga','ligamm'].includes(c.formato||'conv')?'':'hidden'}><input type="checkbox" id="c-idavolta" ${c.idaVolta?'checked':''}> Pontos corridos com ida e volta</label>
     <label class="field" id="cfg-nc" ${(c.formato||'conv')==='ligamm'?'':'hidden'}><span>Classificados p/ mata-mata</span><select id="c-nclass">${[2,4,8].map(n=>`<option value="${n}" ${Number(c.nClass||2)===n?'selected':''}>${n} (${n===2?'final':n===4?'semifinal':'quartas'})</option>`).join('')}</select></label>
-    <label class="field"><span>Times no sorteio (padrão)</span><select id="c-times">${[2,3,4,5,6,7,8,9,10].map(n=>`<option ${c.times==n?'selected':''}>${n}</option>`).join('')}</select></label>
+    <label class="field"><span>Times no sorteio (padrão)</span><select id="c-times">${Array.from({length:MAX_TIMES-1},(_,i)=>i+2).map(n=>`<option ${c.times==n?'selected':''}>${n}</option>`).join('')}</select></label>
     <div class="grid2"><label class="field"><span>Mensalidade (R$)</span><input type="number" id="c-mensal" min="0" step="0.01" value="${c.mensal}"></label>
     <label class="field"><span>Diária (R$)</span><input type="number" id="c-diaria" min="0" step="0.01" value="${c.diaria}"></label></div>
     <label class="field"><span>Diarista que não paga em 30 min perde a vaga. E aí?</span><select id="c-convauto"><option value="0" ${c.convAuto?'':'selected'}>Os administradores escolhem o próximo</option><option value="1" ${c.convAuto?'selected':''}>Convocar o próximo da fila automaticamente</option></select></label>
