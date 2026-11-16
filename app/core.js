@@ -17,8 +17,13 @@ const AVISOS={
   lista:{n:'Lista de presença',d:'Confirmados, espera e pendentes'},
   times:{n:'Times sorteados',d:'Escalação de cada time'},
   resultado:{n:'Resultado e prêmios',d:'Craque, artilheiro, garçom e goleiro'},
-  pagamento:{n:'Cobrança',d:'Quem deve mensalidade ou diária'}
+  pagamento:{n:'Cobrança',d:'Quem deve mensalidade ou diária'},
+  outro:{n:'Outra mensagem',d:'Título e texto do seu jeito'}
 };
+// a Agenda guarda só o que depende de dia e hora; times e resultado viram alerta "Repassar no WhatsApp" quando acontecem
+const AGENDA_OK=['convocacao','cobrar','lista','pagamento','outro'];
+const avN=a=>a.tipo==='outro'?(a.titulo||'Outra mensagem'):(AVISOS[a.tipo]?.n||a.tipo);
+const avD=a=>a.tipo==='outro'?String(a.texto||'').replace(/\s+/g,' ').slice(0,60):(AVISOS[a.tipo]?.d||'');
 const NOTIF={
   confirmou:{n:'Alguém confirmou',d:'"Fulano confirmou presença"',def:true},
   desistiu:{n:'Alguém desistiu',d:'Estava confirmado e saiu da lista',def:true},
@@ -362,17 +367,23 @@ function ocorrencias(a,now=new Date()){
 }
 function avisosVencidos(){
   const now=new Date(),out=[];
-  for(const[id,a] of Object.entries(S.avisos)){if(a.ativo===false)continue;
+  for(const[id,a] of Object.entries(S.avisos)){if(a.ativo===false||!AGENDA_OK.includes(a.tipo))continue;
     const{last}=ocorrencias(a,now);const key=iso(last);
     if(now-last<36*3600e3&&!(a.feitos||{})[key])out.push({id,a,key,when:last})}
   return out.sort((x,y)=>x.when-y.when);
 }
 function proximosAvisos(){
   const now=new Date();
-  return Object.entries(S.avisos).filter(([,a])=>a.ativo!==false).map(([id,a])=>{
+  return Object.entries(S.avisos).filter(([,a])=>a.ativo!==false&&AGENDA_OK.includes(a.tipo)).map(([id,a])=>{
     const{last,next}=ocorrencias(a,now);const feito=(a.feitos||{})[iso(last)];
     return{id,a,when:(!feito&&now-last<36*3600e3)?last:next}}).sort((x,y)=>x.when-y.when);
 }
+// depois de publicar os times e de fechar a votação, o administrador recebe um alerta com a mensagem pronta para o WhatsApp
+function repasses(){const out=[],cur=atual();
+  if(cur&&timesPub(cur[1])&&!(cur[1].rep||{}).times)out.push({k:'times',n:'Times sorteados',pid:cur[0]});
+  const rec=Object.entries(S.pel).filter(([,p])=>p&&p.aval&&!(p.rep||{}).resultado&&Date.now()-new Date(String(p.data).slice(0,10)+'T12:00')<4*864e5).sort((a,b)=>String(b[1].data).localeCompare(String(a[1].data)))[0];
+  if(rec)out.push({k:'resultado',n:'Resultado e prêmios',pid:rec[0]});
+  return out}
 function relTempo(d){const ms=d-new Date(),h=Math.round(Math.abs(ms)/36e5);
   if(ms<0)return h<1?'agora':'há '+h+'h';if(h<1)return'em menos de 1h';if(h<36)return'em '+h+'h';return'em '+Math.round(h/24)+' dias'}
 
@@ -518,6 +529,7 @@ function sheetDono(){const ls=Object.entries(S.locais).sort((a,b)=>a[1].nome.loc
 const MSG_INSTA=new Set(['convocacao','lista','times','resultado','cobrarvoto','javotaram']);
 function msg(tipo,ctx={}){const t=msg0(tipo,ctx);return MSG_INSTA.has(tipo)?t.replace(/\*/g,''):t}
 function msg0(tipo,ctx={}){
+  if(tipo==='outro')return ctx.texto||'';
   const c=cfg(),pe=atual(),p=ctx.pel||(pe&&pe[1]);
   const quando=p?`📅 *${dLong(p.data)}* das *${horaIniDe(p)}* às *${horaFimDe(p)}*`:EV()?'📅 Data a definir':`📅 *${DIAS[c.dia]}* das *${c.hora}* às *${horaFimDe(null)}*`;
   const LL=localDe(p),onde=LL?LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):'';
@@ -736,7 +748,7 @@ function sheetNotif(){
   const due=pr.aviso?avisosVencidos():[];
   const items=feedItems().filter(i=>pr[i.tipo]!==false).slice(0,40);
   let h='<div class="stack"><div class="panel"><div class="list">';
-  for(const v of due)h+=`<div class="item"><div class="grow"><div class="name"><span class="dot-new"></span>Hora de mandar: ${esc(AVISOS[v.a.tipo]?.n)}</div><div class="sub">${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</div></div><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar</button></div>`;
+  for(const v of due)h+=`<div class="item"><div class="grow"><div class="name"><span class="dot-new"></span>Hora de mandar: ${esc(avN(v.a))}</div><div class="sub">${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</div></div><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar</button></div>`;
   for(const i of items)h+=`<div class="item"><div class="grow"><div class="name">${i.t>visto?'<span class="dot-new"></span>':''}${esc(i.texto)}</div><div class="sub">${esc(NOTIF[i.tipo]?.n||'')} · ${quandoTxt(i.t)}</div></div>${i.act==='agenda'?`<button class="btn sm primary" data-act="agenda" data-l="${i.arg}">Responder</button>`:''}</div>`;
   if(!due.length&&!items.length)h+='<div class="empty">Nada novo por aqui.</div>';
   h+='</div></div>';
@@ -1310,7 +1322,8 @@ function tJogo(A){
   h+=cartaoAvCompleta();
   h+=painelPosJogo();
   if(A)h+=painelAprovar();
-  if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar: ${esc(AVISOS[v.a.tipo]?.n||'')}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
+  if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar: ${esc(avN(v.a))}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
+  if(A)for(const r of repasses())h+=`<div class="banner due"><span><b>Repassar no WhatsApp: ${r.n}</b><br>O app já avisou a galera no celular. Mande também no grupo do WhatsApp.</span><button class="btn sm" data-act="msg" data-v="${r.k}" data-p="${r.pid}" data-rk="${r.k}">Ver mensagem</button></div>`;
   const cur=atual();
   if(!cur){
     h+=A?`<button type="button" class="board board-marcar" data-act="np-abrir" aria-expanded="${!!UI.npAberto}"><div class="when">Sem pelada<br>marcada</div><div class="where">${EV()?'Evento livre':esc(DIAS[c.dia])+' das '+esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div><span class="board-cta">${UI.npAberto?'Marcando a pelada ▾':'＋ Toque para marcar a pelada'}</span></button>`
@@ -1942,20 +1955,21 @@ function tElenco(A){
 /* --- Avisos --- */
 /* tudo o que o servidor manda sozinho (functions/regras.js e index.js) */
 const AVISOS_AUTO=[
-  {k:'pelada',e:'⚽',n:'Pelada nova',q:'quando você abre a lista de presença, com os botões Vou / Não vou',p:'todos'},
-  {k:'prazo15',e:'⏰',n:'Faltam 15 minutos',q:'15 min antes de fechar o prazo dos mensalistas',p:'mensalistas que não responderam',pa:1},
-  {k:'convocado',e:'✅',n:'Convocado / vaga liberada',q:'quando o diarista é chamado da fila ou você libera a vaga',p:'o diarista'},
-  {k:'prazopix',e:'⌛',n:'Prazo do Pix do diarista',q:'30 min sem pagar: a vaga passa para o próximo da fila',p:'o diarista e o próximo',pa:1},
-  {k:'presenca',e:'📋',n:'Presença',q:'quando alguém confirma, desiste ou pede vaga',p:'administradores'},
-  {k:'times',e:'🎲',n:'Times sorteados',q:'quando você sorteia os times',p:'cada jogador, com o seu time'},
-  {k:'avaliar',e:'⭐',n:'Avalie a galera',q:'quando a pelada termina',p:'quem jogou'},
-  {k:'resultado',e:'🏆',n:'Saiu o resultado',q:'quando a votação fecha',p:'quem jogou'},
-  {k:'gols',e:'⚽',n:'Gols para aprovar / aprovados',q:'quando um jogador lança gols e quando você aprova',p:'administradores e o jogador'},
-  {k:'cobranca',e:'💰',n:'Cobranças',q:'às 10h: mensalidade nova (dia 1º), vence hoje e 5 dias de atraso; cobrança extra nova; diária do evento ao confirmar. Tocar abre o Pix',p:'quem deve'},
-  {k:'aniversario',e:'🎂',n:'Aniversariante do dia',q:'às 10h, no dia do aniversário de quem informou a data no perfil',p:'todos'},
-  {k:'entrar',e:'👋',n:'Pedido para entrar',q:'quando alguém entra pelo convite',p:'administradores'},
-  {k:'mural',e:'📣',n:'Recado do mural',q:'quando você publica no mural',p:'todos'},
-  {k:'votacao',e:'🗳️',n:'Votação do elenco aberta',q:'quando você abre a avaliação da galera',p:'todos'}];
+  {g:'lista',k:'pelada',e:'⚽',n:'Lista de presença aberta',q:'quando você abre a lista, com os botões Vou / Não vou',p:'todos'},
+  {g:'lista',k:'prazo15',e:'⏰',n:'Prazo de confirmação acabando',q:'15 min antes de fechar o prazo dos mensalistas',p:'mensalistas que não responderam',pa:1},
+  {g:'lista',k:'convocado',e:'✅',n:'Convocado / vaga liberada',q:'quando o diarista é chamado da fila ou você libera a vaga',p:'o diarista'},
+  {g:'lista',k:'prazopix',e:'⌛',n:'Prazo do Pix do diarista',q:'30 min sem pagar: a vaga passa para o próximo da fila',p:'o diarista e o próximo',pa:1},
+  {g:'lista',k:'presenca',e:'📋',n:'Movimento da lista',q:'quando alguém confirma, desiste ou pede vaga',p:'administradores'},
+  {g:'jogo',k:'times',e:'🎲',n:'Times sorteados',q:'quando você publica os times',p:'cada jogador, com o seu time'},
+  {g:'jogo',k:'gols',e:'⚽',n:'Gols para aprovar / aprovados',q:'quando um jogador lança gols e quando você aprova',p:'administradores e o jogador'},
+  {g:'notas',k:'avaliar',e:'⭐',n:'Dar notas da pelada de hoje',q:'quando a pelada termina',p:'quem jogou'},
+  {g:'notas',k:'resultado',e:'🏆',n:'Resultado e prêmios da pelada',q:'quando a votação da pelada fecha',p:'quem jogou'},
+  {g:'notas',k:'votacao',e:'🗳️',n:'Avaliação geral do elenco aberta',q:'quando você abre a avaliação geral (não é a de cada pelada)',p:'todos'},
+  {g:'dinheiro',k:'cobranca',e:'💰',n:'Cobranças',q:'às 10h: mensalidade nova (dia 1º), vence hoje e 5 dias de atraso; cobrança extra nova; diária do evento ao confirmar. Tocar abre o Pix',p:'quem deve'},
+  {g:'grupo',k:'entrar',e:'👋',n:'Pedido para entrar',q:'quando alguém entra pelo convite',p:'administradores'},
+  {g:'grupo',k:'aniversario',e:'🎂',n:'Aniversariante do dia',q:'às 10h, no dia do aniversário de quem informou a data no perfil',p:'todos'},
+  {g:'grupo',k:'mural',e:'📣',n:'Recado do mural',q:'quando você publica no mural ou em "Outra mensagem"',p:'todos'}];
+const AV_GRUPOS={lista:'📋 Lista e presença',jogo:'⚽ Jogo',notas:'⭐ Notas e prêmios',dinheiro:'💰 Dinheiro',grupo:'👥 Grupo'};
 function tAvisos(A){
   let h=`<h2 style="margin-bottom:12px">Avisos</h2>`;
   // 1) o que o app manda sozinho, por notificação no celular
@@ -1963,7 +1977,7 @@ function tAvisos(A){
   h+=`<details class="panel av-auto"${UI.avAuto?' open':''} data-av-auto><summary><div class="panel-h" style="margin:0"><h3>🔔 Automáticos</h3><span class="av-tag auto">sozinho</span></div>
     <p class="sub" style="margin:6px 0 0">${nAuto} notificações que o app manda sozinho para o celular de cada um. Você não precisa fazer nada.${nOff?` <b style="color:var(--red)">${nOff} desligada${nOff>1?'s':''}.</b>`:''} <b class="av-ver">${UI.avAuto?'Esconder':A?'Ver e escolher':'Ver quais são'}</b></p></summary>
     ${A?'<p class="sub" style="margin:8px 0 2px">Todas vêm ligadas e são recomendadas. Desligue só a que não fizer sentido para sua pelada: ela para de ser enviada para todos do grupo.</p>':''}
-    <div class="av-l">${LA.map(x=>`<div class="av-i${off[x.k]?' off':''}"><span class="av-e">${x.e}</span><div class="grow"><b>${x.n}</b><div class="sub">${x.q} · <i>${x.p}</i></div></div>${A?`<label class="sw" aria-label="${off[x.k]?'Ligar':'Desligar'} ${esc(x.n)}"><input type="checkbox" data-act="push-off" data-k="${x.k}" ${off[x.k]?'':'checked'}><span></span></label>`:''}</div>`).join('')}</div></details>`;
+    <div class="av-l">${LA.map((x,i)=>`${!i||LA[i-1].g!==x.g?`<div class="av-g">${AV_GRUPOS[x.g]}</div>`:''}<div class="av-i${off[x.k]?' off':''}"><span class="av-e">${x.e}</span><div class="grow"><b>${x.n}</b><div class="sub">${x.q} · <i>${x.p}</i></div></div>${A?`<label class="sw" aria-label="${off[x.k]?'Ligar':'Desligar'} ${esc(x.n)}"><input type="checkbox" data-act="push-off" data-k="${x.k}" ${off[x.k]?'':'checked'}><span></span></label>`:''}</div>`).join('')}</div></details>`;
   // 2) agenda: lembretes para o administrador mandar
   h+=`<div class="panel av-agenda" style="margin-top:12px"><div class="panel-h"><h3>📅 Agenda</h3><span class="av-tag manual">você manda</span></div>
     <p class="sub" style="margin:6px 0 8px">Não vão sozinhos. No dia e hora marcados aparece um alerta amarelo no topo da aba Jogo com a mensagem pronta. Você confere e manda no app ou no WhatsApp. Repete toda semana até você pausar ou apagar.</p>
@@ -1971,14 +1985,14 @@ function tAvisos(A){
   const prox=proximosAvisos();
   if(!prox.length)h+=`<div class="empty">Nenhum lembrete na agenda.${A?'<br><br><button class="btn sm" data-act="avisos-padrao">Usar sugestão de agenda</button>':''}</div></div>`;
   else{h+='<div class="list">';
-    for(const{id,a,when} of prox){const t=AVISOS[a.tipo]||{n:a.tipo,d:''};const past=when<new Date();
+    for(const{id,a,when} of prox){const t={n:avN(a),d:avD(a)};const past=when<new Date();
       h+=`<div class="item"><div style="width:52px;text-align:center;flex:none"><div style="font-family:var(--f-display);font-weight:800;font-size:18px;line-height:1">${DIAS3[a.dia]}</div><div class="num small">${esc(a.hora)}</div></div>
         <div class="grow"><div class="name">${esc(t.n)}</div><div class="sub">${esc(t.d)} · <span style="${past?'color:var(--red);font-weight:600':''}">${past?'pendente':relTempo(when)}</span></div></div>
-        ${A?`<div class="row" style="gap:4px"><button class="btn sm" data-act="msg" data-v="${a.tipo}">Ver</button><button class="btn sm" data-act="edit-aviso" data-a="${id}" aria-label="Editar">✎</button></div>`:''}</div>`}
+        ${A?`<div class="row" style="gap:4px"><button class="btn sm" data-act="msg" data-v="${a.tipo}" data-oa="${id}">Ver</button><button class="btn sm" data-act="edit-aviso" data-a="${id}" aria-label="Editar">✎</button></div>`:''}</div>`}
     h+='</div></div>'}
   if(A){const ina=Object.entries(S.avisos).filter(([,a])=>a.ativo===false);
-    if(ina.length)h+=`<div class="panel" style="margin-top:12px"><h3 style="margin-bottom:6px">Pausados</h3><div class="list">${ina.map(([id,a])=>`<div class="item"><div class="grow">${esc(AVISOS[a.tipo]?.n)} · ${DIAS3[a.dia]} ${esc(a.hora)}</div><button class="btn sm" data-act="edit-aviso" data-a="${id}">Editar</button></div>`).join('')}</div></div>`;
-    h+=`<div class="panel" style="margin-top:12px"><h3 style="margin-bottom:8px">Mensagens avulsas</h3><div class="pick">${Object.entries(AVISOS).map(([k,v])=>`<button data-act="msg" data-v="${k}">${v.n}</button>`).join('')}<button data-act="msg" data-v="convite">Convite</button></div></div>`}
+    if(ina.length)h+=`<div class="panel" style="margin-top:12px"><h3 style="margin-bottom:6px">Pausados</h3><div class="list">${ina.map(([id,a])=>`<div class="item"><div class="grow">${esc(avN(a))} · ${DIAS3[a.dia]} ${esc(a.hora)}</div><button class="btn sm" data-act="edit-aviso" data-a="${id}">Editar</button></div>`).join('')}</div></div>`;
+    h+=`<div class="panel" style="margin-top:12px"><h3 style="margin-bottom:4px">Mandar agora</h3><p class="sub" style="margin:0 0 8px">Mensagem do seu jeito, no app e/ou no WhatsApp. As mensagens prontas ficam onde são usadas: Jogo, Times, Resultado e Caixa.</p><div class="pick"><button data-act="msg" data-v="outro">✏️ Outra mensagem</button><button data-act="msg" data-v="convite">Convite</button></div></div>`}
   return h;
 }
 
@@ -2260,20 +2274,23 @@ let F=null;
 
 function sheetMsg(tipo,ctx={}){
   const text=msg(tipo,ctx);
-  const titulo=tipo==='convite'?'Convite':tipo==='cobrarvoto'?'Cobrar votação':tipo==='javotaram'?'Quem já votou':tipo==='prestacao'?'Prestação de contas':tipo==='campeonato'?'Relatório do campeonato':AVISOS[tipo]?.n||'Mensagem';
+  const titulo=tipo==='convite'?'Convite':tipo==='cobrarvoto'?'Cobrar votação':tipo==='javotaram'?'Quem já votou':tipo==='prestacao'?'Prestação de contas':tipo==='campeonato'?'Relatório do campeonato':tipo==='outro'?(ctx.titulo||'Outra mensagem'):AVISOS[tipo]?.n||'Mensagem';
+  const livre=tipo==='outro'&&!ctx.titulo;
   const tel=ctx.jid&&J(ctx.jid).tel?String(J(ctx.jid).tel).replace(/\D/g,''):'';
   const fone=tel?(tel.length<=11?'55'+tel:tel):'';
   MSG_ORIG=text;
-  openSheet(titulo,`<div class="row between" style="margin-bottom:6px"><span class="sub">✎ Toque no texto para editar do seu jeito</span><button class="btn sm" data-act="msg-reset">Restaurar texto</button></div>
-    <textarea id="msg-text" rows="14" class="num" aria-label="Texto da mensagem, editável">${esc(text)}</textarea>
+  openSheet(titulo,`${livre?`<label class="field"><span>Título</span><input type="text" id="msg-titulo" maxlength="60" placeholder="Ex.: Camisas novas"></label><label class="field" style="margin-top:8px"><span>Mensagem</span></label>`:`<div class="row between" style="margin-bottom:6px"><span class="sub">✎ Toque no texto para editar do seu jeito</span><button class="btn sm" data-act="msg-reset">Restaurar texto</button></div>`}
+    <textarea id="msg-text" rows="${livre?8:14}" class="num" aria-label="Texto da mensagem, editável"${livre?' placeholder="Escreva aqui o que quiser mandar para a galera."':''}>${esc(text)}</textarea>
     ${tipo==='prestacao'?`<button class="btn warn block" style="margin-top:10px" data-act="prest-pdf" data-m="${ctx.mes||mesAtual()}">📄 Baixar em PDF</button>`:''}
     ${tipo==='campeonato'&&ctx.pel?`<button class="btn warn block" style="margin-top:10px" data-act="camp-pdf" data-d="${ctx.pel.data}" data-p="${pidOf(ctx.pel)}">📄 Baixar em PDF</button>`:''}
     ${tipo==='convocacao'&&atual()?`<button class="btn warn block" style="margin-top:10px" data-act="convoc-arte" data-p="${atual()[0]}">🎨 Gerar arte de convocação</button>`:''}
     <div class="stack" style="margin-top:12px">
       ${ADM()?`<button class="btn primary block" data-act="enviar-app" data-titulo="${esc(titulo)}">Enviar no app para todos</button>`:''}
-      <a class="btn block" id="wa-link" target="_blank" rel="noopener" href="https://wa.me/${fone}?text=${encodeURIComponent(text)}">Abrir no WhatsApp${fone?' (direto para '+esc(nm(ctx.jid))+')':''}</a>
+      <a class="btn block" id="wa-link" target="_blank" rel="noopener" href="https://wa.me/${fone}?text=${encodeURIComponent(ctx.titulo&&tipo==='outro'?'*'+ctx.titulo+'*\n\n'+text:text)}">Abrir no WhatsApp${fone?' (direto para '+esc(nm(ctx.jid))+')':''}</a>
       <button class="btn block" data-act="copy">Copiar mensagem</button>
       ${ctx.aviso?`<button class="btn warn block" data-act="aviso-feito" data-a="${ctx.aviso}" data-key="${ctx.key}">Já mandei · tirar o alerta</button>`:''}
+      ${ctx.rep?`<button class="btn warn block" data-act="rep-feito" data-p="${ctx.rep.p}" data-k="${ctx.rep.k}">Já mandei · tirar o alerta</button>`:''}
+      ${livre&&ADM()?`<button class="btn block" data-act="outro-agenda">📅 Repetir toda semana (Agenda)</button>`:''}
       <p class="sub" style="margin:0">"Enviar no app" chega como notificação para cada jogador. O WhatsApp é opcional: abre com o texto daqui, e você escolhe o grupo.</p></div>`);
 }
 /* Suporte do Pelota FC: o administrador libera por 24 horas; tudo o que o suporte fizer fica registrado */
@@ -2421,10 +2438,12 @@ function sheetVerJog(id){
     <button class="btn warn block" data-act="carta" data-j="${id}">Ver carta do jogador</button>
     ${A?`<div class="row"><button class="btn primary grow" data-act="edit-jog" data-j="${id}">Editar</button><button class="btn grow" data-act="msg" data-v="convite" data-j="${id}">Convite</button></div>`:''}</div>`);
 }
-function sheetAviso(id){
-  const a=id?S.avisos[id]:{tipo:'convocacao',dia:((cfg().dia??6)+5)%7,hora:'19:00',ativo:true};
+function sheetAviso(id,pre){
+  const a=id?S.avisos[id]:{tipo:'convocacao',dia:((cfg().dia??6)+5)%7,hora:'19:00',ativo:true,...(pre||{})};
   openSheet(id?'Editar aviso':'Novo aviso',`<div class="stack">
-    <label class="field"><span>Mensagem</span><select id="a-tipo">${Object.entries(AVISOS).map(([k,v])=>`<option value="${k}" ${a.tipo===k?'selected':''}>${v.n}</option>`).join('')}</select></label>
+    <label class="field"><span>Mensagem</span><select id="a-tipo">${AGENDA_OK.map(k=>`<option value="${k}" ${a.tipo===k?'selected':''}>${AVISOS[k].n}</option>`).join('')}</select></label>
+    <div id="a-outro" class="stack"${a.tipo==='outro'?'':' hidden'}><label class="field"><span>Título</span><input type="text" id="a-titulo" maxlength="60" value="${esc(a.titulo||'')}" placeholder="Ex.: Camisas"></label>
+    <label class="field"><span>Mensagem</span><textarea id="a-texto" rows="5" placeholder="Ex.: Galera, levem as camisas branca e preta.">${esc(a.texto||'')}</textarea></label></div>
     <div class="grid2"><label class="field"><span>Dia</span><select id="a-dia">${DIAS.map((d,i)=>`<option value="${i}" ${a.dia==i?'selected':''}>${d}</option>`).join('')}</select></label>
     <label class="field"><span>Horário</span><input type="time" id="a-hora" value="${esc(a.hora)}"></label></div>
     <label class="row"><input type="checkbox" id="a-ativo" ${a.ativo!==false?'checked':''}> Ativo</label>
@@ -2569,7 +2588,8 @@ document.addEventListener('click',e=>{
     case'ob-dono':obFechar();if(!demo)startDemo();sheetDono();break;
     case'ob-entrar':obFechar();if(!demo)startDemo();if((d.v==='jog')!==!!UI.comoJogador){UI.comoJogador=d.v==='jog';PUSH_PRONTO=false;PUSH_VISTOS.clear()}UI.tab='jogo';UI.sub='presenca';render();window.scrollTo(0,0);break;
     case'enviar-app':{const txt=document.getElementById('msg-text').value.trim();if(!txt){toast('A mensagem está vazia.');return}
-      const m=S.mural||{items:[]};put('mural/geral',{items:[{id:uid('m'),t:Date.now(),titulo:d.titulo,txt}].concat(m.items||[]).slice(0,30)});
+      const tit=((document.getElementById('msg-titulo')||{}).value||'').trim()||d.titulo;
+      const m=S.mural||{items:[]};put('mural/geral',{items:[{id:uid('m'),t:Date.now(),titulo:tit,txt}].concat(m.items||[]).slice(0,30)});
       closeSheet();toast('Enviado no app. Todos os jogadores recebem nas notificações.');break}
     case'tab-jogo':UI.tab='jogo';closeSheet();render();break;
     case'locais':sheetLocais();break;
@@ -2668,16 +2688,23 @@ document.addEventListener('click',e=>{
     case'prest-pdf':{const t=(document.getElementById('msg-text')||{}).value||msg('prestacao',{mes:d.m}),blob=pdfPrestacao(t),fn='prestacao-'+d.m+'.pdf';
       const salvar=dl&&dl.save?dl.save({filename:fn,data:blob,type:'application/pdf'}):Promise.resolve((()=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;document.body.appendChild(a);a.click();a.remove();return{status:'saved'}})());
       salvar.then(r=>{if(r&&r.status==='saved')toast('PDF pronto.')},e=>{if(e&&e.name!=='AbortError')toast('Não deu para gerar o PDF.')});break}
-    case'msg':{const ctx={};if(d.p)ctx.pel=S.pel[d.p];if(d.j)ctx.jid=d.j;if(d.m)ctx.mes=d.m;if(d.aviso){ctx.aviso=d.aviso;ctx.key=d.key}sheetMsg(d.v,ctx);break}
+    case'msg':{const ctx={};if(d.p)ctx.pel=S.pel[d.p];if(d.j)ctx.jid=d.j;if(d.m)ctx.mes=d.m;if(d.aviso){ctx.aviso=d.aviso;ctx.key=d.key}
+      {const av=S.avisos[d.aviso||d.oa];if(d.v==='outro'&&av){ctx.titulo=av.titulo||'Outra mensagem';ctx.texto=av.texto||''}}
+      if(d.rk&&d.p)ctx.rep={p:d.p,k:d.rk};sheetMsg(d.v,ctx);break}
+    case'rep-feito':{const p=S.pel[d.p];if(p)patch('peladas/'+d.p,{rep:{...(p.rep||{}),[d.k]:true}});closeSheet();toast('Alerta tirado.');break}
+    case'outro-agenda':{const titulo=((document.getElementById('msg-titulo')||{}).value||'').trim(),texto=(document.getElementById('msg-text').value||'').trim();
+      if(!texto){toast('Escreva a mensagem primeiro.');return}sheetAviso(null,{tipo:'outro',titulo,texto});break}
     case'copy':{const t=document.getElementById('msg-text');navigator.clipboard?.writeText(t.value).then(()=>toast('Mensagem copiada.'),()=>{t.select();toast('Selecione e copie o texto.')})||(t.select(),toast('Selecione e copie o texto.'));break}
     case'aviso-feito':{const a=S.avisos[d.a];const feitos=Object.fromEntries(Object.entries({...(a.feitos||{}),[d.key]:true}).sort().slice(-12));put('avisos/'+d.a,{...a,feitos});closeSheet();toast('Alerta resolvido.');break}
     case'add-aviso':sheetAviso(null);break;
     case'edit-aviso':sheetAviso(d.a);break;
     case'save-aviso':{const id=d.a||uid('a'),old=d.a?S.avisos[d.a]:{};
-      put('avisos/'+id,{...old,tipo:document.getElementById('a-tipo').value,dia:Number(document.getElementById('a-dia').value),hora:document.getElementById('a-hora').value||'09:00',ativo:document.getElementById('a-ativo').checked});closeSheet();toast('Aviso salvo.');break}
+      const tipo=document.getElementById('a-tipo').value,ex={};
+      if(tipo==='outro'){ex.titulo=document.getElementById('a-titulo').value.trim();ex.texto=document.getElementById('a-texto').value.trim();if(!ex.texto){toast('Escreva a mensagem.');return}}
+      put('avisos/'+id,{...old,...ex,tipo,dia:Number(document.getElementById('a-dia').value),hora:document.getElementById('a-hora').value||'09:00',ativo:document.getElementById('a-ativo').checked});closeSheet();toast('Aviso salvo.');break}
     case'del-aviso':del('avisos/'+d.a);closeSheet();toast('Aviso apagado.');break;
     case'avisos-padrao':{const dia=cfg().dia??6,w=n=>(dia+n+7)%7;
-      [['convocacao',w(-4),'09:00'],['cobrar',w(-2),'19:00'],['lista',w(-1),'20:00'],['times',dia,'07:00'],['resultado',dia,'12:00'],['pagamento',1,'10:00']]
+      [['convocacao',w(-4),'09:00'],['cobrar',w(-2),'19:00'],['lista',w(-1),'20:00'],['pagamento',1,'10:00']]
         .forEach(([tipo,d2,hora])=>put('avisos/'+uid('a'),{tipo,dia:d2,hora,ativo:true}));toast('Agenda sugerida criada. Ajuste à vontade.');break}
     case'premio':break;
     case'push-off':{const o={...(cfg().pushOff||{})};o[d.k]=!b.checked;patch('config/geral',{pushOff:o});toast(o[d.k]?'Desligado: esse aviso não vai mais ser enviado.':'Ligado de novo.');break}
@@ -2890,6 +2917,7 @@ function npQpAtualiza(){const box=document.getElementById('np-qp'),v=document.ge
   box.innerHTML=htmlQuemPaga(ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>nm(a).localeCompare(nm(b))),UI.npDesc||{},Number(String(v.value).replace(',','.'))||0,'npd')}
 document.addEventListener('input',e=>{if(e.target&&e.target.id==='np-valor')npQpAtualiza();if(e.target&&e.target.id==='aj-saldo')ajDif()});
 document.addEventListener('change',e=>{
+  if(e.target.id==='a-tipo'){const o=document.getElementById('a-outro');if(o)o.hidden=e.target.value!=='outro'}
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
   const t=e.target;
   if(t.dataset.act==='npd-sel'||t.dataset.act==='ds-sel'){const form=t.dataset.act==='npd-sel',m=form?{...(UI.npDesc||{})}:(UI.dsc?UI.dsc.map:null);if(!m)return;const j=t.dataset.j,v=t.value;
@@ -2927,7 +2955,7 @@ document.addEventListener('input',e=>{
   if(t.dataset.f&&F)F[t.dataset.f]=t.value;
   if(t.dataset.mapa)atualizarPrevia(t);
   if(t.dataset.np)guardarNp(t);
-  if(t.id==='msg-text'){const a=document.getElementById('wa-link');if(a)a.href=a.href.split('?')[0]+'?text='+encodeURIComponent(t.value)}
+  if(t.id==='msg-text'||t.id==='msg-titulo'){const a=document.getElementById('wa-link'),ti=((document.getElementById('msg-titulo')||{}).value||'').trim(),tx=(document.getElementById('msg-text')||{}).value||'';if(a)a.href=a.href.split('?')[0]+'?text='+encodeURIComponent(ti?'*'+ti+'*\n\n'+tx:tx)}
 });
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(document.getElementById('sheet').innerHTML)closeSheet();else if(!document.getElementById('ob').hidden)obFechar()});
 setInterval(()=>{if(!document.getElementById('sheet').innerHTML&&document.activeElement?.tagName!=='INPUT')render()},60000);

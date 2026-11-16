@@ -36,7 +36,7 @@ No ar em https://pelotafc.com.br/app.
 - Perfil com data de nascimento obrigatória (o grupo vê só dia e mês).
 - Aba Jogo: "Sem pelada marcada" é botão laranja para marcar; formulário Quando → Onde (opcional) → Como → Cobrança ("Com cobrança" padrão, à esquerda); quadro com valor + taxa do Pix (1,99%).
 - Últimas peladas: Notas (com resultado completo e envio) · Times · ⭐ Destaques (artes Feed/Story, "Postar no Instagram", prêmios só pela votação, chave para esconder; premiado também vê e posta as artes dele). Marca "PELOTA FC" discreta no rodapé das artes.
-- Aba Avisos: "Automáticos" (push que o servidor manda, cada um com chave para desligar em `config/geral.pushOff`) e "Agenda" (lembretes semanais para o administrador mandar).
+- Aba Avisos: "Automáticos" agrupados por assunto (Lista e presença · Jogo · Notas e prêmios · Dinheiro · Grupo; push do servidor, cada um com chave para desligar em `config/geral.pushOff`); "Agenda" só para o que depende de horário (Convocação, Cobrar respostas, Lista, Cobrança, Outra mensagem com título e texto livres); "Mandar agora" (✏️ Outra mensagem → mural do app e/ou WhatsApp, pode virar lembrete semanal; Convite). Times e resultado saíram da Agenda: quando os times são publicados e quando a votação fecha, o administrador vê o alerta "Repassar no WhatsApp" na aba Jogo (marca `peladas/{id}.rep`). As outras mensagens prontas ficam nas telas onde são usadas.
 - Notificação de cobrança abre direto o pagamento com Pix.
 - Suporte com autorização do dono (2 h) e chamados.
 
