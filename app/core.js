@@ -2236,11 +2236,38 @@ function resumoCampos(ref,x,ids){const L=[];for(const c of(x.campos||[])){if(c.t
 function textoRespostas(ref,x,ids){const out=[`*${x.nome}*`,''];ids.forEach(id=>{const r=respInfo(ref,id).c;out.push(`• ${nm(id)}: ${(x.campos||[]).map(c=>valCampo(c,r[c.id])||'—').join(' · ')}`)});
   for(const c of(x.campos||[]))if(c.t==='esc'){const n={};ids.forEach(id=>{const v=respInfo(ref,id).c[c.id];if(!vazioCampo(v))n[v]=(n[v]||0)+1});out.push('',`*${c.n}*: `+((c.op||[]).filter(o=>n[o]).map(o=>`${o} ${n[o]}`).join(' · ')||'—'))}
   return out.join('\n')}
+// PDF das respostas de uma cobrança extra: resumo por opção (para o fornecedor) e tabela com cada pessoa
+function pdfRespostas(m,xid){const x=((S.caixa[m]||{}).extras||{})[xid];if(!x)return null;const ref=m+'~'+xid,c=cfg(),C=x.campos||[];
+  const ids=(x.quem||[]).filter(id=>S.jog[id]).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  const P=pdfNovo(),W=P.W,M=P.M,LW=W-2*M,VERDE='#1B6B3A',CLARO='#EEF3EF',CINZA='#6B746F';
+  const secao=t=>{P.cabe(60);P.y+=22;P.ret(M,P.y-11,3,14,{fill:VERDE});P.txt(t,M+9,P.y,{sz:11.5,b:true,cor:VERDE});P.y+=8};
+  P.pagina();
+  P.ret(M,P.y,LW,56,{fill:VERDE});P.txt(String(x.nome||'Cobrança').toUpperCase(),M+14,P.y+24,{sz:17,b:true,cor:'#FFFFFF',w:LW-28});
+  const pg=ids.filter(id=>stPag((x.pag||{})[id])).length;
+  P.txt(`${c.nome} · ${BRL(x.v)} por pessoa${x.venc?' · vence '+dBR(x.venc):''} · ${pg} de ${ids.length} pagos`,M+14,P.y+42,{sz:9.5,cor:'#DDEEE2',w:LW-28});P.y+=60;
+  // resumo de cada campo de escolha
+  for(const cp of C.filter(k=>k.t==='esc')){const n={};ids.forEach(id=>{const v=respInfo(ref,id).c[cp.id];if(!vazioCampo(v))n[v]=(n[v]||0)+1});
+    secao(('TOTAL POR '+cp.n).toUpperCase());const ops=(cp.op||[]),bw=Math.min(70,(LW-(ops.length-1)*6)/Math.max(1,ops.length));let xx=M;
+    ops.forEach(o=>{P.ret(xx,P.y,bw,40,{fill:n[o]?'#FFF7DB':CLARO,stroke:n[o]?'#E9C84A':'#D5DBD7'});P.txt(o,xx+bw/2,P.y+14,{sz:9,b:true,al:'c',cor:CINZA});P.txt(String(n[o]||0),xx+bw/2,P.y+32,{sz:15,b:true,al:'c'});xx+=bw+6});P.y+=40;
+    const falta=ids.length-sum(Object.values(n));P.y+=14;P.txt(`Total: ${sum(Object.values(n))}${falta?` · ${falta} ainda não escolheram`:''}`,M,P.y,{sz:9,cor:falta?'#B23A2E':CINZA})}
+  // tabela de pessoas
+  secao('QUEM PEDIU O QUÊ');
+  const cols=[['Nome',0],...C.map(k=>[k.n,k.t==='esc'?60:k.t==='txt'?120:58]),['Pagamento',70]];
+  const fixo=sum(cols.map(k=>k[1])),xs=[];let x0=M;cols.forEach(k=>{const w=k[1]||Math.max(90,LW-fixo);xs.push([x0,w]);x0+=w});
+  const RH=18,cab=()=>{P.ret(M,P.y,LW,RH,{fill:VERDE});cols.forEach((k,i)=>P.txt(k[0],xs[i][0]+5,P.y+12.5,{sz:8.5,b:true,cor:'#FFFFFF',w:xs[i][1]-8}));P.y+=RH};
+  cab();
+  ids.forEach((id,k)=>{if(!P.cabe(RH))cab();const r=respInfo(ref,id).c,pago=stPag((x.pag||{})[id]);P.ret(M,P.y,LW,RH,{fill:k%2?CLARO:'#FFFFFF'});
+    P.txt(nm(id),xs[0][0]+5,P.y+12.5,{sz:9,w:xs[0][1]-8});
+    C.forEach((cp,i)=>{const v=r[cp.id],t=vazioCampo(v)?'-':typeof v==='object'?(cp.t==='foto'?'enviada':'enviado'):String(v);P.txt(t,xs[i+1][0]+5,P.y+12.5,{sz:9,b:cp.t==='esc'&&!vazioCampo(v),w:xs[i+1][1]-8,cor:vazioCampo(v)&&obrig(cp)?'#B23A2E':undefined})});
+    const L=xs[xs.length-1];P.txt(pago?'Pago':'Em aberto',L[0]+5,P.y+12.5,{sz:9,b:pago,cor:pago?VERDE:'#B23A2E'});P.y+=RH});
+  if(C.some(k=>k.t==='foto'||k.t==='arq')){P.y+=16;P.txt('Fotos e arquivos ficam no app: Caixa > Cobranças extras > Respostas.',M,P.y,{sz:8.5,cor:CINZA})}
+  return P.fim()}
 function sheetRespostas(m,xid){const x=((S.caixa[m]||{}).extras||{})[xid];if(!x)return;const ref=m+'~'+xid,ids=(x.quem||[]).filter(id=>S.jog[id]).sort((a,b)=>nm(a).localeCompare(nm(b)));
   const txt=textoRespostas(ref,x,ids);
   openSheet('Respostas · '+x.nome,`<div class="stack"><div class="sub">${resumoCampos(ref,x,ids)||'Ninguém respondeu ainda.'}</div>
     <div class="list">${ids.map(id=>{const{uid,c:r}=respInfo(ref,id);return`<div class="item" style="align-items:flex-start"><div class="grow"><div class="name">${esc(nm(id))}</div><div class="sub">${(x.campos||[]).map(c=>{const v=r[c.id];if(vazioCampo(v))return obrig(c)?`${esc(c.n)}: <span class="xr-falta">—</span>`:`${esc(c.n)}: —`;
       if(typeof v==='object')return`${esc(c.n)}: <button class="xr-ed" data-act="xr-arq" data-id="${esc(uid+'~'+ref+'~'+c.id)}">${c.t==='foto'?'📷 ver foto':'📎 '+esc(v.nome)}</button>`;return`${esc(c.n)}: <b>${esc(v)}</b>`}).join(' · ')}</div></div></div>`}).join('')}</div>
+    <button class="btn warn block" data-act="xr-pdf" data-m="${m}" data-x="${xid}">📄 Baixar em PDF</button>
     <a class="btn block" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">Abrir lista no WhatsApp</a>
     <button class="btn block" data-act="xr-copiar" data-m="${m}" data-x="${xid}">Copiar lista</button>
     <p class="sub" style="margin:0">Só os administradores veem as respostas, fotos e arquivos.</p></div>`)}
@@ -2796,6 +2823,9 @@ document.addEventListener('click',async e=>{
         if(!calmo){app.classList.add('entrando');setTimeout(()=>app.classList.remove('entrando'),600)}};
       if(calmo)fim();else{app.classList.add('saindo');setTimeout(fim,260)}break}
     case'fechar-enc':UI.recemEnc=null;render();break;
+    case'xr-pdf':{const x=((S.caixa[d.m]||{}).extras||{})[d.x];const blob=pdfRespostas(d.m,d.x);if(!blob)return;const fn=(semAc(x&&x.nome||'cobranca').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'cobranca')+'-'+d.m+'.pdf';
+      const salvar=dl&&dl.save?dl.save({filename:fn,data:blob,type:'application/pdf'}):Promise.resolve((()=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;document.body.appendChild(a);a.click();a.remove();return{status:'saved'}})());
+      salvar.then(r=>{if(r&&r.status==='saved')toast('PDF pronto.')},e=>{if(e&&e.name!=='AbortError')toast('Não deu para gerar o PDF.')});break}
     case'camp-pdf':{const blob=pdfCampeonato(d.p),fn='campeonato-'+(d.d||'pelada')+'.pdf';
       const salvar=dl&&dl.save?dl.save({filename:fn,data:blob,type:'application/pdf'}):Promise.resolve((()=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;document.body.appendChild(a);a.click();a.remove();return{status:'saved'}})());
       salvar.then(r=>{if(r&&r.status==='saved')toast('PDF pronto.')},e=>{if(e&&e.name!=='AbortError')toast('Não deu para gerar o PDF.')});break}
