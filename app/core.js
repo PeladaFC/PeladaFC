@@ -1120,9 +1120,10 @@ async function sheetEscudoFundo(orig){openSheet('Tirar o fundo?','<div class="em
 function salvarEscudo(d,msg){put('config/geral',{...(S.config||{}),escudo:d});if(window.sincronizarGrupo)window.sincronizarGrupo({escudo:d});UI.escOrig=UI.escSem=null;toast(msg||'Escudo salvo.');sheetCfg()}
 /* foto: abre para enquadrar (arrastar e aproximar dentro do círculo, como no Turma em Dia) e devolve um quadrado.
    Cancelar devolve um erro com code 'cancelado' (sem aviso de erro). */
-window.redimFoto=function(file,lado=384){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),img=new Image();
-  img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('foto'))};
-  img.onload=()=>{URL.revokeObjectURL(url);const W=img.naturalWidth,H=img.naturalHeight;
+window.redimFoto=function(file,lado=384){return new Promise((res,rej)=>{const url=URL.createObjectURL(file);let img=new Image();
+  // se o navegador não abrir a foto do jeito normal (ex.: formato HEIF de alguns Samsung), tenta abrir de outro jeito antes de desistir
+  img.onerror=()=>{URL.revokeObjectURL(url);const ok=img.onload;if(window.createImageBitmap)createImageBitmap(file).then(b=>{img=b;ok()},()=>rej(new Error('foto')));else rej(new Error('foto'))};
+  img.onload=()=>{URL.revokeObjectURL(url);const W=img.naturalWidth||img.width,H=img.naturalHeight||img.height;
     const el=document.createElement('div');el.className='enq';el.setAttribute('role','dialog');el.setAttribute('aria-label','Enquadrar a foto');
     el.innerHTML=`<div class="enq-topo"><button type="button" class="enq-bt" data-e="cancela">Cancelar</button><span class="enq-tit">Enquadre o rosto</span><button type="button" class="enq-bt forte" data-e="ok">Pronto</button></div>
       <div class="enq-area"><div class="enq-palco"><canvas></canvas><div class="enq-mascara" aria-hidden="true"></div></div></div>
@@ -1188,7 +1189,7 @@ let ATL_T=null,ATL_ULT='';
 function resumoAtleta(){const jid=meuJogador();if(!jid||!GRUPO)return null;const j=J(jid),st=((estatPeriodo(null,null)||{}).st||{})[jid]||{};
   const vis=cfg().mostrarAval!==false&&!!j.critGalera,cr=critKey(j.pos),fonte=j.critGalera||j.crit||{};
   return{grupo:GRUPO.nome||cfg().nome||'Pelada',pos:j.pos||'MEI',kind:j.pos==='GOL'?'GOL':'linha',ovr:vis?ovr(notaAtual(jid)):null,
-    crit:vis?Object.fromEntries(cr.map(([k])=>[k,Number(fonte[k]??3)])):null,j:st.j||0,g:st.g||0,a:st.a||0,mvp:st.mvp||0,
+    crit:vis?Object.fromEntries(cr.map(([k])=>[k,Number(fonte[k]??3)])):null,fotoGrupo:typeof j.foto==='string'&&/^(data:image\/|https:\/\/)/.test(j.foto)?j.foto:null,j:st.j||0,g:st.g||0,a:st.a||0,mvp:st.mvp||0,
     premios:(st.art||0)+(st.gar||0)+(st.def||0)+(st.gol||0),anos:(()=>{const out={},anos=[...new Set(Object.values(S.pel).map(p=>String(p.data||'').slice(0,4)).filter(x=>/^\d{4}$/.test(x)))];
       for(const y of anos){const t=((estatPeriodo(y+'-01-01',(Number(y)+1)+'-01-01')||{}).st||{})[jid];if(t&&(t.j||t.g||t.a||t.mvp))out[y]={j:t.j||0,g:t.g||0,a:t.a||0,mvp:t.mvp||0}}return out})()}}
 /* Nota geral do app: o administrador guarda (só para administradores e o servidor) a nota de cada jogador do grupo.
@@ -3087,7 +3088,7 @@ document.addEventListener('change',e=>{
   if(t.dataset.act==='premio'){patch('peladas/'+t.dataset.p,{premios:{[t.dataset.f]:t.value||null}})}
   if(t.dataset.act==='ano'){UI.ano=Number(t.value);render()}
   if(t.id==='c-escudo'&&t.files&&t.files[0]){window.redimEscudo(t.files[0]).then(d=>sheetEscudoFundo(d),()=>toast('Não consegui abrir essa imagem. Tente outra.'));return}
-  if(t.id==='f-foto'&&t.files&&t.files[0]&&F){window.redimFoto(t.files[0]).then(d=>{F.foto=d;renderJogForm()},e=>{if(!e||e.code!=='cancelado')toast('Não consegui abrir essa foto. Tente outra.')});t.value=''}
+  if(t.id==='f-foto'&&t.files&&t.files[0]&&F){window.redimFoto(t.files[0]).then(d=>{F.foto=d;renderJogForm()},e=>{if(!e||e.code!=='cancelado')toast('Não consegui abrir essa foto neste celular. Tire uma na hora pela câmera ou escolha outra da galeria.')});t.value=''}
   if(t.dataset.f&&F){F[t.dataset.f]=t.value}
 });
 document.addEventListener('input',e=>{

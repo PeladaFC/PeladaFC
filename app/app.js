@@ -379,7 +379,7 @@ function render() {
     const nomeEu = (PERFIL?.apelido || PERFIL?.nome || '').split(/\s+/)[0];
     const hr = new Date().getHours(), ola = hr < 5 ? 'Boa noite' : hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
     const eu = PERFIL || {};
-    h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELOTA FC</span><button class="eu-av" data-sh="ir" data-v="perfil" aria-label="Meu perfil" style="${eu.foto ? `background-image:url('${eu.foto}')` : ''}">${eu.foto ? '' : ini(eu.apelido || eu.nome)}</button></div>
+    h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELOTA FC</span><button class="eu-av" data-sh="ir" data-v="perfil" aria-label="Meu perfil">${ini(eu.apelido || eu.nome)}${fotoImg(fotosEu(eu), 'eu-av-img')}</button></div>
     ${cartaAtleta(ola, eu)}
     ${prox ? `<button class="prox-linha" data-sh="abrir" data-v="${prox.g}"><span class="pl-ic">📅</span><span class="grow"><b>${escH(falta(prox.d, true))}</b> · ${escH(GRUPOS[prox.g].nome || 'Pelada')}</span><span class="seta" aria-hidden="true">›</span></button>`
       : `<div class="prox-linha vazio"><span class="pl-ic">📅</span><span class="grow">${ids.length ? 'Sem jogo marcado por enquanto.' : 'Crie sua pelada ou entre com o código de um convite.'}</span></div>`}
@@ -684,6 +684,14 @@ function ouvirAtleta() {
 }
 window.salvarAtleta = (gid, r) => { if (!EU || SUPORTE) return; B.set(`users/${EU.uid}/atleta/${gid}`, { ...r, em: Date.now() }).catch(e => console.warn(e)); };
 const ATR = { linha: [['tec', 'TEC'], ['fis', 'FÍS'], ['pas', 'PAS'], ['fin', 'FIN'], ['mar', 'DEF']], GOL: [['ref', 'REF'], ['posi', 'POS'], ['sai', 'SAÍ'], ['rep', 'REP'], ['com', 'COM']] };
+// Foto do usuário na tela inicial: tenta, em ordem, a foto do perfil e a foto que o administrador colocou no jogador em algum grupo.
+// Se uma não abrir (formato ruim, link quebrado), passa para a próxima; se nenhuma abrir, fica a inicial do nome.
+function fotosEu(eu) {
+  const ok = f => typeof f === 'string' && (/^data:image\//.test(f) || /^https:\/\//.test(f));
+  return [...new Set([eu && eu.foto, ...(ATLETA || []).filter(x => GRUPOS[x._gid]).map(x => x.fotoGrupo)].filter(ok))];
+}
+function fotoImg(L, cls) { return L.length ? `<img class="${cls}" src="${escH(L[0])}" alt="" data-alt="${escH(L.slice(1).join('\n'))}" onerror="fotoFalhou(this)">` : ''; }
+window.fotoFalhou = img => { const r = (img.dataset.alt || '').split('\n').filter(Boolean); if (r.length) { img.dataset.alt = r.slice(1).join('\n'); img.src = r[0]; } else img.remove(); };
 function cartaAtleta(ola, eu) {
   const L = (ATLETA || []).filter(x => GRUPOS[x._gid]), vis = L.filter(x => x.ovr != null), w = x => 1 + (x.j || 0), soma = f => L.reduce((t, x) => t + (Number(x[f]) || 0), 0);
   const peso = k => vis.filter(x => x.kind === k).reduce((t, x) => t + w(x), 0), kind = peso('GOL') > peso('linha') ? 'GOL' : 'linha', vk = vis.filter(x => x.kind === kind);
@@ -694,7 +702,7 @@ function cartaAtleta(ola, eu) {
   if (NGERAL && NGERAL.ovr != null && vis.length) { ovrG = NGERAL.ovr; const kg = NGERAL.kind === 'GOL' ? 'GOL' : 'linha'; atr = ATR[kg].map(([k, n]) => [n, Math.round(Number((NGERAL.crit || {})[k]) || 60)]); }
   const posG = NGERAL && NGERAL.pos && vis.length ? NGERAL.pos : null;
   const nome = (eu.apelido || eu.nome || 'Atleta').split(/\s+/)[0];
-  const foto = eu.foto ? `style="background-image:url('${eu.foto}')"` : '';
+  const fotos = fotosEu(eu);
   const tier = ovrG == null ? 'neutro' : ovrG >= 80 ? 'ouro' : ovrG >= 60 ? 'prata' : 'bronze';
   const POSN = { GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral', VOL: 'Volante', MEI: 'Meio-campo', ATA: 'Atacante' };
   // temporadas: soma dos números de cada ano em todas as peladas
@@ -703,7 +711,7 @@ function cartaAtleta(ola, eu) {
   const tudo = { j: 0, g: 0, a: 0, mvp: 0 }; Object.values(anos).forEach(v => { for (const k in tudo) tudo[k] += v[k]; });
   const T = ano === 'todas' ? tudo : anos[ano] || { j: 0, g: 0, a: 0, mvp: 0 };
   return `<div class="atl-carta"><span class="hh-ola">${ola}${nome ? ', ' + escH(nome) : ''}.</span>
-    <div class="atl-corpo"><div class="atl-esc-wrap"><div class="atl-escudo ${tier}"><span class="atl-foto" ${foto}>${eu.foto ? '' : escH((nome[0] || '?').toUpperCase())}</span>${ovrG != null ? `<span class="atl-nivel">${ovrG}</span>` : ''}</div>${(posG || pos) ? `<span class="atl-pos">${escH(POSN[posG || pos] || posG || pos)}</span>` : ''}</div>
+    <div class="atl-corpo"><div class="atl-esc-wrap"><div class="atl-escudo ${tier}"><span class="atl-foto">${escH((nome[0] || '?').toUpperCase())}${fotoImg(fotos, 'atl-foto-img')}</span>${ovrG != null ? `<span class="atl-nivel">${ovrG}</span>` : ''}</div>${(posG || pos) ? `<span class="atl-pos">${escH(POSN[posG || pos] || posG || pos)}</span>` : ''}</div>
       <div class="atl-dir">${atr ? atr.map(([n, v]) => `<div class="atl-at"><span>${n}</span><b>${Math.max(0, Math.min(99, v))}</b></div>`).join('')
         : `<p class="atl-vazio">${L.length ? 'Seus números aparecem depois da primeira avaliação da galera.' : (Object.keys(GRUPOS).length ? 'Abra suas peladas para montar sua carta.' : 'Sua carta de atleta aparece aqui depois que você entrar no elenco de uma pelada.')}</p>`}</div></div>
     <div class="atl-meus"><div class="atl-meus-top"><span class="atl-tit">Meus números</span><label class="atl-temp"><span>${ano === 'todas' ? 'Todas as temporadas' : 'Temporada ' + ano.slice(2)}</span><i aria-hidden="true">▾</i><select data-temporada aria-label="Escolher temporada">${lista.map(y => `<option value="${y}" ${y === ano ? 'selected' : ''}>Temporada ${y.slice(2)}</option>`).join('')}<option value="todas" ${ano === 'todas' ? 'selected' : ''}>Todas as temporadas</option></select></label></div>
@@ -1536,7 +1544,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', e => {
   const t = e.target; if (t.id !== 'p-foto' || !t.files || !t.files[0]) return;
   const keep = { nome: $('p-nome').value, ap: $('p-ap').value, tel: $('p-tel').value };
-  window.redimFoto(t.files[0]).then(d => { UIp.foto = d; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }, e => { if (!e || e.code !== 'cancelado') aviso('Não consegui abrir essa foto. Tente outra.'); }); t.value = '';
+  window.redimFoto(t.files[0]).then(d => { UIp.foto = d; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }, e => { if (!e || e.code !== 'cancelado') aviso('Não consegui abrir essa foto neste celular. Tire uma foto na hora pela câmera ou escolha outra da galeria (de preferência um print ou uma foto do WhatsApp).'); }); t.value = '';
 });
 ['input', 'change'].forEach(tipo => document.addEventListener(tipo, e => {
   const el = e.target.closest && e.target.closest('[data-gf]'); if (!el || TELA !== 'donogrupos') return;

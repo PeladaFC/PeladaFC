@@ -754,6 +754,9 @@ nav.tabs button:active svg{transform:scale(.9)}
 
 /* casca (login, minhas peladas) */
 .eu-av{all:unset;cursor:pointer;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--pitch) center/cover;color:var(--pitch-ink);font-family:var(--f-display);font-weight:800;font-size:17px;box-shadow:0 0 0 3px var(--card)}
+.eu-av{position:relative;overflow:hidden}
+.eu-av-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.atl-foto-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 28%}
 .eu-av:focus-visible{outline:3px solid var(--pitch);outline-offset:3px}
 .home-hero{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:20px 20px 18px;color:#fff;border-radius:6px;position:relative;overflow:hidden;
   clip-path:polygon(0 0,calc(100% - 26px) 0,100% 26px,100% 100%,26px 100%,0 calc(100% - 26px));
@@ -821,9 +824,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261116g"></script>
-<script src="br.js?v=20261116g"></script>
-<script src="core.js?v=20261116g"></script>
-<script type="module" src="app.js?v=20261116g"></script>
+<script src="qrcode.js?v=20261116h"></script>
+<script src="br.js?v=20261116h"></script>
+<script src="core.js?v=20261116h"></script>
+<script type="module" src="app.js?v=20261116h"></script>
 </body>
 </html>
