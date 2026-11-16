@@ -388,6 +388,13 @@ input::-webkit-date-and-time-value{text-align:left}
 .av-tag{white-space:nowrap;flex:none;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px;margin-left:auto}
 .av-tag.auto{background:var(--pitch);color:#fff}.av-tag.manual{background:var(--card);color:var(--card-ink)}
 .av-l{display:flex;flex-direction:column}
+.av-subs{margin:-2px 0 6px 40px;border-left:2px solid var(--line);padding-left:10px}
+.av-subs.off{opacity:.55}
+.av-sub{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
+.av-sub:first-child{border-top:0}
+.av-salvar{position:sticky;bottom:0;z-index:5;margin-top:10px;padding:10px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.av-salvar.sujo{background:#FFF4CC;box-shadow:0 -4px 14px rgba(0,0,0,.08)}
+.nf-limpar{font-size:14px}
 .av-g{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted,#6b6b6b);margin:12px 0 2px}
 .av-rec{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--pitch);background:rgba(27,106,54,.1);padding:2px 6px;border-radius:999px;vertical-align:2px}
 .av-i.off .grow{opacity:.45}
@@ -824,9 +831,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261116h"></script>
-<script src="br.js?v=20261116h"></script>
-<script src="core.js?v=20261116h"></script>
-<script type="module" src="app.js?v=20261116h"></script>
+<script src="qrcode.js?v=20261116i"></script>
+<script src="br.js?v=20261116i"></script>
+<script src="core.js?v=20261116i"></script>
+<script type="module" src="app.js?v=20261116i"></script>
 </body>
 </html>

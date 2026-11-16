@@ -124,6 +124,15 @@ t('nome do time personalizado aparece no aviso do sorteio', () => {
   const av = R.pelAtualizada({ data: '2026-10-10' }, { data: '2026-10-10', sorteadoEm: 5, times: [{ cor: 0, ids: ['jA'] }, { cor: 1, ids: ['jB'] }] }, 'p1', c2);
   assert.match(av[0].texto, /time Cobra/); assert.match(av[1].texto, /Time 2/);
 });
+t('movimento da lista: "não vai" vem desligado; detalhes desligados não mandam aviso ao administrador', () => {
+  const base = { ...ctx, jog: { ...(ctx.jog || {}), jX: { nome: 'Zé', tipo: 'mensalista' } } };
+  const a = { jogador: 'jX', pel: {} }, nao = { jogador: 'jX', pel: { p1: { s: 'nao', t: 2 } } }, sim = { jogador: 'jX', pel: { p1: { s: 'sim', t: 3 } } };
+  const ad = x => x.filter(v => String(v.tag).startsWith('pres-'));
+  assert.equal(ad(R.presAtualizada(a, nao, 'uZ', base)).length, 0);
+  assert.equal(ad(R.presAtualizada(a, sim, 'uZ', base)).length, 1);
+  const off = { ...base, cfg: { ...base.cfg, notif: { confirmou: false } } };
+  assert.equal(ad(R.presAtualizada(a, sim, 'uZ', off)).length, 0);
+});
 t('times sem nome viram "Time 1, Time 2…"; nome personalizado continua vencendo', () => {
   const c2 = { ...ctx, cfg: { ...ctx.cfg, nomesTimes: ['Cobra', ''] } };
   const av = R.pelAtualizada({ data: '2026-10-10' }, { data: '2026-10-10', sorteadoEm: 5, times: [{ cor: 0, ids: ['jA'] }, { cor: 1, ids: ['jB'] }] }, 'p1', c2);

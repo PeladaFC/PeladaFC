@@ -708,6 +708,9 @@ function itensJogador(){
   const pa=avalPendenteJogador();if(pa){const[pid,p]=pa;if(p.encerradaEm)out.push({id:'aval'+pid,tipo:'convoca',titulo:'Avalie o campo',texto:`Como estava o ${S.locais[p.localId].nome} na pelada de ${dShort(p.data)}? Avalie gramado, atendimento, ambiente, banheiros e tamanho.`,t:p.encerradaEm+2})}
   return out.filter(x=>x.t).sort((a,b)=>b.t-a.t);
 }
+// "Limpar" no sino: some com tudo até agora, só para quem limpou (e neste aparelho); o que tiver mais de 30 dias some sozinho
+function limpoEm(){let v=0;try{v=Number(localStorage.getItem('pelada.limpo.'+GID+'.'+(myId||'x')))||0}catch(e){}return Math.max(v,Date.now()-30*864e5)}
+function botaoLimpar(){return'<button class="btn block nf-limpar" data-act="nf-limpar">🧹 Limpar notificações</button>'}
 function vistoLocal(){try{return Number(localStorage.getItem('pelada.visto.'+(myId||'x')))||0}catch(e){return 0}}
 function marcarVisto(){try{localStorage.setItem('pelada.visto.'+(myId||'x'),String(Date.now()))}catch(e){}}
 function itensVisiveis(){if(ADM()){const pr=prefs();return feedItems().filter(i=>pr[i.tipo]!==false)}return itensJogador()}
@@ -747,21 +750,19 @@ function quandoTxt(t){const d=new Date(t),hoje=new Date();const h=pad(d.getHours
   return iso(d)===iso(hoje)?'hoje '+h:DIAS3[d.getDay()]+' '+pad(d.getDate())+'/'+pad(d.getMonth()+1)+' '+h}
 function sheetNotif(){
   document.getElementById('push').hidden=true;
-  if(!ADM()){const v=vistoLocal(),its=itensJogador().slice(0,40);
-    openSheet('Notificações',`<div class="stack"><div class="panel"><div class="list">${its.length?its.map(i=>`<div class="item" style="align-items:flex-start"><div class="grow"><div class="name">${i.t>v?'<span class="dot-new"></span>':''}${esc(i.titulo||'')}</div>${i.longo?`<div class="recado">${esc(i.texto).replace(/\*([^*\n]+)\*/g,'<b>$1</b>')}</div>`:`<div>${esc(i.texto)}</div>`}<div class="sub">${quandoTxt(i.t)}</div></div></div>`).join(''):`<div class="empty">${meuJogador()?'Nada novo por aqui.':'Escolha seu nome na aba Jogo para receber as notificações da pelada.'}</div>`}</div></div>
+  if(!ADM()){const v=vistoLocal(),lim=limpoEm(),its=itensJogador().filter(i=>i.t>lim).slice(0,40);
+    openSheet('Notificações',`<div class="stack">${its.length?botaoLimpar():''}<div class="panel"><div class="list">${its.length?its.map(i=>`<div class="item" style="align-items:flex-start"><div class="grow"><div class="name">${i.t>v?'<span class="dot-new"></span>':''}${esc(i.titulo||'')}</div>${i.longo?`<div class="recado">${esc(i.texto).replace(/\*([^*\n]+)\*/g,'<b>$1</b>')}</div>`:`<div>${esc(i.texto)}</div>`}<div class="sub">${quandoTxt(i.t)}</div></div></div>`).join(''):`<div class="empty">${meuJogador()?'Nada novo por aqui.':'Escolha seu nome na aba Jogo para receber as notificações da pelada.'}</div>`}</div></div>
       <p class="sub" style="margin:0">Por enquanto, as notificações aparecem quando o app está aberto.</p></div>`);
     marcarVisto();render();return}
   const f=S.feed||{},visto=f.visto||0,pr=prefs(),A=ADM();
   const due=pr.aviso?avisosVencidos():[];
-  const items=feedItems().filter(i=>pr[i.tipo]!==false).slice(0,40);
-  let h='<div class="stack"><div class="panel"><div class="list">';
+  const lim=limpoEm(),items=feedItems().filter(i=>pr[i.tipo]!==false&&i.t>lim).slice(0,40);
+  let h=`<div class="stack">${items.length?botaoLimpar():''}<div class="panel"><div class="list">`;
   for(const v of due)h+=`<div class="item"><div class="grow"><div class="name"><span class="dot-new"></span>Hora de mandar: ${esc(avN(v.a))}</div><div class="sub">${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</div></div><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar</button></div>`;
   for(const i of items)h+=`<div class="item"><div class="grow"><div class="name">${i.t>visto?'<span class="dot-new"></span>':''}${esc(i.texto)}</div><div class="sub">${esc(NOTIF[i.tipo]?.n||'')} · ${quandoTxt(i.t)}</div></div>${i.act==='agenda'?`<button class="btn sm primary" data-act="agenda" data-l="${i.arg}">Responder</button>`:''}</div>`;
   if(!due.length&&!items.length)h+='<div class="empty">Nada novo por aqui.</div>';
   h+='</div></div>';
-  if(A){h+=`<div class="panel"><h3 style="margin-bottom:2px">O que chega para mim</h3><div class="sub" style="margin-bottom:6px">Escolha quais notificações aparecem no sino.</div>`;
-    for(const[k,n] of Object.entries(NOTIF))h+=`<div class="sw-row"><div><div class="name">${n.n}</div><div class="sub">${esc(n.d)}</div></div><button class="toggle" role="switch" aria-checked="${!!pr[k]}" aria-label="${esc(n.n)}" data-act="pref" data-v="${k}"></button></div>`;
-    h+='</div>'}
+  if(A){h+=`<div class="panel"><h3 style="margin-bottom:2px">Avisos automáticos</h3><div class="sub" style="margin-bottom:6px">É a mesma lista da aba Avisos: mudou aqui, muda lá. O que estiver desligado não vai para o celular e não aparece no sino. Depois de mexer, toque em <b>Salvar</b>.</div><div class="av-cfg" data-a="1">${cfgAvisosHTML(true)}</div></div>`}
   openSheet('Notificações',h+'</div>');
   if(A&&feedItems().some(i=>i.t>visto))put('eventos/feed',{...f,items:f.items||[],visto:Date.now()});
 }
@@ -1997,14 +1998,36 @@ const AVISOS_AUTO=[
   {g:'grupo',k:'aniversario',e:'🎂',n:'Aniversariante do dia',q:'às 10h, no dia do aniversário de quem informou a data no perfil',p:'todos'},
   {g:'grupo',k:'mural',e:'📣',n:'Recado do mural',q:'quando você publica no mural ou em "Outra mensagem"',p:'todos'}];
 const AV_GRUPOS={lista:'📋 Lista e presença',jogo:'⚽ Jogo',notas:'⭐ Notas e prêmios',dinheiro:'💰 Dinheiro',grupo:'👥 Grupo'};
+/* ---------- escolhas dos avisos: UMA lista só, usada na aba Avisos e no sino ----------
+   pushOff = o que o servidor não manda para o celular; notif = os detalhes do "Movimento da lista" e o que aparece no sino.
+   As mudanças ficam num rascunho (UI.avd) até tocar em Salvar; as duas telas mostram o mesmo rascunho. */
+const SUB_LISTA=['confirmou','desistiu','naoVai','pedido','espera','subiu','cheia'];
+const SO_SINO=[{g:'grupo',k:'nf:posicao',e:'🔁',n:'Troca de posição',q:'quando um jogador muda a própria posição no grupo',p:'administradores, só no sino'},
+  {g:'grupo',k:'nf:aviso',e:'📅',n:'Hora de mandar mensagem',q:'os lembretes da Agenda, na hora marcada',p:'administradores, só no sino'}];
+function avDraft(){if(!UI.avd)UI.avd={off:{...(cfg().pushOff||{})},nf:prefs()};return UI.avd}
+function avSujo(){const d=UI.avd;if(!d)return false;const c=cfg(),pr=prefs(),o=c.pushOff||{};
+  return Object.keys({...d.off,...o}).some(k=>!!d.off[k]!==!!o[k])||Object.keys(NOTIF).some(k=>!!d.nf[k]!==!!pr[k])}
+function avLigado(k){const d=avDraft();return k.startsWith('nf:')?d.nf[k.slice(3)]!==false:!d.off[k]}
+function cfgAvisosHTML(A){const d=avDraft(),LA=AVISOS_AUTO.filter(x=>!x.pa||!EV()).concat(A?SO_SINO:[]);
+  const ordem=Object.keys(AV_GRUPOS),L=LA.slice().sort((a,b)=>ordem.indexOf(a.g)-ordem.indexOf(b.g));
+  const chave=(k,n,on)=>A?`<label class="sw" aria-label="${on?'Desligar':'Ligar'} ${esc(n)}"><input type="checkbox" data-act="avc" data-k="${k}" ${on?'checked':''}><span></span></label>`:'';
+  let h='<div class="av-l">';
+  L.forEach((x,i)=>{const on=avLigado(x.k);
+    if(!i||L[i-1].g!==x.g)h+=`<div class="av-g">${AV_GRUPOS[x.g]}</div>`;
+    h+=`<div class="av-i${on?'':' off'}"><span class="av-e">${x.e}</span><div class="grow"><b>${x.n}</b><div class="sub">${x.q} · <i>${x.p}</i></div></div>${chave(x.k,x.n,on)}</div>`;
+    if(A&&x.k==='presenca')h+=`<div class="av-subs${on?'':' off'}">${SUB_LISTA.map(k=>{const o=d.nf[k]!==false;return`<div class="av-sub"><div class="grow"><span>${NOTIF[k].n}</span><div class="sub">${esc(NOTIF[k].d)}</div></div>${chave('nf:'+k,NOTIF[k].n,o)}</div>`}).join('')}</div>`});
+  h+='</div>';
+  if(A){const sj=avSujo();h+=`<div class="av-salvar${sj?' sujo':''}"><span class="sub">${sj?'⚠️ Mudanças ainda não salvas':'✓ Tudo salvo. Vale para a aba Avisos e para o sino.'}</span><div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-act="avc-desfazer" ${sj?'':'disabled'}>Desfazer</button><button class="btn primary sm" data-act="avc-salvar" ${sj?'':'disabled'}>Salvar</button></div></div>`}
+  return h}
+function avRedesenha(){document.querySelectorAll('.av-cfg').forEach(el=>{el.innerHTML=cfgAvisosHTML(el.dataset.a==='1')})}
 function tAvisos(A){
   let h=`<h2 style="margin-bottom:12px">Avisos</h2>`;
   // 1) o que o app manda sozinho, por notificação no celular
   const LA=AVISOS_AUTO.filter(x=>!x.pa||!EV()),off=cfg().pushOff||{},nAuto=LA.length,nOff=LA.filter(x=>off[x.k]).length;
   h+=`<details class="panel av-auto"${UI.avAuto?' open':''} data-av-auto><summary><div class="panel-h" style="margin:0"><h3>🔔 Automáticos</h3><span class="av-tag auto">sozinho</span></div>
     <p class="sub" style="margin:6px 0 0">${nAuto} notificações que o app manda sozinho para o celular de cada um. Você não precisa fazer nada.${nOff?` <b style="color:var(--red)">${nOff} desligada${nOff>1?'s':''}.</b>`:''} <b class="av-ver">${UI.avAuto?'Esconder':A?'Ver e escolher':'Ver quais são'}</b></p></summary>
-    ${A?'<p class="sub" style="margin:8px 0 2px">Todas vêm ligadas e são recomendadas. Desligue só a que não fizer sentido para sua pelada: ela para de ser enviada para todos do grupo.</p>':''}
-    <div class="av-l">${LA.map((x,i)=>`${!i||LA[i-1].g!==x.g?`<div class="av-g">${AV_GRUPOS[x.g]}</div>`:''}<div class="av-i${off[x.k]?' off':''}"><span class="av-e">${x.e}</span><div class="grow"><b>${x.n}</b><div class="sub">${x.q} · <i>${x.p}</i></div></div>${A?`<label class="sw" aria-label="${off[x.k]?'Ligar':'Desligar'} ${esc(x.n)}"><input type="checkbox" data-act="push-off" data-k="${x.k}" ${off[x.k]?'':'checked'}><span></span></label>`:''}</div>`).join('')}</div></details>`;
+    ${A?'<p class="sub" style="margin:8px 0 2px">Todas vêm ligadas e são recomendadas. Desligue só a que não fizer sentido para sua pelada: ela para de ser enviada para todos do grupo. É a mesma lista do sino 🔔: mudou aqui, muda lá. Depois de mexer, toque em <b>Salvar</b>.</p>':''}
+    <div class="av-cfg" data-a="${A?1:0}">${cfgAvisosHTML(A)}</div></details>`;
   // 2) agenda: lembretes para o administrador mandar
   h+=`<div class="panel av-agenda" style="margin-top:12px"><div class="panel-h"><h3>📅 Agenda</h3><span class="av-tag manual">você manda</span></div>
     <p class="sub" style="margin:6px 0 8px">Não vão sozinhos. No dia e hora marcados aparece um alerta amarelo no topo da aba Jogo com a mensagem pronta. Você confere e manda no app ou no WhatsApp. Repete toda semana até você pausar ou apagar.</p>
@@ -2836,6 +2859,15 @@ document.addEventListener('click',async e=>{
       [['convocacao',w(-4),'09:00'],['cobrar',w(-2),'19:00'],['lista',w(-1),'20:00'],['pagamento',1,'10:00']]
         .forEach(([tipo,d2,hora])=>put('avisos/'+uid('a'),{tipo,dia:d2,hora,ativo:true}));toast('Agenda sugerida criada. Ajuste à vontade.');break}
     case'premio':break;
+    case'avc':{const d=avDraft(),k=d&&b.dataset.k,on=b.checked;if(!k)return;
+      if(k==='presenca'){d.off.presenca=!on;if(!on)SUB_LISTA.forEach(s=>d.nf[s]=false);else if(SUB_LISTA.every(s=>d.nf[s]===false))SUB_LISTA.forEach(s=>d.nf[s]=NOTIF[s].def)}
+      else if(k.startsWith('nf:')){const s=k.slice(3);d.nf[s]=on;if(SUB_LISTA.includes(s)){if(on)d.off.presenca=false;else if(SUB_LISTA.every(x=>d.nf[x]===false))d.off.presenca=true}}
+      else d.off[k]=!on;
+      avRedesenha();break}
+    case'avc-desfazer':UI.avd=null;avRedesenha();break;
+    case'avc-salvar':{const d=avDraft();patch('config/geral',{pushOff:{...d.off},notif:{...d.nf}});UI.avd=null;toast('Salvo. Vale para a aba Avisos e para o sino.');setTimeout(avRedesenha,50);break}
+    case'nf-limpar':{if(b.dataset.ok!=='1'){b.dataset.ok='1';b.classList.add('warn');b.textContent='Toque de novo para limpar';clearTimeout(b._t);b._t=setTimeout(()=>{b.dataset.ok='';b.classList.remove('warn');b.textContent='🧹 Limpar notificações'},4000);return}
+      try{localStorage.setItem('pelada.limpo.'+GID+'.'+(myId||'x'),String(Date.now()))}catch(e){}toast('Notificações limpas.');sheetNotif();break}
     case'push-off':{const o={...(cfg().pushOff||{})};o[d.k]=!b.checked;patch('config/geral',{pushOff:o});toast(o[d.k]?'Desligado: esse aviso não vai mais ser enviado.':'Ligado de novo.');break}
     case'minha-pos-abrir':sheetMinhaPos();break;
     case'minha-pos':{const id=meuJogador();if(!id||!trocaPosAberta()){sheetMinhaPos();return}const de=J(id).pos;if(d.v===de){closeSheet();return}

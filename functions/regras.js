@@ -87,11 +87,14 @@ function presAtualizada(a, b, uid, ctx) {
     const r0 = (a.pel || {})[pid]; if (!r || (r0 && r0.s === r.s && r0.t === r.t)) continue; if (r0 && r0.s === r.s) continue;
     const p = (ctx.pel || {})[pid]; const quando = p ? ' · ' + dShort(p.data) : '';
     const j = (ctx.jog || {})[jid] || {};
-    let texto;
-    if (r.s === 'sim') texto = j.tipo === 'diarista' && !r.esp ? `${nome} (diarista) pediu vaga${quando} e entrou na fila de convocação.` : r.esp ? `${nome} pediu vaga${quando}. Toque em Liberar na lista.` : `${nome} confirmou presença${quando}.`;
-    else if (r.s === 'nao') texto = r0 && r0.s === 'sim' ? `${nome} desistiu${quando}.` : `${nome} não vai${quando}.`;
+    let texto, sub;
+    if (r.s === 'sim') { sub = (j.tipo === 'diarista' && !r.esp) || r.esp ? 'pedido' : 'confirmou'; texto = j.tipo === 'diarista' && !r.esp ? `${nome} (diarista) pediu vaga${quando} e entrou na fila de convocação.` : r.esp ? `${nome} pediu vaga${quando}. Toque em Liberar na lista.` : `${nome} confirmou presença${quando}.`; }
+    else if (r.s === 'nao') { sub = r0 && r0.s === 'sim' ? 'desistiu' : 'naoVai'; texto = sub === 'desistiu' ? `${nome} desistiu${quando}.` : `${nome} não vai${quando}.`; }
     else continue;
-    out.push({ para, titulo: `📋 ${nomePelada(ctx)}`, texto, tag: 'pres-' + pid });
+    // os detalhes do "Movimento da lista" (aba Avisos / sino) também valem para o celular; "Alguém recusou" vem desligado
+    const nf = { naoVai: false, ...((ctx.cfg || {}).notif || {}) };
+    if (nf[sub] === false) continue;
+    out.push({ para, titulo: `📋 ${nomePelada(ctx)}`, texto, tag: 'pres-' + pid, sub });
   }
   for (const [pid, L] of Object.entries(b.lanc || {})) {
     const L0 = (a.lanc || {})[pid]; if (!L || (L0 && L0.t === L.t)) continue;
