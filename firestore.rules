@@ -123,16 +123,10 @@ service cloud.firestore {
         allow write: if logado() && eu() == uid && membro(gid);
       }
 
-      // Respostas das cobranças extras (tamanho, texto): cada jogador lê e grava só as suas; os administradores leem todas.
+      // Respostas das cobranças extras (ex.: tamanho da camisa): cada jogador lê e grava só as suas; os administradores leem todas.
       match /respExtras/{uid} {
         allow read: if (logado() && eu() == uid) || gestor(gid);
         allow write: if (logado() && eu() == uid && membro(gid)) || gestor(gid);
-      }
-      // Fotos e arquivos enviados nas cobranças extras (id começa com o uid de quem enviou): a pessoa e os administradores.
-      match /arqExtras/{doc} {
-        allow read: if gestor(gid) || (logado() && doc.split('~')[0] == eu());
-        allow write: if gestor(gid) || (logado() && doc.split('~')[0] == eu() && membro(gid)
-          && (request.resource == null || (request.resource.data.uid == eu() && request.resource.data.dados is string && request.resource.data.dados.size() <= 1000000)));
       }
 
       // Chave do Mercado Pago do grupo: só o servidor lê e grava (conexão pelo botão "Conectar").
@@ -166,8 +160,8 @@ service cloud.firestore {
       }
 
       match /{colecao}/{doc} {
-        allow read: if colecao != 'votos' && colecao != 'respExtras' && colecao != 'arqExtras' && colecao != 'segredos' && colecao != 'suporteLog' && colecao != 'notas' && (membro(gid) || gestor(gid));
-        allow write: if colecao != 'membros' && colecao != 'respExtras' && colecao != 'arqExtras' && colecao != 'presencas' && colecao != 'votos' && colecao != 'segredos' && colecao != 'cobrancas' && colecao != 'suporteLog' && colecao != 'notas' && (adminDepois(gid) || suporte(gid));
+        allow read: if colecao != 'votos' && colecao != 'respExtras' && colecao != 'segredos' && colecao != 'suporteLog' && colecao != 'notas' && (membro(gid) || gestor(gid));
+        allow write: if colecao != 'membros' && colecao != 'respExtras' && colecao != 'presencas' && colecao != 'votos' && colecao != 'segredos' && colecao != 'cobrancas' && colecao != 'suporteLog' && colecao != 'notas' && (adminDepois(gid) || suporte(gid));
       }
     }
   }

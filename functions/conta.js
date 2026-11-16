@@ -37,9 +37,6 @@ module.exports = db => {
       if (P.bloqueia.length) return res.status(409).json({ erro: `Você é o único administrador de: ${nomes(P.bloqueia).join(', ')}. Coloque outra pessoa como administradora (Ajustes do grupo) ou apague o grupo antes de excluir a conta.`, bloqueia: nomes(P.bloqueia) });
       const tirar = async gid => {
         for (const c of ['membros', 'presencas', 'votos', 'respExtras']) await db.doc(`grupos/${gid}/${c}/${uid}`).delete().catch(() => {});
-        // fotos e arquivos enviados nas cobranças extras
-        const q = await db.collection(`grupos/${gid}/arqExtras`).where('uid', '==', uid).get().catch(() => null);
-        if (q) for (const d of q.docs) await d.ref.delete().catch(() => {});
       };
       for (const x of P.sai) await tirar(x.gid);
       for (const x of P.passa) { await db.doc('grupos/' + x.gid).update({ admins: x.admins, dono: x.dono }); await tirar(x.gid); }
