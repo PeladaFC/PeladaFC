@@ -66,8 +66,8 @@ t('times sorteados: cada um recebe a cor do próprio time; goleiro extra recebe 
   const b = { data: '2026-10-10', sorteadoEm: 5, times: [{ cor: 0, ids: ['jA'] }, { cor: 1, ids: ['jB'] }], goleiros: ['jC'] };
   const av = R.pelAtualizada({ data: '2026-10-10' }, b, 'p1', ctx);
   assert.strictEqual(av.length, 3);
-  assert.deepStrictEqual(av[0].para, ['uA']); assert.match(av[0].texto, /Laranja/);
-  assert.deepStrictEqual(av[1].para, ['uB']); assert.match(av[1].texto, /Azul/);
+  assert.deepStrictEqual(av[0].para, ['uA']); assert.match(av[0].texto, /Time 1/);
+  assert.deepStrictEqual(av[1].para, ['uB']); assert.match(av[1].texto, /Time 2/);
   assert.deepStrictEqual(av[2].para, ['uC']); assert.match(av[2].texto, /gol/);
 });
 t('mudança sem importância não dispara nada nem lê o banco', () => {
@@ -122,11 +122,11 @@ t('avaliação completa aberta avisa todo mundo com o prazo em horário de Recif
 t('nome do time personalizado aparece no aviso do sorteio', () => {
   const c2 = { ...ctx, cfg: { ...ctx.cfg, nomesTimes: ['Cobra', ''] } };
   const av = R.pelAtualizada({ data: '2026-10-10' }, { data: '2026-10-10', sorteadoEm: 5, times: [{ cor: 0, ids: ['jA'] }, { cor: 1, ids: ['jB'] }] }, 'p1', c2);
-  assert.match(av[0].texto, /time Cobra/); assert.match(av[1].texto, /time Azul/);
+  assert.match(av[0].texto, /time Cobra/); assert.match(av[1].texto, /Time 2/);
 });
-t('times com letras: "Você está no Time B"; nome personalizado continua vencendo', () => {
-  const c2 = { ...ctx, cfg: { ...ctx.cfg, nomesTipo: 'letras', nomesTimes: ['Cobra', ''] } };
+t('times sem nome viram "Time 1, Time 2…"; nome personalizado continua vencendo', () => {
+  const c2 = { ...ctx, cfg: { ...ctx.cfg, nomesTimes: ['Cobra', ''] } };
   const av = R.pelAtualizada({ data: '2026-10-10' }, { data: '2026-10-10', sorteadoEm: 5, times: [{ cor: 0, ids: ['jA'] }, { cor: 1, ids: ['jB'] }] }, 'p1', c2);
-  assert.match(av[0].texto, /no time Cobra/); assert.match(av[1].texto, /Você está no Time B /);
+  assert.match(av[0].texto, /no time Cobra/); assert.match(av[1].texto, /Você está no Time 2 ⚽/);
 });
 console.log(`\n${n} testes passaram.`);

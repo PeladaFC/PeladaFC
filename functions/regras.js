@@ -3,7 +3,6 @@
    [{ para: [uid, ...], titulo, texto, tag }] */
 'use strict';
 const DIAS3 = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-const CORES = [['Laranja', '🟠'], ['Azul', '🔵'], ['Branco', '⚪'], ['Preto', '⚫'], ['Verde', '🟢'], ['Vermelho', '🔴'], ['Amarelo', '🟡'], ['Roxo', '🟣'], ['Marrom', '🟤'], ['Cinza', '🔘'], ['Rosa', '🩷'], ['Celeste', '🩵'], ['Vinho', '🍷'], ['Turquesa', '🌊'], ['Dourado', '⭐'], ['Limão', '🍋']];
 const pad = n => String(n).padStart(2, '0');
 const parseD = s => { const [y, m, d] = String(s).split('-').map(Number); return new Date(Date.UTC(y, m - 1, d, 12)); };
 const dShort = s => { const d = parseD(s); return `${DIAS3[d.getUTCDay()]} ${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}`; };
@@ -66,7 +65,7 @@ function pelMudouAlgo(a, b) {
 function pelAtualizada(a, b, pid, ctx) {
   const out = [], quando = dShort(b.data);
   if (b.times && (a.sorteadoEm || 0) !== (b.sorteadoEm || 0)) {
-    b.times.forEach(t => { const [nc, e] = CORES[t.cor] || ['?', '']; const n0 = (ctx.cfg || {}).nomesTipo === 'letras' ? 'Time ' + String.fromCharCode(65 + Number(t.cor)) : nc; const n = String(((ctx.cfg || {}).nomesTimes || [])[t.cor] || '').trim() || n0; const js = (t.gk ? [t.gk] : []).concat(t.ids || []);
+    b.times.forEach(t => { const e = '⚽'; const n0 = 'Time ' + (Number(t.cor) + 1); const n = String(((ctx.cfg || {}).nomesTimes || [])[t.cor] || '').trim() || n0; const js = (t.gk ? [t.gk] : []).concat(t.ids || []);
       const us = uidsDe(ctx, js); if (us.length) out.push({ para: us, titulo: `🎲 Times sorteados · ${quando}`, texto: `Você está ${/^time /i.test(n) ? 'no ' + n : 'no time ' + n} ${e}. Bom jogo!`, tag: 'times-' + pid }); });
     const gx = uidsDe(ctx, b.goleiros || []); if (gx.length) out.push({ para: gx, titulo: `🎲 Times sorteados · ${quando}`, texto: 'Os times saíram. Você joga no gol como extra. Bom jogo!', tag: 'times-' + pid });
   }
