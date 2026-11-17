@@ -346,7 +346,7 @@ function render() {
         <label class="field"><span>Série das notas</span><input type="text" id="nfc-serie" inputmode="numeric" value="${escH(r.serie || '900')}"></label></div></div></details>
       <details class="nfc-sub" data-nfcs="cert" ${(C.abre || {}).cert ?? !cert.tem ? 'open' : ''}><summary><b>Certificado digital A1</b> <span class="sub">${cert.tem ? (cert.validade ? 'vale até ' + new Date(cert.validade).toLocaleDateString('pt-BR') + (cert.validade - Date.now() < 30 * 864e5 ? ' · renove logo!' : '') : 'instalado') : 'não instalado'}</span></summary><div class="stack" style="margin-top:8px">
         ${cert.titular ? `<div class="small">Titular: <b>${escH(cert.titular)}</b></div>` : ''}
-        <label class="field"><span>${cert.tem ? 'Trocar o certificado (.pfx ou .p12)' : 'Arquivo do certificado (.pfx ou .p12)'}</span><input type="file" id="nfc-arq" accept=".pfx,.p12,application/x-pkcs12"></label>
+        <div class="field"><span>${cert.tem ? 'Trocar o certificado (.pfx ou .p12)' : 'Arquivo do certificado (.pfx ou .p12)'}</span><label class="btn block nfc-arq">📎 <span id="nfc-arq-nome">Escolher o arquivo</span><input type="file" id="nfc-arq" accept=".pfx,.p12,application/x-pkcs12" hidden></label></div>
         <label class="field"><span>Senha do certificado</span><input type="password" id="nfc-senha" autocomplete="off" placeholder="Só se for enviar um certificado"></label>
         <p class="sub" style="margin:0">O certificado vai direto para o servidor, num lugar que o app não consegue ler de volta.</p></div></details>
       <div class="dq-acoes"><button class="btn" data-sh="nfc-cancelar">Cancelar</button><button class="btn primary" data-sh="nfc-salvar">Salvar</button></div></div></details>`;
@@ -1462,6 +1462,7 @@ function cartaoPush() {
 
 /* ================= Eventos ================= */
 document.addEventListener('change', e => { if (e.target && e.target.matches && e.target.matches('[data-temporada]')) { UIp.temporada = e.target.value; render(); } });
+document.addEventListener('change', e => { if (e.target && e.target.id === 'nfc-arq') { const f = e.target.files && e.target.files[0], n = $('nfc-arq-nome'); if (n) n.textContent = f ? '✓ ' + f.name : 'Escolher o arquivo'; } });
 // lembra o que ficou aberto na configuração das notas, para não fechar ao mudar uma opção
 document.addEventListener('toggle', e => { const d = e.target, C = UIp.nfc; if (!C || !d || !d.matches) return;
   if (d.matches('[data-nfc]')) C.aberto = d.open; else if (d.matches('[data-nfcs]')) (C.abre = C.abre || {})[d.dataset.nfcs] = d.open; }, true);
