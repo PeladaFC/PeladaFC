@@ -402,7 +402,8 @@ function render() {
     const nomeEu = (PERFIL?.apelido || PERFIL?.nome || '').split(/\s+/)[0];
     const hr = new Date().getHours(), ola = hr < 5 ? 'Boa noite' : hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
     const eu = PERFIL || {};
-    h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELOTA FC</span><button class="eu-av" data-sh="ir" data-v="perfil" aria-label="Meu perfil">${ini(eu.apelido || eu.nome)}${fotoImg(fotosEu(eu), 'eu-av-img')}</button></div>
+    verificarDonoInicio();
+    h = `<div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELOTA FC</span><span class="ob-dir">${souDono() ? `<button class="dono-bt" data-sh="dono" aria-label="Painel do dono">${ICO_COROA}<span>Painel</span></button>` : ''}<button class="eu-av" data-sh="ir" data-v="perfil" aria-label="Meu perfil">${ini(eu.apelido || eu.nome)}${fotoImg(fotosEu(eu), 'eu-av-img')}</button></span></div>
     ${cartaAtleta(ola, eu)}
     ${prox ? `<button class="prox-linha" data-sh="abrir" data-v="${prox.g}"><span class="pl-ic">📅</span><span class="grow"><b>${escH(falta(prox.d, true))}</b> · ${escH(GRUPOS[prox.g].nome || 'Pelada')}</span><span class="seta" aria-hidden="true">›</span></button>`
       : `<div class="prox-linha vazio"><span class="pl-ic">📅</span><span class="grow">${ids.length ? 'Sem jogo marcado por enquanto.' : 'Crie sua pelada ou entre com o código de um convite.'}</span></div>`}
@@ -715,6 +716,17 @@ function fotosEu(eu) {
 }
 function fotoImg(L, cls) { return L.length ? `<img class="${cls}" src="${escH(L[0])}" alt="" data-alt="${escH(L.slice(1).join('\n'))}" onerror="fotoFalhou(this)">` : ''; }
 window.fotoFalhou = img => { const r = (img.dataset.alt || '').split('\n').filter(Boolean); if (r.length) { img.dataset.alt = r.slice(1).join('\n'); img.src = r[0]; } else img.remove(); };
+// Botão "👑 Painel" na tela inicial: só para o dono do app. O servidor confirma uma vez e o aparelho guarda;
+// para quem não é dono, a conferência se repete no máximo uma vez por semana.
+const ICO_COROA = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l4.5 4L12 5l4.5 6L21 7l-2 11H5z"/></svg>';
+function souDono() { return !!(EU && (UIp.notasOk || ls.get('pelota.dono.' + EU.uid) === '1')); }
+let DONO_CK = false;
+function verificarDonoInicio() {
+  if (!EU || DONO_CK || souDono()) return; const k = 'pelota.donock.' + EU.uid, t = Number(ls.get(k)) || 0;
+  if (Date.now() - t < 7 * 864e5) return; DONO_CK = true;
+  notasServidor('acesso').then(() => { ls.set('pelota.dono.' + EU.uid, '1'); UIp.notasOk = true; if (TELA === 'minhas') render(); },
+    e => { if (e && e.status === 403) ls.set(k, String(Date.now())); });
+}
 function cartaAtleta(ola, eu) {
   const L = (ATLETA || []).filter(x => GRUPOS[x._gid]), vis = L.filter(x => x.ovr != null), w = x => 1 + (x.j || 0), soma = f => L.reduce((t, x) => t + (Number(x[f]) || 0), 0);
   const peso = k => vis.filter(x => x.kind === k).reduce((t, x) => t + w(x), 0), kind = peso('GOL') > peso('linha') ? 'GOL' : 'linha', vk = vis.filter(x => x.kind === kind);
