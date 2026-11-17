@@ -406,7 +406,11 @@ input::-webkit-date-and-time-value{text-align:left}
 .av-i{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line,rgba(0,0,0,.08))}
 .av-i .av-e{font-size:20px;width:28px;text-align:center;flex:none;line-height:1.3}
 .av-i b{font-size:15px}.av-i i{font-style:normal;font-weight:600;opacity:.85}
-.nf-pos{display:grid;gap:6px}.nf-pos span{opacity:.6;padding-left:10px;border-left:3px solid transparent}.nf-pos span.on{opacity:1;border-left-color:var(--pitch)}
+.nfc summary,.nfc-sub summary{cursor:pointer;list-style:none}.nfc summary::-webkit-details-marker,.nfc-sub summary::-webkit-details-marker{display:none}
+.nfc .panel-h{flex-wrap:wrap;gap:4px 10px}
+.nfc-t{font-weight:700;font-size:14px;margin-bottom:6px}
+.nfc-auto{display:flex;gap:12px;align-items:center;padding:12px 14px;margin:0}
+.nfc-sub{border-top:1px solid var(--line,rgba(0,0,0,.08));padding-top:10px}
 .atl-priv{position:relative;margin:-4px 0 0;font-size:11px;line-height:1.35;opacity:.72;text-align:center}
 .atl-temp select{background:transparent;border:0;color:inherit;font:inherit;font-weight:800;padding:0;min-height:0;width:auto;-webkit-appearance:none;appearance:none}
 .atl-temp select option{color:#000}
@@ -832,9 +836,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261116j"></script>
-<script src="br.js?v=20261116j"></script>
-<script src="core.js?v=20261116j"></script>
-<script type="module" src="app.js?v=20261116j"></script>
+<script src="qrcode.js?v=20261116k"></script>
+<script src="br.js?v=20261116k"></script>
+<script src="core.js?v=20261116k"></script>
+<script type="module" src="app.js?v=20261116k"></script>
 </body>
 </html>
