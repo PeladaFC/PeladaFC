@@ -600,6 +600,9 @@ nav.tabs button:active svg{transform:scale(.9)}
 @keyframes introBarra{from{width:0}to{width:100%}}
 .ob-dir{display:flex;align-items:center;gap:10px}
 .dono-bt{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--pitch);font:inherit;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.dono-mini{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border:0;background:none;color:var(--muted);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;border-radius:6px}
+.dono-mini svg{width:15px;height:15px}
+.dono-mini:active{background:var(--surface2)}
 .dono-bt:active{transform:translateY(1px)}
 .ob-sim{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--card);color:var(--card-ink);padding:3px 8px;border-radius:4px}
 .ob-hero{border-radius:6px;padding:28px 20px 22px;color:var(--pitch-ink);clip-path:polygon(0 0,calc(100% - 28px) 0,100% 28px,100% 100%,28px 100%,0 calc(100% - 28px));
@@ -840,9 +843,9 @@ body.em-suporte #app{padding-top:calc(36px + env(safe-area-inset-top,0px))}
 
 <div id="shell" class="ob" hidden></div>
 <div id="leitor" class="leitor" hidden role="dialog" aria-modal="true" aria-label="Ler QR Code"></div>
-<script src="qrcode.js?v=20261116m"></script>
-<script src="br.js?v=20261116m"></script>
-<script src="core.js?v=20261116m"></script>
-<script type="module" src="app.js?v=20261116m"></script>
+<script src="qrcode.js?v=20261116n"></script>
+<script src="br.js?v=20261116n"></script>
+<script src="core.js?v=20261116n"></script>
+<script type="module" src="app.js?v=20261116n"></script>
 </body>
 </html>

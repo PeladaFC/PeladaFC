@@ -237,8 +237,8 @@ function ir(t) { TELA = t; mostrarCasca(true); render(); }
 
 /* ================= Telas ================= */
 const HERO_BOAS = '<div class="ob-hero"><div class="ob-logo">Pelota<br><span>FC</span></div><p>Organize a pelada, sorteie times equilibrados e acompanhe quem é o craque da galera.</p></div>';
-function topo(voltar) {
-  return `<div class="ob-top">${voltar ? `<button class="btn sm" data-sh="ir" data-v="${voltar}">‹ Voltar</button>` : '<span></span>'}<span></span>${EU ? '' : ''}</div>`;
+function topo(voltar, dir) {
+  return `<div class="ob-top">${voltar ? `<button class="btn sm" data-sh="ir" data-v="${voltar}">‹ Voltar</button>` : '<span></span>'}${dir || '<span></span>'}</div>`;
 }
 function render() {
   const el = $('shell'); let h = '';
@@ -280,8 +280,9 @@ function render() {
   if (t === 'perfil' && EU && UIp.parcOk === undefined) { UIp.parcOk = ls.get('pelota.parc.' + EU.uid) === '1' ? true : null; carregarParceiro(true); }
   if (t === 'perfil' && EU && UIp.notasOk === undefined) { const ck = 'pelota.dono.' + EU.uid, tinha = ls.get(ck) === '1'; UIp.notasOk = tinha ? true : null; UIp.notasErro = null; notasServidor('acesso').then(() => { ls.set(ck, '1'); UIp.notasOk = true; if (TELA === 'perfil' && !tinha) render(); }, e => { if (e && e.status === 403) { ls.set(ck, null); UIp.notasOk = false; if (TELA === 'perfil' && tinha) render(); } else if (!tinha) { UIp.notasOk = null; UIp.notasErro = (e && e.message) || 'erro'; if (TELA === 'perfil') render(); } }); }
   if (t === 'perfil') { const p = PERFIL || {}; const pos = UIp.pos || p.pos || 'MEI'; const pronto = !!(p.apelido || p.pos);
-    h = (pronto ? topo('minhas') : '') + `<h2>${pronto ? 'Meu perfil' : 'Seu perfil de jogador'}</h2><p class="lead">É assim que a galera vai te ver.</p>
-    ${EU && UIp.notasOk ? `<button class="btn block primary" data-sh="dono" style="margin-bottom:6px">Painel do dono</button>` : ''}
+    // Painel do dono: botãozinho discreto no canto de cima, só para o dono do app
+    const dono = EU && UIp.notasOk ? `<button class="dono-mini" data-sh="dono" aria-label="Painel do dono">${ICO_COROA}<span>Painel do dono</span></button>` : '';
+    h = (pronto ? topo('minhas', dono) : (dono ? `<div class="ob-top"><span></span>${dono}</div>` : '')) + `<h2>${pronto ? 'Meu perfil' : 'Seu perfil de jogador'}</h2><p class="lead">É assim que a galera vai te ver.</p>
     ${EU && UIp.parcOk ? `<button class="btn block" data-sh="parceiro" style="margin-bottom:6px">🤝 Área do parceiro${UIp.parc && UIp.parc.rep && !UIp.parc.rep.aceiteOk ? ' · termo para aceitar' : ''}</button>` : ''}
     ${EU && UIp.notasErro && !UIp.notasOk ? `<button class="btn sm" data-sh="dono-verificar" style="align-self:flex-start;margin-bottom:6px">Não consegui verificar o acesso ao painel. Tocar para tentar de novo</button>` : ''}
     <form id="f-perfil" class="stack" novalidate>
