@@ -325,9 +325,31 @@ function render() {
       return ''; };
     const F = (D && D.nfse) || null;
     const auto = !F ? '' : F.falta && F.falta.length ? `<div class="banner" style="margin:0"><b>Emissão automática ainda não ligada.</b> Falta: ${escH(F.falta.join(', '))}. Enquanto isso, dá para emitir à mão (no fim da tela).</div>`
-      : `<div class="panel" style="padding:12px 14px;display:grid;gap:8px"><div class="small"><b>${F.ligado ? 'Emissão automática ligada' : 'Emissão automática desligada'}</b>${F.ligado ? ': todo dia 1º, o app emite a nota do mês anterior para cada organizador.' : '.'}${F.ambiente !== 'producao' ? ' <b>Modo de teste</b>: as notas não têm valor fiscal.' : ''}</div>
-        ${F.validade ? `<div class="sub">Certificado digital vale até ${new Date(F.validade).toLocaleDateString('pt-BR')}.${F.validade - Date.now() < 30 * 864e5 ? ' <b>Renove logo!</b>' : ''}</div>` : ''}
-        ${L.length && L.some(l => l.doc && (!l.nota || l.nota.status === 'erro')) ? '<button class="btn sm primary" data-sh="nf-emitir" style="justify-self:start">Emitir as notas deste mês agora</button>' : ''}</div>`;
+      : L.length && L.some(l => l.doc && (!l.nota || l.nota.status === 'erro')) ? '<button class="btn primary block" data-sh="nf-emitir">Emitir as notas deste mês agora</button>' : '';
+    const C = UIp.nfc || {}, r = C.r || {}, cert = C.cert || {};
+    const sw = (id, on) => `<label class="sw" style="flex:none"><input type="checkbox" id="${id}" data-sh="nfc-toggle" ${on ? 'checked' : ''}><span></span></label>`;
+    const cfgNf = C.carregando ? '<div class="panel"><p class="sub" style="margin:0">Carregando a configuração…</p></div>' : C.erro ? `<div class="banner">${escH(C.erro)}</div>` : !C.cfg ? '' : `
+    <details class="panel nfc" ${C.aberto ? 'open' : ''} data-nfc><summary><div class="panel-h" style="margin:0"><h3>⚙️ Configuração</h3><span class="sub">${r.ligado ? 'emissão ligada' : 'emissão desligada'} · ${r.ambiente === 'producao' ? 'valendo' : 'teste'}</span></div></summary>
+      <div class="stack" style="margin-top:10px">
+      <div><div class="nfc-t">Quando emitir</div><div class="seg"><button type="button" aria-pressed="true">Uma por mês</button></div>
+        <p class="sub" style="margin:6px 0 0">No dia 1º, sai uma nota para cada organizador com a comissão do mês anterior. Combine com a contadora.</p></div>
+      <div><div class="nfc-t">Ambiente</div><div class="seg"><button type="button" data-sh="nfc-amb" data-v="restrita" aria-pressed="${r.ambiente !== 'producao'}">Teste</button><button type="button" data-sh="nfc-amb" data-v="producao" aria-pressed="${r.ambiente === 'producao'}">Valendo</button></div>
+        <p class="sub" id="nfc-amb-txt" style="margin:6px 0 0">${r.ambiente === 'producao' ? 'As notas saem de verdade, com valor fiscal.' : 'As notas saem sem valor fiscal, só para conferir. Comece por aqui.'}</p></div>
+      <div class="panel nfc-auto"><div class="grow"><b>Emitir notas automaticamente</b>
+        <div class="small" style="margin-top:4px"><b>Ligado:</b> o app emite as notas sozinho, sem ninguém entrar no site do governo. Vale para a comissão dos Pix pagos pelo app, numa nota por organizador no dia 1º.<br><b>Desligado:</b> o app não emite nada; as notas ficam por sua conta no site <a href="https://www.nfse.gov.br/EmissorNacional/" target="_blank" rel="noopener">nfse.gov.br</a>.</div></div>${sw('nfc-ligado', r.ligado)}</div>
+      <details class="nfc-sub" data-nfcs="emp" ${(C.abre || {}).emp ?? (C.falta && C.falta.some(x => !/certificado/.test(x))) ? 'open' : ''}><summary><b>Dados da empresa</b> <span class="sub">(a contadora informa)</span></summary><div class="stack" style="margin-top:8px">
+        <label class="field"><span>CNPJ da empresa</span><input type="text" id="nfc-cnpj" inputmode="numeric" value="${escH(r.cnpj || '')}" placeholder="Só números"></label>
+        <label class="field"><span>Inscrição municipal (Recife)</span><input type="text" id="nfc-im" value="${escH(r.im || '')}" placeholder="Se tiver"></label>
+        <label class="field"><span>Código do serviço (6 números)</span><input type="text" id="nfc-ctrib" inputmode="numeric" maxlength="6" value="${escH(r.cTribNac || '')}"></label>
+        <label class="field"><span>Código NBS</span><input type="text" id="nfc-nbs" inputmode="numeric" value="${escH(r.cNBS || '')}" placeholder="Se a contadora informou"></label>
+        <div class="cx-precos"><label class="field"><span>% de tributos do Simples</span><input type="text" id="nfc-ptrib" inputmode="decimal" value="${escH(r.pTotTribSN == null ? '' : String(r.pTotTribSN).replace('.', ','))}" placeholder="Ex.: 6"></label>
+        <label class="field"><span>Série das notas</span><input type="text" id="nfc-serie" inputmode="numeric" value="${escH(r.serie || '900')}"></label></div></div></details>
+      <details class="nfc-sub" data-nfcs="cert" ${(C.abre || {}).cert ?? !cert.tem ? 'open' : ''}><summary><b>Certificado digital A1</b> <span class="sub">${cert.tem ? (cert.validade ? 'vale até ' + new Date(cert.validade).toLocaleDateString('pt-BR') + (cert.validade - Date.now() < 30 * 864e5 ? ' · renove logo!' : '') : 'instalado') : 'não instalado'}</span></summary><div class="stack" style="margin-top:8px">
+        ${cert.titular ? `<div class="small">Titular: <b>${escH(cert.titular)}</b></div>` : ''}
+        <div class="field"><span>${cert.tem ? 'Trocar o certificado (.pfx ou .p12)' : 'Arquivo do certificado (.pfx ou .p12)'}</span><label class="btn block nfc-arq">📎 <span id="nfc-arq-nome">Escolher o arquivo</span><input type="file" id="nfc-arq" accept=".pfx,.p12,application/x-pkcs12" hidden></label></div>
+        <label class="field"><span>Senha do certificado</span><input type="password" id="nfc-senha" autocomplete="off" placeholder="Só se for enviar um certificado"></label>
+        <p class="sub" style="margin:0">O certificado vai direto para o servidor, num lugar que o app não consegue ler de volta.</p></div></details>
+      <div class="dq-acoes"><button class="btn" data-sh="nfc-cancelar">Cancelar</button><button class="btn primary" data-sh="nfc-salvar">Salvar</button></div></div></details>`;
     const card = (l, i) => N.editar === l.gid ? `<form id="f-tomador" class="panel stack" style="padding:12px 14px" data-gid="${escH(l.gid)}">
         <b>${escH(l.grupo)}</b><span class="sub">Dados de quem recebe os Pix desta pelada (o organizador).</span>
         <label class="field"><span>Nome completo</span><input id="t-nome" value="${escH(l.nome)}" required></label>
@@ -342,6 +364,7 @@ function render() {
         ${situacao(l)}
         <div class="row" style="gap:8px;flex-wrap:wrap">${l.nota && l.nota.status === 'ok' ? `<button class="btn sm primary" data-sh="nf-pdf" data-v="${escH(l.gid)}">Baixar PDF</button>` : l.doc ? `<button class="btn sm" data-sh="nf-copiar" data-v="${i}">Copiar dados da nota</button>` : ''}<button class="btn sm" data-sh="nf-editar" data-v="${escH(l.gid)}">${l.doc ? 'Corrigir dados' : 'Preencher dados'}</button></div></div>`;
     h = topo('perfil') + abasDono('notas') + `<h2>Notas fiscais</h2><p class="lead">Comissão de 1% dos Pix, separada por organizador. Uma nota para cada um, uma vez por mês.</p>
+    ${cfgNf}
     <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:nowrap"><button class="btn sm" data-sh="nf-mes" data-v="-1" aria-label="Mês anterior">‹</button><b style="font-size:18px">${MESES[Number(mm) - 1]} de ${ano}</b><button class="btn sm" data-sh="nf-mes" data-v="1" aria-label="Próximo mês">›</button></div>
     ${N.carregando ? '<p class="lead">Somando as comissões…</p>' : N.erro ? `<div class="banner">${escH(N.erro)}</div>` : !L.length ? '<p class="sub">Nenhuma comissão neste mês. Não precisa emitir nota.</p>' : `
     ${auto}
@@ -853,6 +876,8 @@ async function notasServidor(acao, extra) {
     if (acao === 'acesso') return { ok: true };
     if (acao === 'emitir') { (UIp.nfMock || []).forEach(l => { if (l.doc) l.nota = { status: 'ok', chave: '26116062211222333000181000000000000126091234567890', ambiente: 'restrita' }; }); return { ok: 1 }; }
     if (acao === 'pdf') throw new Error('Na demonstração não há PDF.');
+    if (acao === 'nf-config') { UIp.nfcMock = UIp.nfcMock || { cfg: { ligado: false, ambiente: 'restrita', cnpj: '', cTribNac: '', serie: '900' }, cert: { tem: false }, falta: ['CNPJ da empresa', 'código do serviço (cTribNac)', 'percentual de tributos do Simples', 'certificado digital A1'] }; return JSON.parse(JSON.stringify(UIp.nfcMock)); }
+    if (acao === 'nf-salvar') { const M = UIp.nfcMock; M.cfg = { ...M.cfg, ...extra.cfg }; if (extra.cert) M.cert = { tem: true, titular: 'EMPRESA TESTE LTDA', validade: Date.now() + 300 * 864e5 }; M.falta = []; return JSON.parse(JSON.stringify(M)); }
     if (acao === 'tomador') { const l = (UIp.nfMock || []).find(x => x.gid === extra.gid); if (l) Object.assign(l, { nome: extra.nome, doc: extra.doc.replace(/\D/g, ''), email: extra.email, tipoDoc: extra.doc.replace(/\D/g, '').length === 14 ? 'CNPJ' : 'CPF' }); return { ok: true }; }
     UIp.nfMock = UIp.nfMock || [{ gid: 'g1', grupo: 'Pelada de Quinta', qtd: 46, total: 37.62, nome: 'Maria Teste da Silva', doc: '12345678909', tipoDoc: 'CPF', email: 'maria@exemplo.com' }, { gid: 'g2', grupo: 'Fut do Pina', qtd: 18, total: 12.4, nome: 'João Exemplo', doc: '', tipoDoc: '', email: '' }];
     return { mes: extra.mes, linhas: UIp.nfMock, total: UIp.nfMock.reduce((s, l) => s + l.total, 0), nfse: { ligado: true, ambiente: 'restrita', falta: [], validade: Date.now() + 300 * 864e5 } };
@@ -1320,7 +1345,12 @@ window.notasComissao = async (acao, mes) => {
   if (acao === 'pdf') baixarPdf(j);
   return j;
 };
-async function carregarNotas() { const N = UIp.nf; N.carregando = true; N.erro = null; N.editar = null; render();
+async function carregarConfigNf(forcar) { const C = UIp.nfc = UIp.nfc || {}; if (C.cfg && !forcar) return; C.carregando = true; C.erro = null; render();
+  try { const d = await notasServidor('nf-config'); Object.assign(C, d, { r: { ...d.cfg }, aberto: C.aberto ?? !!(d.falta && d.falta.length) }); } catch (e) { C.erro = e.message; }
+  C.carregando = false; if (TELA === 'notas') render(); }
+function rascNf() { const C = UIp.nfc, r = C.r, v = id => ($(id) || {}).value; if (!$('nfc-cnpj')) return r;
+  Object.assign(r, { cnpj: v('nfc-cnpj'), im: v('nfc-im'), cTribNac: v('nfc-ctrib'), cNBS: v('nfc-nbs'), pTotTribSN: v('nfc-ptrib'), serie: v('nfc-serie'), ligado: !!($('nfc-ligado') || {}).checked }); return r; }
+async function carregarNotas() { const N = UIp.nf; N.carregando = true; N.erro = null; N.editar = null; carregarConfigNf(); render();
   try { N.dados = await notasServidor('relatorio', { mes: N.mes }); } catch (e) { N.erro = e.message; N.dados = null; }
   N.carregando = false; if (TELA === 'notas') render(); }
 function textoNota(l, mes) { const [a, m] = mes.split('-');
@@ -1432,6 +1462,10 @@ function cartaoPush() {
 
 /* ================= Eventos ================= */
 document.addEventListener('change', e => { if (e.target && e.target.matches && e.target.matches('[data-temporada]')) { UIp.temporada = e.target.value; render(); } });
+document.addEventListener('change', e => { if (e.target && e.target.id === 'nfc-arq') { const f = e.target.files && e.target.files[0], n = $('nfc-arq-nome'); if (n) n.textContent = f ? '✓ ' + f.name : 'Escolher o arquivo'; } });
+// lembra o que ficou aberto na configuração das notas, para não fechar ao mudar uma opção
+document.addEventListener('toggle', e => { const d = e.target, C = UIp.nfc; if (!C || !d || !d.matches) return;
+  if (d.matches('[data-nfc]')) C.aberto = d.open; else if (d.matches('[data-nfcs]')) (C.abre = C.abre || {})[d.dataset.nfcs] = d.open; }, true);
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-sh]'); if (!b || !($('shell').contains(b) || $('leitor').contains(b))) return;
   const a = b.dataset.sh, v = b.dataset.v;
@@ -1521,6 +1555,19 @@ document.addEventListener('click', async e => {
   if (a === 'dono-verificar') { UIp.notasOk = undefined; UIp.notasErro = null; render(); }
   if (a === 'dono-met') { UIp.painel.met = v; render(); }
   if (a === 'notas') { const d = new Date(Date.now() - 3 * 36e5); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); UIp.nf = { mes: d.toISOString().slice(0, 7) }; ir('notas'); carregarNotas(); }
+  // sem redesenhar a tela (não perde o arquivo do certificado nem a senha já digitados)
+  if (a === 'nfc-amb') { rascNf().ambiente = v; document.querySelectorAll('[data-sh=nfc-amb]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === v)));
+    const t = $('nfc-amb-txt'); if (t) t.textContent = v === 'producao' ? 'As notas saem de verdade, com valor fiscal.' : 'As notas saem sem valor fiscal, só para conferir. Comece por aqui.'; }
+  if (a === 'nfc-toggle') rascNf();
+  if (a === 'nfc-cancelar') { const C = UIp.nfc; C.r = { ...C.cfg }; render(); aviso('Alterações descartadas.'); }
+  if (a === 'nfc-salvar') { const C = UIp.nfc, r = rascNf(), arq = ($('nfc-arq') || {}).files && $('nfc-arq').files[0], senha = ($('nfc-senha') || {}).value || '';
+    if (!doisToques(b, r.ambiente === 'producao' && C.cfg.ambiente !== 'producao' ? 'Notas de verdade: toque de novo' : 'Toque de novo para salvar')) return;
+    if (arq && !senha) { aviso('Digite a senha do certificado.'); return; }
+    let cert = null; if (arq) { if (arq.size > 150000) { aviso('Esse arquivo é grande demais para um certificado A1.'); return; }
+      const buf = new Uint8Array(await arq.arrayBuffer()); let bin = ''; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]); cert = { pfx: btoa(bin), senha }; }
+    b.disabled = true; b.textContent = 'Salvando…';
+    try { const d = await notasServidor('nf-salvar', { cfg: r, cert }); Object.assign(C, d, { r: { ...d.cfg } }); aviso('Configuração salva.' + (d.cfg.ligado ? ' O app vai emitir as notas sozinho no dia 1º.' : '')); carregarNotas(); }
+    catch (e) { aviso(e.message); b.disabled = false; b.textContent = 'Salvar'; } }
   if (a === 'nf-mes') { const [y, m] = UIp.nf.mes.split('-').map(Number), d = new Date(Date.UTC(y, m - 1 + Number(v), 1)); UIp.nf.mes = d.toISOString().slice(0, 7); carregarNotas(); }
   if (a === 'nf-emitir') { b.disabled = true; b.textContent = 'Emitindo… (pode levar um minuto)'; try { const r = await notasServidor('emitir', { mes: UIp.nf.mes }); aviso(r.ok ? `${r.ok} nota${r.ok === 1 ? '' : 's'} emitida${r.ok === 1 ? '' : 's'}.` : 'Nenhuma nota nova emitida. Veja a situação de cada uma.'); } catch (err) { registrarErro(err, 'acao'); aviso(err.message); } carregarNotas(); }
   if (a === 'nf-pdf') { b.disabled = true; try { baixarPdf(await notasServidor('pdf', { mes: UIp.nf.mes, gid: v })); } catch (err) { registrarErro(err, 'acao'); aviso(err.message); } b.disabled = false; }

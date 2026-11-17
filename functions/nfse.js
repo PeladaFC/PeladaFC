@@ -246,6 +246,42 @@ module.exports = (db, PAG) => {
     tot.volumeMes = Math.round(tot.volumeMes * 100) / 100; tot.comissaoMes = Math.round(tot.comissaoMes * 100) / 100;
     return { em: agora, mes, contas, totais: tot, regioes: lista(reg), estados: lista(ufs), cidades: lista(cids).slice(0, 30), grupos: listaGrupos };
   }
+  // ---- configuração pelo app ----
+  const CAMPOS_NF = ['ligado', 'ambiente', 'cnpj', 'im', 'cTribNac', 'cNBS', 'pTotTribSN', 'serie', 'nInicial'];
+  function infoCert(pfx, senha) { // confere a senha e lê titular e validade, sem biblioteca extra
+    const tls = require('tls');
+    try { const ctx = tls.createSecureContext({ pfx, passphrase: senha }); const s = new tls.TLSSocket(null, { secureContext: ctx, isServer: true });
+      const c = s.getCertificate(); s.destroy(); return { titular: (c && c.subject && c.subject.CN) || '', validade: (c && Date.parse(c.valid_to)) || 0 }; }
+    catch (e) { const m = String(e && e.message || '');
+      if (/mac verify|bad decrypt|password/i.test(m)) throw erro('Senha do certificado errada.', 400);
+      if (/unsupported|algorithm/i.test(m)) return { titular: '', validade: 0, legado: true }; // certificado antigo: a emissão abre com a biblioteca própria
+      throw erro('Esse arquivo não parece um certificado A1 (.pfx ou .p12).', 400); } }
+  async function configNf() {
+    const cfg = (await ler('servidor/nfse')) || {}, c = (await ler('servidor/nfse_cert')) || {}, o = {};
+    for (const k of CAMPOS_NF) if (cfg[k] !== undefined) o[k] = cfg[k];
+    return { cfg: o, cert: { tem: !!c.pfx, titular: c.titular || '', validade: c.validade || 0 }, falta: falta(cfg).concat(c.pfx ? [] : ['certificado digital A1']) };
+  }
+  async function salvarConfigNf(n, cert) {
+    const so = v => String(v == null ? '' : v).replace(/\D/g, '');
+    const o = { ligado: !!n.ligado, ambiente: n.ambiente === 'producao' ? 'producao' : 'restrita', cnpj: so(n.cnpj), im: String(n.im || '').replace(/[^0-9A-Za-z]/g, '').slice(0, 20),
+      cTribNac: so(n.cTribNac), cNBS: so(n.cNBS), pTotTribSN: Number(String(n.pTotTribSN ?? '').replace(',', '.')), serie: String(parseInt(so(n.serie) || '900', 10)), nInicial: parseInt(so(n.nInicial) || '1', 10),
+      codMun: COD_RECIFE, opSimpNac: '3', regApTribSN: '1', regEspTrib: '0', alteradoEm: Date.now() };
+    if (o.cnpj && o.cnpj.length !== 14) throw erro('O CNPJ precisa ter 14 números.', 400);
+    if (o.cTribNac && o.cTribNac.length !== 6) throw erro('O código do serviço precisa ter 6 números.', 400);
+    if (!(o.pTotTribSN >= 0 && o.pTotTribSN <= 100)) o.pTotTribSN = null;
+    if (!(o.serie.length >= 1 && o.serie.length <= 5)) throw erro('Série inválida.', 400);
+    if (!(o.nInicial >= 1)) o.nInicial = 1;
+    if (cert && cert.pfx) {
+      const buf = Buffer.from(String(cert.pfx), 'base64'); if (!buf.length || buf.length > 200000) throw erro('Arquivo do certificado inválido.', 400);
+      const inf = infoCert(buf, String(cert.senha || ''));
+      if (inf.titular && o.cnpj && !inf.titular.replace(/\D/g, '').includes(o.cnpj)) logger.warn('certificado com CNPJ diferente', { titular: inf.titular });
+      await db.doc('servidor/nfse_cert').set({ pfx: buf.toString('base64'), senha: String(cert.senha || ''), validade: inf.validade, titular: inf.titular, enviadoEm: Date.now() });
+    }
+    const cfg0 = (await ler('servidor/nfse')) || {}, cer = (await ler('servidor/nfse_cert')) || {};
+    if (o.ligado && (falta({ ...cfg0, ...o }).length || !cer.pfx)) throw erro('Para ligar, preencha os dados da empresa e envie o certificado: falta ' + falta({ ...cfg0, ...o }).concat(cer.pfx ? [] : ['certificado digital A1']).join(', ') + '.', 400);
+    await db.doc('servidor/nfse').set(o, { merge: true });
+    return configNf();
+  }
   const notasPlataforma = onRequest({ cors: true, maxInstances: 2, memory: '512MiB', timeoutSeconds: 300 }, async (req, res) => {
     try {
       if (req.method !== 'POST') return res.status(405).json({ erro: 'Use POST.' });
@@ -253,6 +289,9 @@ module.exports = (db, PAG) => {
       const b = req.body || {};
       if (b.acao === 'acesso') return res.json({ ok: true });
       if (b.acao === 'painel') return res.json(await painel());
+      // configuração da nota fiscal pelo app (só a empresa): substitui o configurar-nfse.sh no Cloud Shell
+      if (b.acao === 'nf-config') return res.json(await configNf());
+      if (b.acao === 'nf-salvar') return res.json(await salvarConfigNf(b.cfg || {}, b.cert || null));
       // representantes: cadastro do dono (comissão e prazo editáveis). Os grupos ligam na fase 2, pelo código da loja.
       if (b.acao === 'reps') {
         const q = await db.collection('servidor/plataforma/representantes').get();
