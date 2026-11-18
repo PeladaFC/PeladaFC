@@ -1057,7 +1057,7 @@ function telaVitViu() { const V = UIp.vit || {}, W = V.viu || {}, a = ((V.lista 
       <span class="vt-st ${c.confirmou ? 'on' : 'off'}">${c.confirmou ? 'Confirmou' : 'Viu'}</span></div>`).join('')}</div>` : ''}`; }
 // ---------- criar / editar ----------
 function vtNovoForm(id) { const a = id ? (((UIp.vit || {}).lista || []).find(x => x.id === id) || {}).data || {} : {};
-  UIp.vf = { ...GF0 };
+  UIp.vf = gfNovo();
   UIp.vform = { id: id || null, a0: id ? a : null, titulo: a.titulo || '', texto: a.texto || '', formato: a.formato === 'cheia' ? 'cheia' : 'janela',
     midia: a.midia ? { ...a.midia, antiga: true } : null, tirou: false, url: null,
     btx: (a.botao || {}).texto || '', blk: (a.botao || {}).link || '',
@@ -1152,16 +1152,17 @@ function vtExemplosMock() {
 }
 
 /* lista de grupos do painel, com várias formas de procurar (a mesma peça serve para a Vitrine → Escolher grupos) */
-const GF0 = { q: '', sit: 'todos', reg: '', uf: '', cidade: '', pix: '', pag: '', tipo: '', dia: '', ord: 'recente' };
+// filtros: nenhum tocado = todos os grupos; tocar num filtro abre as opções, e cada opção tocada diminui a lista
+const GF0 = { q: '', aberto: '', reg: [], uf: [], cidade: [], sit: [], tipo: [], dia: [], pix: [], pag: [], ord: 'recente' };
+const GF_CHAVES = ['reg', 'uf', 'cidade', 'sit', 'tipo', 'dia', 'pix', 'pag'];
+const gfNovo = () => JSON.parse(JSON.stringify(GF0));
 const REGIOES_UF = { Norte: ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'], Nordeste: ['AL', 'BA', 'CE', 'MA', 'PB', 'PE', 'PI', 'RN', 'SE'], 'Centro-Oeste': ['DF', 'GO', 'MT', 'MS'], Sudeste: ['ES', 'MG', 'RJ', 'SP'], Sul: ['PR', 'RS', 'SC'] };
 const regiaoDe = uf => Object.keys(REGIOES_UF).find(r => REGIOES_UF[r].includes(uf)) || '';
 const DIAS_CURTO = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const semAcento = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 function gruposFiltrados(F0) { const G = ((UIp.painel || {}).dados || {}).grupos || [], F = F0 || UIp.gf || GF0, q = semAcento(F.q).trim();
-  let L = G.filter(g => (!q || semAcento([g.nome, g.cidade, g.uf, g.codigo].join(' ')).includes(q))
-    && (F.sit === 'todos' || (F.sit === 'ativos' ? g.ativo : !g.ativo)) && (!F.reg || regiaoDe(g.uf) === F.reg) && (!F.uf || g.uf === F.uf) && (!F.cidade || (g.cidade + ' · ' + g.uf) === F.cidade)
-    && (!F.pix || (F.pix === 'sim') === g.pix) && (!F.pag || (F.pag === 'sim') === (g.comissaoMes > 0)) && (!F.tipo || (F.tipo === 'evento') === g.evento)
-    && (F.dia === '' || g.dia === Number(F.dia)));
+  const ok = (k, v) => !(F[k] || []).length || F[k].includes(v);
+  let L = G.filter(g => (!q || semAcento([g.nome, g.cidade, g.uf, g.codigo].join(' ')).includes(q)) && GF_CHAVES.every(k => ok(k, gfValor(g, k))));
   const ord = { recente: (a, b) => (b.criadoEm || 0) - (a.criadoEm || 0), antigo: (a, b) => (a.criadoEm || 0) - (b.criadoEm || 0), jogadores: (a, b) => b.jogadores - a.jogadores,
     comissao: (a, b) => b.comissaoMes - a.comissaoMes, ultima: (a, b) => String(b.ultima || '').localeCompare(String(a.ultima || '')), nome: (a, b) => a.nome.localeCompare(b.nome) }[F.ord] || (() => 0);
   return L.sort(ord); }
@@ -1174,29 +1175,36 @@ function listaGruposHTML() { const L = gruposFiltrados(), n = v => Number(v || 0
       <span>${g.pix ? '💳 Pix conectado' : '💳 Sem Pix'}${g.comissaoMes > 0 ? ' · ' + rs(g.comissaoMes) + ' de comissão no mês' : ''}</span><span>🔑 Código ${escH(g.codigo || '—')}</span>${g.rep ? `<span>🤝 Representante ${escH(g.rep)}</span>` : ''}<span>🗓️ Criado em ${dc(g.criadoEm)}</span></div>
     <button class="btn sm" style="align-self:flex-start" data-sh="suporte-dono" data-v="${escH(g.gid)}">🛟 Suporte</button></div>`).join('')
     : '<p class="sub">Nenhum grupo com esses filtros.</p>'); }
-// os filtros da aba Grupos (iguais na Vitrine → Escolher grupos): só mostram opções que existem
+// o valor de cada grupo em cada filtro
+function gfValor(g, k) { return { reg: regiaoDe(g.uf), uf: g.uf || '', cidade: g.uf ? g.cidade + ' · ' + g.uf : '', sit: g.ativo ? 'ativos' : 'parados', tipo: g.evento ? 'evento' : 'fixa', dia: g.dia == null ? '' : String(g.dia), pix: g.pix ? 'sim' : 'nao', pag: g.comissaoMes > 0 ? 'sim' : 'nao' }[k]; }
+// as opções de cada filtro: só as que existem nos grupos (e o estado/cidade obedecem à região/estado já tocados)
+function gfOpcoes(G, F) {
+  const tem = k => new Set(G.map(g => gfValor(g, k)).filter(Boolean)), cabe = (g, ks) => ks.every(k => !(F[k] || []).length || F[k].includes(gfValor(g, k)));
+  const ufs = [...new Set(G.filter(g => cabe(g, ['reg'])).map(g => g.uf).filter(Boolean))].sort(), cids = [...new Set(G.filter(g => g.uf && cabe(g, ['reg', 'uf'])).map(g => gfValor(g, 'cidade')))].sort();
+  const lst = (k, pares) => { const t = tem(k); return pares.filter(([v]) => t.has(v)); };
+  return [['reg', 'Região', lst('reg', Object.keys(REGIOES_UF).map(r => [r, r]))], ['uf', 'Estado', ufs.map(u => [u, u])], ['cidade', 'Cidade', cids.map(c => [c, c])],
+    ['sit', 'Situação', lst('sit', [['ativos', 'Ativos'], ['parados', 'Parados']])], ['tipo', 'Tipo', lst('tipo', [['fixa', 'Semanal'], ['evento', 'Evento']])],
+    ['dia', 'Dia da pelada', lst('dia', DIAS_CURTO.map((d, i) => [String(i), d]))], ['pix', 'Pix', lst('pix', [['sim', 'Pix conectado'], ['nao', 'Sem Pix']])],
+    ['pag', 'Comissão', lst('pag', [['sim', 'Gerou comissão no mês'], ['nao', 'Sem comissão no mês']])]].filter(([, , o]) => o.length);
+}
+// os filtros da aba Grupos (iguais na Vitrine → Escolher grupos)
 function filtrosGruposHTML(F, G, attr, pref, qr) {
-  const ufsTodas = [...new Set(G.map(g => g.uf).filter(Boolean))].sort(), regs = Object.keys(REGIOES_UF).filter(r => ufsTodas.some(u => REGIOES_UF[r].includes(u)));
-  const ufs = ufsTodas.filter(u => !F.reg || REGIOES_UF[F.reg].includes(u)), cids = [...new Set(G.filter(g => g.uf && ufs.includes(g.uf) && (!F.uf || g.uf === F.uf)).map(g => g.cidade + ' · ' + g.uf))].sort();
-  const sel = (k, rot, ops) => `<label class="field" style="margin:0"><span>${rot}</span><select data-${attr}="${k}">${ops.map(([v, t]) => `<option value="${escH(v)}" ${String(F[k]) === String(v) ? 'selected' : ''}>${escH(t)}</option>`).join('')}</select></label>`;
+  const ops = gfOpcoes(G, F), aberto = ops.find(o => o[0] === F.aberto), algum = GF_CHAVES.some(k => (F[k] || []).length);
   return `<div class="row" style="gap:8px;flex-wrap:nowrap"><label class="field" style="flex:1;min-width:0;margin:0"><input type="search" data-${attr}="q" value="${escH(F.q)}" placeholder="Nome, cidade ou código" aria-label="Procurar grupo"></label>${qr ? '<button class="btn sm" data-sh="dono-qr" aria-label="Ler QR Code do grupo">📷 QR</button>' : ''}</div>
-  <div class="pick">${[['todos', 'Todos'], ['ativos', 'Ativos'], ['parados', 'Parados']].map(([v, t]) => `<button type="button" data-sh="${pref}-sit" data-v="${v}" aria-pressed="${F.sit === v}">${t}</button>`).join('')}</div>
-  <details class="panel" style="padding:10px 14px" ${UIp[pref + 'Aberto'] ? 'open' : ''}><summary data-sh="${pref}-abrir"><b>Mais filtros</b></summary>
-    <div class="par" style="margin-top:10px">
-    ${sel('reg', 'Região', [['', 'Todas'], ...regs.map(r => [r, r])])}
-    ${sel('uf', 'Estado', [['', 'Todos'], ...ufs.map(u => [u, u])])}
-    ${sel('cidade', 'Cidade', [['', 'Todas'], ...cids.map(c => [c, c])])}
-    ${sel('pix', 'Pix', [['', 'Todos'], ['sim', 'Com Pix'], ['nao', 'Sem Pix']])}
-    ${sel('pag', 'Pagante', [['', 'Todos'], ['sim', 'Gerou comissão no mês'], ['nao', 'Sem comissão']])}
-    ${sel('tipo', 'Tipo', [['', 'Todos'], ['fixa', 'Fixa (toda semana)'], ['evento', 'Evento']])}
-    ${sel('dia', 'Dia da pelada', [['', 'Todos'], ...DIAS_CURTO.map((d, i) => [String(i), d])])}
-    </div></details>
-  <div class="row" style="gap:8px;flex-wrap:nowrap;align-items:flex-end">${sel('ord', 'Ordenar por', [['recente', 'Mais novos'], ['antigo', 'Mais antigos'], ['ultima', 'Pelada mais recente'], ['jogadores', 'Mais jogadores'], ['comissao', 'Mais comissão'], ['nome', 'Nome (A–Z)']])}
-    <button class="btn" data-sh="${pref}-limpar" style="flex:none;min-height:42px">Limpar filtros</button></div>`;
+  <div class="fb">${ops.map(([k, rot]) => { const n = (F[k] || []).length; return `<button type="button" class="fb-b${n ? ' on' : ''}" data-sh="${pref}-fab" data-v="${k}" aria-expanded="${F.aberto === k}">${rot}${n ? ` · ${n}` : ''} <span class="fb-seta">${F.aberto === k ? '▴' : '▾'}</span></button>`; }).join('')}${algum ? `<button type="button" class="fb-limpar" data-sh="${pref}-limpar">Limpar filtros</button>` : ''}</div>
+  ${aberto ? `<div class="fb-ops">${aberto[2].map(([v, t]) => `<button type="button" data-sh="${pref}-fop" data-v="${aberto[0]}" data-o="${escH(v)}" aria-pressed="${(F[aberto[0]] || []).includes(v)}">${escH(t)}</button>`).join('')}</div>` : ''}
+  ${attr === 'gf' ? `<label class="field" style="margin:0"><span>Ordenar por</span><select data-gf="ord">${[['recente', 'Mais novos'], ['antigo', 'Mais antigos'], ['ultima', 'Pelada mais recente'], ['jogadores', 'Mais jogadores'], ['comissao', 'Mais comissão'], ['nome', 'Nome (A–Z)']].map(([v, t]) => `<option value="${v}" ${F.ord === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}`;
+}
+// tocar num filtro abre/fecha as opções; tocar numa opção liga/desliga (região limpa estado e cidade que não cabem; estado limpa cidade)
+function gfToque(F, a, k, o, G) {
+  if (a === 'fab') { F.aberto = F.aberto === k ? '' : k; return; }
+  const L = F[k] = F[k] || [], i = L.indexOf(o); i >= 0 ? L.splice(i, 1) : L.push(o);
+  if (k === 'reg' || k === 'uf') { const ops = Object.fromEntries(gfOpcoes(G, F).map(([kk, , op]) => [kk, op.map(x => x[0])]));
+    F.uf = (F.uf || []).filter(u => (ops.uf || []).includes(u)); F.cidade = (F.cidade || []).filter(c => (ops.cidade || []).includes(c)); }
 }
 function telaGruposDono() { const P = UIp.painel || {}, D = P.dados;
   if (!D) return '<h2>Grupos</h2>' + (P.erro ? `<div class="banner">${escH(P.erro)}</div>` : '<p class="lead">Carregando os grupos…</p>');
-  const F = UIp.gf = UIp.gf || { ...GF0 }, G = D.grupos || [];
+  const F = UIp.gf = UIp.gf && Array.isArray(UIp.gf.reg) ? UIp.gf : gfNovo(), G = D.grupos || [];
   return `<h2>Grupos</h2><p class="lead">Todos os grupos do app. Procure pelo nome, cidade, código de convite ou QR Code.</p>
   ${filtrosGruposHTML(F, G, 'gf', 'gf', true)}
   <div id="gf-lista" class="stack" style="gap:10px">${listaGruposHTML()}</div>`; }
@@ -1814,12 +1822,10 @@ document.addEventListener('click', async e => {
   if (a === 'rep-relatorio') { const x = ((UIp.reps || {}).lista || []).find(r => r.id === v); if (!x || !x.whats) return; let n = x.whats.replace(/\D/g, ''); if (n.length <= 11) n = '55' + n;
     window.open('https://wa.me/' + n + '?text=' + encodeURIComponent(relatorioRep(x)), '_blank', 'noopener'); }
   if (a === 'rep-editar') { UIp.reps = UIp.reps || {}; UIp.reps.editar = v || null; render(); }
-  if (a === 'gf-sit') { UIp.gf.sit = v; render(); }
-  if (a === 'gf-limpar') { UIp.gf = { ...GF0 }; render(); }
-  if (a === 'gf-abrir') { UIp.gfAberto = !UIp.gfAberto; }
-  if (a === 'vf-sit') { UIp.vf.sit = v; vtRedesenha(); }
-  if (a === 'vf-limpar') { UIp.vf = { ...GF0 }; vtRedesenha(); }
-  if (a === 'vf-abrir') { UIp.vfAberto = !UIp.vfAberto; }
+  if (a === 'gf-limpar') { UIp.gf = gfNovo(); render(); }
+  if (a === 'gf-fab' || a === 'gf-fop') { gfToque(UIp.gf, a.slice(3), v, b.dataset.o, ((UIp.painel || {}).dados || {}).grupos || []); const y = window.scrollY; render(); window.scrollTo(0, y); }
+  if (a === 'vf-limpar') { const ab = UIp.vf.aberto; UIp.vf = gfNovo(); UIp.vf.aberto = ab; vtRedesenha(); }
+  if (a === 'vf-fab' || a === 'vf-fop') { gfToque(UIp.vf, a.slice(3), v, b.dataset.o, ((UIp.painel || {}).dados || {}).grupos || []); vtRedesenha(); }
   if (a === 'dono-vitrine') { ir('donovitrine'); vtCarregar(); }
   if (a === 'vt-recarregar') vtCarregar();
   if (a === 'vt-novo') vtNovoForm(null);
@@ -1835,7 +1841,7 @@ document.addEventListener('click', async e => {
   if (a === 'vt-como') { UIp.vform.como = v; vtPrev(); }
   if (a === 'vt-marcar') { const X = UIp.vform, L = gruposFiltrados(UIp.vf), todos = L.length && L.every(g => X.sel.has(g.gid)); L.forEach(g => todos ? X.sel.delete(g.gid) : X.sel.add(g.gid)); const box = $('vt-grupos'); if (box) box.innerHTML = vtListaGrupos(); }
   if (a === 'vt-real') { const X = UIp.vform, url = await vtUrlPrev(); vtAbrir(vtDados(X), url || null, !!(X.como && X.obrig[X.como] && X.para.has(X.como)), () => { }); }
-  if (a === 'dono-qr') { window.__leitorDono = cod => { UIp.gf = { ...GF0, q: cod }; ir('donogrupos'); }; abrirLeitor(); }
+  if (a === 'dono-qr') { window.__leitorDono = cod => { UIp.gf = { ...gfNovo(), q: cod }; ir('donogrupos'); }; abrirLeitor(); }
   if (a === 'dono-verificar') { UIp.notasOk = undefined; UIp.notasErro = null; render(); }
   if (a === 'dono-met') { UIp.painel.met = v; render(); }
   if (a === 'notas') { const d = new Date(Date.now() - 3 * 36e5); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); UIp.nf = { mes: d.toISOString().slice(0, 7) }; ir('notas'); carregarNotas(); }
@@ -1883,7 +1889,7 @@ function vtRedesenha() { const y = window.scrollY; render(); window.scrollTo(0, 
   if (TELA !== 'donovitform' || !UIp.vform) return; const X = UIp.vform, t = e.target;
   if (t.dataset.vt) { X[t.dataset.vt] = t.value; vtPrev(); return; }
   if (tipo !== 'change') { if (t.dataset.vf === 'q') { UIp.vf.q = t.value; const box = $('vt-grupos'); if (box) box.innerHTML = vtListaGrupos(); } return; }
-  if (t.dataset.vf) { UIp.vf[t.dataset.vf] = t.value; if (t.dataset.vf === 'reg') { UIp.vf.uf = ''; UIp.vf.cidade = ''; } if (t.dataset.vf === 'uf') UIp.vf.cidade = ''; if (t.dataset.vf !== 'q') vtRedesenha(); return; }
+  if (t.dataset.vf) return;
   if (t.dataset.vtp) { t.checked ? X.para.add(t.dataset.vtp) : X.para.delete(t.dataset.vtp); if (!t.checked) X.obrig[t.dataset.vtp] = false; vtRedesenha(); return; }
   if (t.dataset.vto) { X.obrig[t.dataset.vto] = t.checked; vtPrev(); return; }
   if (t.dataset.vtg) { t.checked ? X.sel.add(t.dataset.vtg) : X.sel.delete(t.dataset.vtg); const box = $('vt-grupos'); if (box) box.innerHTML = vtListaGrupos(); return; }
@@ -1893,7 +1899,7 @@ function vtRedesenha() { const y = window.scrollY; render(); window.scrollTo(0, 
 }));
 ['input', 'change'].forEach(tipo => document.addEventListener(tipo, e => {
   const el = e.target.closest && e.target.closest('[data-gf]'); if (!el || TELA !== 'donogrupos') return;
-  UIp.gf = UIp.gf || { ...GF0 }; UIp.gf[el.dataset.gf] = el.value; if (el.dataset.gf === 'reg') { UIp.gf.uf = ''; UIp.gf.cidade = ''; } if (el.dataset.gf === 'uf') UIp.gf.cidade = '';
+  UIp.gf = UIp.gf && Array.isArray(UIp.gf.reg) ? UIp.gf : gfNovo(); UIp.gf[el.dataset.gf] = el.value;
   if (el.dataset.gf === 'q') { const box = $('gf-lista'); if (box) box.innerHTML = listaGruposHTML(); } else if (tipo === 'change') render();
 }));
 document.addEventListener('input', e => {
