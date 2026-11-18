@@ -74,6 +74,10 @@ h3{font-size:17px;text-transform:uppercase;letter-spacing:.04em}
 .iconbtn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
 .iconbtn svg{width:20px;height:20px}
 .banner{border-radius:var(--r);padding:10px 12px;font-size:13px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px;background:var(--surface2)}
+.banner:has(>.btn),.banner:has(>.row){flex-wrap:nowrap}
+.banner:has(>.btn)>span,.banner:has(>.row)>span{flex:1 1 auto;min-width:0}
+.banner>.btn,.banner>.row{flex:0 0 auto;margin-left:auto}
+.banner>.btn{min-width:132px;justify-content:center;text-align:center}
 .banner.demo{background:var(--card);color:var(--card-ink)}
 .banner.due{background:var(--card);color:var(--card-ink);font-size:14px}
 .banner.due b{font-family:var(--f-display);font-size:17px;text-transform:uppercase}

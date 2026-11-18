@@ -1331,8 +1331,8 @@ function tJogo(A){
   h+=cartaoAvCompleta();
   h+=painelPosJogo();
   if(A)h+=painelAprovar();
-  if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar: ${esc(avN(v.a))}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
-  if(A)for(const r of repasses())h+=`<div class="banner due"><span><b>Repassar no WhatsApp: ${r.n}</b><br>O app já avisou a galera no celular. Mande também no grupo do WhatsApp.</span><button class="btn sm" data-act="msg" data-v="${r.k}" data-p="${r.pid}" data-rk="${r.k}">Ver mensagem</button></div>`;
+  if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar:<br>${esc(avN(v.a))}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
+  if(A)for(const r of repasses())h+=`<div class="banner due"><span><b>Repassar no WhatsApp:<br>${r.n}</b><br>O app já avisou a galera no celular. Mande também no grupo do WhatsApp.</span><button class="btn sm" data-act="msg" data-v="${r.k}" data-p="${r.pid}" data-rk="${r.k}">Ver mensagem</button></div>`;
   const cur=atual();
   if(!cur){
     h+=A?`<button type="button" class="board board-marcar" data-act="np-abrir" aria-expanded="${!!UI.npAberto}"><div class="when">Sem pelada<br>marcada</div><div class="where">${EV()?'Evento livre':esc(DIAS[c.dia])+' das '+esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div><span class="board-cta">${UI.npAberto?'Marcando a pelada ▾':'＋ Toque para marcar a pelada'}</span></button>`
