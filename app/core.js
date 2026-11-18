@@ -369,6 +369,32 @@ function ocorrencias(a,now=new Date()){
   const next=new Date(last);next.setDate(next.getDate()+7);
   return{last,next};
 }
+// cartões de alerta (Hora de mandar / Repassar no WhatsApp): texto curto à esquerda, botão à direita; arrastar para o lado tira o alerta (com Desfazer)
+function cartaoTexto(nome,rotulo,quando){return`<b>${nome}</b><br><span class="sw-sub">${rotulo}${quando?' · '+quando:''}</span>`}
+function cartaoSw(cls,attrs,texto,botao){return`<div class="sw-wrap"><div class="sw-fundo" aria-hidden="true"><span>🗑️ Tirar alerta</span><span>Tirar alerta 🗑️</span></div><div class="banner due swc${cls}" ${attrs}><span>${texto}</span>${botao}</div></div>`}
+let SW_UNDO=null;
+function swTirar(el){const d=el.dataset;let volta=null;
+  if(d.sw==='aviso'){const a=S.avisos[d.a];if(!a)return;const antes=JSON.parse(JSON.stringify(a));const feitos=Object.fromEntries(Object.entries({...(a.feitos||{}),[d.key]:true}).sort().slice(-12));put('avisos/'+d.a,{...a,feitos});volta=()=>put('avisos/'+d.a,antes)}
+  else if(d.sw==='rep'){const p=S.pel[d.p];if(!p)return;const antes={...(p.rep||{})};patch('peladas/'+d.p,{rep:{...antes,[d.k]:true}});volta=()=>patch('peladas/'+d.p,{rep:antes})}
+  if(!volta)return;SW_UNDO=volta;
+  const t=document.getElementById('toast');t.innerHTML='<span style="flex:1">Alerta tirado.</span><button class="btn sm" data-act="sw-desfazer">Desfazer</button>';t.hidden=true;void t.offsetWidth;t.hidden=false;t.onclick=null;
+  clearTimeout(toast.t);toast.t=setTimeout(()=>{t.hidden=true;SW_UNDO=null},6000)}
+(function(){let el=null,x0=0,y0=0,dx=0,modo=0;
+  const fim=()=>{if(!el)return;const c=el,w=c.offsetWidth;el=null;c.style.transition='transform .2s ease';
+    if(modo===1&&Math.abs(dx)>w*.35){c.style.transform=`translateX(${dx>0?w+40:-w-40}px)`;c.dataset.arrastou='1';setTimeout(()=>{const wr=c.closest('.sw-wrap');if(wr){wr.style.transition='height .2s ease,margin .2s ease';wr.style.height=wr.offsetHeight+'px';void wr.offsetHeight;wr.style.height='0';wr.style.marginBottom='0'}setTimeout(()=>swTirar(c),200)},200)}
+    else{c.style.transform='';if(modo===1){c.dataset.arrastou='1';setTimeout(()=>{delete c.dataset.arrastou},50)}}
+    const wr=c.closest('.sw-wrap');if(wr&&Math.abs(dx)<=w*.35)wr.removeAttribute('data-lado');modo=0;dx=0};
+  document.addEventListener('pointerdown',e=>{const c=e.target.closest&&e.target.closest('.banner.swc');if(!c||e.button>0)return;el=c;x0=e.clientX;y0=e.clientY;dx=0;modo=0;c.style.transition='none'},{passive:true});
+  document.addEventListener('pointermove',e=>{if(!el)return;const mx=e.clientX-x0,my=e.clientY-y0;
+    if(!modo){if(Math.abs(my)>10&&Math.abs(my)>Math.abs(mx)){el.style.transition='';el=null;return}if(Math.abs(mx)>10)modo=1}
+    if(modo===1){dx=mx;el.style.transform=`translateX(${dx}px)`;const wr=el.closest('.sw-wrap');if(wr)wr.dataset.lado=dx>0?'d':'e'}},{passive:true});
+  document.addEventListener('pointerup',fim);document.addEventListener('pointercancel',fim);
+  document.addEventListener('click',e=>{const c=e.target.closest&&e.target.closest('.banner.swc[data-arrastou]');if(c){e.preventDefault();e.stopPropagation()}},true);
+})();
+// dica: nos 3 primeiros acessos o primeiro cartão se mexe sozinho para mostrar que dá para arrastar
+function swDica(){if(swDica.feita)return;const c=document.querySelector('.banner.swc');if(!c)return;let n=0;try{n=Number(localStorage.getItem('pelota.swDica')||0)}catch(e){}
+  if(n>=3)return;swDica.feita=true;try{localStorage.setItem('pelota.swDica',String(n+1))}catch(e){}
+  setTimeout(()=>{const k=document.querySelector('.banner.swc');if(!k)return;const wr=k.closest('.sw-wrap');if(wr)wr.dataset.lado='e';k.classList.add('sw-dica');setTimeout(()=>{k.classList.remove('sw-dica');if(wr)wr.removeAttribute('data-lado')},1400)},1200)}
 function avisosVencidos(){
   const now=new Date(),out=[];
   for(const[id,a] of Object.entries(S.avisos)){if(a.ativo===false||!AGENDA_OK.includes(a.tipo))continue;
@@ -1238,6 +1264,7 @@ function render(){
   renderNav();setTimeout(checarPush,0);
   const antes={};app.querySelectorAll('.lista-pres [data-fl]').forEach(e=>antes[e.dataset.fl]=e.getBoundingClientRect().top);
   app.innerHTML=renderTop()+(ready?renderTab():'<div class="empty">Carregando a pelada…</div>');
+  if(ready)swDica();
   // quem mudou de lugar na lista desliza até a nova posição (sem pular)
   if(Object.keys(antes).length&&!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches))app.querySelectorAll('.lista-pres [data-fl]').forEach(e=>{const t0=antes[e.dataset.fl];if(t0==null||!e.animate)return;const dy=t0-e.getBoundingClientRect().top;if(Math.abs(dy)>2)e.animate([{transform:`translateY(${dy}px)`,position:'relative',zIndex:2},{transform:'none',position:'relative',zIndex:2}],{duration:520,easing:'cubic-bezier(.22,.8,.28,1)'})});
   if(aid&&!document.getElementById('sheet').contains(ae)){const el=document.getElementById(aid);if(el&&el!==ae){el.focus();if(sel)try{el.setSelectionRange(sel[0],sel[1])}catch(e){}}}
@@ -1331,8 +1358,8 @@ function tJogo(A){
   h+=cartaoAvCompleta();
   h+=painelPosJogo();
   if(A)h+=painelAprovar();
-  if(A)for(const v of avisosVencidos())h+=`<div class="banner due"><span><b>Hora de mandar:<br>${esc(avN(v.a))}</b><br>Programado para ${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</span><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button></div>`;
-  if(A)for(const r of repasses())h+=`<div class="banner due"><span><b>Repassar no WhatsApp:<br>${r.n}</b><br>O app já avisou a galera no celular. Mande também no grupo do WhatsApp.</span><button class="btn sm" data-act="msg" data-v="${r.k}" data-p="${r.pid}" data-rk="${r.k}">Ver mensagem</button></div>`;
+  if(A)for(const v of avisosVencidos())h+=cartaoSw('',`data-sw="aviso" data-a="${v.id}" data-key="${v.key}"`,cartaoTexto(esc(avN(v.a)),'Hora de mandar',`${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}`),`<button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button>`);
+  if(A)for(const r of repasses())h+=cartaoSw(' wa',`data-sw="rep" data-p="${r.pid}" data-k="${r.k}"`,cartaoTexto(r.n,'Repassar no WhatsApp',''),`<button class="btn sm" data-act="msg" data-v="${r.k}" data-p="${r.pid}" data-rk="${r.k}">Ver mensagem</button>`);
   const cur=atual();
   if(!cur){
     h+=A?`<button type="button" class="board board-marcar" data-act="np-abrir" aria-expanded="${!!UI.npAberto}"><div class="when">Sem pelada<br>marcada</div><div class="where">${EV()?'Evento livre':esc(DIAS[c.dia])+' das '+esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div><span class="board-cta">${UI.npAberto?'Marcando a pelada ▾':'＋ Toque para marcar a pelada'}</span></button>`
@@ -2843,6 +2870,7 @@ document.addEventListener('click',async e=>{
     case'msg':{const ctx={};if(d.p)ctx.pel=S.pel[d.p];if(d.j)ctx.jid=d.j;if(d.m)ctx.mes=d.m;if(d.aviso){ctx.aviso=d.aviso;ctx.key=d.key}
       {const av=S.avisos[d.aviso||d.oa];if(d.v==='outro'&&av){ctx.titulo=av.titulo||'Outra mensagem';ctx.texto=av.texto||''}}
       if(d.rk&&d.p)ctx.rep={p:d.p,k:d.rk};sheetMsg(d.v,ctx);break}
+    case'sw-desfazer':{const f=SW_UNDO;SW_UNDO=null;document.getElementById('toast').hidden=true;if(f){f();toast('Alerta de volta.')}break}
     case'rep-feito':{const p=S.pel[d.p];if(p)patch('peladas/'+d.p,{rep:{...(p.rep||{}),[d.k]:true}});closeSheet();toast('Alerta tirado.');break}
     case'outro-agenda':{const titulo=((document.getElementById('msg-titulo')||{}).value||'').trim(),texto=(document.getElementById('msg-text').value||'').trim();
       if(!texto){toast('Escreva a mensagem primeiro.');return}sheetAviso(null,{tipo:'outro',titulo,texto});break}

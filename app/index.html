@@ -81,6 +81,17 @@ h3{font-size:17px;text-transform:uppercase;letter-spacing:.04em}
 .banner.demo{background:var(--card);color:var(--card-ink)}
 .banner.due{background:var(--card);color:var(--card-ink);font-size:14px}
 .banner.due b{font-family:var(--f-display);font-size:17px;text-transform:uppercase}
+.sw-wrap{position:relative;margin-bottom:12px;border-radius:4px;overflow:hidden}
+.sw-wrap>.banner{margin-bottom:0;position:relative;z-index:1;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.sw-fundo{position:absolute;inset:0;display:none;align-items:center;justify-content:space-between;padding:0 18px;background:var(--red);color:#fff;font-weight:700;font-size:14px}
+.sw-wrap[data-lado] .sw-fundo{display:flex}
+.sw-wrap[data-lado="e"] .sw-fundo span:first-child,.sw-wrap[data-lado="d"] .sw-fundo span:last-child{visibility:hidden}
+.banner .sw-sub{font-size:13px;opacity:.85}
+.banner.due.wa{background:repeating-linear-gradient(-45deg,rgba(0,0,0,.07) 0 3px,transparent 3px 12px),#1FA855;color:#fff}
+.banner.due.wa .btn{color:#0B5A2B}
+@keyframes swDica{0%,100%{transform:translateX(0)}35%,60%{transform:translateX(-72px)}}
+.banner.sw-dica{animation:swDica 1.3s ease}
+@media (prefers-reduced-motion:reduce){.banner.sw-dica{animation:none}}
 
 /* placar da próxima pelada */
 .board{background:var(--pitch);color:var(--pitch-ink);border-radius:16px;padding:16px;position:relative;overflow:hidden}
