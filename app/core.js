@@ -372,17 +372,21 @@ function ocorrencias(a,now=new Date()){
 // cartões de alerta (Hora de mandar / Repassar no WhatsApp): texto curto à esquerda, botão à direita; arrastar para o lado tira o alerta (com Desfazer)
 function cartaoTexto(nome,rotulo,quando){return`<b>${nome}</b><br><span class="sw-sub">${rotulo}${quando?' · '+quando:''}</span>`}
 function cartaoSw(cls,attrs,texto,botao){return`<div class="sw-wrap"><div class="sw-fundo" aria-hidden="true"><span>Excluir</span><span>Excluir</span></div><div class="banner due swc${cls}" ${attrs}><span>${texto}</span>${botao}</div></div>`}
-let SW_UNDO=null,SW_DICA_ON=false;try{SW_DICA_ON=Number(localStorage.getItem('pelota.swDica')||0)<3}catch(e){}
+let SW_DICA_ON=false;try{SW_DICA_ON=Number(localStorage.getItem('pelota.swDica')||0)<3}catch(e){}
 function swDicaTexto(){return SW_DICA_ON&&document.querySelector?'<p class="sw-dica-txt">← Arraste o cartão para o lado para excluir →</p>':''}
-function swTirar(el){const d=el.dataset;let volta=null;
-  if(d.sw==='aviso'){const a=S.avisos[d.a];if(!a)return;const antes=JSON.parse(JSON.stringify(a));const feitos=Object.fromEntries(Object.entries({...(a.feitos||{}),[d.key]:true}).sort().slice(-12));put('avisos/'+d.a,{...a,feitos});volta=()=>put('avisos/'+d.a,antes)}
-  else if(d.sw==='rep'){const p=S.pel[d.p];if(!p)return;const antes={...(p.rep||{})};patch('peladas/'+d.p,{rep:{...antes,[d.k]:true}});volta=()=>patch('peladas/'+d.p,{rep:antes})}
-  if(!volta)return;SW_UNDO=volta;
-  const t=document.getElementById('toast');t.innerHTML='<span style="flex:1">Excluído.</span><button class="btn sm" data-act="sw-desfazer">Desfazer</button>';t.hidden=true;void t.offsetWidth;t.hidden=false;t.onclick=null;
-  clearTimeout(toast.t);toast.t=setTimeout(()=>{t.hidden=true;SW_UNDO=null},6000)}
+function swTirar(el){const d=el.dataset;
+  if(d.sw==='aviso'){const a=S.avisos[d.a];if(!a)return;const feitos=Object.fromEntries(Object.entries({...(a.feitos||{}),[d.key]:true}).sort().slice(-12));put('avisos/'+d.a,{...a,feitos})}
+  else if(d.sw==='rep'){const p=S.pel[d.p];if(!p)return;patch('peladas/'+d.p,{rep:{...(p.rep||{}),[d.k]:true}})}}
+// depois de arrastar: no lugar do cartão fica um "Desfazer" cinza por 1 s; passou o tempo, exclui de vez
+function swSaiu(c){const wr=c.closest('.sw-wrap');if(!wr){swTirar(c);return}
+  wr.removeAttribute('data-lado');wr.classList.add('sw-saiu');
+  const u=document.createElement('div');u.className='sw-desf';u.innerHTML='<button class="btn sm" data-act="sw-desfazer">↩ Desfazer</button>';wr.appendChild(u);
+  wr._t=setTimeout(()=>{wr.style.transition='height .2s ease,margin .2s ease';wr.style.height=wr.offsetHeight+'px';void wr.offsetHeight;wr.style.height='0';wr.style.marginBottom='0';setTimeout(()=>swTirar(c),200)},1000)}
+function swVolta(b){const wr=b.closest('.sw-wrap');if(!wr)return;clearTimeout(wr._t);const c=wr.querySelector('.banner.swc'),u=wr.querySelector('.sw-desf');if(u)u.remove();wr.classList.remove('sw-saiu');
+  if(c){c.style.transition='transform .2s ease';c.style.transform='';setTimeout(()=>{delete c.dataset.arrastou},250)}}
 (function(){let el=null,x0=0,y0=0,dx=0,modo=0;
   const fim=()=>{if(!el)return;const c=el,w=c.offsetWidth;el=null;c.style.transition='transform .2s ease';
-    if(modo===1&&Math.abs(dx)>w*.35){c.style.transform=`translateX(${dx>0?w+40:-w-40}px)`;c.dataset.arrastou='1';setTimeout(()=>{const wr=c.closest('.sw-wrap');if(wr){wr.style.transition='height .2s ease,margin .2s ease';wr.style.height=wr.offsetHeight+'px';void wr.offsetHeight;wr.style.height='0';wr.style.marginBottom='0'}setTimeout(()=>swTirar(c),200)},200)}
+    if(modo===1&&Math.abs(dx)>w*.35){c.style.transform=`translateX(${dx>0?w+40:-w-40}px)`;c.dataset.arrastou='1';setTimeout(()=>swSaiu(c),200)}
     else{c.style.transform='';if(modo===1){c.dataset.arrastou='1';setTimeout(()=>{delete c.dataset.arrastou},50)}}
     const wr=c.closest('.sw-wrap');if(wr&&Math.abs(dx)<=w*.35)wr.removeAttribute('data-lado');modo=0;dx=0};
   document.addEventListener('pointerdown',e=>{const c=e.target.closest&&e.target.closest('.banner.swc');if(!c||e.button>0)return;el=c;x0=e.clientX;y0=e.clientY;dx=0;modo=0;c.style.transition='none'},{passive:true});
@@ -2872,7 +2876,7 @@ document.addEventListener('click',async e=>{
     case'msg':{const ctx={};if(d.p)ctx.pel=S.pel[d.p];if(d.j)ctx.jid=d.j;if(d.m)ctx.mes=d.m;if(d.aviso){ctx.aviso=d.aviso;ctx.key=d.key}
       {const av=S.avisos[d.aviso||d.oa];if(d.v==='outro'&&av){ctx.titulo=av.titulo||'Outra mensagem';ctx.texto=av.texto||''}}
       if(d.rk&&d.p)ctx.rep={p:d.p,k:d.rk};sheetMsg(d.v,ctx);break}
-    case'sw-desfazer':{const f=SW_UNDO;SW_UNDO=null;document.getElementById('toast').hidden=true;if(f){f();toast('Voltou.')}break}
+    case'sw-desfazer':swVolta(b);break;
     case'rep-feito':{const p=S.pel[d.p];if(p)patch('peladas/'+d.p,{rep:{...(p.rep||{}),[d.k]:true}});closeSheet();toast('Alerta tirado.');break}
     case'outro-agenda':{const titulo=((document.getElementById('msg-titulo')||{}).value||'').trim(),texto=(document.getElementById('msg-text').value||'').trim();
       if(!texto){toast('Escreva a mensagem primeiro.');return}sheetAviso(null,{tipo:'outro',titulo,texto});break}
