@@ -371,13 +371,14 @@ function ocorrencias(a,now=new Date()){
 }
 // cartões de alerta (Hora de mandar / Repassar no WhatsApp): texto curto à esquerda, botão à direita; arrastar para o lado tira o alerta (com Desfazer)
 function cartaoTexto(nome,rotulo,quando){return`<b>${nome}</b><br><span class="sw-sub">${rotulo}${quando?' · '+quando:''}</span>`}
-function cartaoSw(cls,attrs,texto,botao){return`<div class="sw-wrap"><div class="sw-fundo" aria-hidden="true"><span>🗑️ Tirar alerta</span><span>Tirar alerta 🗑️</span></div><div class="banner due swc${cls}" ${attrs}><span>${texto}</span>${botao}</div></div>`}
-let SW_UNDO=null;
+function cartaoSw(cls,attrs,texto,botao){return`<div class="sw-wrap"><div class="sw-fundo" aria-hidden="true"><span>Excluir</span><span>Excluir</span></div><div class="banner due swc${cls}" ${attrs}><span>${texto}</span>${botao}</div></div>`}
+let SW_UNDO=null,SW_DICA_ON=false;try{SW_DICA_ON=Number(localStorage.getItem('pelota.swDica')||0)<3}catch(e){}
+function swDicaTexto(){return SW_DICA_ON&&document.querySelector?'<p class="sw-dica-txt">← Arraste o cartão para o lado para excluir →</p>':''}
 function swTirar(el){const d=el.dataset;let volta=null;
   if(d.sw==='aviso'){const a=S.avisos[d.a];if(!a)return;const antes=JSON.parse(JSON.stringify(a));const feitos=Object.fromEntries(Object.entries({...(a.feitos||{}),[d.key]:true}).sort().slice(-12));put('avisos/'+d.a,{...a,feitos});volta=()=>put('avisos/'+d.a,antes)}
   else if(d.sw==='rep'){const p=S.pel[d.p];if(!p)return;const antes={...(p.rep||{})};patch('peladas/'+d.p,{rep:{...antes,[d.k]:true}});volta=()=>patch('peladas/'+d.p,{rep:antes})}
   if(!volta)return;SW_UNDO=volta;
-  const t=document.getElementById('toast');t.innerHTML='<span style="flex:1">Alerta tirado.</span><button class="btn sm" data-act="sw-desfazer">Desfazer</button>';t.hidden=true;void t.offsetWidth;t.hidden=false;t.onclick=null;
+  const t=document.getElementById('toast');t.innerHTML='<span style="flex:1">Excluído.</span><button class="btn sm" data-act="sw-desfazer">Desfazer</button>';t.hidden=true;void t.offsetWidth;t.hidden=false;t.onclick=null;
   clearTimeout(toast.t);toast.t=setTimeout(()=>{t.hidden=true;SW_UNDO=null},6000)}
 (function(){let el=null,x0=0,y0=0,dx=0,modo=0;
   const fim=()=>{if(!el)return;const c=el,w=c.offsetWidth;el=null;c.style.transition='transform .2s ease';
@@ -1359,7 +1360,8 @@ function tJogo(A){
   h+=painelPosJogo();
   if(A)h+=painelAprovar();
   if(A)for(const v of avisosVencidos())h+=cartaoSw('',`data-sw="aviso" data-a="${v.id}" data-key="${v.key}"`,cartaoTexto(esc(avN(v.a)),'Hora de mandar',`${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}`),`<button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button>`);
-  if(A)for(const r of repasses())h+=cartaoSw(' wa',`data-sw="rep" data-p="${r.pid}" data-k="${r.k}"`,cartaoTexto(r.n,'Repassar no WhatsApp',''),`<button class="btn sm" data-act="msg" data-v="${r.k}" data-p="${r.pid}" data-rk="${r.k}">Ver mensagem</button>`);
+  if(A)for(const r of repasses())h+=cartaoSw(' wa',`data-sw="rep" data-p="${r.pid}" data-k="${r.k}"`,cartaoTexto(r.n,'✓ Já enviado pelo app<br>Agora repasse no WhatsApp',''),`<button class="btn sm" data-act="msg" data-v="${r.k}" data-p="${r.pid}" data-rk="${r.k}">Ver mensagem</button>`);
+  if(A&&(avisosVencidos().length||repasses().length))h+=swDicaTexto();
   const cur=atual();
   if(!cur){
     h+=A?`<button type="button" class="board board-marcar" data-act="np-abrir" aria-expanded="${!!UI.npAberto}"><div class="when">Sem pelada<br>marcada</div><div class="where">${EV()?'Evento livre':esc(DIAS[c.dia])+' das '+esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div><span class="board-cta">${UI.npAberto?'Marcando a pelada ▾':'＋ Toque para marcar a pelada'}</span></button>`
@@ -2870,7 +2872,7 @@ document.addEventListener('click',async e=>{
     case'msg':{const ctx={};if(d.p)ctx.pel=S.pel[d.p];if(d.j)ctx.jid=d.j;if(d.m)ctx.mes=d.m;if(d.aviso){ctx.aviso=d.aviso;ctx.key=d.key}
       {const av=S.avisos[d.aviso||d.oa];if(d.v==='outro'&&av){ctx.titulo=av.titulo||'Outra mensagem';ctx.texto=av.texto||''}}
       if(d.rk&&d.p)ctx.rep={p:d.p,k:d.rk};sheetMsg(d.v,ctx);break}
-    case'sw-desfazer':{const f=SW_UNDO;SW_UNDO=null;document.getElementById('toast').hidden=true;if(f){f();toast('Alerta de volta.')}break}
+    case'sw-desfazer':{const f=SW_UNDO;SW_UNDO=null;document.getElementById('toast').hidden=true;if(f){f();toast('Voltou.')}break}
     case'rep-feito':{const p=S.pel[d.p];if(p)patch('peladas/'+d.p,{rep:{...(p.rep||{}),[d.k]:true}});closeSheet();toast('Alerta tirado.');break}
     case'outro-agenda':{const titulo=((document.getElementById('msg-titulo')||{}).value||'').trim(),texto=(document.getElementById('msg-text').value||'').trim();
       if(!texto){toast('Escreva a mensagem primeiro.');return}sheetAviso(null,{tipo:'outro',titulo,texto});break}
