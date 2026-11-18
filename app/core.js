@@ -372,8 +372,9 @@ function ocorrencias(a,now=new Date()){
 // cartões de alerta (Hora de mandar / Repassar no WhatsApp): texto curto à esquerda, botão à direita; arrastar para o lado tira o alerta (com Desfazer)
 function cartaoTexto(nome,rotulo,quando){return`<b>${nome}</b><br><span class="sw-sub">${rotulo}${quando?' · '+quando:''}</span>`}
 function cartaoSw(cls,attrs,texto,botao){return`<div class="sw-wrap"><div class="sw-fundo" aria-hidden="true"><span>Excluir</span><span>Excluir</span></div><div class="banner due swc${cls}" ${attrs}><span>${texto}</span>${botao}</div></div>`}
-// a linha escrita da dica aparece só nas 3 primeiras aberturas do app; o cartão se mexer acontece sempre (swDica)
-let SW_DICA_ON=false;try{const n=Number(localStorage.getItem('pelota.swDica')||0);SW_DICA_ON=n<3;if(n<3)localStorage.setItem('pelota.swDica',String(n+1))}catch(e){}
+// dica de arrastar: nas 5 primeiras vezes em que o cartão REALMENTE aparece na tela (uma por abertura do app), ele se mexe sozinho e aparece a linha escrita; depois para
+let SW_DICA_N=0;try{SW_DICA_N=Number(localStorage.getItem('pelota.swDica5')||0)}catch(e){}
+let SW_DICA_ON=SW_DICA_N<5;
 function swDicaTexto(){return SW_DICA_ON&&document.querySelector?'<p class="sw-dica-txt">← Arraste o cartão para o lado para excluir →</p>':''}
 function swTirar(el){const d=el.dataset;
   if(d.sw==='aviso'){const a=S.avisos[d.a];if(!a)return;const feitos=Object.fromEntries(Object.entries({...(a.feitos||{}),[d.key]:true}).sort().slice(-12));put('avisos/'+d.a,{...a,feitos})}
@@ -393,9 +394,14 @@ function swSaiu(c){const wr=c.closest('.sw-wrap');if(!wr){swTirar(c);return}
   document.addEventListener('pointerup',fim);document.addEventListener('pointercancel',fim);
   document.addEventListener('click',e=>{const c=e.target.closest&&e.target.closest('.banner.swc[data-arrastou]');if(c){e.preventDefault();e.stopPropagation()}},true);
 })();
-// dica: toda vez que o app é aberto, o primeiro cartão se mexe sozinho uma vez para mostrar que dá para arrastar (o Felipe quer sempre, não só no começo)
-function swDica(){if(swDica.feita)return;const c=document.querySelector('.banner.swc');if(!c)return;swDica.feita=true;
-  setTimeout(()=>{const k=document.querySelector('.banner.swc');if(!k)return;const wr=k.closest('.sw-wrap');if(wr)wr.dataset.lado='e';k.classList.add('sw-dica');setTimeout(()=>{k.classList.remove('sw-dica');if(wr)wr.removeAttribute('data-lado')},1400)},1200)}
+function swDica(){if(swDica.feita||!SW_DICA_ON)return;const c=document.querySelector('.banner.swc');if(!c)return;
+  if(swDica.obs)swDica.obs.disconnect();if(!window.IntersectionObserver)return;
+  // só mexe quando o cartão está inteiro na tela e o app está aberto na frente; se sair da tela antes, espera aparecer de novo
+  let t=null;const obs=new IntersectionObserver(es=>{const e=es[0];clearTimeout(t);if(!e||e.intersectionRatio<.95||document.hidden)return;
+    t=setTimeout(()=>{const k=e.target;if(!k.isConnected||swDica.feita||document.hidden)return;const r=k.getBoundingClientRect();if(r.top<0||r.bottom>innerHeight)return;
+      swDica.feita=true;obs.disconnect();try{localStorage.setItem('pelota.swDica5',String(SW_DICA_N+1))}catch(e){}
+      const wr=k.closest('.sw-wrap');if(wr)wr.dataset.lado='e';k.classList.add('sw-dica');setTimeout(()=>{k.classList.remove('sw-dica');if(wr)wr.removeAttribute('data-lado')},1400)},700)},{threshold:[0,.95,1]});
+  obs.observe(c);swDica.obs=obs}
 function avisosVencidos(){
   const now=new Date(),out=[];
   for(const[id,a] of Object.entries(S.avisos)){if(a.ativo===false||!AGENDA_OK.includes(a.tipo))continue;
