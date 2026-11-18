@@ -377,13 +377,9 @@ function swDicaTexto(){return SW_DICA_ON&&document.querySelector?'<p class="sw-d
 function swTirar(el){const d=el.dataset;
   if(d.sw==='aviso'){const a=S.avisos[d.a];if(!a)return;const feitos=Object.fromEntries(Object.entries({...(a.feitos||{}),[d.key]:true}).sort().slice(-12));put('avisos/'+d.a,{...a,feitos})}
   else if(d.sw==='rep'){const p=S.pel[d.p];if(!p)return;patch('peladas/'+d.p,{rep:{...(p.rep||{}),[d.k]:true}})}}
-// depois de arrastar: no lugar do cartão fica um "Desfazer" cinza por 1 s; passou o tempo, exclui de vez
+// depois de arrastar até o fim: a linha se fecha e o alerta é excluído na hora (sem Desfazer, a pedido do Felipe)
 function swSaiu(c){const wr=c.closest('.sw-wrap');if(!wr){swTirar(c);return}
-  wr.removeAttribute('data-lado');wr.classList.add('sw-saiu');
-  const u=document.createElement('div');u.className='sw-desf';u.innerHTML='<button class="btn sm" data-act="sw-desfazer">↩ Desfazer</button>';wr.appendChild(u);
-  wr._t=setTimeout(()=>{wr.style.transition='height .2s ease,margin .2s ease';wr.style.height=wr.offsetHeight+'px';void wr.offsetHeight;wr.style.height='0';wr.style.marginBottom='0';setTimeout(()=>swTirar(c),200)},1000)}
-function swVolta(b){const wr=b.closest('.sw-wrap');if(!wr)return;clearTimeout(wr._t);const c=wr.querySelector('.banner.swc'),u=wr.querySelector('.sw-desf');if(u)u.remove();wr.classList.remove('sw-saiu');
-  if(c){c.style.transition='transform .2s ease';c.style.transform='';setTimeout(()=>{delete c.dataset.arrastou},250)}}
+  wr.removeAttribute('data-lado');wr.style.transition='height .2s ease,margin .2s ease';wr.style.height=wr.offsetHeight+'px';void wr.offsetHeight;wr.style.height='0';wr.style.marginBottom='0';setTimeout(()=>swTirar(c),200)}
 (function(){let el=null,x0=0,y0=0,dx=0,modo=0;
   const fim=()=>{if(!el)return;const c=el,w=c.offsetWidth;el=null;c.style.transition='transform .2s ease';
     if(modo===1&&Math.abs(dx)>w*.35){c.style.transform=`translateX(${dx>0?w+40:-w-40}px)`;c.dataset.arrastou='1';setTimeout(()=>swSaiu(c),200)}
@@ -2876,7 +2872,6 @@ document.addEventListener('click',async e=>{
     case'msg':{const ctx={};if(d.p)ctx.pel=S.pel[d.p];if(d.j)ctx.jid=d.j;if(d.m)ctx.mes=d.m;if(d.aviso){ctx.aviso=d.aviso;ctx.key=d.key}
       {const av=S.avisos[d.aviso||d.oa];if(d.v==='outro'&&av){ctx.titulo=av.titulo||'Outra mensagem';ctx.texto=av.texto||''}}
       if(d.rk&&d.p)ctx.rep={p:d.p,k:d.rk};sheetMsg(d.v,ctx);break}
-    case'sw-desfazer':swVolta(b);break;
     case'rep-feito':{const p=S.pel[d.p];if(p)patch('peladas/'+d.p,{rep:{...(p.rep||{}),[d.k]:true}});closeSheet();toast('Alerta tirado.');break}
     case'outro-agenda':{const titulo=((document.getElementById('msg-titulo')||{}).value||'').trim(),texto=(document.getElementById('msg-text').value||'').trim();
       if(!texto){toast('Escreva a mensagem primeiro.');return}sheetAviso(null,{tipo:'outro',titulo,texto});break}
