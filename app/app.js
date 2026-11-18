@@ -44,6 +44,7 @@ async function backendReal() {
     listenCol: (p, cb, err) => F.onSnapshot(F.collection(fs, p), s => cb(s.docs.map(d => ({ id: d.id, data: d.data() }))), e => err && err(e)),
     listenOnde: (p, campo, valor, cb, err) => F.onSnapshot(F.query(F.collection(fs, p), F.where(campo, '==', valor)), s => cb(s.docs.map(d => ({ id: d.id, data: d.data() }))), e => err && err(e)),
     listar: async p => (await F.getDocs(F.collection(fs, p)).catch(erro)).docs.map(d => d.id),
+    onde: async (p, campo, valor) => (await F.getDocs(F.query(F.collection(fs, p), F.where(campo, '==', valor))).catch(erro)).docs.map(d => ({ id: d.id, data: d.data() })),
     ultimos: async (p, campo, n) => (await F.getDocs(F.query(F.collection(fs, p), F.orderBy(campo, 'desc'), F.limit(n))).catch(erro)).docs.map(d => ({ id: d.id, data: d.data() })),
     tirarGrupo: (uid, gid) => F.updateDoc(ref('users/' + uid), { ['grupos.' + gid]: F.deleteField() }).catch(erro),
     batch: async ops => { const b = F.writeBatch(fs); for (const o of ops) { if (o.op === 'del') b.delete(ref(o.path)); else b.set(ref(o.path), o.data, o.op === 'merge' ? { merge: true } : {}); } await b.commit().catch(erro); }
@@ -78,6 +79,7 @@ function backendMock() {
     listenCol: (p, cb) => { setTimeout(() => cb(colDocs(p)), 0); return add(colL, p, cb); },
     listenOnde: (p, campo, valor, cb) => { const f = ds => ds.filter(x => x.data[campo] === valor); setTimeout(() => cb(f(colDocs(p))), 0); return add(colL, p, ds => cb(f(ds))); },
     listar: async p => colDocs(p).map(d => d.id),
+    onde: async (p, campo, valor) => colDocs(p).filter(x => x.data[campo] === valor),
     ultimos: async (p, campo, n) => colDocs(p).sort((a, b) => (b.data[campo] || 0) - (a.data[campo] || 0)).slice(0, n),
     tirarGrupo: async (uid, gid) => { const p = 'users/' + uid, u = clone(store.get(p)) || {}; if (u.grupos) delete u.grupos[gid]; store.set(p, u); fire(p); },
     batch: async ops => { for (const o of ops) { if (o.op === 'del') await api.del(o.path); else await api.set(o.path, o.data, { merge: o.op === 'merge' }); } }
@@ -305,6 +307,9 @@ function render() {
   if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + (UIp.supInfo ? `<div class="sup-info"><span>🛟 <b>${UIp.supInfo.novo ? 'Pedido enviado' : 'Pedido já enviado'}</b> · ${escH(UIp.supInfo.nome)} · vale até ${(d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'))(new Date(UIp.supInfo.em + PEDIDO_VALE))}</span><button class="btn sm" data-sh="sup-cancelar" data-v="${escH(UIp.supInfo.gid)}">Retirar</button><button class="btn sm" data-sh="sup-info-ok" aria-label="Fechar">✕</button></div>` : '') + telaGruposDono();
   if (t === 'donoreps') h = topo('perfil') + abasDono('reps') + telaRepsDono();
   if (t === 'donoerros') h = topo('perfil') + abasDono('erros') + telaErrosDono();
+  if (t === 'donovitrine') h = topo('perfil') + abasDono('vitrine') + telaVitrine();
+  if (t === 'donovitform') h = topo('donovitrine') + telaVitForm();
+  if (t === 'donovitviu') h = topo('donovitrine') + telaVitViu();
   if (t === 'donosuporte') h = topo('perfil') + abasDono('suporte') + telaDuvidasDono();
   if (t === 'parceiro') h = topo('perfil') + telaParceiro();
   if (t === 'donorepqr') { const x = repDoQr(), A3 = UIp.repFmt === 'a3', A4 = UIp.repFmt === 'a4' || A3;
@@ -475,6 +480,8 @@ function render() {
   el.dataset.tela = t;
   if (['minhas', 'boas', 'login', 'criar'].includes(t)) try { localStorage.setItem('pf_logado', t === 'minhas' ? '1' : '0'); } catch (e) {}
   if (t === 'minhas' && de && de.r.height) animarCarta(el, de);
+  if (t === 'minhas') { vtExemplosMock(); vtAgendar(); }
+  if (t === 'donovitform') vtUrlPrev().then(vtPrev);
 }
 // A carta nasce do cartão verde: mesma posição e altura, e vai crescendo até caber as valências e os números.
 function animarCarta(el, de) {
@@ -905,14 +912,254 @@ async function notasServidor(acao, extra) {
   if (!r.ok) throw Object.assign(new Error(j.erro || 'Não deu certo agora. Tente de novo.'), { status: r.status });
   return j;
 }
-function abasDono(at) { return `<div class="pick" style="margin:6px 0 4px"><button type="button" data-sh="dono" aria-pressed="${at === 'dono'}">Visão geral</button><button type="button" data-sh="dono-grupos" aria-pressed="${at === 'grupos'}">Grupos</button><button type="button" data-sh="dono-reps" aria-pressed="${at === 'reps'}">Representantes</button><button type="button" data-sh="notas" aria-pressed="${at === 'notas'}">Notas fiscais</button><button type="button" data-sh="dono-erros" aria-pressed="${at === 'erros'}">Erros</button><button type="button" class="aba-sup" data-sh="dono-suporte" aria-pressed="${at === 'suporte'}">🛟 Suporte técnico${ouvirDuvidasDono() ? `<span class="badge-n">${ouvirDuvidasDono()}</span>` : ''}</button></div>`; }
-/* lista de grupos do painel, com várias formas de procurar */
-const GF0 = { q: '', sit: 'todos', uf: '', cidade: '', pix: '', pag: '', tipo: '', dia: '', ord: 'recente' };
+function abasDono(at) { return `<div class="pick abas-dono" style="margin:6px 0 4px"><button type="button" data-sh="dono" aria-pressed="${at === 'dono'}">Visão geral</button><button type="button" data-sh="dono-grupos" aria-pressed="${at === 'grupos'}">Grupos</button><button type="button" data-sh="dono-reps" aria-pressed="${at === 'reps'}">Represen&shy;tantes</button><button type="button" data-sh="notas" aria-pressed="${at === 'notas'}">Notas fiscais</button><button type="button" data-sh="dono-vitrine" aria-pressed="${at === 'vitrine'}">Vitrine</button><button type="button" data-sh="dono-erros" aria-pressed="${at === 'erros'}">Erros</button><button type="button" class="aba-sup" data-sh="dono-suporte" aria-pressed="${at === 'suporte'}">🛟 Suporte técnico${ouvirDuvidasDono() ? `<span class="badge-n">${ouvirDuvidasDono()}</span>` : ''}</button></div>`; }
+/* ================= Vitrine (Painel do dono → Vitrine): avisos e divulgação do app inteiro =================
+   Não confundir com a aba Avisos de cada pelada: a Vitrine é só do dono do app e vale para todo mundo.
+   O dono escreve (texto, imagem ou vídeo curto, botão com link), escolhe quem recebe (Organizadores, Jogadores,
+   Contas sem pelada, Representantes), quem precisa confirmar e para quais grupos. Ao abrir o app, aparece por cima de tudo.
+   Banco: avisosApp/{id}; avisosApp/{id}/partes/{n} (mídia em pedaços, sem Storage); avisosApp/{id}/cientes/{uid} (quem viu);
+   users/{uid}.avisosLidos (para não mostrar de novo). */
+const VT_PARTE = 700000, VT_VIDEO_MAX = 6 * 1048576;
+const VT_PARA = [['org', 'Organizadores', 'administram pelo menos uma pelada'], ['jog', 'Jogadores', 'estão em pelo menos uma pelada com conta'], ['semgrupo', 'Contas sem pelada', 'criaram conta, mas não estão em nenhuma pelada'], ['rep', 'Representantes', 'parceiros com código ou QR Code de indicação']];
+const VT_NOME = { org: 'Organizadores', jog: 'Jogadores', semgrupo: 'Contas sem pelada', rep: 'Representantes' };
+const VT_PAPEL = { org: 'Organizador', jog: 'Jogador', semgrupo: 'Conta sem pelada', rep: 'Representante' };
+const VT_ADIADOS = new Set(); let VT_FILA = [], VT_ABERTO = false, VT_VEZ = 0, VT_CHECOU = 0;
+const vtHoje = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const vtDataBR = d => d ? d.split('-').reverse().join('/') : '';
+const vtKb = n => n >= 1048576 ? (n / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+const vtNoAr = a => a && a.ativo !== false && (!a.fim || a.fim >= vtHoje()) && (!a.inicio || a.inicio <= vtHoje());
+const vtObrig = (a, p) => !!(a.obrig && a.obrig[p]);
+const vtAlvoOk = (a, gid) => !a.alvo || a.alvo.todas || (a.alvo.grupos || []).includes(gid);
+// representante: o servidor diz (pelo e-mail); o aparelho guarda o "sim" e, para quem não é, confere de novo no máximo 1 vez por semana
+function vtSouRep() { return !!(EU && (UIp.parcOk || ls.get('pelota.parc.' + EU.uid) === '1')); }
+async function vtConferirRep() { if (!EU || vtSouRep()) return; const k = 'pelota.parcck.' + EU.uid; if (Date.now() - (Number(ls.get(k)) || 0) < 7 * 864e5) return;
+  try { await parceiroServidor('meu'); UIp.parcOk = true; ls.set('pelota.parc.' + EU.uid, '1'); } catch (e) { if (e && e.status === 404) ls.set(k, String(Date.now())); } }
+// os papéis desta pessoa que o aviso alcança: [papel, gid, nome do grupo]
+function vtMeus(a) {
+  const P = a.para || [], out = [], ids = Object.keys(GRUPOS || {});
+  for (const gid of ids) { const g = GRUPOS[gid] || {}, p = (g.admins || []).includes(EU.uid) ? 'org' : 'jog'; if (P.includes(p) && vtAlvoOk(a, gid)) out.push([p, gid, g.nome || '']); }
+  if (!ids.length && P.includes('semgrupo')) out.push(['semgrupo', null, '']);
+  if (P.includes('rep') && vtSouRep()) out.push(['rep', null, '']);
+  return out;
+}
+async function vtMidia(id, a) {
+  if (!a.midia || !a.midia.partes) return null;
+  const ps = await Promise.all(Array.from({ length: a.midia.partes }, (_, i) => B.get(`avisosApp/${id}/partes/${i}`)));
+  const bin = atob(ps.map(p => (p && p.d) || '').join('')), u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([u8], { type: a.midia.mime || (a.midia.tipo === 'video' ? 'video/mp4' : 'image/jpeg') }));
+}
+// ao entrar no app: espera a carta nascer (uns 4 s) e mostra um aviso por vez, os de confirmar primeiro
+function vtAgendar() { if (!EU || Date.now() - VT_CHECOU < 60 * 60 * 1000) return; VT_CHECOU = Date.now(); setTimeout(vtChecar, 4000); }
+async function vtChecar() {
+  const vez = ++VT_VEZ; if (!EU) return;
+  let lista; try { lista = await B.onde('avisosApp', 'ativo', true); } catch (e) { return; }
+  if (vez !== VT_VEZ || !EU) return;
+  if (lista.some(x => vtNoAr(x.data) && (x.data.para || []).includes('rep'))) await vtConferirRep();
+  const lidos = (PERFIL && PERFIL.avisosLidos) || {};
+  VT_FILA = lista.filter(({ id, data: a }) => vtNoAr(a) && !lidos[id] && !VT_ADIADOS.has(id) && vtMeus(a).length)
+    .map(x => ({ ...x, imp: vtMeus(x.data).some(([p]) => vtObrig(x.data, p)) }))
+    .sort((x, y) => (x.imp ? 0 : 1) - (y.imp ? 0 : 1) || (x.data.criadoEm || 0) - (y.data.criadoEm || 0));
+  vtProximo();
+}
+async function vtProximo() {
+  // pula o que já foi visto ou adiado enquanto esperava (a fila pode ter sido montada de novo)
+  while (VT_FILA.length && (((PERFIL && PERFIL.avisosLidos) || {})[VT_FILA[0].id] || VT_ADIADOS.has(VT_FILA[0].id))) VT_FILA.shift();
+  if (VT_ABERTO || !VT_FILA.length) return;
+  const { id, data: a, imp } = VT_FILA.shift(); VT_ABERTO = true;
+  const url = await vtMidia(id, a).catch(() => null);
+  vtAbrir(a, url, imp, acao => {
+    if (acao === 'depois') VT_ADIADOS.add(id);
+    else {
+      const em = Date.now(); if (PERFIL) PERFIL.avisosLidos = { ...(PERFIL.avisosLidos || {}), [id]: em };
+      B.set('users/' + EU.uid, { avisosLidos: { [id]: em } }, { merge: true }).catch(() => { });
+      const ms = vtMeus(a), nome = String((PERFIL && (PERFIL.apelido || PERFIL.nome)) || EU.nome || '').slice(0, 80);
+      B.set(`avisosApp/${id}/cientes/${EU.uid}`, { em, confirmou: !!imp, nome, email: String(EU.email || '').slice(0, 120), papeis: [...new Set(ms.map(m => m[0]))].slice(0, 4), grupos: [...new Set(ms.map(m => m[2]).filter(Boolean))].map(n => n.slice(0, 80)).slice(0, 10) }).catch(() => { });
+    }
+    if (url) URL.revokeObjectURL(url);
+    VT_ABERTO = false; setTimeout(vtProximo, 300);
+  });
+}
+// o desenho do aviso (o mesmo no app e na prévia do celular). Sem botão forte: a pessoa marca a caixinha de propósito.
+function vtHTML(a, url, imp) {
+  const cheia = a.formato === 'cheia' && url, midia = !url ? '' : a.midia && a.midia.tipo === 'video'
+    ? `<video class="vt-midia" src="${url}" autoplay muted loop playsinline ${cheia ? '' : 'controls'}></video>` : `<img class="vt-midia" src="${url}" alt="">`;
+  const fim = `${a.botao && a.botao.link ? `<button type="button" class="btn block vt-link">${escH(a.botao.texto || 'Saiba mais')}</button>` : ''}
+    <label class="vt-ciente"><input type="checkbox" class="vt-ck"><span>${imp ? 'Li e estou ciente' : 'Entendi'}</span></label>
+    <button type="button" class="vt-dep">${imp ? 'Ver mais tarde' : 'Ver depois'}</button>`;
+  if (cheia) return `<div class="vt-cheia">${midia}<div class="vt-rodape">${fim}</div></div>`;
+  return `<div class="vt-caixa"><span class="vt-tag${imp ? ' imp' : ''}">${imp ? 'Aviso importante' : 'Novidade'}</span>
+    ${a.titulo ? `<h3>${escH(a.titulo)}</h3>` : ''}${midia}${a.texto ? `<div class="vt-texto">${escH(a.texto).replace(/\n/g, '<br>')}</div>` : ''}${fim}</div>`;
+}
+function vtLigar(el, a, fim) {
+  const ck = el.querySelector('.vt-ck'); let foi = false;
+  ck.onchange = () => { if (!ck.checked || foi) return; foi = true; ck.closest('.vt-ciente').classList.add('ok'); setTimeout(() => fim('ok'), 450); };
+  el.querySelector('.vt-dep').onclick = () => { if (!foi) { foi = true; fim('depois'); } };
+  const l = el.querySelector('.vt-link'); if (l) l.onclick = () => window.open(a.botao.link, '_blank', 'noopener');
+}
+// a janela de verdade: por cima de tudo, só fecha pelos controles dela (tocar fora não fecha)
+function vtAbrir(a, url, imp, fim) {
+  const el = document.createElement('div');
+  el.className = 'vt-bg' + (a.formato === 'cheia' && url ? ' cheia' : ''); el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+  el.innerHTML = vtHTML(a, url, imp);
+  document.body.appendChild(el); const ov = document.body.style.overflow; document.body.style.overflow = 'hidden';
+  vtLigar(el, a, acao => { el.remove(); document.body.style.overflow = ov; fim(acao); });
+}
+// imagem: até 1600 px, JPEG com fundo branco (PNG transparente); se o celular não abrir do jeito normal (ex.: HEIF de Samsung), tenta de outro jeito
+function vtAbrirImg(f) { return new Promise((res, rej) => { const u = URL.createObjectURL(f), im = new Image();
+  im.onload = () => { URL.revokeObjectURL(u); res(im); };
+  im.onerror = () => { URL.revokeObjectURL(u); if (window.createImageBitmap) createImageBitmap(f).then(res, () => rej(new Error('Não consegui abrir essa imagem neste celular. Tente outra (de preferência um print ou JPEG).'))); else rej(new Error('Não consegui abrir essa imagem neste celular. Tente outra.')); };
+  im.src = u; }); }
+async function vtLerMidia(f) {
+  if (/^image\//.test(f.type) || /\.(jpe?g|png|webp|heic|heif|gif)$/i.test(f.name || '')) {
+    const im = await vtAbrirImg(f), W = im.naturalWidth || im.width, H = im.naturalHeight || im.height, k = Math.min(1, 1600 / Math.max(W, H));
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(W * k)); c.height = Math.max(1, Math.round(H * k));
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+    let url = ''; for (const q of [0.85, 0.75, 0.65, 0.55]) { url = c.toDataURL('image/jpeg', q); if (url.length * 0.75 <= 600000) break; }
+    return { tipo: 'img', mime: 'image/jpeg', dados: url.split(',')[1], w: c.width, h: c.height, nome: f.name || 'imagem.jpg' };
+  }
+  if (/^video\//.test(f.type) || /\.(mp4|mov|m4v|webm)$/i.test(f.name || '')) {
+    if (f.size > VT_VIDEO_MAX) throw new Error(`Esse vídeo tem ${vtKb(f.size)}. O limite é 6 MB: use um vídeo mais curto (até uns 15 segundos).`);
+    const u = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+    return { tipo: 'video', mime: f.type || 'video/mp4', dados: String(u).split(',')[1], nome: f.name || 'video.mp4' };
+  }
+  throw new Error('Escolha uma imagem ou um vídeo.');
+}
+const vtParaTxt = a => (a.para || []).map(p => VT_NOME[p] + (vtObrig(a, p) ? ' (confirma)' : '')).join(', ');
+const vtEstado = a => a.ativo === false ? ['Pausado', 'off'] : a.fim && a.fim < vtHoje() ? ['Encerrado', 'off'] : a.inicio && a.inicio > vtHoje() ? ['Começa ' + vtDataBR(a.inicio).slice(0, 5), 'esp'] : ['No ar', 'on'];
+// ---------- lista (Painel do dono → Vitrine) ----------
+async function vtCarregar() { const V = UIp.vit = UIp.vit || {}; V.carregando = true; V.erro = null; if (TELA === 'donovitrine') render();
+  try { V.lista = await B.ultimos('avisosApp', 'criadoEm', 100); } catch (e) { V.erro = e && e.code === 'permission-denied' ? 'Sem permissão. As regras novas do banco entram no ar depois do Cloud Shell.' : 'Não consegui carregar. Tente de novo.'; }
+  V.carregando = false; if (TELA === 'donovitrine') render(); }
+function telaVitrine() { const V = UIp.vit || {}, L = V.lista;
+  let h = `<h2>Vitrine</h2><p class="lead">Avisos e divulgação do app inteiro (novidades, mudança de regra, campeonato, propaganda). Aparecem por cima de tudo quando a pessoa abre o app. Não é a aba Avisos das peladas.</p>
+    <button class="btn block primary" data-sh="vt-novo">+ Novo na vitrine</button>`;
+  if (V.erro) return h + `<div class="banner">${escH(V.erro)}</div><button class="btn" data-sh="vt-recarregar">Tentar de novo</button>`;
+  if (!L) return h + '<p class="sub">Carregando…</p>';
+  if (!L.length) return h + '<p class="sub">A vitrine está vazia. Toque em "+ Novo na vitrine".</p>';
+  return h + `<div class="stack" style="gap:10px">${L.map(({ id, data: a }) => { const [st, c] = vtEstado(a), ng = (a.alvo && a.alvo.grupos || []).length;
+    return `<div class="panel vt-item"><div class="row" style="justify-content:space-between;gap:10px;flex-wrap:nowrap;align-items:flex-start"><b style="font-size:16px">${escH(a.titulo || '(sem título)')}</b><span class="vt-st ${c}">${st}</span></div>
+      <div class="sub">Para ${escH(vtParaTxt(a) || '—')} · ${!a.alvo || a.alvo.todas ? 'todos os grupos' : `${ng} grupo${ng === 1 ? '' : 's'}`}${a.midia ? ` · com ${a.midia.tipo === 'video' ? 'vídeo' : 'imagem'}${a.formato === 'cheia' ? ' em tela cheia' : ''}` : ''} · ${a.fim ? 'no ar até ' + vtDataBR(a.fim) : 'sem data para sair'}</div>
+      <div class="vt-acoes"><button class="btn sm" data-sh="vt-viu" data-v="${escH(id)}">Quem viu</button><button class="btn sm" data-sh="vt-editar" data-v="${escH(id)}">Editar</button><button class="btn sm" data-sh="vt-pausa" data-v="${escH(id)}">${a.ativo === false ? 'Pôr no ar' : 'Pausar'}</button><button class="btn sm vt-apagar" data-sh="vt-apagar" data-v="${escH(id)}">Apagar</button></div></div>`; }).join('')}</div>`; }
+// ---------- quem viu ----------
+async function vtCarregarViu(id) { const V = UIp.vit; V.viu = { id, lista: null };
+  try { V.viu.lista = await B.ultimos(`avisosApp/${id}/cientes`, 'em', 5000); } catch (e) { V.viu.erro = 'Não consegui carregar. Tente de novo.'; }
+  if (TELA === 'donovitviu') render(); }
+function telaVitViu() { const V = UIp.vit || {}, W = V.viu || {}, a = ((V.lista || []).find(x => x.id === W.id) || {}).data || {}, L = W.lista;
+  let h = `<h2>Quem viu</h2><p class="lead">${escH(a.titulo || '')}</p>`;
+  if (W.erro) return h + `<div class="banner">${escH(W.erro)}</div>`;
+  if (!L) return h + '<p class="sub">Carregando…</p>';
+  const conf = L.filter(c => c.data.confirmou).length;
+  return h + `<p class="sub" style="margin:0"><b>${L.length}</b> pessoa${L.length === 1 ? '' : 's'} ${L.length === 1 ? 'viu' : 'viram'}; <b>${conf}</b> confirm${conf === 1 ? 'ou' : 'aram'}.</p>
+    ${L.length ? `<div class="list">${L.map(({ data: c }) => `<div class="item" style="align-items:flex-start"><div class="grow"><div class="name">${escH(c.nome || c.email || 'Sem nome')}</div>
+      <div class="sub">${escH((c.papeis || []).map(p => VT_PAPEL[p] || p).join(', '))}${(c.grupos || []).length ? ' · ' + escH(c.grupos.join(', ')) : ''}</div>
+      <div class="sub">${new Date(c.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}${c.email && c.nome ? ' · ' + escH(c.email) : ''}</div></div>
+      <span class="vt-st ${c.confirmou ? 'on' : 'off'}">${c.confirmou ? 'Confirmou' : 'Viu'}</span></div>`).join('')}</div>` : ''}`; }
+// ---------- criar / editar ----------
+function vtNovoForm(id) { const a = id ? (((UIp.vit || {}).lista || []).find(x => x.id === id) || {}).data || {} : {};
+  UIp.vf = { ...GF0 };
+  UIp.vform = { id: id || null, a0: id ? a : null, titulo: a.titulo || '', texto: a.texto || '', formato: a.formato === 'cheia' ? 'cheia' : 'janela',
+    midia: a.midia ? { ...a.midia, antiga: true } : null, tirou: false, url: null,
+    btx: (a.botao || {}).texto || '', blk: (a.botao || {}).link || '',
+    para: new Set(id ? a.para || [] : ['org', 'jog']), obrig: Object.fromEntries(VT_PARA.map(([k]) => [k, vtObrig(a, k)])),
+    todos: !a.alvo || !!a.alvo.todas, sel: new Set((a.alvo && a.alvo.grupos) || []),
+    ini: a.inicio || vtHoje(), fim: a.fim || '', como: null, erro: '' };
+  ir('donovitform'); if (!UIp.painel || !UIp.painel.dados) carregarPainel(); vtUrlPrev().then(() => vtPrev()); }
+async function vtUrlPrev() { const X = UIp.vform; if (!X || X.url !== null) return X && X.url; if (!X.midia) return X.url = '';
+  if (X.midia.dados) { const bin = atob(X.midia.dados), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); X.url = URL.createObjectURL(new Blob([u8], { type: X.midia.mime })); }
+  else X.url = (await vtMidia(X.id, X.a0).catch(() => '')) || '';
+  return X.url; }
+const vtDados = X => ({ titulo: X.titulo.trim(), texto: X.texto.trim(), formato: X.formato, midia: X.midia, botao: X.blk.trim() ? { texto: X.btx.trim() || 'Saiba mais', link: X.blk.trim() } : null });
+// a prévia no celular desenhado muda enquanto o dono preenche
+function vtPrev() { const X = UIp.vform, p = $('vt-prev'); if (!X || !p) return;
+  const s = [...X.para]; if (!s.includes(X.como)) X.como = s[0] || null;
+  const como = $('vt-como'); if (como) como.innerHTML = VT_PARA.map(([k]) => `<button type="button" data-sh="vt-como" data-v="${k}" aria-pressed="${k === X.como}" ${s.includes(k) ? '' : 'disabled'}>${VT_NOME[k]}</button>`).join('');
+  const d = vtDados(X), url = X.url || '', imp = !!(X.como && X.obrig[X.como] && X.para.has(X.como));
+  p.className = 'vt-bg vt-dentro' + (d.formato === 'cheia' && url ? ' cheia' : '');
+  p.innerHTML = vtHTML(d, url, imp); p.querySelectorAll('button,input,a').forEach(x => { x.tabIndex = -1; });
+  const v = p.querySelector('video'); if (v) v.muted = true; }
+function vtListaGrupos() { const X = UIp.vform, P = UIp.painel || {}, D = P.dados;
+  if (!D) return P.erro ? `<div class="banner">${escH(P.erro)}</div>` : '<p class="sub">Carregando os grupos…</p>';
+  const L = gruposFiltrados(UIp.vf), n = L.filter(g => X.sel.has(g.gid)).length;
+  return `<div class="vt-gtopo"><span class="sub" style="margin:0"><b>${L.length}</b> no filtro · <b>${X.sel.size}</b> escolhido${X.sel.size === 1 ? '' : 's'}</span><button type="button" class="btn sm" data-sh="vt-marcar">${L.length && n === L.length ? 'Desmarcar os do filtro' : 'Marcar todos do filtro'}</button></div>
+    <div class="vt-glista">${L.length ? L.map(g => `<label class="vt-g"><input type="checkbox" data-vtg="${escH(g.gid)}" ${X.sel.has(g.gid) ? 'checked' : ''}><span class="grow"><b>${escH(g.nome)}</b><span class="sub">${escH([g.cidade, g.uf].filter(Boolean).join(' · ') || 'Sem cidade')}${g.evento ? ' · evento' : g.dia != null ? ' · ' + DIAS_CURTO[g.dia] : ''} · ${g.ativo ? 'ativo' : 'parado'}</span></span></label>`).join('') : '<p class="sub">Nenhum grupo com esses filtros.</p>'}</div>`; }
+function telaVitForm() { const X = UIp.vform; if (!X) return '<h2>Vitrine</h2>';
+  const D = (UIp.painel || {}).dados, chave = (attr, k, on, dis) => `<label class="sw"><input type="checkbox" ${attr}="${k}" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''}><span></span></label>`;
+  const temGrupoTipo = X.para.has('org') || X.para.has('jog'), mid = X.midia;
+  return `<h2>${X.id ? 'Editar na vitrine' : 'Novo na vitrine'}</h2>
+  <label class="field"><span>Título</span><input data-vt="titulo" maxlength="80" value="${escH(X.titulo)}" placeholder="Ex.: Copa Pelota FC 2027"><i class="sub">Aparece na lista do Painel. ${X.formato === 'cheia' && mid ? 'Em tela cheia o título não aparece no celular.' : ''}</i></label>
+  <label class="field"><span>Texto</span><textarea data-vt="texto" rows="4" maxlength="1500" placeholder="Explique em poucas linhas.">${escH(X.texto)}</textarea></label>
+  <div class="field"><span>Imagem ou vídeo <i class="opc">opcional</i></span>
+    ${mid ? `<div class="vt-midbox"><span class="grow"><b>${mid.tipo === 'video' ? '🎬 Vídeo' : '🖼️ Imagem'}</b><span class="sub">${escH(mid.nome || (mid.antiga ? 'já salvo' : ''))} · ${vtKb(mid.tam || Math.round((mid.dados || '').length * 0.75))}${mid.w ? ` · ${mid.w} × ${mid.h}` : ''}</span></span><label class="btn sm">Trocar<input type="file" hidden data-vtarq accept="image/*,video/mp4,video/quicktime,video/webm"></label><button type="button" class="btn sm" data-sh="vt-tirar">Tirar</button></div>`
+    : `<label class="btn block">+ Imagem ou vídeo<input type="file" hidden data-vtarq accept="image/*,video/mp4,video/quicktime,video/webm"></label><i class="sub">Vídeo: até 6 MB (uns 15 segundos). Prefira MP4, que abre em iPhone e Android.</i>`}
+    ${X.merr ? `<span class="vt-err">${escH(X.merr)}</span>` : ''}</div>
+  ${mid ? `<div class="field"><span>Como a imagem aparece</span><div class="seg" role="group"><button type="button" data-sh="vt-fmt" data-v="janela" aria-pressed="${X.formato === 'janela'}">Janela com texto</button><button type="button" data-sh="vt-fmt" data-v="cheia" aria-pressed="${X.formato === 'cheia'}">Tela cheia</button></div>
+    <i class="sub">${X.formato === 'cheia' ? 'A imagem ocupa a tela toda, inteira, sem cortar (título e texto não aparecem, só os controles embaixo). Tamanho ideal: em pé, 1080 × 1920.' : 'A imagem aparece inteira, com o título e o texto. Tamanho ideal: quadrada, 1080 × 1080.'}</i></div>` : ''}
+  <div class="par"><label class="field"><span>Texto do botão <i class="opc">opcional</i></span><input data-vt="btx" maxlength="30" value="${escH(X.btx)}" placeholder="Ex.: Inscreva-se"></label><label class="field"><span>Link do botão</span><input data-vt="blk" inputmode="url" maxlength="300" value="${escH(X.blk)}" placeholder="https://"></label></div>
+  <div class="field"><span>Quem recebe?</span><div class="vt-chaves">${VT_PARA.map(([k, n, s]) => `<div class="vt-ch"><div class="grow"><b>${n}</b><div class="sub">${s}</div></div>${chave('data-vtp', k, X.para.has(k))}</div>`).join('')}</div></div>
+  <div class="field"><span>Precisa confirmar que viu?</span><i class="sub">Ligado: a caixinha diz "Li e estou ciente". Desligado: diz "Entendi". Nos dois, "Ver depois" faz voltar na próxima vez que abrir o app.</i>
+    <div class="vt-chaves">${VT_PARA.map(([k, n]) => { const on = X.para.has(k); return `<div class="vt-ch${on ? '' : ' vt-off'}"><div class="grow"><b>${n}</b>${on ? '' : '<div class="sub">não recebe este aviso</div>'}</div>${chave('data-vto', k, on && X.obrig[k], !on)}</div>`; }).join('')}</div></div>
+  <div class="field"><span>Para quais grupos?</span><div class="seg" role="group"><button type="button" data-sh="vt-alvo" data-v="todos" aria-pressed="${X.todos}">Todos</button><button type="button" data-sh="vt-alvo" data-v="escolher" aria-pressed="${!X.todos}">Escolher</button></div>
+    <i class="sub vt-cinza">Vale para Organizadores e Jogadores. Contas sem pelada não têm grupo, e Representantes recebem pela própria chave: para esses dois, a escolha de grupos não muda nada.</i>
+    ${X.todos ? `<i class="sub">Vai para todos os grupos${D ? ` (hoje são ${(D.grupos || []).length})` : ''}, inclusive os criados enquanto estiver no ar.</i>`
+    : `${D ? filtrosGruposHTML(UIp.vf, D.grupos || [], 'vf', 'vf') : ''}<div id="vt-grupos">${vtListaGrupos()}</div>`}${!temGrupoTipo && !X.todos ? '<i class="sub vt-cinza">Organizadores e Jogadores estão desligados: os grupos escolhidos não vão mudar nada agora.</i>' : ''}</div>
+  <div class="par"><label class="field"><span>Começa em</span><input type="date" data-vt="ini" value="${escH(X.ini)}"></label><label class="field"><span>Sai do ar em <i class="opc">opcional</i></span><input type="date" data-vt="fim" value="${escH(X.fim)}"></label></div>
+  <div class="field"><span>Como vai aparecer no celular</span><div class="seg vt-como" id="vt-como" role="group"></div>
+    <div class="vt-fone"><div class="vt-tela"><div class="vt-app"></div><div class="vt-bg vt-dentro" id="vt-prev"></div></div></div>
+    <button type="button" class="btn sm" style="align-self:center" data-sh="vt-real">Ver em tamanho real</button></div>
+  ${X.erro ? `<div class="banner">${escH(X.erro)}</div>` : ''}
+  <div class="vt-fim"><button type="button" class="btn" data-sh="vt-cancelar">Cancelar</button><button type="button" class="btn primary" data-sh="vt-salvar">${X.id ? 'Salvar' : 'Pôr no ar'}</button></div>`; }
+function vtValidar() { const X = UIp.vform, d = vtDados(X), para = VT_PARA.map(([k]) => k).filter(k => X.para.has(k));
+  if (!d.titulo) throw new Error('Escreva o título.');
+  if (!d.texto && !X.midia) throw new Error('Escreva o texto ou ponha uma imagem ou vídeo.');
+  if (!para.length) throw new Error('Ligue pelo menos um tipo em "Quem recebe?".');
+  if (!X.todos && !X.sel.size && (X.para.has('org') || X.para.has('jog'))) throw new Error('Escolha pelo menos um grupo (ou "Todos").');
+  if (d.botao && !/^https:\/\/[^\s]+\.[^\s]+/i.test(d.botao.link)) throw new Error('O link do botão precisa começar com https://');
+  const ini = X.ini || vtHoje(), fim = X.fim || null;
+  if (fim && fim < ini) throw new Error('A data de sair do ar é antes da data de começo.');
+  return { titulo: d.titulo, texto: d.texto, formato: X.midia ? X.formato : 'janela', para, obrig: Object.fromEntries(VT_PARA.map(([k]) => [k, X.para.has(k) && !!X.obrig[k]])),
+    alvo: X.todos ? { todas: true } : { grupos: [...X.sel] }, inicio: ini, fim, botao: d.botao }; }
+async function vtSalvar(b) { const X = UIp.vform; X.erro = ''; let d; try { d = vtValidar(); } catch (e) { X.erro = e.message; render(); vtPrev(); return; }
+  b.disabled = true; b.textContent = 'Salvando…';
+  try { const id = X.id || ('av' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), a0 = X.a0 || {}, ops = [];
+    let md = X.midia && X.midia.antiga ? a0.midia : null;
+    if (X.tirou && a0.midia && a0.midia.partes) for (let i = 0; i < a0.midia.partes; i++) ops.push({ op: 'del', path: `avisosApp/${id}/partes/${i}` });
+    if (ops.length) await B.batch(ops);
+    if (X.midia && X.midia.dados) { const n = Math.ceil(X.midia.dados.length / VT_PARTE);
+      for (let i = 0; i < n; i++) await B.set(`avisosApp/${id}/partes/${i}`, { d: X.midia.dados.slice(i * VT_PARTE, (i + 1) * VT_PARTE) });
+      md = { tipo: X.midia.tipo, mime: X.midia.mime, partes: n, tam: Math.round(X.midia.dados.length * 0.75), ...(X.midia.w ? { w: X.midia.w, h: X.midia.h } : {}) }; }
+    await B.set('avisosApp/' + id, { ...d, midia: md, ativo: X.id ? a0.ativo !== false : true, criadoEm: a0.criadoEm || Date.now(), editadoEm: Date.now() });
+    if (X.url) URL.revokeObjectURL(X.url);
+    UIp.vform = null; aviso(X.id ? 'Salvo' : 'No ar na vitrine'); ir('donovitrine'); vtCarregar(); }
+  catch (e) { X.erro = msgErro(e); b.disabled = false; render(); vtPrev(); } }
+async function vtApagar(id) { const a = (((UIp.vit || {}).lista || []).find(x => x.id === id) || {}).data || {};
+  const cs = await B.ultimos(`avisosApp/${id}/cientes`, 'em', 5000).catch(() => []);
+  const ops = [...cs.map(c => ({ op: 'del', path: `avisosApp/${id}/cientes/${c.id}` })), ...Array.from({ length: (a.midia && a.midia.partes) || 0 }, (_, i) => ({ op: 'del', path: `avisosApp/${id}/partes/${i}` })), { op: 'del', path: 'avisosApp/' + id }];
+  for (let i = 0; i < ops.length; i += 400) await B.batch(ops.slice(i, i + 400)); }
+// modo de teste: 2 exemplos na vitrine (um "Aviso importante" e uma "Novidade" com imagem)
+function vtExemplosMock() {
+  if (!MOCK || window.__vtEx) return; window.__vtEx = true;
+  const c = document.createElement('canvas'); c.width = 1080; c.height = 1080; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 1080, 1080); gr.addColorStop(0, '#1B6B3A'); gr.addColorStop(1, '#0F3D22'); g.fillStyle = gr; g.fillRect(0, 0, 1080, 1080);
+  g.fillStyle = '#F2C12E'; g.beginPath(); g.arc(540, 430, 210, 0, 7); g.fill(); g.fillStyle = '#0F3D22'; g.font = 'bold 150px sans-serif'; g.textAlign = 'center'; g.fillText('⚽', 540, 485);
+  g.fillStyle = '#fff'; g.font = 'bold 92px sans-serif'; g.fillText('COPA PELOTA FC', 540, 800); g.font = '54px sans-serif'; g.fillText('Inscrições abertas', 540, 890);
+  const d = c.toDataURL('image/jpeg', .8).split(',')[1], agora = Date.now();
+  B.set('avisosApp/exImp', { titulo: 'Nova regra de cobrança', texto: 'A partir de dezembro, a diária dos diaristas passa a ser paga só pelo Pix do app. Confira os valores na aba Caixa da sua pelada.', formato: 'janela', para: ['org', 'jog'], obrig: { org: true, jog: false, semgrupo: false, rep: false }, alvo: { todas: true }, inicio: vtHoje(), fim: null, botao: null, midia: null, ativo: true, criadoEm: agora - 2000 });
+  B.set('avisosApp/exNov/partes/0', { d });
+  B.set('avisosApp/exNov', { titulo: 'Copa Pelota FC', texto: 'Monte seu time e participe da primeira Copa Pelota FC. Vagas limitadas!', formato: 'janela', para: ['org', 'jog', 'semgrupo'], obrig: { org: false, jog: false, semgrupo: false, rep: false }, alvo: { todas: true }, inicio: vtHoje(), fim: null, botao: { texto: 'Inscreva-se', link: 'https://pelotafc.com.br' }, midia: { tipo: 'img', mime: 'image/jpeg', partes: 1, tam: Math.round(d.length * .75), w: 1080, h: 1080 }, ativo: true, criadoEm: agora - 1000 });
+  B.set('avisosApp/exImp/cientes/uX', { em: agora - 36e5, confirmou: true, nome: 'Carlos Souza', email: 'carlos@exemplo.com', papeis: ['org'], grupos: ['Pelada do Sábado'] });
+  B.set('avisosApp/exImp/cientes/uY', { em: agora - 18e5, confirmou: false, nome: 'Marcos Lima', email: 'marcos@exemplo.com', papeis: ['jog'], grupos: ['Pelada do Sábado'] });
+}
+
+/* lista de grupos do painel, com várias formas de procurar (a mesma peça serve para a Vitrine → Escolher grupos) */
+const GF0 = { q: '', sit: 'todos', reg: '', uf: '', cidade: '', pix: '', pag: '', tipo: '', dia: '', ord: 'recente' };
+const REGIOES_UF = { Norte: ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'], Nordeste: ['AL', 'BA', 'CE', 'MA', 'PB', 'PE', 'PI', 'RN', 'SE'], 'Centro-Oeste': ['DF', 'GO', 'MT', 'MS'], Sudeste: ['ES', 'MG', 'RJ', 'SP'], Sul: ['PR', 'RS', 'SC'] };
+const regiaoDe = uf => Object.keys(REGIOES_UF).find(r => REGIOES_UF[r].includes(uf)) || '';
 const DIAS_CURTO = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const semAcento = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-function gruposFiltrados() { const G = ((UIp.painel || {}).dados || {}).grupos || [], F = UIp.gf || GF0, q = semAcento(F.q).trim();
+function gruposFiltrados(F0) { const G = ((UIp.painel || {}).dados || {}).grupos || [], F = F0 || UIp.gf || GF0, q = semAcento(F.q).trim();
   let L = G.filter(g => (!q || semAcento([g.nome, g.cidade, g.uf, g.codigo].join(' ')).includes(q))
-    && (F.sit === 'todos' || (F.sit === 'ativos' ? g.ativo : !g.ativo)) && (!F.uf || g.uf === F.uf) && (!F.cidade || (g.cidade + ' · ' + g.uf) === F.cidade)
+    && (F.sit === 'todos' || (F.sit === 'ativos' ? g.ativo : !g.ativo)) && (!F.reg || regiaoDe(g.uf) === F.reg) && (!F.uf || g.uf === F.uf) && (!F.cidade || (g.cidade + ' · ' + g.uf) === F.cidade)
     && (!F.pix || (F.pix === 'sim') === g.pix) && (!F.pag || (F.pag === 'sim') === (g.comissaoMes > 0)) && (!F.tipo || (F.tipo === 'evento') === g.evento)
     && (F.dia === '' || g.dia === Number(F.dia)));
   const ord = { recente: (a, b) => (b.criadoEm || 0) - (a.criadoEm || 0), antigo: (a, b) => (a.criadoEm || 0) - (b.criadoEm || 0), jogadores: (a, b) => b.jogadores - a.jogadores,
@@ -927,25 +1174,31 @@ function listaGruposHTML() { const L = gruposFiltrados(), n = v => Number(v || 0
       <span>${g.pix ? '💳 Pix conectado' : '💳 Sem Pix'}${g.comissaoMes > 0 ? ' · ' + rs(g.comissaoMes) + ' de comissão no mês' : ''}</span><span>🔑 Código ${escH(g.codigo || '—')}</span>${g.rep ? `<span>🤝 Representante ${escH(g.rep)}</span>` : ''}<span>🗓️ Criado em ${dc(g.criadoEm)}</span></div>
     <button class="btn sm" style="align-self:flex-start" data-sh="suporte-dono" data-v="${escH(g.gid)}">🛟 Suporte</button></div>`).join('')
     : '<p class="sub">Nenhum grupo com esses filtros.</p>'); }
-function telaGruposDono() { const P = UIp.painel || {}, D = P.dados;
-  if (!D) return '<h2>Grupos</h2>' + (P.erro ? `<div class="banner">${escH(P.erro)}</div>` : '<p class="lead">Carregando os grupos…</p>');
-  const F = UIp.gf = UIp.gf || { ...GF0 }, G = D.grupos || [];
-  const ufs = [...new Set(G.map(g => g.uf).filter(Boolean))].sort(), cids = [...new Set(G.filter(g => g.uf && (!F.uf || g.uf === F.uf)).map(g => g.cidade + ' · ' + g.uf))].sort();
-  const sel = (k, rot, ops) => `<label class="field" style="margin:0"><span>${rot}</span><select data-gf="${k}">${ops.map(([v, t]) => `<option value="${escH(v)}" ${String(F[k]) === String(v) ? 'selected' : ''}>${escH(t)}</option>`).join('')}</select></label>`;
-  return `<h2>Grupos</h2><p class="lead">Todos os grupos do app. Procure pelo nome, cidade, código de convite ou QR Code.</p>
-  <div class="row" style="gap:8px;flex-wrap:nowrap"><label class="field" style="flex:1;min-width:0;margin:0"><input type="search" data-gf="q" value="${escH(F.q)}" placeholder="Nome, cidade ou código" aria-label="Procurar grupo"></label><button class="btn sm" data-sh="dono-qr" aria-label="Ler QR Code do grupo">📷 QR</button></div>
-  <div class="pick">${[['todos', 'Todos'], ['ativos', 'Ativos'], ['parados', 'Parados']].map(([v, t]) => `<button type="button" data-sh="gf-sit" data-v="${v}" aria-pressed="${F.sit === v}">${t}</button>`).join('')}</div>
-  <details class="panel" style="padding:10px 14px" ${UIp.gfAberto ? 'open' : ''}><summary data-sh="gf-abrir"><b>Mais filtros</b></summary>
+// os filtros da aba Grupos (iguais na Vitrine → Escolher grupos): só mostram opções que existem
+function filtrosGruposHTML(F, G, attr, pref, qr) {
+  const ufsTodas = [...new Set(G.map(g => g.uf).filter(Boolean))].sort(), regs = Object.keys(REGIOES_UF).filter(r => ufsTodas.some(u => REGIOES_UF[r].includes(u)));
+  const ufs = ufsTodas.filter(u => !F.reg || REGIOES_UF[F.reg].includes(u)), cids = [...new Set(G.filter(g => g.uf && ufs.includes(g.uf) && (!F.uf || g.uf === F.uf)).map(g => g.cidade + ' · ' + g.uf))].sort();
+  const sel = (k, rot, ops) => `<label class="field" style="margin:0"><span>${rot}</span><select data-${attr}="${k}">${ops.map(([v, t]) => `<option value="${escH(v)}" ${String(F[k]) === String(v) ? 'selected' : ''}>${escH(t)}</option>`).join('')}</select></label>`;
+  return `<div class="row" style="gap:8px;flex-wrap:nowrap"><label class="field" style="flex:1;min-width:0;margin:0"><input type="search" data-${attr}="q" value="${escH(F.q)}" placeholder="Nome, cidade ou código" aria-label="Procurar grupo"></label>${qr ? '<button class="btn sm" data-sh="dono-qr" aria-label="Ler QR Code do grupo">📷 QR</button>' : ''}</div>
+  <div class="pick">${[['todos', 'Todos'], ['ativos', 'Ativos'], ['parados', 'Parados']].map(([v, t]) => `<button type="button" data-sh="${pref}-sit" data-v="${v}" aria-pressed="${F.sit === v}">${t}</button>`).join('')}</div>
+  <details class="panel" style="padding:10px 14px" ${UIp[pref + 'Aberto'] ? 'open' : ''}><summary data-sh="${pref}-abrir"><b>Mais filtros</b></summary>
     <div class="par" style="margin-top:10px">
+    ${sel('reg', 'Região', [['', 'Todas'], ...regs.map(r => [r, r])])}
     ${sel('uf', 'Estado', [['', 'Todos'], ...ufs.map(u => [u, u])])}
     ${sel('cidade', 'Cidade', [['', 'Todas'], ...cids.map(c => [c, c])])}
     ${sel('pix', 'Pix', [['', 'Todos'], ['sim', 'Com Pix'], ['nao', 'Sem Pix']])}
-    ${sel('pag', 'Pagante', [['', 'Todos'], ['sim', 'Gerou comissão'], ['nao', 'Sem comissão']])}
+    ${sel('pag', 'Pagante', [['', 'Todos'], ['sim', 'Gerou comissão no mês'], ['nao', 'Sem comissão']])}
     ${sel('tipo', 'Tipo', [['', 'Todos'], ['fixa', 'Fixa (toda semana)'], ['evento', 'Evento']])}
     ${sel('dia', 'Dia da pelada', [['', 'Todos'], ...DIAS_CURTO.map((d, i) => [String(i), d])])}
     </div></details>
   <div class="row" style="gap:8px;flex-wrap:nowrap;align-items:flex-end">${sel('ord', 'Ordenar por', [['recente', 'Mais novos'], ['antigo', 'Mais antigos'], ['ultima', 'Pelada mais recente'], ['jogadores', 'Mais jogadores'], ['comissao', 'Mais comissão'], ['nome', 'Nome (A–Z)']])}
-    <button class="btn" data-sh="gf-limpar" style="flex:none;min-height:42px">Limpar filtros</button></div>
+    <button class="btn" data-sh="${pref}-limpar" style="flex:none;min-height:42px">Limpar filtros</button></div>`;
+}
+function telaGruposDono() { const P = UIp.painel || {}, D = P.dados;
+  if (!D) return '<h2>Grupos</h2>' + (P.erro ? `<div class="banner">${escH(P.erro)}</div>` : '<p class="lead">Carregando os grupos…</p>');
+  const F = UIp.gf = UIp.gf || { ...GF0 }, G = D.grupos || [];
+  return `<h2>Grupos</h2><p class="lead">Todos os grupos do app. Procure pelo nome, cidade, código de convite ou QR Code.</p>
+  ${filtrosGruposHTML(F, G, 'gf', 'gf', true)}
   <div id="gf-lista" class="stack" style="gap:10px">${listaGruposHTML()}</div>`; }
 /* representantes + simulador do líquido (fase 1: só cadastro; os grupos ligam na fase 2 pelo código da loja) */
 const SIM0 = { preco: '19,90', loja: '15', imp: '6', com: '10', regime: 'simples' };
@@ -1330,9 +1583,9 @@ function telaDono() { const P = UIp.painel || {}, D = P.dados;
     <tbody>${D.cidades.length ? D.cidades.map(c => `<tr style="border-top:1px solid var(--line,#d2dbce)"><td style="padding:6px 4px">${escH(c.nome)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.grupos)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.jogadores)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.contas)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.pagantes)}</td></tr>`).join('') : '<tr><td colspan="5" class="sub" style="padding:6px 4px">Nenhuma cidade informada ainda.</td></tr>'}</tbody></table></div></div>
   <p class="sub" style="text-align:center;margin:0">Atualizado às ${new Date(D.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${P.carregando ? ' · atualizando…' : ''}</p>
   <button class="btn block" data-sh="dono-atualizar">Atualizar números</button>`; }
-async function carregarPainel() { const P = UIp.painel = UIp.painel || {}; P.carregando = true; P.erro = null; if (TELA === 'dono' || TELA === 'donogrupos') render();
+async function carregarPainel() { const P = UIp.painel = UIp.painel || {}; P.carregando = true; P.erro = null; if (TELA === 'dono' || TELA === 'donogrupos') render(); if (TELA === 'donovitform') vtRedesenha();
   try { P.dados = MOCK ? painelMock() : await notasServidor('painel'); } catch (e) { P.erro = e.message; }
-  P.carregando = false; if (TELA === 'dono' || TELA === 'donogrupos') render(); }
+  P.carregando = false; if (TELA === 'dono' || TELA === 'donogrupos') render(); if (TELA === 'donovitform') vtRedesenha(); }
 function painelMock() { const r = (nome, grupos, ativos, jogadores, contas, pagantes) => ({ nome, grupos, ativos, jogadores, contas, pagantes, comissaoMes: pagantes * 9.4 });
   return { em: Date.now(), mes: new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 7), contas: { total: 412, novas30: 58, ativas30: 296, comCidade: 187 },
     totais: { grupos: 23, ativos: 19, jogadores: 486, membros: 351, comPix: 9, pagantes: 7, pixMes: 214, volumeMes: 5180.5, comissaoMes: 51.81, semCidade: 2 },
@@ -1564,6 +1817,24 @@ document.addEventListener('click', async e => {
   if (a === 'gf-sit') { UIp.gf.sit = v; render(); }
   if (a === 'gf-limpar') { UIp.gf = { ...GF0 }; render(); }
   if (a === 'gf-abrir') { UIp.gfAberto = !UIp.gfAberto; }
+  if (a === 'vf-sit') { UIp.vf.sit = v; vtRedesenha(); }
+  if (a === 'vf-limpar') { UIp.vf = { ...GF0 }; vtRedesenha(); }
+  if (a === 'vf-abrir') { UIp.vfAberto = !UIp.vfAberto; }
+  if (a === 'dono-vitrine') { ir('donovitrine'); vtCarregar(); }
+  if (a === 'vt-recarregar') vtCarregar();
+  if (a === 'vt-novo') vtNovoForm(null);
+  if (a === 'vt-editar') vtNovoForm(v);
+  if (a === 'vt-viu') { ir('donovitviu'); vtCarregarViu(v); }
+  if (a === 'vt-pausa') { const x = ((UIp.vit || {}).lista || []).find(y => y.id === v); if (!x) return; b.disabled = true; try { await B.set('avisosApp/' + v, { ativo: x.data.ativo === false }, { merge: true }); aviso(x.data.ativo === false ? 'No ar de novo' : 'Pausado'); } catch (err) { aviso(msgErro(err)); } vtCarregar(); }
+  if (a === 'vt-apagar') { if (!doisToques(b, 'Toque de novo para apagar')) return; b.disabled = true; try { await vtApagar(v); aviso('Apagado da vitrine'); } catch (err) { aviso(msgErro(err)); } vtCarregar(); }
+  if (a === 'vt-cancelar') { const X = UIp.vform; if (X && X.url) URL.revokeObjectURL(X.url); UIp.vform = null; ir('donovitrine'); }
+  if (a === 'vt-salvar') vtSalvar(b);
+  if (a === 'vt-fmt') { UIp.vform.formato = v; vtRedesenha(); }
+  if (a === 'vt-tirar') { const X = UIp.vform; X.midia = null; X.tirou = true; if (X.url) URL.revokeObjectURL(X.url); X.url = null; X.formato = 'janela'; vtRedesenha(); }
+  if (a === 'vt-alvo') { UIp.vform.todos = v === 'todos'; vtRedesenha(); }
+  if (a === 'vt-como') { UIp.vform.como = v; vtPrev(); }
+  if (a === 'vt-marcar') { const X = UIp.vform, L = gruposFiltrados(UIp.vf), todos = L.length && L.every(g => X.sel.has(g.gid)); L.forEach(g => todos ? X.sel.delete(g.gid) : X.sel.add(g.gid)); const box = $('vt-grupos'); if (box) box.innerHTML = vtListaGrupos(); }
+  if (a === 'vt-real') { const X = UIp.vform, url = await vtUrlPrev(); vtAbrir(vtDados(X), url || null, !!(X.como && X.obrig[X.como] && X.para.has(X.como)), () => { }); }
   if (a === 'dono-qr') { window.__leitorDono = cod => { UIp.gf = { ...GF0, q: cod }; ir('donogrupos'); }; abrirLeitor(); }
   if (a === 'dono-verificar') { UIp.notasOk = undefined; UIp.notasErro = null; render(); }
   if (a === 'dono-met') { UIp.painel.met = v; render(); }
@@ -1606,9 +1877,23 @@ document.addEventListener('change', e => {
   const keep = { nome: $('p-nome').value, ap: $('p-ap').value, tel: $('p-tel').value };
   window.redimFoto(t.files[0]).then(d => { UIp.foto = d; render(); $('p-nome').value = keep.nome; $('p-ap').value = keep.ap; $('p-tel').value = keep.tel; }, e => { if (!e || e.code !== 'cancelado') aviso('Não consegui abrir essa foto neste celular. Tire uma foto na hora pela câmera ou escolha outra da galeria (de preferência um print ou uma foto do WhatsApp).'); }); t.value = '';
 });
+// Vitrine: redesenha o formulário sem perder o ponto da tela
+function vtRedesenha() { const y = window.scrollY; render(); window.scrollTo(0, y); }
+['input', 'change'].forEach(tipo => document.addEventListener(tipo, e => {
+  if (TELA !== 'donovitform' || !UIp.vform) return; const X = UIp.vform, t = e.target;
+  if (t.dataset.vt) { X[t.dataset.vt] = t.value; vtPrev(); return; }
+  if (tipo !== 'change') { if (t.dataset.vf === 'q') { UIp.vf.q = t.value; const box = $('vt-grupos'); if (box) box.innerHTML = vtListaGrupos(); } return; }
+  if (t.dataset.vf) { UIp.vf[t.dataset.vf] = t.value; if (t.dataset.vf === 'reg') { UIp.vf.uf = ''; UIp.vf.cidade = ''; } if (t.dataset.vf === 'uf') UIp.vf.cidade = ''; if (t.dataset.vf !== 'q') vtRedesenha(); return; }
+  if (t.dataset.vtp) { t.checked ? X.para.add(t.dataset.vtp) : X.para.delete(t.dataset.vtp); if (!t.checked) X.obrig[t.dataset.vtp] = false; vtRedesenha(); return; }
+  if (t.dataset.vto) { X.obrig[t.dataset.vto] = t.checked; vtPrev(); return; }
+  if (t.dataset.vtg) { t.checked ? X.sel.add(t.dataset.vtg) : X.sel.delete(t.dataset.vtg); const box = $('vt-grupos'); if (box) box.innerHTML = vtListaGrupos(); return; }
+  if (t.hasAttribute('data-vtarq')) { const f = t.files && t.files[0]; t.value = ''; if (!f) return; X.merr = 'Preparando…'; vtRedesenha();
+    vtLerMidia(f).then(m => { X.midia = m; X.tirou = true; X.merr = ''; if (X.url) URL.revokeObjectURL(X.url); X.url = null; if (m.w && m.h > m.w * 1.3) X.formato = 'cheia'; vtRedesenha(); },
+      err => { X.merr = err.message; vtRedesenha(); }); }
+}));
 ['input', 'change'].forEach(tipo => document.addEventListener(tipo, e => {
   const el = e.target.closest && e.target.closest('[data-gf]'); if (!el || TELA !== 'donogrupos') return;
-  UIp.gf = UIp.gf || { ...GF0 }; UIp.gf[el.dataset.gf] = el.value; if (el.dataset.gf === 'uf') UIp.gf.cidade = '';
+  UIp.gf = UIp.gf || { ...GF0 }; UIp.gf[el.dataset.gf] = el.value; if (el.dataset.gf === 'reg') { UIp.gf.uf = ''; UIp.gf.cidade = ''; } if (el.dataset.gf === 'uf') UIp.gf.cidade = '';
   if (el.dataset.gf === 'q') { const box = $('gf-lista'); if (box) box.innerHTML = listaGruposHTML(); } else if (tipo === 'change') render();
 }));
 document.addEventListener('input', e => {
