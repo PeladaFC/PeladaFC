@@ -372,7 +372,8 @@ function ocorrencias(a,now=new Date()){
 // cartões de alerta (Hora de mandar / Repassar no WhatsApp): texto curto à esquerda, botão à direita; arrastar para o lado tira o alerta (com Desfazer)
 function cartaoTexto(nome,rotulo,quando){return`<b>${nome}</b><br><span class="sw-sub">${rotulo}${quando?' · '+quando:''}</span>`}
 function cartaoSw(cls,attrs,texto,botao){return`<div class="sw-wrap"><div class="sw-fundo" aria-hidden="true"><span>Excluir</span><span>Excluir</span></div><div class="banner due swc${cls}" ${attrs}><span>${texto}</span>${botao}</div></div>`}
-let SW_DICA_ON=false;try{SW_DICA_ON=Number(localStorage.getItem('pelota.swDica')||0)<3}catch(e){}
+// a linha escrita da dica aparece só nas 3 primeiras aberturas do app; o cartão se mexer acontece sempre (swDica)
+let SW_DICA_ON=false;try{const n=Number(localStorage.getItem('pelota.swDica')||0);SW_DICA_ON=n<3;if(n<3)localStorage.setItem('pelota.swDica',String(n+1))}catch(e){}
 function swDicaTexto(){return SW_DICA_ON&&document.querySelector?'<p class="sw-dica-txt">← Arraste o cartão para o lado para excluir →</p>':''}
 function swTirar(el){const d=el.dataset;
   if(d.sw==='aviso'){const a=S.avisos[d.a];if(!a)return;const feitos=Object.fromEntries(Object.entries({...(a.feitos||{}),[d.key]:true}).sort().slice(-12));put('avisos/'+d.a,{...a,feitos})}
@@ -392,9 +393,8 @@ function swSaiu(c){const wr=c.closest('.sw-wrap');if(!wr){swTirar(c);return}
   document.addEventListener('pointerup',fim);document.addEventListener('pointercancel',fim);
   document.addEventListener('click',e=>{const c=e.target.closest&&e.target.closest('.banner.swc[data-arrastou]');if(c){e.preventDefault();e.stopPropagation()}},true);
 })();
-// dica: nos 3 primeiros acessos o primeiro cartão se mexe sozinho para mostrar que dá para arrastar
-function swDica(){if(swDica.feita)return;const c=document.querySelector('.banner.swc');if(!c)return;let n=0;try{n=Number(localStorage.getItem('pelota.swDica')||0)}catch(e){}
-  if(n>=3)return;swDica.feita=true;try{localStorage.setItem('pelota.swDica',String(n+1))}catch(e){}
+// dica: toda vez que o app é aberto, o primeiro cartão se mexe sozinho uma vez para mostrar que dá para arrastar (o Felipe quer sempre, não só no começo)
+function swDica(){if(swDica.feita)return;const c=document.querySelector('.banner.swc');if(!c)return;swDica.feita=true;
   setTimeout(()=>{const k=document.querySelector('.banner.swc');if(!k)return;const wr=k.closest('.sw-wrap');if(wr)wr.dataset.lado='e';k.classList.add('sw-dica');setTimeout(()=>{k.classList.remove('sw-dica');if(wr)wr.removeAttribute('data-lado')},1400)},1200)}
 function avisosVencidos(){
   const now=new Date(),out=[];
