@@ -2092,10 +2092,8 @@ function tAvisos(A){
   if(!prox.length)h+=`<div class="empty">Nenhum lembrete na agenda.${A?'<br><br><button class="btn sm" data-act="avisos-padrao">Usar sugestão de agenda</button>':''}</div></div>`;
   else{h+='<div class="list">';
     for(const{id,a,when} of prox){const t={n:avN(a),d:avD(a)},on=a.ativo!==false,past=on&&when<new Date();
-      h+=`<div class="item ag-item${on?'':' off'}"><div class="ag-hora"><div>${DIAS3[a.dia]}</div><div class="num small">${esc(a.hora)}</div></div>
-        <div class="grow"><div class="name">${esc(t.n)}</div><div class="sub">${esc(t.d)} · <span style="${past?'color:var(--red);font-weight:600':''}">${!on?'desligado':past?'pendente':relTempo(when)}</span></div>
-        ${A?`<div class="ag-bts"><button class="btn sm" data-act="msg" data-v="${a.tipo}" data-oa="${id}">Ver e editar</button><button class="btn sm danger-l" data-act="del-aviso" data-a="${id}">Excluir</button></div>`:''}</div>
-        ${A?`<label class="sw" aria-label="${on?'Desligar':'Ligar'} ${esc(t.n)}"><input type="checkbox" data-act="aviso-onoff" data-a="${id}" ${on?'checked':''}><span></span></label>`:''}</div>`}
+      h+=`<div class="item ag-item"><div class="grow"><div class="name">${esc(t.n)}</div><div class="sub">${DIAS3[a.dia]} ${esc(a.hora)} · <span style="${past?'color:var(--red);font-weight:600':''}">${!on?'desligado':past?'pendente':relTempo(when)}</span></div></div>
+        ${A?`<div class="ag-bts"><button class="btn sm" data-act="msg" data-v="${a.tipo}" data-oa="${id}">Editar</button><button class="btn sm danger-l" data-act="del-aviso" data-a="${id}">Excluir</button><label class="sw sm" aria-label="${on?'Desligar':'Ligar'} ${esc(t.n)}"><input type="checkbox" data-act="aviso-onoff" data-a="${id}" ${on?'checked':''}><span></span></label></div>`:''}</div>`}
     h+='</div></div>'}
   if(A){
     h+=`<div class="panel" style="margin-top:12px"><h3 style="margin-bottom:4px">Mandar agora</h3><p class="sub" style="margin:0 0 8px">Mensagem do seu jeito, no app e/ou no WhatsApp. As mensagens prontas ficam onde são usadas: Jogo, Times, Resultado e Caixa.</p><div class="pick"><button data-act="msg" data-v="outro">✏️ Outra mensagem</button><button data-act="msg" data-v="convite">Convite</button></div></div>`}
