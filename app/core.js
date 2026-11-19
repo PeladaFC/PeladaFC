@@ -2066,12 +2066,12 @@ function avSujo(){const d=UI.avd;if(!d)return false;const c=cfg(),pr=prefs(),o=c
 function avLigado(k){const d=avDraft();return k.startsWith('nf:')?d.nf[k.slice(3)]!==false:!d.off[k]}
 function cfgAvisosHTML(A){const d=avDraft(),LA=AVISOS_AUTO.filter(x=>!x.pa||!EV()).concat(A?SO_SINO:[]);
   const ordem=Object.keys(AV_GRUPOS),L=LA.slice().sort((a,b)=>ordem.indexOf(a.g)-ordem.indexOf(b.g));
-  const chave=(k,n,on)=>A?`<label class="sw" aria-label="${on?'Desligar':'Ligar'} ${esc(n)}"><input type="checkbox" data-act="avc" data-k="${k}" ${on?'checked':''}><span></span></label>`:'';
+  const chave=(k,n,on)=>A?`<label class="sw sm" aria-label="${on?'Desligar':'Ligar'} ${esc(n)}"><input type="checkbox" data-act="avc" data-k="${k}" ${on?'checked':''}><span></span></label>`:'';
   let h='<div class="av-l">';
   L.forEach((x,i)=>{const on=avLigado(x.k);
     if(!i||L[i-1].g!==x.g)h+=`<div class="av-g">${AV_GRUPOS[x.g]}</div>`;
     const ed=A&&window.MODELOS&&Object.values(MODELOS.MOD).some(m=>m.k===x.k),mex=ed&&Object.keys(MODELOS.MOD).some(m=>MODELOS.MOD[m].k===x.k&&MODELOS.proprio(cfg().textos,m));
-    h+=`<div class="av-i${on?'':' off'}"><span class="av-e">${x.e}</span><div class="grow"><b>${x.n}</b>${mex?' <span class="av-rec">texto seu</span>':''}<div class="sub">${x.q} · <i>${x.p}</i></div></div>${ed?`<button class="btn sm av-ed" data-act="txt-editar" data-k="${x.k}">Editar</button>`:''}${chave(x.k,x.n,on)}</div>`;
+    h+=`<div class="av-i${on?'':' off'}"><span class="av-e">${x.e}</span><div class="grow${ed?' av-txt':''}"${ed?` data-act="txt-editar" data-k="${x.k}" role="button" tabindex="0"`:''}><b>${x.n}</b>${mex?' <span class="av-rec">texto seu</span>':''}<div class="sub">${x.q} · <i>${x.p}</i></div></div>${chave(x.k,x.n,on)}</div>`;
     if(A&&x.k==='presenca')h+=`<div class="av-subs${on?'':' off'}">${SUB_LISTA.map(k=>{const o=d.nf[k]!==false;return`<div class="av-sub"><div class="grow"><span>${NOTIF[k].n}</span><div class="sub">${esc(NOTIF[k].d)}</div></div>${chave('nf:'+k,NOTIF[k].n,o)}</div>`}).join('')}</div>`});
   h+='</div>';
   if(A){const sj=avSujo();h+=`<div class="av-salvar${sj?' sujo':''}"><span class="sub">${sj?'⚠️ Mudanças ainda não salvas':'✓ Tudo salvo. Vale para a aba Avisos e para o sino.'}</span><div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-act="avc-desfazer" ${sj?'':'disabled'}>Desfazer</button><button class="btn primary sm" data-act="avc-salvar" ${sj?'':'disabled'}>Salvar</button></div></div>`}
@@ -2108,8 +2108,8 @@ function tAvisos(A){
   if(!prox.length)h+=`<div class="empty">Nenhum lembrete na agenda.${A?'<br><br><button class="btn sm" data-act="avisos-padrao">Usar sugestão de agenda</button>':''}</div></div>`;
   else{h+='<div class="list">';
     for(const{id,a,when} of prox){const t={n:avN(a),d:avD(a)},on=a.ativo!==false,past=on&&when<new Date();
-      h+=`<div class="item ag-item"><div class="grow"><div class="name">${esc(t.n)}</div><div class="sub ag-d">${esc(t.d)}</div><div class="sub">${DIAS3[a.dia]} ${esc(a.hora)} · <span style="${past?'color:var(--red);font-weight:600':''}">${!on?'desligado':past?'pendente':relTempo(when)}</span></div></div>
-        ${A?`<div class="ag-bts"><button class="btn sm" data-act="msg" data-v="${a.tipo}" data-oa="${id}">Editar</button><button class="btn sm danger-l" data-act="del-aviso" data-a="${id}">Excluir</button><label class="sw sm" aria-label="${on?'Desligar':'Ligar'} ${esc(t.n)}"><input type="checkbox" data-act="aviso-onoff" data-a="${id}" ${on?'checked':''}><span></span></label></div>`:''}</div>`}
+      h+=`<div class="item ag-item"><div class="grow ag-txt"${A?` data-act="msg" data-v="${a.tipo}" data-oa="${id}" role="button" tabindex="0"`:''}><div class="name">${esc(t.n)}</div><div class="sub ag-d">${esc(t.d)}</div><div class="sub">${DIAS3[a.dia]} ${esc(a.hora)} · <span style="${past?'color:var(--red);font-weight:600':''}">${!on?'desligado':past?'pendente':relTempo(when)}</span></div></div>
+        ${A?`<div class="ag-dir"><label class="sw sm" aria-label="${on?'Desligar':'Ligar'} ${esc(t.n)}"><input type="checkbox" data-act="aviso-onoff" data-a="${id}" ${on?'checked':''}><span></span></label><button class="ag-exc" data-act="del-aviso" data-a="${id}">Excluir</button></div>`:''}</div>`}
     h+='</div></div>'}
   if(A){
     h+=`<div class="panel" style="margin-top:12px"><h3 style="margin-bottom:4px">Mandar agora</h3><p class="sub" style="margin:0 0 8px">Mensagem do seu jeito, no app e/ou no WhatsApp. As mensagens prontas ficam onde são usadas: Jogo, Times, Resultado e Caixa.</p><div class="pick"><button data-act="msg" data-v="outro">✏️ Outra mensagem</button><button data-act="msg" data-v="convite">Convite</button></div></div>`}
@@ -2939,7 +2939,7 @@ document.addEventListener('click',async e=>{
       const tipo=document.getElementById('a-tipo').value,ex={};
       if(tipo==='outro'){ex.titulo=document.getElementById('a-titulo').value.trim();ex.texto=document.getElementById('a-texto').value.trim();if(!ex.texto){toast('Escreva a mensagem.');return}}
       put('avisos/'+id,{...old,...ex,tipo,dia:Number(document.getElementById('a-dia').value),hora:document.getElementById('a-hora').value||'09:00',ativo:document.getElementById('a-ativo').checked});closeSheet();toast('Aviso salvo.');break}
-    case'del-aviso':if(!doisToques(b,'Toque de novo'))break;del('avisos/'+d.a);closeSheet();toast('Lembrete excluído.');break;
+    case'del-aviso':if(!doisToques(b,b.classList.contains('ag-exc')?'Certeza?':'Toque de novo'))break;del('avisos/'+d.a);closeSheet();toast('Lembrete excluído.');break;
     case'aviso-onoff':{const a=S.avisos[d.a];if(!a)break;const on=b.checked;put('avisos/'+d.a,{...a,ativo:on});toast(on?'Ligado: o cartão volta a aparecer na aba Jogo.':'Desligado: não aparece mais na aba Jogo.');break}
     case'aviso-agenda':closeSheet();sheetAviso(d.a);break;
     case'msg-editar':{const t=document.getElementById('msg-text');if(t){t.focus();try{t.setSelectionRange(t.value.length,t.value.length)}catch(e){}}break}
