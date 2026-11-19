@@ -2108,7 +2108,7 @@ function tAvisos(A){
   if(!prox.length)h+=`<div class="empty">Nenhum lembrete na agenda.${A?'<br><br><button class="btn sm" data-act="avisos-padrao">Usar sugestão de agenda</button>':''}</div></div>`;
   else{h+='<div class="list">';
     for(const{id,a,when} of prox){const t={n:avN(a),d:avD(a)},on=a.ativo!==false,past=on&&when<new Date();
-      h+=`<div class="item ag-item"><div class="grow ag-txt"${A?` data-act="msg" data-v="${a.tipo}" data-oa="${id}" role="button" tabindex="0"`:''}><div class="name">${esc(t.n)}</div><div class="sub ag-d">${esc(t.d)}</div><div class="sub">${DIAS3[a.dia]} ${esc(a.hora)} · <span style="${past?'color:var(--red);font-weight:600':''}">${!on?'desligado':past?'pendente':relTempo(when)}</span></div></div>
+      h+=`<div class="item ag-item"><div class="grow ag-txt"${A?` data-act="msg" data-v="${a.tipo}" data-oa="${id}" role="button" tabindex="0"`:''}><div class="name">${esc(t.n)}</div><div class="sub ag-d">${esc(t.d)}</div><div class="sub ag-qdo">${a.dia==0||a.dia==6?'Todo':'Toda'} ${DIAS[a.dia].toLowerCase()} às ${esc(a.hora)}</div></div>
         ${A?`<div class="ag-dir"><label class="sw sm" aria-label="${on?'Desligar':'Ligar'} ${esc(t.n)}"><input type="checkbox" data-act="aviso-onoff" data-a="${id}" ${on?'checked':''}><span></span></label><button class="ag-exc" data-act="del-aviso" data-a="${id}">Excluir</button></div>`:''}</div>`}
     h+='</div></div>'}
   if(A){
