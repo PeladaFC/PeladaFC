@@ -402,6 +402,23 @@ function swDica(){if(swDica.feita||!SW_DICA_ON)return;const c=document.querySele
       swDica.feita=true;obs.disconnect();try{localStorage.setItem('pelota.swDica5',String(SW_DICA_N+1))}catch(e){}
       const wr=k.closest('.sw-wrap');if(wr)wr.dataset.lado='e';k.classList.add('sw-dica');setTimeout(()=>{k.classList.remove('sw-dica');if(wr)wr.removeAttribute('data-lado')},1400)},700)},{threshold:[0,.95,1]});
   obs.observe(c);swDica.obs=obs}
+// O app já avisou a galera sobre este aviso da Agenda? (confere de verdade antes de pintar o cartão de verde)
+// - Convocação: tem pelada marcada desde antes do horário → todos já receberam "Pelada marcada" no app (e o lembrete de confirmar).
+// - Cobrar respostas e Lista: pelada marcada desde antes do horário E alguém ainda sem resposta naquela hora → o app mandou o lembrete para quem faltava.
+// - Cobrança: o servidor manda às 10h no dia 1º (mensalidade nova), no dia do vencimento e 5 dias depois, para quem deve; só vale se esse aviso estiver ligado.
+// - Outra mensagem: o app não manda sozinho → continua amarelo.
+function jaNoApp(v){const a=v.a,t=v.when.getTime();
+  // só conta quem tem conta no app (é quem recebe): jogadores ligados a uma conta
+  const comConta=new Set(Object.values(S.pres||{}).map(d=>d&&d.jogador).filter(Boolean)),gente=ativos().filter(j=>comConta.has(j));if(!gente.length)return false;
+  if(['convocacao','cobrar','lista'].includes(a.tipo)){
+    const ps=abertas().filter(([,p])=>(p.criadoEm||0)&&p.criadoEm<=t);if(!ps.length)return false;
+    if(a.tipo==='convocacao')return true;
+    return ps.some(([pid,p])=>{const R=respDe(p,pid);return gente.some(j=>{const r=R[j];return!r||!r.s||r.t>t})})}
+  if(a.tipo==='pagamento'){if(!CX()||(cfg().pushOff||{}).cobranca)return false;
+    const dia=iso(v.when).slice(0,10),dez=new Date(dia+'T10:00:00');if(Date.now()<dez.getTime())return false;
+    const ant=iso(new Date(dez.getTime()-5*864e5)).slice(0,10);
+    return gente.some(j=>pendenciasDe(j).some(c=>(c.tipo==='m'&&dia.slice(8)==='01'&&c.ref===dia.slice(0,7))||c.venc===dia||c.venc===ant))}
+  return false}
 function avisosVencidos(){
   const now=new Date(),out=[];
   for(const[id,a] of Object.entries(S.avisos)){if(a.ativo===false||!AGENDA_OK.includes(a.tipo))continue;
@@ -734,7 +751,7 @@ function itensJogador(){
     out.push({id:'nova'+pid,tipo:'convoca',titulo:'Pelada marcada',texto:`${q}${onde}. ${l.vagas>l.escalados.length?`Temos ${l.vagas-l.escalados.length} vaga(s) na linha. Confirme sua presença!`:'A lista está cheia, mas você pode entrar na espera.'}`,t:t0,act:'tab-jogo'});
     for(const[aid,a] of Object.entries(S.avisos)){if(a.ativo===false||!['convocacao','cobrar','lista'].includes(a.tipo))continue;
       const{last}=ocorrencias(a);if(last.getTime()<t0||last>new Date())continue;
-      if(!r||!r.s||r.t<last.getTime())out.push({id:'lem'+pid+aid+iso(last),tipo:'convoca',titulo:'Lembrete',texto:`Você ainda não confirmou a pelada de ${q}. ${l.vagas>l.escalados.length?'Restam '+(l.vagas-l.escalados.length)+' vaga(s).':'Lista cheia, ainda dá para entrar na espera.'}`,t:last.getTime(),act:'tab-jogo'})}
+      if(!r||!r.s||r.t>last.getTime())out.push({id:'lem'+pid+aid+iso(last),tipo:'convoca',titulo:'Lembrete',texto:`Você ainda não confirmou a pelada de ${q}. ${l.vagas>l.escalados.length?'Restam '+(l.vagas-l.escalados.length)+' vaga(s).':'Lista cheia, ainda dá para entrar na espera.'}`,t:last.getTime(),act:'tab-jogo'})}
     const ap=(p.aprov||{})[j];if(ap&&r&&r.s==='sim'&&l.escalados.concat(l.gks).includes(j))out.push({id:'lib'+pid+ap,tipo:'convoca',titulo:'Vaga liberada ✅',texto:`O administrador liberou sua vaga na pelada de ${q}.`,t:ap});
     if(timesPub(p)&&p.sorteadoEm){const ti=p.times.findIndex(tm=>tm.gk===j||tm.ids.includes(j));
       if(ti>=0)out.push({id:'times'+pid+(p.publicadoEm||p.sorteadoEm),tipo:'convoca',titulo:'Times sorteados',texto:`Você está ${/^time /i.test(nomeTime(p.times[ti].cor))?'no':'no time'} ${nomeTime(p.times[ti].cor)} ${CORES[p.times[ti].cor].e} na pelada de ${q}.`,t:p.sorteadoEm})}}
@@ -791,7 +808,7 @@ function sheetNotif(){
   const due=pr.aviso?avisosVencidos():[];
   const lim=limpoEm(),items=feedItems().filter(i=>pr[i.tipo]!==false&&i.t>lim).slice(0,40);
   let h=`<div class="stack">${items.length?botaoLimpar():''}<div class="panel"><div class="list">`;
-  for(const v of due)h+=`<div class="item"><div class="grow"><div class="name"><span class="dot-new"></span>Hora de mandar: ${esc(avN(v.a))}</div><div class="sub">${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</div></div><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar</button></div>`;
+  for(const v of due)h+=`<div class="item"><div class="grow"><div class="name"><span class="dot-new"></span>${jaNoApp(v)?'Repassar no WhatsApp':'Hora de mandar'}: ${esc(avN(v.a))}</div><div class="sub">${jaNoApp(v)?'✓ Já enviado pelo app · ':''}${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</div></div><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar</button></div>`;
   for(const i of items)h+=`<div class="item"><div class="grow"><div class="name">${i.t>visto?'<span class="dot-new"></span>':''}${esc(i.texto)}</div><div class="sub">${esc(NOTIF[i.tipo]?.n||'')} · ${quandoTxt(i.t)}</div></div>${i.act==='agenda'?`<button class="btn sm primary" data-act="agenda" data-l="${i.arg}">Responder</button>`:''}</div>`;
   if(!due.length&&!items.length)h+='<div class="empty">Nada novo por aqui.</div>';
   h+='</div></div>';
@@ -1365,7 +1382,7 @@ function tJogo(A){
   h+=cartaoAvCompleta();
   h+=painelPosJogo();
   if(A)h+=painelAprovar();
-  if(A)for(const v of avisosVencidos())h+=cartaoSw('',`data-sw="aviso" data-a="${v.id}" data-key="${v.key}"`,cartaoTexto(esc(avN(v.a)),'Hora de mandar',`${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}`),`<button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button>`);
+  if(A)for(const v of avisosVencidos()){const app=jaNoApp(v);h+=cartaoSw(app?' wa':'',`data-sw="aviso" data-a="${v.id}" data-key="${v.key}"`,app?cartaoTexto(esc(avN(v.a)),'✓ Já enviado pelo app<br>Agora repasse no WhatsApp',''):cartaoTexto(esc(avN(v.a)),'Hora de mandar',`${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}`),`<button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button>`);}
   if(A)for(const r of repasses())h+=cartaoSw(' wa',`data-sw="rep" data-p="${r.pid}" data-k="${r.k}"`,cartaoTexto(r.n,'✓ Já enviado pelo app<br>Agora repasse no WhatsApp',''),`<button class="btn sm" data-act="msg" data-v="${r.k}" data-p="${r.pid}" data-rk="${r.k}">Ver mensagem</button>`);
   if(A&&(avisosVencidos().length||repasses().length))h+=swDicaTexto();
   const cur=atual();
