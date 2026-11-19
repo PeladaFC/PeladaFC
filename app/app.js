@@ -995,7 +995,7 @@ function vtLigar(el, a, fim) {
   const ck = el.querySelector('.vt-ck'); let foi = false;
   ck.onchange = () => { if (!ck.checked || foi) return; foi = true; ck.closest('.vt-ciente').classList.add('ok'); setTimeout(() => fim('ok'), 450); };
   el.querySelector('.vt-dep').onclick = () => { if (!foi) { foi = true; fim('depois'); } };
-  const l = el.querySelector('.vt-link'); if (l) l.onclick = () => window.open(a.botao.link, '_blank', 'noopener');
+  const l = el.querySelector('.vt-link'); if (l) l.onclick = () => window.open(vtLinkOk(a.botao.link), '_blank', 'noopener');
 }
 // a janela de verdade: por cima de tudo, só fecha pelos controles dela (tocar fora não fecha)
 function vtAbrir(a, url, imp, fim) {
@@ -1060,7 +1060,7 @@ function vtNovoForm(id) { const a = id ? (((UIp.vit || {}).lista || []).find(x =
   UIp.vf = gfNovo();
   UIp.vform = { id: id || null, a0: id ? a : null, titulo: a.titulo || '', texto: a.texto || '', formato: a.formato === 'cheia' ? 'cheia' : 'janela',
     midia: a.midia ? { ...a.midia, antiga: true } : null, tirou: false, url: null,
-    btx: (a.botao || {}).texto || '', blk: (a.botao || {}).link || '',
+    btx: (a.botao || {}).texto || '', blk: vtSemProto((a.botao || {}).link || ''),
     para: new Set(id ? a.para || [] : ['org', 'jog']), obrig: Object.fromEntries(VT_PARA.map(([k]) => [k, vtObrig(a, k)])),
     todos: !a.alvo || !!a.alvo.todas, sel: new Set((a.alvo && a.alvo.grupos) || []),
     ini: a.inicio || vtHoje(), fim: a.fim || '', como: null, erro: '' };
@@ -1069,7 +1069,10 @@ async function vtUrlPrev() { const X = UIp.vform; if (!X || X.url !== null) retu
   if (X.midia.dados) { const bin = atob(X.midia.dados), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); X.url = URL.createObjectURL(new Blob([u8], { type: X.midia.mime })); }
   else X.url = (await vtMidia(X.id, X.a0).catch(() => '')) || '';
   return X.url; }
-const vtDados = X => ({ titulo: X.titulo.trim(), texto: X.texto.trim(), formato: X.formato, midia: X.midia, botao: X.blk.trim() ? { texto: X.btx.trim() || 'Saiba mais', link: X.blk.trim() } : null });
+// link do botão: o "https://" já fica escrito fixo no campo; a pessoa digita só o resto (ex.: turmaemdia.com.br). Se colar com https:// ou http://, o app tira e põe certo.
+const vtSemProto = s => String(s || '').trim().replace(/^https?:\/\//i, '');
+const vtLinkOk = s => { const r = vtSemProto(s); return r ? 'https://' + r : ''; };
+const vtDados = X => ({ titulo: X.titulo.trim(), texto: X.texto.trim(), formato: X.formato, midia: X.midia, botao: X.blk.trim() ? { texto: X.btx.trim() || 'Saiba mais', link: vtLinkOk(X.blk) } : null });
 // a prévia no celular desenhado muda enquanto o dono preenche
 function vtPrev() { const X = UIp.vform, p = $('vt-prev'); if (!X || !p) return;
   const s = [...X.para]; if (!s.includes(X.como)) X.como = s[0] || null;
@@ -1095,7 +1098,7 @@ function telaVitForm() { const X = UIp.vform; if (!X) return '<h2>Vitrine</h2>';
     ${X.merr ? `<span class="vt-err">${escH(X.merr)}</span>` : ''}</div>
   ${mid ? `<div class="field"><span>Como a imagem aparece</span><div class="seg" role="group"><button type="button" data-sh="vt-fmt" data-v="janela" aria-pressed="${X.formato === 'janela'}">Janela com texto</button><button type="button" data-sh="vt-fmt" data-v="cheia" aria-pressed="${X.formato === 'cheia'}">Tela cheia</button></div>
     <i class="sub">${X.formato === 'cheia' ? 'A imagem ocupa a tela toda, inteira, sem cortar (título e texto não aparecem, só os controles embaixo). Tamanho ideal: em pé, 1080 × 1920.' : 'A imagem aparece inteira, com o título e o texto. Tamanho ideal: quadrada, 1080 × 1080.'}</i></div>` : ''}
-  <div class="par"><label class="field"><span>Botão <i class="opc">opcional</i></span><input type="text" data-vt="btx" maxlength="30" value="${escH(X.btx)}" placeholder="Ex.: Inscreva-se"></label><label class="field"><span>Link do botão</span><input type="url" data-vt="blk" inputmode="url" maxlength="300" value="${escH(X.blk)}" placeholder="https://"></label></div>
+  <label class="field"><span>Botão <i class="opc">opcional</i></span><input type="text" data-vt="btx" maxlength="30" value="${escH(X.btx)}" placeholder="Ex.: Inscreva-se"></label><label class="field"><span>Link do botão</span><div class="vt-url"><b>https://</b><input type="url" data-vt="blk" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="300" value="${escH(vtSemProto(X.blk))}" placeholder="turmaemdia.com.br"></div></label>
   <div class="field"><span>Quem recebe?</span><div class="vt-chaves">${VT_PARA.map(([k, n, s]) => `<div class="vt-ch"><div class="grow"><b>${n}</b><div class="sub">${s}</div></div>${chave('data-vtp', k, X.para.has(k))}</div>`).join('')}</div></div>
   <div class="field"><span>Precisa confirmar que viu?</span><i class="sub">Ligado: a caixinha diz "Li e estou ciente". Desligado: diz "Entendi". Nos dois, "Ver depois" faz voltar na próxima vez que abrir o app.</i>
     <div class="vt-chaves">${VT_PARA.map(([k, n]) => { const on = X.para.has(k); return `<div class="vt-ch${on ? '' : ' vt-off'}"><div class="grow"><b>${n}</b>${on ? '' : '<div class="sub">não recebe este aviso</div>'}</div>${chave('data-vto', k, on && X.obrig[k], !on)}</div>`; }).join('')}</div></div>
@@ -1114,7 +1117,7 @@ function vtValidar() { const X = UIp.vform, d = vtDados(X), para = VT_PARA.map((
   if (!d.texto && !X.midia) throw new Error('Escreva o texto ou ponha uma imagem ou vídeo.');
   if (!para.length) throw new Error('Ligue pelo menos um tipo em "Quem recebe?".');
   if (!X.todos && !X.sel.size && (X.para.has('org') || X.para.has('jog'))) throw new Error('Escolha pelo menos um grupo (ou "Todos").');
-  if (d.botao && !/^https:\/\/[^\s]+\.[^\s]+/i.test(d.botao.link)) throw new Error('O link do botão precisa começar com https://');
+  if (d.botao && !/^https:\/\/[^\s]+\.[^\s]+/i.test(d.botao.link)) throw new Error('Confira o link do botão (ex.: turmaemdia.com.br).');
   const ini = X.ini || vtHoje(), fim = X.fim || null;
   if (fim && fim < ini) throw new Error('A data de sair do ar é antes da data de começo.');
   return { titulo: d.titulo, texto: d.texto, formato: X.midia ? X.formato : 'janela', para, obrig: Object.fromEntries(VT_PARA.map(([k]) => [k, X.para.has(k) && !!X.obrig[k]])),
