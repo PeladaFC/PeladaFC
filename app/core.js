@@ -407,9 +407,15 @@ function swDica(){if(swDica.feita||!SW_DICA_ON)return;const c=document.querySele
 // - Cobrar respostas e Lista: pelada marcada desde antes do horário E alguém ainda sem resposta naquela hora → o app mandou o lembrete para quem faltava.
 // - Cobrança: o servidor manda às 10h no dia 1º (mensalidade nova), no dia do vencimento e 5 dias depois, para quem deve; só vale se esse aviso estiver ligado.
 // - Outra mensagem: o app não manda sozinho → continua amarelo.
+// jogadores ligados a uma conta do app (são os que recebem os avisos do app)
+function comContaSet(){return new Set(Object.values(S.pres||{}).map(d=>d&&d.jogador).filter(Boolean))}
+function semAppN(){const c=comContaSet();return ativos().filter(j=>!c.has(j)).length}
+// Ajustes → "Lembrar de repassar no WhatsApp" (ligado por padrão): desligado, os cartões verdes somem
+function repassarOn(){return cfg().repassarWpp!==false}
+function subVerde(){const n=semAppN();return '✓ Já foi pelo app · '+(n?n+' sem o app':'todos têm')}
 function jaNoApp(v){const a=v.a,t=v.when.getTime();
-  // só conta quem tem conta no app (é quem recebe): jogadores ligados a uma conta
-  const comConta=new Set(Object.values(S.pres||{}).map(d=>d&&d.jogador).filter(Boolean)),gente=ativos().filter(j=>comConta.has(j));if(!gente.length)return false;
+  // só conta quem tem conta no app (é quem recebe)
+  const comConta=comContaSet(),gente=ativos().filter(j=>comConta.has(j));if(!gente.length)return false;
   if(['convocacao','cobrar','lista'].includes(a.tipo)){
     const ps=abertas().filter(([,p])=>(p.criadoEm||0)&&p.criadoEm<=t);if(!ps.length)return false;
     if(a.tipo==='convocacao')return true;
@@ -423,7 +429,7 @@ function avisosVencidos(){
   const now=new Date(),out=[];
   for(const[id,a] of Object.entries(S.avisos)){if(a.ativo===false||!AGENDA_OK.includes(a.tipo))continue;
     const{last}=ocorrencias(a,now);const key=iso(last);
-    if(now-last<36*3600e3&&!(a.feitos||{})[key])out.push({id,a,key,when:last})}
+    if(now-last<36*3600e3&&!(a.feitos||{})[key]){const v={id,a,key,when:last};if(!repassarOn()&&jaNoApp(v))continue;out.push(v)}}
   return out.sort((x,y)=>x.when-y.when);
 }
 function proximosAvisos(){
@@ -433,7 +439,7 @@ function proximosAvisos(){
     return{id,a,when:(!feito&&now-last<36*3600e3)?last:next}}).sort((x,y)=>x.when-y.when);
 }
 // depois de publicar os times e de fechar a votação, o administrador recebe um alerta com a mensagem pronta para o WhatsApp
-function repasses(){const out=[],cur=atual();
+function repasses(){const out=[],cur=atual();if(!repassarOn())return out;
   if(cur&&timesPub(cur[1])&&!(cur[1].rep||{}).times)out.push({k:'times',n:'Times sorteados',pid:cur[0]});
   const rec=Object.entries(S.pel).filter(([,p])=>p&&p.aval&&!(p.rep||{}).resultado&&Date.now()-new Date(String(p.data).slice(0,10)+'T12:00')<4*864e5).sort((a,b)=>String(b[1].data).localeCompare(String(a[1].data)))[0];
   if(rec)out.push({k:'resultado',n:'Resultado e prêmios',pid:rec[0]});
@@ -808,7 +814,7 @@ function sheetNotif(){
   const due=pr.aviso?avisosVencidos():[];
   const lim=limpoEm(),items=feedItems().filter(i=>pr[i.tipo]!==false&&i.t>lim).slice(0,40);
   let h=`<div class="stack">${items.length?botaoLimpar():''}<div class="panel"><div class="list">`;
-  for(const v of due)h+=`<div class="item"><div class="grow"><div class="name"><span class="dot-new"></span>${jaNoApp(v)?'Repassar no WhatsApp':'Hora de mandar'}: ${esc(avN(v.a))}</div><div class="sub">${jaNoApp(v)?'✓ Já enviado pelo app · ':''}${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</div></div><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar</button></div>`;
+  for(const v of due)h+=`<div class="item"><div class="grow"><div class="name"><span class="dot-new"></span>${jaNoApp(v)?'Repassar no WhatsApp':'Hora de mandar'}: ${esc(avN(v.a))}</div><div class="sub">${jaNoApp(v)?subVerde()+' · ':''}${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}</div></div><button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar</button></div>`;
   for(const i of items)h+=`<div class="item"><div class="grow"><div class="name">${i.t>visto?'<span class="dot-new"></span>':''}${esc(i.texto)}</div><div class="sub">${esc(NOTIF[i.tipo]?.n||'')} · ${quandoTxt(i.t)}</div></div>${i.act==='agenda'?`<button class="btn sm primary" data-act="agenda" data-l="${i.arg}">Responder</button>`:''}</div>`;
   if(!due.length&&!items.length)h+='<div class="empty">Nada novo por aqui.</div>';
   h+='</div></div>';
@@ -1382,8 +1388,8 @@ function tJogo(A){
   h+=cartaoAvCompleta();
   h+=painelPosJogo();
   if(A)h+=painelAprovar();
-  if(A)for(const v of avisosVencidos()){const app=jaNoApp(v);h+=cartaoSw(app?' wa':'',`data-sw="aviso" data-a="${v.id}" data-key="${v.key}"`,app?cartaoTexto(esc(avN(v.a)),'✓ Já enviado pelo app<br>Agora repasse no WhatsApp',''):cartaoTexto(esc(avN(v.a)),'Hora de mandar',`${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}`),`<button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button>`);}
-  if(A)for(const r of repasses())h+=cartaoSw(' wa',`data-sw="rep" data-p="${r.pid}" data-k="${r.k}"`,cartaoTexto(r.n,'✓ Já enviado pelo app<br>Agora repasse no WhatsApp',''),`<button class="btn sm" data-act="msg" data-v="${r.k}" data-p="${r.pid}" data-rk="${r.k}">Ver mensagem</button>`);
+  if(A)for(const v of avisosVencidos()){const app=jaNoApp(v);h+=cartaoSw(app?' wa':'',`data-sw="aviso" data-a="${v.id}" data-key="${v.key}"`,app?cartaoTexto(esc(avN(v.a)),subVerde(),''):cartaoTexto(esc(avN(v.a)),'Hora de mandar',`${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}`),`<button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button>`);}
+  if(A)for(const r of repasses())h+=cartaoSw(' wa',`data-sw="rep" data-p="${r.pid}" data-k="${r.k}"`,cartaoTexto(r.n,subVerde(),''),`<button class="btn sm" data-act="msg" data-v="${r.k}" data-p="${r.pid}" data-rk="${r.k}">Ver mensagem</button>`);
   if(A&&(avisosVencidos().length||repasses().length))h+=swDicaTexto();
   const cur=atual();
   if(!cur){
@@ -2547,6 +2553,7 @@ function sheetCfg(){
 </div>`:`<button type="button" class="btn primary block" data-act="mp-antes">Conectar Mercado Pago</button>`}
       <label class="row"><input type="checkbox" id="c-pixrepassa" ${c.pixRepassa!==false?'checked':''}> Quem paga cobre a taxa (${pct(taxaTotal(c))})</label></div>
     <label class="row"><input type="checkbox" id="c-nivelpub" ${c.nivelPublico?'checked':''}> Mostrar o nível da pelada (estrelas) para os jogadores</label>
+    <label class="row"><input type="checkbox" id="c-repwpp" ${c.repassarWpp!==false?'checked':''}> Lembrar de repassar no WhatsApp o que o app já avisou (cartão verde na aba Jogo)</label>
     <label class="row"><input type="checkbox" id="c-mostraval" ${c.mostrarAval===false?'':'checked'}> Mostrar as avaliações dos jogadores (0 a 100) para todos. Mesmo ligado, só aparece depois da avaliação da galera.</label>
     <div class="panel"><h3 style="margin-bottom:6px">Escudo da pelada</h3><div class="row" style="gap:12px;flex-wrap:nowrap">
       <div style="width:64px;height:72px;flex:none;display:grid;place-items:center">${c.escudo?`<img src="${c.escudo}" alt="Escudo" style="max-width:64px;max-height:72px">`:`<div style="width:56px;height:64px;background:${corEscudo()};clip-path:polygon(50% 0,100% 12%,100% 58%,50% 100%,0 58%,0 12%);display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:800;font-size:20px">${esc(((c.nome||'P').split(/\s+/).filter(t=>t.length>2).slice(0,2).map(t=>t[0]).join('')||'P').toUpperCase())}</div>`}</div>
@@ -3097,7 +3104,7 @@ document.addEventListener('click',async e=>{
     case'save-cfg':{const g=id=>document.getElementById(id).value;
       const ev=g('c-tipo')==='evento',dataEv=null,diaEv=Number(g('c-dia'));
       {const nt=Number(g('c-times'));if(nt&&nt!==Number(cfg().times))for(const[pid,p] of Object.entries(S.pel))if(!p.times&&p.status!=='encerrada'&&p.nTimes)patch('peladas/'+pid,{nTimes:null})}
-      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,cidade:(g('c-cidade')||'').trim(),uf:g('c-uf')||'',dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),usarCaixa:!!document.getElementById('c-caixa')?.checked,...(document.getElementById('c-mpdono')?{mpDonoJid:g('c-mpdono')||null}:{}),convAuto:g('c-convauto')==='1',vencMens:Math.min(28,Math.max(1,Number(g('c-vencmens'))||10)),pixRepassa:!!document.getElementById('c-pixrepassa')?.checked,formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
+      put('config/geral',{...(S.config||{}),evento:ev,dataEvento:dataEv,nome:g('c-nome').trim()||DEF_CFG.nome,cidade:(g('c-cidade')||'').trim(),uf:g('c-uf')||'',dia:diaEv,hora:g('c-hora')||'08:00',horaFim:g('c-fim')||maisHora(g('c-hora')||'08:00',60),localId:g('c-localid')||null,local:(S.locais[g('c-localid')]||{}).nome||'',times:Number(g('c-times')),vagas:Math.max(2,Math.min(60,Number(g('c-vagas'))||vagasCfg())),mensal:Number(g('c-mensal'))||0,diaria:Number(g('c-diaria'))||0,nivelPublico:document.getElementById('c-nivelpub').checked,mostrarAval:document.getElementById('c-mostraval').checked,repassarWpp:document.getElementById('c-repwpp').checked,golSorteio:F.golSorteio,janelaAval:lerJanela(),usarCaixa:!!document.getElementById('c-caixa')?.checked,...(document.getElementById('c-mpdono')?{mpDonoJid:g('c-mpdono')||null}:{}),convAuto:g('c-convauto')==='1',vencMens:Math.min(28,Math.max(1,Number(g('c-vencmens'))||10)),pixRepassa:!!document.getElementById('c-pixrepassa')?.checked,formato:g('c-formato')||'conv',idaVolta:document.getElementById('c-idavolta').checked,nClass:Number(g('c-nclass'))||2,nomesTimes:CORES.map((_,i)=>g('c-tn'+i).trim()),restr:F.restr});
       if(window.sincronizarGrupo)window.sincronizarGrupo({nome:g('c-nome').trim()||DEF_CFG.nome,dia:diaEv,hora:g('c-hora')||'08:00',evento:ev,data:dataEv});
       closeSheet();toast('Ajustes salvos.');break}
     case'pagou-m':case'pagou-d':{const kind=d.act==='pagou-m'?'m':'d',key=kind==='m'?d.m:d.p,src=kind==='m'?((S.caixa[key]||{}).mens||{}):((S.pel[key]||{}).diarias||{}),st=stPag(src[d.j]);
