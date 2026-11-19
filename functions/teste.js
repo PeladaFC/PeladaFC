@@ -153,4 +153,8 @@ t('textos editáveis: padrão igual ao de hoje, texto próprio troca as [etiquet
   assert.strictEqual(M.aplicar(a, { 'cob-hoje': { t: M.MOD['cob-hoje'].t, x: M.MOD['cob-hoje'].x } }), a);
   assert.strictEqual(M.aplicar(a, null), a);
 });
+t('recado do app com pelada leva os botões Vou / Não vou', () => {
+  const av = R.muralAtualizado({ items: [] }, { items: [{ id: 'm1', titulo: 'Convocação', txt: 'Bora!', p: 'p1' }, { id: 'm2', titulo: 'Oi', txt: 'Recado' }] }, ctx);
+  assert.deepStrictEqual(av[0].rsvp, { g: ctx.gid, p: 'p1' }); assert.ok(!av[1].rsvp);
+});
 console.log(`\n${n} testes passaram.`);

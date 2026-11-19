@@ -112,7 +112,7 @@ function muralAtualizado(a, b, ctx) {
   const vistos = new Set(((a && a.items) || []).map(x => x.id)), out = [];
   // tira o negrito do WhatsApp (*assim*) e junta as linhas: a notificação do celular mostra o texto puro
   const limpo = t => String(t || '').replace(/\*/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{2,}/g, '\n').trim();
-  for (const m of ((b && b.items) || [])) if (!vistos.has(m.id)) out.push({ para: todos(ctx), titulo: `📣 ${limpo(m.titulo) || 'Recado do administrador'}`, texto: limpo(m.txt).slice(0, 180), tag: 'mural-' + m.id });
+  for (const m of ((b && b.items) || [])) if (!vistos.has(m.id)) out.push({ para: todos(ctx), titulo: `📣 ${limpo(m.titulo) || 'Recado do administrador'}`, texto: limpo(m.txt).slice(0, 180), tag: 'mural-' + m.id, ...(typeof m.p === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(m.p) ? { rsvp: { g: ctx.gid, p: m.p } } : {}) });
   return out;
 }
 // avaliação abriu (no término) e ainda não avisamos

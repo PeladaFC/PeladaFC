@@ -595,7 +595,7 @@ function msg0(tipo,ctx={}){
   const quando=p?`📅 *${dLong(p.data)}* das *${horaIniDe(p)}* às *${horaFimDe(p)}*`:EV()?'📅 Data a definir':`📅 *${DIAS[c.dia]}* das *${c.hora}* às *${horaFimDe(null)}*`;
   const LL=localDe(p),onde=LL?LL.nome+(LL.end?' · '+LL.end:'')+(LL.url?'\n🗺️ '+LL.url:''):'';
   const head=`⚽ *${c.nome.toUpperCase()}*`;
-  if(tipo==='convocacao')return[head,quando,onde?'📍 '+onde:'','',`São ${vagasCfg()} vagas na linha + goleiros.${EV()?' Quem confirmar primeiro garante a vaga.':' Mensalista tem prioridade.'}`,...(p&&CX()&&valorTxt(p)?['💰 '+valorTxt(p)+(p.extra?' · evento extra, mensalista também paga':PA(p)?'':' · mensalista já paga na mensalidade')]:[]),...(p&&pidOf(p)&&GRUPO&&GRUPO.codigo&&!demo?['\u0001','Responda com um toque (entre no app com a sua conta):','✅ VOU: '+linkResp(pidOf(p),'sim'),'❌ NÃO VOU: '+linkResp(pidOf(p),'nao')]:['Responda aqui: ✅ vou  |  ❌ não vou'])].filter((x,i)=>x!==''||i===3).map(x=>x==='\u0001'?'':x).join('\n');
+  if(tipo==='convocacao')return[head,quando,onde?'📍 '+onde:'','',`São ${vagasCfg()} vagas na linha + goleiros.${EV()?' Quem confirmar primeiro garante a vaga.':' Mensalista tem prioridade.'}`,...(p&&CX()&&valorTxt(p)?['💰 '+valorTxt(p)+(p.extra?' · evento extra, mensalista também paga':PA(p)?'':' · mensalista já paga na mensalidade')]:[]),...(p&&pidOf(p)&&GRUPO&&GRUPO.codigo&&!demo?['\u0001','Responda com um toque (entre no app com a sua conta):','✅ VOU: '+linkResp(pidOf(p),'sim'),'❌ NÃO VOU: '+linkResp(pidOf(p),'nao')]:[])].filter((x,i)=>x!==''||i===3).map(x=>x==='\u0001'?'':x).join('\n');
   if(!p&&tipo!=='pagamento'&&tipo!=='convite'&&tipo!=='prestacao')return head+'\n\nAinda não tem pelada marcada. Marque a próxima no app.';
   if(tipo==='cobrar'){const l=lista(p);if(!l.pend.length)return head+'\n'+quando+'\n\nTodo mundo já respondeu. Valeu! 🙌';
     return[head,quando,'',`⏰ Ainda faltam ${l.pend.length} responder:`,...l.pend.map(id=>'• '+nm(id)),'','Confirma aí pra gente fechar a lista! ✅ ou ❌'].join('\n')}
@@ -739,7 +739,7 @@ function feedItems(){
 function meuJogador(){const d=myId&&S.pres[myId];return d&&S.jog[d.jogador]?d.jogador:null}
 function itensJogador(){
   const j=meuJogador(),out=[];
-  for(const m of ((S.mural||{}).items||[]))out.push({id:'m'+m.id,tipo:'recado',titulo:m.titulo||'Recado do administrador',texto:m.txt,t:m.t,longo:true});
+  for(const m of ((S.mural||{}).items||[]))out.push({id:'m'+m.id,tipo:'recado',titulo:m.titulo||'Recado do administrador',texto:m.txt,t:m.t,longo:true,...(m.p&&S.pel[m.p]&&S.pel[m.p].status!=='encerrada'?{act:'tab-jogo'}:{})});
   if(!j)return out.sort((a,b)=>b.t-a.t);
   const c=cfg();
   for(const[pid,p] of Object.entries(S.pel)){const q=dShort(p.data)+' das '+horarioTxt(p),LL=localDe(p),onde=LL?' · '+LL.nome:'';
@@ -816,7 +816,7 @@ function sheetNotif(){
   for(const i of items)h+=`<div class="item"><div class="grow"><div class="name">${i.t>visto?'<span class="dot-new"></span>':''}${esc(i.texto)}</div><div class="sub">${esc(NOTIF[i.tipo]?.n||'')} · ${quandoTxt(i.t)}</div></div>${i.act==='agenda'?`<button class="btn sm primary" data-act="agenda" data-l="${i.arg}">Responder</button>`:''}</div>`;
   if(!due.length&&!items.length)h+='<div class="empty">Nada novo por aqui.</div>';
   h+='</div></div>';
-  if(A){h+=`<div class="panel"><h3 style="margin-bottom:2px">Avisos automáticos</h3><div class="sub" style="margin-bottom:6px">É a mesma lista da aba Avisos: mudou aqui, muda lá. O que estiver desligado não vai para o celular e não aparece no sino. Depois de mexer, toque em <b>Salvar</b>.</div><div class="av-cfg" data-a="1">${cfgAvisosHTML(true)}</div></div>`}
+  // o sino mostra só o que chegou; as escolhas dos avisos ficam na aba Avisos (pedido do Felipe)
   openSheet('Notificações',h+'</div>');
   if(A&&feedItems().some(i=>i.t>visto))put('eventos/feed',{...f,items:f.items||[],visto:Date.now()});
 }
@@ -2486,7 +2486,9 @@ function sheetMsg(tipo,ctx={}){
   const tel=ctx.jid&&J(ctx.jid).tel?String(J(ctx.jid).tel).replace(/\D/g,''):'';
   const fone=tel?(tel.length<=11?'55'+tel:tel):'';
   MSG_ORIG=text;
-  openSheet(titulo,`${livre?`<label class="field"><span>Título</span><input type="text" id="msg-titulo" maxlength="60" placeholder="Ex.: Camisas novas"></label><label class="field" style="margin-top:8px"><span>Mensagem</span></label>`:`<div class="row between" style="margin-bottom:6px;gap:6px"><button class="btn sm" data-act="msg-editar">✎ Editar texto</button><button class="btn sm" data-act="msg-reset">Restaurar texto</button></div>`}
+  openSheet(titulo,`${livre?`<label class="field"><span>Título</span><input type="text" id="msg-titulo" maxlength="60" placeholder="Ex.: Camisas novas"></label><label class="field" style="margin-top:8px"><span>Mensagem</span></label>`:`${ctx.oa&&S.avisos[ctx.oa]?(()=>{const av=S.avisos[ctx.oa];return`<div class="msg-qdo"><label class="field"><span>Toca toda</span><select data-act-ch="av-dia" data-a="${ctx.oa}">${DIAS.map((n,i)=>`<option value="${i}"${Number(av.dia)===i?' selected':''}>${n}</option>`).join('')}</select></label><label class="field"><span>Às</span><input type="time" data-act-ch="av-hora" data-a="${ctx.oa}" value="${esc(av.hora||'09:00')}"></label></div>`})():''}
+    <div class="row between" style="margin-bottom:6px;gap:6px"><span class="sub">Toque no texto para mudar</span><button class="btn sm" data-act="msg-reset">Restaurar texto</button></div>`}
+    ${['convocacao','cobrar','lista'].includes(tipo)&&!atual()&&!livre?'<div class="banner" style="margin-bottom:8px"><span>Ainda não tem pelada marcada. Marque a pelada para a mensagem levar os links de ✅ Vou e ❌ Não vou.</span></div>':''}
     <textarea id="msg-text" rows="${livre?8:14}" class="num" aria-label="Texto da mensagem, editável"${livre?' placeholder="Escreva aqui o que quiser mandar para a galera."':''}>${esc(text)}</textarea>
     ${tipo==='prestacao'?`<button class="btn warn block" style="margin-top:10px" data-act="prest-pdf" data-m="${ctx.mes||mesAtual()}">📄 Baixar em PDF</button>`:''}
     ${tipo==='campeonato'&&ctx.pel?`<button class="btn warn block" style="margin-top:10px" data-act="camp-pdf" data-d="${ctx.pel.data}" data-p="${pidOf(ctx.pel)}">📄 Baixar em PDF</button>`:''}
@@ -2499,7 +2501,6 @@ function sheetMsg(tipo,ctx={}){
       ${ctx.aviso?`<button class="btn warn block" data-act="aviso-feito" data-a="${ctx.aviso}" data-key="${ctx.key}">Já mandei · excluir o alerta</button>`:''}
       ${ctx.rep?`<button class="btn warn block" data-act="rep-feito" data-p="${ctx.rep.p}" data-k="${ctx.rep.k}">Já mandei · excluir o alerta</button>`:''}
       ${livre&&ADM()?`<button class="btn block" data-act="outro-agenda">📅 Repetir toda semana (Agenda)</button>`:''}
-      ${ctx.oa&&ADM()?`<button class="btn block" data-act="aviso-agenda" data-a="${ctx.oa}">📅 Mudar dia e hora</button>`:''}
       <p class="sub" style="margin:0">"Enviar no app" chega como notificação para cada jogador. O WhatsApp é opcional: abre com o texto daqui, e você escolhe o grupo.</p></div>`);
 }
 /* Suporte do Pelota FC: o administrador libera por 24 horas; tudo o que o suporte fizer fica registrado */
@@ -2801,7 +2802,9 @@ document.addEventListener('click',async e=>{
       if(d.ja&&!doisToques(b,'Já foi pelo app. Toque de novo para mandar outra vez'))break;
       if(d.a&&d.key&&S.avisos[d.a]){const a=S.avisos[d.a];put('avisos/'+d.a,{...a,app:Object.fromEntries(Object.entries({...(a.app||{}),[d.key]:true}).sort().slice(-12))})}
       const tit=((document.getElementById('msg-titulo')||{}).value||'').trim()||d.titulo;
-      const m=S.mural||{items:[]};put('mural/geral',{items:[{id:uid('m'),t:Date.now(),titulo:tit,txt}].concat(m.items||[]).slice(0,30)});
+      const cur=['Convocação','Cobrar respostas','Lista de presença'].includes(d.titulo)&&atual();let txt2=txt;
+      if(cur)txt2=txt.split('\n').filter(l=>!/[?&]c=[^&\s]+&p=/.test(l)&&!/^Responda com um toque/.test(l)).join('\n').replace(/\n{3,}/g,'\n\n').trim()+'\n\nToque aqui para responder: ✅ Vou ou ❌ Não vou.';
+      const m=S.mural||{items:[]};put('mural/geral',{items:[{id:uid('m'),t:Date.now(),titulo:tit,txt:txt2,...(cur?{p:cur[0]}:{})}].concat(m.items||[]).slice(0,30)});
       closeSheet();toast('Enviado no app. Todos os jogadores recebem nas notificações.');break}
     case'tab-jogo':UI.tab='jogo';closeSheet();render();break;
     case'locais':sheetLocais();break;
@@ -3178,6 +3181,7 @@ function npQpAtualiza(){const box=document.getElementById('np-qp'),v=document.ge
   box.innerHTML=htmlQuemPaga(ativos().filter(id=>pa||J(id).tipo==='diarista').sort((a,b)=>nm(a).localeCompare(nm(b))),UI.npDesc||{},Number(String(v.value).replace(',','.'))||0,'npd')}
 document.addEventListener('input',e=>{if(e.target&&e.target.id==='np-valor')npQpAtualiza();if(e.target&&e.target.id==='aj-saldo')ajDif()});
 document.addEventListener('change',e=>{
+  {const t=e.target;if(t.dataset&&(t.dataset.actCh==='av-dia'||t.dataset.actCh==='av-hora')){const a=S.avisos[t.dataset.a];if(a){put('avisos/'+t.dataset.a,{...a,[t.dataset.actCh==='av-dia'?'dia':'hora']:t.dataset.actCh==='av-dia'?Number(t.value):t.value});toast('Dia e hora salvos.')}return}}
   if(e.target.id==='filtro-mais'){UI.filtro=e.target.value||'todos';render();return}
   if(e.target.id==='a-tipo'){const o=document.getElementById('a-outro');if(o)o.hidden=e.target.value!=='outro'}
   if(e.target.dataset&&e.target.dataset.np)guardarNp(e.target);
