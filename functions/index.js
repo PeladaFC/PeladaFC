@@ -104,9 +104,11 @@ const TIPO_TAG = [['pel-', 'pelada'], ['mens15-', 'prazo15'], ['conv-', 'convoca
   ['times-', 'times'], ['aval-', 'avaliar'], ['notas-', 'resultado'], ['lanc-', 'gols'], ['cob', 'cobranca'], ['x-', 'cobranca'], ['pag30-', 'cobranca'],
   ['membro-', 'entrar'], ['mural-', 'mural'], ['rodada', 'votacao'], ['niver-', 'aniversario']];
 function tipoAviso(a) { if (a.tipo) return a.tipo; const t = String(a.tag || ''); const x = TIPO_TAG.find(([pre]) => t.startsWith(pre)); return x ? x[1] : ''; }
+// textos próprios do grupo (Avisos → Automáticos → Editar) trocam o texto padrão; as [etiquetas] viram os dados na hora
+const MODELOS = require('./modelos');
 async function enviarTodos(avisos, ctx) {
-  const off = (ctx && ctx.cfg && ctx.cfg.pushOff) || {};
-  for (const a of avisos) if (a && a.para && a.para.length && !off[tipoAviso(a)]) await enviarPara(a.para, a);
+  const off = (ctx && ctx.cfg && ctx.cfg.pushOff) || {}, textos = (ctx && ctx.cfg && ctx.cfg.textos) || null;
+  for (const a of avisos) if (a && a.para && a.para.length && !off[tipoAviso(a)]) await enviarPara(a.para, MODELOS.aplicar(a, textos));
 }
 
 /* ---------- "Vou" / "Não vou" direto da notificação (Android) ----------

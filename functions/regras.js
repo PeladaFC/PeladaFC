@@ -41,13 +41,13 @@ function pelCriada(p, pid, ctx) {
   const quando = `${dShort(p.data)} das ${horaIni(p, cfg)} às ${horaFim(p, cfg)}${onde}`;
   if (ehPA(p, cfg)) { // evento livre ou evento extra
     const v = precoPel(p, cfg), nome = p.nome || (p.extra ? 'Evento extra' : g);
-    return [{ para: todos(ctx), titulo: `🎉 ${nome} · ${g}`, texto: `${dShort(p.data)} às ${horaIni(p, cfg)}${onde}. ${v > 0 ? `Valor: ${BRL(v)} por atleta${p.extra ? ' (mensalista também paga)' : ''}.` : 'Sem cobrança.'} Confirme pelo app!`, tag: 'pel-' + pid, rsvp: { g: ctx.gid, p: pid } }];
+    return [{ para: todos(ctx), titulo: `🎉 ${nome} · ${g}`, texto: `${dShort(p.data)} às ${horaIni(p, cfg)}${onde}. ${v > 0 ? `Valor: ${BRL(v)} por atleta${p.extra ? ' (mensalista também paga)' : ''}.` : 'Sem cobrança.'} Confirme pelo app!`, tag: 'pel-' + pid, rsvp: { g: ctx.gid, p: pid }, m: 'pel-ev', v: { evento: nome, grupo: g, data: dShort(p.data), hora: horaIni(p, cfg), local: onde, cobrar: v > 0 ? `Valor: ${BRL(v)} por atleta${p.extra ? ' (mensalista também paga)' : ''}.` : 'Sem cobrança.' } }];
   }
   const mens = [], dia = [];
   for (const u of todos(ctx)) (tipoDe(ctx, u) === 'diarista' ? dia : mens).push(u);
   const out = [];
-  if (mens.length) out.push({ para: mens, titulo: `⚽ ${g} · nova pelada`, texto: `${quando}. ${p.mensAte ? `Mensalista: confirme até ${quandoMs(p.mensAte)} para garantir sua vaga.` : 'Confirme sua presença!'}`, tag: 'pel-' + pid, rsvp: { g: ctx.gid, p: pid } });
-  if (dia.length) out.push({ para: dia, titulo: `⚽ ${g} · nova pelada`, texto: `${quando}. Diarista: peça sua vaga pelo app.${p.mensAte ? ` A convocação dos diaristas sai depois de ${quandoMs(p.mensAte)}, por ordem de pedido.` : ''}`, tag: 'pel-' + pid, rsvp: { g: ctx.gid, p: pid } });
+  if (mens.length) out.push({ para: mens, titulo: `⚽ ${g} · nova pelada`, texto: `${quando}. ${p.mensAte ? `Mensalista: confirme até ${quandoMs(p.mensAte)} para garantir sua vaga.` : 'Confirme sua presença!'}`, tag: 'pel-' + pid, rsvp: { g: ctx.gid, p: pid }, m: 'pel-mens', v: { grupo: g, quando, prazo: p.mensAte ? `Mensalista: confirme até ${quandoMs(p.mensAte)} para garantir sua vaga.` : 'Confirme sua presença!' } });
+  if (dia.length) out.push({ para: dia, titulo: `⚽ ${g} · nova pelada`, texto: `${quando}. Diarista: peça sua vaga pelo app.${p.mensAte ? ` A convocação dos diaristas sai depois de ${quandoMs(p.mensAte)}, por ordem de pedido.` : ''}`, tag: 'pel-' + pid, rsvp: { g: ctx.gid, p: pid }, m: 'pel-dia', v: { grupo: g, quando, convocacao: p.mensAte ? ` A convocação dos diaristas sai depois de ${quandoMs(p.mensAte)}, por ordem de pedido.` : '' } });
   return out;
 }
 // 15 minutos antes do prazo: avisa os mensalistas que ainda não responderam
@@ -56,7 +56,7 @@ function lembreteMens(p, pid, ctx) {
   if (ehPA(p, ctx.cfg)) return [];
   const para = todos(ctx).filter(u => { if (tipoDe(ctx, u) !== 'mensalista') return false; const r = respDe(p, pid, ctx, ctx.pres[u].jogador); return !r || !r.s; });
   if (!para.length) return [];
-  return [{ para, titulo: `⏰ Faltam 15 minutos · ${nomePelada(ctx)}`, texto: `Confirme sua presença na pelada de ${dShort(p.data)}. Às ${horaMs(p.mensAte)} fecha o prazo dos mensalistas e as vagas que sobrarem vão para os diaristas convocados.`, tag: 'mens15-' + pid, rsvp: { g: ctx.gid, p: pid } }];
+  return [{ para, titulo: `⏰ Faltam 15 minutos · ${nomePelada(ctx)}`, texto: `Confirme sua presença na pelada de ${dShort(p.data)}. Às ${horaMs(p.mensAte)} fecha o prazo dos mensalistas e as vagas que sobrarem vão para os diaristas convocados.`, tag: 'mens15-' + pid, rsvp: { g: ctx.gid, p: pid }, m: 'mens15', v: { grupo: nomePelada(ctx), data: dShort(p.data), fecha: horaMs(p.mensAte) } }];
 }
 // campos que interessam numa atualização da pelada (para não ler o banco à toa)
 function pelMudouAlgo(a, b) {
@@ -66,15 +66,16 @@ function pelAtualizada(a, b, pid, ctx) {
   const out = [], quando = dShort(b.data);
   if (b.times && (a.sorteadoEm || 0) !== (b.sorteadoEm || 0)) {
     b.times.forEach(t => { const e = '⚽'; const n0 = 'Time ' + (Number(t.cor) + 1); const n = String(((ctx.cfg || {}).nomesTimes || [])[t.cor] || '').trim() || n0; const js = (t.gk ? [t.gk] : []).concat(t.ids || []);
-      const us = uidsDe(ctx, js); if (us.length) out.push({ para: us, titulo: `🎲 Times sorteados · ${quando}`, texto: `Você está ${/^time /i.test(n) ? 'no ' + n : 'no time ' + n} ${e}. Bom jogo!`, tag: 'times-' + pid }); });
-    const gx = uidsDe(ctx, b.goleiros || []); if (gx.length) out.push({ para: gx, titulo: `🎲 Times sorteados · ${quando}`, texto: 'Os times saíram. Você joga no gol como extra. Bom jogo!', tag: 'times-' + pid });
+      const us = uidsDe(ctx, js); if (us.length) out.push({ para: us, titulo: `🎲 Times sorteados · ${quando}`, texto: `Você está ${/^time /i.test(n) ? 'no ' + n : 'no time ' + n} ${e}. Bom jogo!`, tag: 'times-' + pid, m: 'times', v: { data: quando, time: /^time /i.test(n) ? 'no ' + n : 'no time ' + n, grupo: nomePelada(ctx) } }); });
+    const gx = uidsDe(ctx, b.goleiros || []); if (gx.length) out.push({ para: gx, titulo: `🎲 Times sorteados · ${quando}`, texto: 'Os times saíram. Você joga no gol como extra. Bom jogo!', tag: 'times-' + pid, m: 'times-gk', v: { data: quando, grupo: nomePelada(ctx) } });
   }
-  if (!a.avalEm && b.avalEm) out.push({ para: uidsDe(ctx, participantes(b, pid, ctx)), titulo: `🏆 Saiu o resultado · ${nomePelada(ctx)}`, texto: `A votação da pelada de ${quando} terminou. Veja o craque, as notas e os prêmios.`, tag: 'notas-' + pid });
+  if (!a.avalEm && b.avalEm) out.push({ para: uidsDe(ctx, participantes(b, pid, ctx)), titulo: `🏆 Saiu o resultado · ${nomePelada(ctx)}`, texto: `A votação da pelada de ${quando} terminou. Veja o craque, as notas e os prêmios.`, tag: 'notas-' + pid, m: 'notas', v: { grupo: nomePelada(ctx), data: quando } });
   // diaristas convocados pelo administrador
   for (const [j, t] of Object.entries(b.conv || {})) if (t && !(a.conv || {})[j]) { const u = uidDoJogador(ctx, j); if (!u) continue; const r = respDe(b, pid, ctx, j), v = precoPel(b, ctx.cfg);
-    out.push({ para: [u], titulo: `✅ Você foi convocado · ${nomePelada(ctx)}`, texto: `Pelada de ${quando} às ${horaIni(b, ctx.cfg)}${b.local ? ' · ' + b.local : ''}. ${v > 0 ? (r && r.s === 'sim' ? `Pague a diária de ${BRL(v)} pelo app em até 30 minutos para garantir sua vaga.` : `Confirme sua presença e pague a diária de ${BRL(v)} pelo app em até 30 minutos.`) : (r && r.s === 'sim' ? 'Sua vaga está garantida.' : 'Confirme sua presença pelo app.')}`, tag: 'conv-' + pid }); }
-  for (const [j, t] of Object.entries(b.aprov || {})) if (t && t !== (a.aprov || {})[j] && !(b.conv || {})[j]) { const u = uidDoJogador(ctx, j); if (u) out.push({ para: [u], titulo: '✅ Vaga liberada', texto: `O administrador liberou sua vaga na pelada de ${quando}.`, tag: 'lib-' + pid }); }
-  for (const [u, t] of Object.entries(b.lancOk || {})) if (t && t !== (a.lancOk || {})[u]) out.push({ para: [u], titulo: '⚽ Números aprovados', texto: `Seus gols e assistências da pelada de ${quando} foram aprovados.`, tag: 'lanc-' + pid });
+    const instrucao = v > 0 ? (r && r.s === 'sim' ? `Pague a diária de ${BRL(v)} pelo app em até 30 minutos para garantir sua vaga.` : `Confirme sua presença e pague a diária de ${BRL(v)} pelo app em até 30 minutos.`) : (r && r.s === 'sim' ? 'Sua vaga está garantida.' : 'Confirme sua presença pelo app.');
+    out.push({ para: [u], titulo: `✅ Você foi convocado · ${nomePelada(ctx)}`, texto: `Pelada de ${quando} às ${horaIni(b, ctx.cfg)}${b.local ? ' · ' + b.local : ''}. ${instrucao}`, tag: 'conv-' + pid, m: 'conv', v: { grupo: nomePelada(ctx), data: quando, hora: horaIni(b, ctx.cfg), local: b.local ? ' · ' + b.local : '', instrucao, valor: BRL(v) } }); }
+  for (const [j, t] of Object.entries(b.aprov || {})) if (t && t !== (a.aprov || {})[j] && !(b.conv || {})[j]) { const u = uidDoJogador(ctx, j); if (u) out.push({ para: [u], titulo: '✅ Vaga liberada', texto: `O administrador liberou sua vaga na pelada de ${quando}.`, tag: 'lib-' + pid, m: 'lib', v: { data: quando, grupo: nomePelada(ctx) } }); }
+  for (const [u, t] of Object.entries(b.lancOk || {})) if (t && t !== (a.lancOk || {})[u]) out.push({ para: [u], titulo: '⚽ Números aprovados', texto: `Seus gols e assistências da pelada de ${quando} foram aprovados.`, tag: 'lanc-' + pid, m: 'lanc-ok', v: { data: quando, grupo: nomePelada(ctx) } });
   return out;
 }
 function presAtualizada(a, b, uid, ctx) {
@@ -94,18 +95,18 @@ function presAtualizada(a, b, uid, ctx) {
     // os detalhes do "Movimento da lista" (aba Avisos / sino) também valem para o celular; "Alguém recusou" vem desligado
     const nf = { naoVai: false, ...((ctx.cfg || {}).notif || {}) };
     if (nf[sub] === false) continue;
-    out.push({ para, titulo: `📋 ${nomePelada(ctx)}`, texto, tag: 'pres-' + pid, sub });
+    out.push({ para, titulo: `📋 ${nomePelada(ctx)}`, texto, tag: 'pres-' + pid, sub, m: 'pres', v: { grupo: nomePelada(ctx), movimento: texto, nome } });
   }
   for (const [pid, L] of Object.entries(b.lanc || {})) {
     const L0 = (a.lanc || {})[pid]; if (!L || (L0 && L0.t === L.t)) continue;
     const p = (ctx.pel || {})[pid];
-    out.push({ para, titulo: '⚽ Gols para aprovar', texto: `${nome} lançou ${L.g || 0} gol(s) e ${L.a || 0} assist.${p ? ' na pelada de ' + dShort(p.data) : ''}.`, tag: 'lanc-' + pid });
+    out.push({ para, titulo: '⚽ Gols para aprovar', texto: `${nome} lançou ${L.g || 0} gol(s) e ${L.a || 0} assist.${p ? ' na pelada de ' + dShort(p.data) : ''}.`, tag: 'lanc-' + pid, m: 'lanc', v: { nome, gols: L.g || 0, assist: L.a || 0, pelada: p ? ' na pelada de ' + dShort(p.data) : '', grupo: nomePelada(ctx) } });
   }
   return out;
 }
 function membroNovo(m, uid, ctx) {
   const para = admins(ctx).filter(x => x !== uid); if (!para.length) return [];
-  return [{ para, titulo: `👋 ${nomePelada(ctx)}`, texto: `${m.apelido || m.nome || 'Alguém'} entrou pelo convite e espera sua autorização.`, tag: 'membro-' + uid }];
+  return [{ para, titulo: `👋 ${nomePelada(ctx)}`, texto: `${m.apelido || m.nome || 'Alguém'} entrou pelo convite e espera sua autorização.`, tag: 'membro-' + uid, m: 'membro', v: { nome: m.apelido || m.nome || 'Alguém', grupo: nomePelada(ctx) } }];
 }
 function muralAtualizado(a, b, ctx) {
   const vistos = new Set(((a && a.items) || []).map(x => x.id)), out = [];
@@ -119,13 +120,13 @@ function avalAbriu(p, cfg, agora) { if (!p || !p.data || p.pushAvalEm || p.aval)
 function avisoAval(p, pid, ctx) {
   const loc = new Date(fimDe(p, ctx.cfg) + janelaH(ctx.cfg) * 36e5 - 3 * 36e5); // horário de Recife
   const ate = `${DIAS3[loc.getUTCDay()]} ${pad(loc.getUTCHours())}:${pad(loc.getUTCMinutes())}`;
-  return [{ para: uidsDe(ctx, participantes(p, pid, ctx)), titulo: `⭐ Dar notas da pelada · ${nomePelada(ctx)}`, texto: `Como foi a pelada de ${dShort(p.data)}? Dê suas estrelas até ${ate}. O voto é secreto.`, tag: 'aval-' + pid }];
+  return [{ para: uidsDe(ctx, participantes(p, pid, ctx)), titulo: `⭐ Dar notas da pelada · ${nomePelada(ctx)}`, texto: `Como foi a pelada de ${dShort(p.data)}? Dê suas estrelas até ${ate}. O voto é secreto.`, tag: 'aval-' + pid, m: 'aval', v: { grupo: nomePelada(ctx), data: dShort(p.data), ate } }];
 }
 function rodadaNova(r, ctx) {
   if (!r || r.status !== 'aberta') return [];
   const n = (r.alvos || []).length, loc = new Date((r.fim || Date.now()) - 3 * 36e5);
   const ate = `${DIAS3[loc.getUTCDay()]} ${pad(loc.getUTCDate())}/${pad(loc.getUTCMonth() + 1)} ${pad(loc.getUTCHours())}:${pad(loc.getUTCMinutes())}`;
-  return [{ para: todos(ctx), titulo: `⭐ Avaliação geral do elenco aberta · ${nomePelada(ctx)}`, texto: `Avalie ${n} jogador${n === 1 ? '' : 'es'} da galera nos 5 critérios até ${ate}. O voto é secreto.`, tag: 'rodada' }];
+  return [{ para: todos(ctx), titulo: `⭐ Avaliação geral do elenco aberta · ${nomePelada(ctx)}`, texto: `Avalie ${n} jogador${n === 1 ? '' : 'es'} da galera nos 5 critérios até ${ate}. O voto é secreto.`, tag: 'rodada', m: 'rodada', v: { grupo: nomePelada(ctx), jogadores: `${n} jogador${n === 1 ? '' : 'es'}`, ate } }];
 }
 /* ---------- diarista convocado: 30 minutos para pagar ---------- */
 const PRAZO_PAG = 30 * 60e3;
@@ -150,14 +151,16 @@ function vencidosConv(p, pid, ctx, agora) {
 }
 function avisosVencidos(p, pid, ctx, r) {
   const out = [], g = nomePelada(ctx), quando = dShort(p.data), nome = j => nomeJog((ctx.jog || {})[j]);
-  for (const j of r.venc) { const u = uidDoJogador(ctx, j); if (u) out.push({ para: [u], titulo: `⌛ Vaga perdida · ${g}`, texto: `A diária da pelada de ${quando} não foi paga em 30 minutos e sua vaga foi liberada.`, tag: 'exp-' + pid }); }
-  const adm = admins(ctx); if (adm.length) out.push({ para: adm, titulo: `⌛ Vaga repassada · ${g}`, texto: `${r.venc.map(nome).join(', ')} não pagou a diária em 30 minutos.${r.prox.length ? ` ${r.prox.map(nome).join(', ')} foi convocado automaticamente.` : (ctx.cfg || {}).convAuto ? ' Não há mais diaristas na fila.' : ` A vaga está livre: abra "Convocar diaristas" e escolha o próximo${r.fila ? ` (${r.fila} na fila de pedidos)` : ''}.`}`, tag: 'exp-adm-' + pid });
+  for (const j of r.venc) { const u = uidDoJogador(ctx, j); if (u) out.push({ para: [u], titulo: `⌛ Vaga perdida · ${g}`, texto: `A diária da pelada de ${quando} não foi paga em 30 minutos e sua vaga foi liberada.`, tag: 'exp-' + pid, m: 'exp', v: { grupo: g, data: quando } }); }
+  const seguinte = r.prox.length ? ` ${r.prox.map(nome).join(', ')} foi convocado automaticamente.` : (ctx.cfg || {}).convAuto ? ' Não há mais diaristas na fila.' : ` A vaga está livre: abra "Convocar diaristas" e escolha o próximo${r.fila ? ` (${r.fila} na fila de pedidos)` : ''}.`;
+  const adm = admins(ctx); if (adm.length) out.push({ para: adm, titulo: `⌛ Vaga repassada · ${g}`, texto: `${r.venc.map(nome).join(', ')} não pagou a diária em 30 minutos.${seguinte}`, tag: 'exp-adm-' + pid, m: 'exp-adm', v: { grupo: g, data: quando, nomes: r.venc.map(nome).join(', '), seguinte } });
   return out;
 }
 function cobrancaConvocado(p, pid, jid, uid, ctx) {
   const cfg = ctx.cfg || {}; if (!p || ehPA(p, cfg) || !(p.conv || {})[jid] || !mpOn(cfg)) return [];
   const v = valorJog(p, cfg, jid); if (!(v > 0) || stPag0((p.diarias || {})[jid])) return [];
-  return [{ para: [uid], titulo: `💰 Pague em até 30 minutos · ${nomePelada(ctx)}`, texto: `Diária da pelada de ${dShort(p.data)}: ${BRL(v)}. Pague pelo app até ${horaMs(Date.now() + PRAZO_PAG)} para garantir sua vaga; depois disso ela é liberada para outro diarista.`, tag: 'pag30-' + pid, pagar: ctx.gid }];
+  const ate = horaMs(Date.now() + PRAZO_PAG);
+  return [{ para: [uid], titulo: `💰 Pague em até 30 minutos · ${nomePelada(ctx)}`, texto: `Diária da pelada de ${dShort(p.data)}: ${BRL(v)}. Pague pelo app até ${ate} para garantir sua vaga; depois disso ela é liberada para outro diarista.`, tag: 'pag30-' + pid, pagar: ctx.gid, m: 'pag30', v: { grupo: nomePelada(ctx), data: dShort(p.data), valor: BRL(v), ate } }];
 }
 /* ---------- cobranças ---------- */
 const stPag = x => !!x && (x === true || !!x.s);
@@ -197,9 +200,10 @@ function avisosCobranca(ctx, hoje) {
   const out = [], g = nomePelada(ctx), atraso = somaDias(hoje, -5);
   for (const c of devidas(ctx, hoje)) {
     const u = uidDoJogador(ctx, c.jid); if (!u) continue; const dono = linhaDono(ctx, u);
-    if (c.tipo === 'm' && hoje.slice(8) === '01' && c.ini === hoje) out.push({ para: [u], titulo: `💰 ${c.desc} · ${g}`, texto: `${BRL(c.v)}, vence dia ${dBR(c.venc)}. Pague pelo app com Pix.${dono}`, tag: 'cob-' + c.tipo + c.venc, pagar: ctx.gid });
-    else if (c.venc === hoje) out.push({ para: [u], titulo: `⏰ Vence hoje · ${g}`, texto: `${c.desc}: ${BRL(c.v)} vence hoje. Pague pelo app com Pix e o Caixa confirma na hora.${dono}`, tag: 'cob-' + c.tipo + c.venc, pagar: ctx.gid });
-    else if (c.venc === atraso) out.push({ para: [u], titulo: `🔴 Pagamento atrasado · ${g}`, texto: `${c.desc}: ${BRL(c.v)} venceu há 5 dias. Toque para pagar com Pix.${dono}`, tag: 'cob-' + c.tipo + c.venc, pagar: ctx.gid });
+    // avisa no dia do vencimento que a pelada escolheu (Ajustes) e 5 dias depois; o aviso do dia 1º saiu a pedido do Felipe
+    const v = { grupo: g, cobranca: c.desc, valor: BRL(c.v), dia: dBR(c.venc) };
+    if (c.venc === hoje) out.push({ para: [u], titulo: `⏰ Vence hoje · ${g}`, texto: `${c.desc}: ${BRL(c.v)} vence hoje. Pague pelo app com Pix e o Caixa confirma na hora.${dono}`, tag: 'cob-' + c.tipo + c.venc, pagar: ctx.gid, m: 'cob-hoje', v, suf: dono });
+    else if (c.venc === atraso) out.push({ para: [u], titulo: `🔴 Pagamento atrasado · ${g}`, texto: `${c.desc}: ${BRL(c.v)} venceu há 5 dias. Toque para pagar com Pix.${dono}`, tag: 'cob-' + c.tipo + c.venc, pagar: ctx.gid, m: 'cob-atraso', v, suf: dono });
   }
   return out;
 }
@@ -210,7 +214,7 @@ function extrasNovas(a, b, ctx) {
     if (!x || ea[xid] || !(Number(x.v) > 0)) continue;
     const venc = x.venc || x.d;
     for (const jid of x.quem || []) { const u = uidDoJogador(ctx, jid); if (!u || stPag((x.pag || {})[jid])) continue;
-      out.push({ para: [u], titulo: `💰 Nova cobrança · ${g}`, texto: `${x.nome || 'Cobrança'}: ${BRL(x.v)}${venc ? ', vence em ' + dBR(venc) : ''}. Pague pelo app com Pix.${linhaDono(ctx, u)}`, tag: 'x-' + xid, pagar: ctx.gid }); }
+      out.push({ para: [u], titulo: `💰 Nova cobrança · ${g}`, texto: `${x.nome || 'Cobrança'}: ${BRL(x.v)}${venc ? ', vence em ' + dBR(venc) : ''}. Pague pelo app com Pix.${linhaDono(ctx, u)}`, tag: 'x-' + xid, pagar: ctx.gid, m: 'cob-extra', v: { grupo: g, cobranca: x.nome || 'Cobrança', valor: BRL(x.v), vence: venc ? ', vence em ' + dBR(venc) : '', dia: venc ? dBR(venc) : '' }, suf: linhaDono(ctx, u) }); }
   }
   return out;
 }
@@ -218,7 +222,7 @@ function extrasNovas(a, b, ctx) {
 function cobrancaEvento(p, pid, jid, uid, ctx) {
   if (!p || !ehPA(p, ctx.cfg) || (p.dividir && p.precoDiaria == null)) return [];
   const v = valorJog(p, ctx.cfg, jid); if (!(v > 0) || stPag((p.diarias || {})[jid])) return [];
-  return [{ para: [uid], titulo: `💰 ${p.extra ? (p.nome || 'Evento extra') : (p.nome || 'Evento')} de ${dBR(p.data)} · ${nomePelada(ctx)}`, texto: `${BRL(v)}, vence em ${dBR(p.data)}. Pague pelo app com Pix.${linhaDono(ctx, uid)}`, tag: 'cobev-' + pid, pagar: ctx.gid }];
+  return [{ para: [uid], titulo: `💰 ${p.extra ? (p.nome || 'Evento extra') : (p.nome || 'Evento')} de ${dBR(p.data)} · ${nomePelada(ctx)}`, texto: `${BRL(v)}, vence em ${dBR(p.data)}. Pague pelo app com Pix.${linhaDono(ctx, uid)}`, tag: 'cobev-' + pid, pagar: ctx.gid, m: 'cob-ev', v: { grupo: nomePelada(ctx), evento: p.extra ? (p.nome || 'Evento extra') : (p.nome || 'Evento'), dia: dBR(p.data), valor: BRL(v) }, suf: linhaDono(ctx, uid) }];
 }
 
 /* ---------- resposta pelo botão da notificação (Vou / Não vou) ---------- */
@@ -231,7 +235,7 @@ function aniversarios(ctx, hoje) {
   for (const [u, m] of Object.entries(ctx.membros || {})) {
     if (!m || m.niver !== md) continue; const nome = m.apelido || String(m.nome || '').split(' ')[0] || 'Alguém';
     const para = todos(ctx); if (!para.length) continue;
-    out.push({ para, titulo: `🎂 Hoje é aniversário de ${nome}!`, texto: `${nomePelada(ctx)}: mande os parabéns para ${nome}. 🎉`, tag: 'niver-' + u + '-' + hoje });
+    out.push({ para, titulo: `🎂 Hoje é aniversário de ${nome}!`, texto: `${nomePelada(ctx)}: mande os parabéns para ${nome}. 🎉`, tag: 'niver-' + u + '-' + hoje, m: 'niver', v: { nome, grupo: nomePelada(ctx) } });
   }
   return out;
 }

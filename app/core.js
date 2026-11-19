@@ -14,12 +14,12 @@ const CORES=[{n:'Laranja',c:'#E8742A',e:'🟠'},{n:'Azul',c:'#2F6FD0',e:'🔵'},
 CORES.forEach(c=>{c.e='⚽'});
 const MAX_TIMES=CORES.length;
 const AVISOS={
-  convocacao:{n:'Convocação',d:'Abre a lista e chama todo mundo'},
-  cobrar:{n:'Cobrar respostas',d:'Lista quem ainda não respondeu'},
-  lista:{n:'Lista de presença',d:'Confirmados, espera e pendentes'},
+  convocacao:{n:'Convocação',d:'Chama a galera para confirmar presença na pelada'},
+  cobrar:{n:'Cobrar respostas',d:'Cobra quem ainda não disse se vai ou não'},
+  lista:{n:'Lista de presença',d:'Mostra quem vai, quem está na espera e quem falta'},
   times:{n:'Times sorteados',d:'Escalação de cada time'},
   resultado:{n:'Resultado e prêmios',d:'Craque, artilheiro, garçom e goleiro'},
-  pagamento:{n:'Cobrança',d:'Quem deve mensalidade ou diária'},
+  pagamento:{n:'Cobrança',d:'Cobra quem está devendo mensalidade ou diária'},
   outro:{n:'Outra mensagem',d:'Título e texto do seu jeito'}
 };
 // a Agenda guarda só o que depende de dia e hora; times e resultado viram alerta "Repassar no WhatsApp" quando acontecem
@@ -405,7 +405,7 @@ function swDica(){if(swDica.feita||!SW_DICA_ON)return;const c=document.querySele
 // O app já avisou a galera sobre este aviso da Agenda? (confere de verdade antes de pintar o cartão de verde)
 // - Convocação: tem pelada marcada desde antes do horário → todos já receberam "Pelada marcada" no app (e o lembrete de confirmar).
 // - Cobrar respostas e Lista: pelada marcada desde antes do horário E alguém ainda sem resposta naquela hora → o app mandou o lembrete para quem faltava.
-// - Cobrança: o servidor manda às 10h no dia 1º (mensalidade nova), no dia do vencimento e 5 dias depois, para quem deve; só vale se esse aviso estiver ligado.
+// - Cobrança: o servidor manda às 10h no dia do vencimento (o que a pelada escolheu) e 5 dias depois, para quem deve; só vale se esse aviso estiver ligado.
 // - Outra mensagem: o app não manda sozinho → continua amarelo.
 // jogadores ligados a uma conta do app (são os que recebem os avisos do app)
 function comContaSet(){return new Set(Object.values(S.pres||{}).map(d=>d&&d.jogador).filter(Boolean))}
@@ -421,7 +421,7 @@ function jaNoApp(v){const a=v.a,t=v.when.getTime();if(v.key&&(a.app||{})[v.key])
   if(a.tipo==='pagamento'){if(!CX()||(cfg().pushOff||{}).cobranca)return false;
     const dia=iso(v.when).slice(0,10),dez=new Date(dia+'T10:00:00');if(Date.now()<dez.getTime())return false;
     const ant=iso(new Date(dez.getTime()-5*864e5)).slice(0,10);
-    return gente.some(j=>pendenciasDe(j).some(c=>(c.tipo==='m'&&dia.slice(8)==='01'&&c.ref===dia.slice(0,7))||c.venc===dia||c.venc===ant))}
+    return gente.some(j=>pendenciasDe(j).some(c=>c.venc===dia||c.venc===ant))}
   return false}
 function avisosVencidos(){
   const now=new Date(),out=[];
@@ -2049,7 +2049,7 @@ const AVISOS_AUTO=[
   {g:'notas',k:'avaliar',e:'⭐',n:'Dar notas da pelada de hoje',q:'quando a pelada termina',p:'quem jogou'},
   {g:'notas',k:'resultado',e:'🏆',n:'Resultado e prêmios da pelada',q:'quando a votação da pelada fecha',p:'quem jogou'},
   {g:'notas',k:'votacao',e:'🗳️',n:'Avaliação geral do elenco aberta',q:'quando você abre a avaliação geral (não é a de cada pelada)',p:'todos'},
-  {g:'dinheiro',k:'cobranca',e:'💰',n:'Cobranças',q:'às 10h: mensalidade nova (dia 1º), vence hoje e 5 dias de atraso; cobrança extra nova; diária do evento ao confirmar. Tocar abre o Pix',p:'quem deve'},
+  {g:'dinheiro',k:'cobranca',e:'💰',n:'Cobranças',q:'às 10h, no dia do vencimento que a pelada escolheu e 5 dias depois; cobrança extra nova; diária do evento ao confirmar. Tocar abre o Pix',p:'quem deve'},
   {g:'grupo',k:'entrar',e:'👋',n:'Pedido para entrar',q:'quando alguém entra pelo convite',p:'administradores'},
   {g:'grupo',k:'aniversario',e:'🎂',n:'Aniversariante do dia',q:'às 10h, no dia do aniversário de quem informou a data no perfil',p:'todos'},
   {g:'grupo',k:'mural',e:'📣',n:'Recado do mural',q:'quando você publica no mural ou em "Outra mensagem"',p:'todos'}];
@@ -2070,11 +2070,27 @@ function cfgAvisosHTML(A){const d=avDraft(),LA=AVISOS_AUTO.filter(x=>!x.pa||!EV(
   let h='<div class="av-l">';
   L.forEach((x,i)=>{const on=avLigado(x.k);
     if(!i||L[i-1].g!==x.g)h+=`<div class="av-g">${AV_GRUPOS[x.g]}</div>`;
-    h+=`<div class="av-i${on?'':' off'}"><span class="av-e">${x.e}</span><div class="grow"><b>${x.n}</b><div class="sub">${x.q} · <i>${x.p}</i></div></div>${chave(x.k,x.n,on)}</div>`;
+    const ed=A&&window.MODELOS&&Object.values(MODELOS.MOD).some(m=>m.k===x.k),mex=ed&&Object.keys(MODELOS.MOD).some(m=>MODELOS.MOD[m].k===x.k&&MODELOS.proprio(cfg().textos,m));
+    h+=`<div class="av-i${on?'':' off'}"><span class="av-e">${x.e}</span><div class="grow"><b>${x.n}</b>${mex?' <span class="av-rec">texto seu</span>':''}<div class="sub">${x.q} · <i>${x.p}</i></div></div>${ed?`<button class="btn sm av-ed" data-act="txt-editar" data-k="${x.k}">Editar</button>`:''}${chave(x.k,x.n,on)}</div>`;
     if(A&&x.k==='presenca')h+=`<div class="av-subs${on?'':' off'}">${SUB_LISTA.map(k=>{const o=d.nf[k]!==false;return`<div class="av-sub"><div class="grow"><span>${NOTIF[k].n}</span><div class="sub">${esc(NOTIF[k].d)}</div></div>${chave('nf:'+k,NOTIF[k].n,o)}</div>`}).join('')}</div>`});
   h+='</div>';
   if(A){const sj=avSujo();h+=`<div class="av-salvar${sj?' sujo':''}"><span class="sub">${sj?'⚠️ Mudanças ainda não salvas':'✓ Tudo salvo. Vale para a aba Avisos e para o sino.'}</span><div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-act="avc-desfazer" ${sj?'':'disabled'}>Desfazer</button><button class="btn primary sm" data-act="avc-salvar" ${sj?'':'disabled'}>Salvar</button></div></div>`}
   return h}
+/* Textos das notificações automáticas: o administrador edita título e texto; as [etiquetas] o app troca na hora de mandar */
+function sheetTextos(k){const M=window.MODELOS;if(!M)return;const it=AVISOS_AUTO.find(x=>x.k===k)||{n:'Aviso',e:'🔔'},ms=Object.keys(M.MOD).filter(m=>M.MOD[m].k===k),T=cfg().textos||{};
+  const etq=m=>[...new Set((M.MOD[m].t+' '+M.MOD[m].x).match(/\[[a-z]+\]/g)||[])].map(e=>e.slice(1,-1));
+  openSheet(`${it.e} ${it.n}`,`<p class="sub" style="margin:-4px 0 10px">Toque no texto para mudar do seu jeito. As palavras entre colchetes, como <b>[data]</b>, o app troca sozinho na hora de mandar. Para usar uma, toque nela embaixo do texto.</p>
+    ${ms.map(m=>{const P=M.MOD[m],cur=M.proprio(T,m)||P;return`<div class="panel txt-mod" data-m="${m}" style="margin-bottom:10px">
+      ${ms.length>1?`<div class="av-g" style="margin-top:0">${esc(P.n)}</div>`:''}
+      <label class="field"><span>Título</span><input type="text" class="txt-t" maxlength="${M.LIM_T}" value="${esc(cur.t)}"></label>
+      <label class="field" style="margin-top:8px"><span>Texto</span><textarea class="txt-x" rows="3" maxlength="${M.LIM_X}">${esc(cur.x)}</textarea></label>
+      <div class="txt-etq">${etq(m).map(e=>`<button class="chip" data-act="txt-etq" data-e="${e}" title="${esc((M.ETQ[e]||[''])[0])}">[${e}]</button>`).join('')}</div>
+      <div class="sub txt-prev"><b>Exemplo:</b> ${esc(M.exemplo(cur.t))} — ${esc(M.exemplo(cur.x))}</div>
+      <div class="txt-bts"><button class="btn sm" data-act="txt-restaurar">Restaurar texto</button><button class="btn sm" data-act="txt-copiar">Copiar</button></div></div>`}).join('')}
+    <button class="btn primary block" data-act="txt-salvar" data-k="${k}">Salvar textos</button>`)}
+function txtPrevia(box){const M=window.MODELOS,t=box.querySelector('.txt-t').value,x=box.querySelector('.txt-x').value;box.querySelector('.txt-prev').innerHTML=`<b>Exemplo:</b> ${esc(M.exemplo(t))} — ${esc(M.exemplo(x))}`}
+document.addEventListener('input',e=>{const box=e.target.closest&&e.target.closest('.txt-mod');if(box&&window.MODELOS)txtPrevia(box)});
+document.addEventListener('focusin',e=>{if(e.target.matches&&e.target.matches('.txt-mod .txt-t,.txt-mod .txt-x'))window.__txtUlt=e.target});
 function avRedesenha(){document.querySelectorAll('.av-cfg').forEach(el=>{el.innerHTML=cfgAvisosHTML(el.dataset.a==='1')})}
 function tAvisos(A){
   let h=`<h2 style="margin-bottom:12px">Avisos</h2>`;
@@ -2092,7 +2108,7 @@ function tAvisos(A){
   if(!prox.length)h+=`<div class="empty">Nenhum lembrete na agenda.${A?'<br><br><button class="btn sm" data-act="avisos-padrao">Usar sugestão de agenda</button>':''}</div></div>`;
   else{h+='<div class="list">';
     for(const{id,a,when} of prox){const t={n:avN(a),d:avD(a)},on=a.ativo!==false,past=on&&when<new Date();
-      h+=`<div class="item ag-item"><div class="grow"><div class="name">${esc(t.n)}</div><div class="sub">${DIAS3[a.dia]} ${esc(a.hora)} · <span style="${past?'color:var(--red);font-weight:600':''}">${!on?'desligado':past?'pendente':relTempo(when)}</span></div></div>
+      h+=`<div class="item ag-item"><div class="grow"><div class="name">${esc(t.n)}</div><div class="sub ag-d">${esc(t.d)}</div><div class="sub">${DIAS3[a.dia]} ${esc(a.hora)} · <span style="${past?'color:var(--red);font-weight:600':''}">${!on?'desligado':past?'pendente':relTempo(when)}</span></div></div>
         ${A?`<div class="ag-bts"><button class="btn sm" data-act="msg" data-v="${a.tipo}" data-oa="${id}">Editar</button><button class="btn sm danger-l" data-act="del-aviso" data-a="${id}">Excluir</button><label class="sw sm" aria-label="${on?'Desligar':'Ligar'} ${esc(t.n)}"><input type="checkbox" data-act="aviso-onoff" data-a="${id}" ${on?'checked':''}><span></span></label></div>`:''}</div>`}
     h+='</div></div>'}
   if(A){
@@ -2908,6 +2924,16 @@ document.addEventListener('click',async e=>{
     case'copy':{const t=document.getElementById('msg-text');navigator.clipboard?.writeText(t.value).then(()=>toast('Mensagem copiada.'),()=>{t.select();toast('Selecione e copie o texto.')})||(t.select(),toast('Selecione e copie o texto.'));break}
     case'aviso-feito':{const a=S.avisos[d.a];const feitos=Object.fromEntries(Object.entries({...(a.feitos||{}),[d.key]:true}).sort().slice(-12));put('avisos/'+d.a,{...a,feitos});closeSheet();toast('Alerta resolvido.');break}
     case'add-aviso':sheetAviso(null);break;
+    case'txt-editar':sheetTextos(d.k);break;
+    case'txt-etq':{const box=b.closest('.txt-mod'),u=window.__txtUlt&&box.contains(window.__txtUlt)?window.__txtUlt:box.querySelector('.txt-x'),e='['+d.e+']',i=u.selectionStart??u.value.length,f=u.selectionEnd??i;
+      u.value=u.value.slice(0,i)+e+u.value.slice(f);u.focus();try{u.setSelectionRange(i+e.length,i+e.length)}catch(er){}txtPrevia(box);break}
+    case'txt-restaurar':{const box=b.closest('.txt-mod'),P=MODELOS.MOD[box.dataset.m];box.querySelector('.txt-t').value=P.t;box.querySelector('.txt-x').value=P.x;txtPrevia(box);toast('Texto original restaurado. Toque em Salvar textos para valer.');break}
+    case'txt-copiar':{const box=b.closest('.txt-mod'),txt=MODELOS.exemplo(box.querySelector('.txt-t').value)+'\n'+MODELOS.exemplo(box.querySelector('.txt-x').value);
+      (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Copiado. Cole no WhatsApp e troque o que for exemplo.'),()=>toast('Não deu para copiar neste aparelho.'));break}
+    case'txt-salvar':{if(!doisToques(b,'Toque de novo para salvar'))break;const T={...(cfg().textos||{})};
+      document.querySelectorAll('.txt-mod').forEach(box=>{const m=box.dataset.m,t=box.querySelector('.txt-t').value.trim(),x=box.querySelector('.txt-x').value.trim();
+        if(MODELOS.proprio({[m]:{t,x}},m))T[m]={t,x};else delete T[m]});
+      put('config/geral',{...(S.config||{}),textos:T});closeSheet();toast('Textos salvos. As próximas notificações já saem assim.');break}
     case'edit-aviso':sheetAviso(d.a);break;
     case'save-aviso':{const id=d.a||uid('a'),old=d.a?S.avisos[d.a]:{};
       const tipo=document.getElementById('a-tipo').value,ex={};

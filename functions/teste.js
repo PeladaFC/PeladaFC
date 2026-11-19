@@ -30,10 +30,10 @@ t('15 minutos antes: só mensalista sem resposta', () => {
   assert.ok(R.prazoMensChegando(p, 990 * 60e3)); assert.ok(!R.prazoMensChegando(p, 900 * 60e3));
   const av = R.lembreteMens(p, 'p1', ctx); assert.deepStrictEqual(av[0].para, ['uB']);
 });
-t('cobranças: dia 1º, vence hoje, 5 dias de atraso e dono da conta', () => {
+t('cobranças: no vencimento da pelada, 5 dias de atraso e dono da conta (sem aviso no dia 1º)', () => {
   const c2 = { ...ctx, cfg: { ...ctx.cfg, mensal: 80, vencMens: 10, mpConectadoEm: 1, mpDonoJid: 'jB' }, caixa: { '2026-10': { extras: { x1: { nome: 'Camisa', v: 35, quem: ['jC'], venc: '2026-10-15', pag: {} } } } }, pel: {} };
-  const d1 = R.avisosCobranca(c2, '2026-10-01'); assert.ok(d1.some(x => x.para[0] === 'uB' && /Mensalidade de outubro/.test(x.titulo) && /vence dia 10\/10/.test(x.texto) && /A conta que recebe é sua/.test(x.texto)));
-  const d10 = R.avisosCobranca(c2, '2026-10-10'); assert.ok(d10.some(x => /Vence hoje/.test(x.titulo)));
+  assert.strictEqual(R.avisosCobranca(c2, '2026-10-01').length, 0);
+  const d10 = R.avisosCobranca(c2, '2026-10-10'); assert.ok(d10.some(x => x.para[0] === 'uB' && /Vence hoje/.test(x.titulo) && /Mensalidade de outubro/.test(x.texto) && /A conta que recebe é sua/.test(x.texto)));
   const d15 = R.avisosCobranca(c2, '2026-10-15'); assert.ok(d15.some(x => x.para[0] === 'uC' && /Camisa: R\$ 35,00 vence hoje/.test(x.texto)));
   const d20 = R.avisosCobranca(c2, '2026-10-20'); assert.ok(d20.some(x => /atrasado/.test(x.titulo) && /Camisa/.test(x.texto)));
   assert.ok(R.avisosCobranca(c2, '2026-10-12').length === 0);
@@ -80,7 +80,7 @@ t('notas publicadas avisam quem jogou', () => {
 });
 t('vaga liberada avisa só o jogador', () => {
   const av = R.pelAtualizada({ data: '2026-10-10', aprov: {} }, { data: '2026-10-10', aprov: { jC: 7 } }, 'p1', ctx);
-  assert.deepStrictEqual(av, [{ para: ['uC'], titulo: '✅ Vaga liberada', texto: 'O administrador liberou sua vaga na pelada de sáb 10/10.', tag: 'lib-p1' }]);
+  assert.deepStrictEqual(av.map(({ m, v, suf, ...r }) => r), [{ para: ['uC'], titulo: '✅ Vaga liberada', texto: 'O administrador liberou sua vaga na pelada de sáb 10/10.', tag: 'lib-p1' }]);
 });
 t('confirmação avisa os administradores, menos quem confirmou', () => {
   const av = R.presAtualizada({ jogador: 'jB', pel: {} }, { jogador: 'jB', pel: { p1: { s: 'sim', t: 1 } } }, 'uB', ctx);
@@ -137,5 +137,20 @@ t('times sem nome viram "Time 1, Time 2…"; nome personalizado continua vencend
   const c2 = { ...ctx, cfg: { ...ctx.cfg, nomesTimes: ['Cobra', ''] } };
   const av = R.pelAtualizada({ data: '2026-10-10' }, { data: '2026-10-10', sorteadoEm: 5, times: [{ cor: 0, ids: ['jA'] }, { cor: 1, ids: ['jB'] }] }, 'p1', c2);
   assert.match(av[0].texto, /no time Cobra/); assert.match(av[1].texto, /Você está no Time 2 ⚽/);
+});
+t('textos editáveis: padrão igual ao de hoje, texto próprio troca as [etiquetas], app e servidor iguais', () => {
+  const M = require('./modelos'), fs = require('fs'), path = require('path');
+  assert.strictEqual(fs.readFileSync(path.join(__dirname, 'modelos.js'), 'utf8'), fs.readFileSync(path.join(__dirname, '..', 'app', 'modelos.js'), 'utf8'), 'app/modelos.js precisa ser igual a functions/modelos.js');
+  // o texto padrão do modelo, preenchido, dá exatamente o texto que o app manda hoje
+  const c2 = { ...ctx, cfg: { ...ctx.cfg, mensal: 80, vencMens: 10, mpConectadoEm: 1, mpDonoJid: 'jB' }, caixa: {}, pel: {} };
+  const amostras = [...R.avisosCobranca(c2, '2026-10-10'), ...R.avisosCobranca(c2, '2026-10-15'),
+    ...R.pelAtualizada({ data: '2026-10-10' }, { data: '2026-10-10', sorteadoEm: 5, times: [{ cor: 0, ids: ['jA'] }], goleiros: ['jB'] }, 'p1', ctx)];
+  assert.ok(amostras.length >= 3);
+  for (const a of amostras) { assert.ok(M.MOD[a.m], 'sem modelo: ' + a.m); assert.strictEqual(M.preencher(M.MOD[a.m].t, a.v), a.titulo, a.m); assert.strictEqual(M.preencher(M.MOD[a.m].x, a.v) + (a.suf || ''), a.texto, a.m); }
+  // texto próprio
+  const a = amostras.find(x => x.m === 'cob-hoje' && x.para[0] === 'uB'), b = M.aplicar(a, { 'cob-hoje': { t: 'Ei, [grupo]', x: 'Paga a [cobranca] de [valor] hoje!' } });
+  assert.strictEqual(b.titulo, 'Ei, ' + a.v.grupo); assert.ok(b.texto.startsWith('Paga a Mensalidade de outubro de R$ 80,00 hoje!')); assert.ok(/A conta que recebe é sua/.test(b.texto));
+  assert.strictEqual(M.aplicar(a, { 'cob-hoje': { t: M.MOD['cob-hoje'].t, x: M.MOD['cob-hoje'].x } }), a);
+  assert.strictEqual(M.aplicar(a, null), a);
 });
 console.log(`\n${n} testes passaram.`);
