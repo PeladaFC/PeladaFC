@@ -55,7 +55,7 @@ body{font-family:var(--f-body);font-size:15px;line-height:1.45;-webkit-font-smoo
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--pitch);outline-offset:2px}
-.wrap{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:12px 110px}
+.wrap{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:12px 120px}
 h1,h2,h3{font-family:var(--f-display);letter-spacing:.01em;text-wrap:balance;margin:0}
 h2{font-size:22px;text-transform:uppercase}
 h3{font-size:17px;text-transform:uppercase;letter-spacing:.04em}
@@ -579,6 +579,14 @@ nav.tabs button[aria-current="page"]::after{content:"";position:absolute;z-index
 nav.tabs button[aria-current="page"] svg{transform:scale(1.22) translateY(-1px);filter:drop-shadow(2px 2px 0 var(--card))}
 nav.tabs button:active svg{transform:scale(.9)}
 @media (prefers-reduced-motion:reduce){nav.tabs button svg{transition:none}}
+/* Abas em bolha flutuante (estilo do WhatsApp novo), a pedido do Felipe */
+nav.tabs{left:0;right:0;margin:0 auto;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);width:min(560px,calc(100% - 20px));padding:4px;border:1px solid rgba(255,255,255,.6);border-image:none;border-radius:999px;background:rgba(255,255,255,.72);-webkit-backdrop-filter:blur(18px) saturate(1.6);backdrop-filter:blur(18px) saturate(1.6);box-shadow:0 8px 28px rgba(19,32,24,.16),0 1px 3px rgba(19,32,24,.08)}
+nav.tabs button{padding:6px 2px 6px;border-radius:999px}
+nav.tabs button[aria-current="page"]::before{display:none}
+nav.tabs button[aria-current="page"]::after{top:0;bottom:0;left:2px;right:2px;border-radius:999px;transform:none;background:rgba(27,107,58,.12)}
+nav.tabs button[aria-current="page"] svg{transform:scale(1.08);filter:none}
+@media (prefers-color-scheme:dark){nav.tabs{background:rgba(21,31,25,.72);border-color:rgba(255,255,255,.08)}nav.tabs button[aria-current="page"]::after{background:rgba(95,191,131,.16)}}
+:root[data-tema="escuro"] nav.tabs{background:rgba(21,31,25,.72);border-color:rgba(255,255,255,.08)}
 .rsvp button,.dots button,.step button,.pick button{border-radius:5px}
 .pick button[aria-pressed="true"]{background:var(--pitch);border-color:var(--pitch);color:var(--pitch-ink);box-shadow:2px 2px 0 var(--card)}
 .sheet{border-radius:16px 16px 0 0;border-top:4px solid var(--pitch);background:

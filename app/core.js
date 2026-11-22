@@ -2051,7 +2051,7 @@ const AVISOS_AUTO=[
   {g:'notas',k:'votacao',e:'🗳️',n:'Avaliação geral do elenco aberta',q:'quando você abre a avaliação geral (não é a de cada pelada)',p:'todos'},
   {g:'dinheiro',k:'cobranca',e:'💰',n:'Cobranças',q:'às 10h, no dia do vencimento que a pelada escolheu e, se ainda não pagou, 3 e 5 dias depois; cobrança extra nova; diária do evento ao confirmar. Tocar abre o Pix',p:'quem deve'},
   {g:'grupo',k:'entrar',e:'👋',n:'Pedido para entrar',q:'quando alguém entra pelo convite',p:'administradores'},
-  {g:'grupo',k:'aniversario',e:'🎂',n:'Aniversariante do dia',q:'às 10h, no dia do aniversário de quem informou a data no perfil',p:'todos'},
+  {g:'grupo',k:'aniversario',e:'🎂',n:'Aniversariante do dia',q:'às 8h, no dia do aniversário de quem informou a data no perfil',p:'todos'},
   {g:'grupo',k:'mural',e:'📣',n:'Recado do mural',q:'quando você publica no mural ou em "Outra mensagem"',p:'todos'}];
 const AV_GRUPOS={lista:'📋 Lista e presença',jogo:'⚽ Jogo',notas:'⭐ Notas e prêmios',dinheiro:'💰 Dinheiro',grupo:'👥 Grupo'};
 /* ---------- escolhas dos avisos: UMA lista só, usada na aba Avisos e no sino ----------

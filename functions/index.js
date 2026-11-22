@@ -267,10 +267,19 @@ exports.pushPrazoMensalistas = onSchedule({ schedule: 'every 15 minutes', timeZo
     if (!alvo.length) continue;
     const ctx = await contexto(g.id, { pres: true, jog: true, membros: true });
     for (const d of alvo) { await d.ref.update({ pushMens15: agora }); await enviarTodos(R.lembreteMens(d.data(), d.id, ctx), ctx); }
+  }  // aniversários: às 8h (Recife), uma vez por dia, aproveitando esta rotina de 15 em 15 minutos (sem agendamento novo, sem custo)
+  const local = new Date(agora - 3 * 36e5);
+  if (local.getUTCHours() >= 8) {
+    const ref = db.collection('sistema').doc('rotinas');
+    const vez = await db.runTransaction(async tx => { const s = await tx.get(ref); if (s.exists && s.data().niver === hoje) return false; tx.set(ref, { niver: hoje }, { merge: true }); return true; });
+    if (vez) for (const g of grupos.docs) {
+      try { const ctx = await contexto(g.id, { pres: true, jog: true, membros: true }); await enviarTodos(R.aniversarios(ctx, hoje), ctx); }
+      catch (e) { logger.warn('aniversarios', g.id, e.message); }
+    }
   }
 });
 
-// Todo dia às 10h: mensalidade nova (dia 1º), vence hoje e 5 dias de atraso,
+// Todo dia às 10h: cobrança no dia do vencimento e, se atrasado, no 3º e 5º dia,
 // e, na mesma rotina (sem custo de agendamento extra), a nota fiscal da comissão: dia 1º emite o mês anterior
 exports.pushCobrancas = onSchedule({ schedule: '0 10 * * *', timeZone: 'America/Recife', maxInstances: 1, memory: '512MiB', timeoutSeconds: 540 }, async () => {
   const hoje = new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 10);
@@ -278,7 +287,7 @@ exports.pushCobrancas = onSchedule({ schedule: '0 10 * * *', timeZone: 'America/
   try { await avisarErros(); } catch (e) { logger.error('aviso de erros', e.message); }
   const grupos = await db.collection('grupos').select().get();
   for (const g of grupos.docs) {
-    try { const ctx = await contexto(g.id, { pres: true, jog: true, pel: true, caixa: true, membros: true }); await enviarTodos(R.avisosCobranca(ctx, hoje), ctx); await enviarTodos(R.aniversarios(ctx, hoje), ctx); }
+    try { const ctx = await contexto(g.id, { pres: true, jog: true, pel: true, caixa: true, membros: true }); await enviarTodos(R.avisosCobranca(ctx, hoje), ctx); }
     catch (e) { logger.warn('cobrancas', g.id, e.message); }
   }
 });
