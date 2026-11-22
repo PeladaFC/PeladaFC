@@ -3474,7 +3474,7 @@ function pdfCampeonato(pid){const p=S.pel[pid];if(!p)return null;const c=cfg(),T
    Aqui ela é reancorada no fundo da área visível sempre que a tela muda de tamanho. */
 (function(){const vv=window.visualViewport;let pend=false;
   const ajustar=()=>{pend=false;const n=document.getElementById('nav');if(!n)return;n.style.transform='';if(!vv)return;
-    const base=vv.offsetTop+vv.height,r=n.getBoundingClientRect(),dif=base-r.bottom;
+    const base=vv.offsetTop+vv.height-(parseFloat(getComputedStyle(n).bottom)||0),r=n.getBoundingClientRect(),dif=base-r.bottom; // respeita o espaço da bolha embaixo
     // só corrige quando a barra ficou acima do fundo (teclado aberto não conta: aí o fundo visível fica acima da barra)
     if(dif>2&&!(document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)))n.style.transform=`translateY(${Math.round(dif)}px)`};
   const agenda=()=>{if(pend)return;pend=true;requestAnimationFrame(ajustar)};
