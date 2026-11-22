@@ -195,15 +195,15 @@ function devidas(ctx, hoje) {
   return out;
 }
 const linhaDono = (ctx, uid) => { const c = ctx.cfg || {}; return c.mpConectadoEm && c.mpDonoJid && (ctx.pres || {})[uid] && ctx.pres[uid].jogador === c.mpDonoJid ? ' A conta que recebe é sua: pague por outra conta ou marque como pago no app.' : ''; };
-// aviso diário (10h): mensalidade nova no dia 1º, vence hoje, 5 dias de atraso
+// aviso diário (10h): no dia do vencimento que a pelada escolheu e, se ainda não pagou, 3 e 5 dias depois
 function avisosCobranca(ctx, hoje) {
-  const out = [], g = nomePelada(ctx), atraso = somaDias(hoje, -5);
+  const out = [], g = nomePelada(ctx), atraso3 = somaDias(hoje, -3), atraso5 = somaDias(hoje, -5);
   for (const c of devidas(ctx, hoje)) {
     const u = uidDoJogador(ctx, c.jid); if (!u) continue; const dono = linhaDono(ctx, u);
     // avisa no dia do vencimento que a pelada escolheu (Ajustes) e 5 dias depois; o aviso do dia 1º saiu a pedido do Felipe
     const v = { grupo: g, cobranca: c.desc, valor: BRL(c.v), dia: dBR(c.venc) };
     if (c.venc === hoje) out.push({ para: [u], titulo: `⏰ Vence hoje · ${g}`, texto: `${c.desc}: ${BRL(c.v)} vence hoje. Pague pelo app com Pix e o Caixa confirma na hora.${dono}`, tag: 'cob-' + c.tipo + c.venc, pagar: ctx.gid, m: 'cob-hoje', v, suf: dono });
-    else if (c.venc === atraso) out.push({ para: [u], titulo: `🔴 Pagamento atrasado · ${g}`, texto: `${c.desc}: ${BRL(c.v)} venceu há 5 dias. Toque para pagar com Pix.${dono}`, tag: 'cob-' + c.tipo + c.venc, pagar: ctx.gid, m: 'cob-atraso', v, suf: dono });
+    else if (c.venc === atraso3 || c.venc === atraso5) { const dias = c.venc === atraso3 ? 3 : 5; out.push({ para: [u], titulo: `🔴 Pagamento atrasado · ${g}`, texto: `${c.desc}: ${BRL(c.v)} venceu há ${dias} dias. Toque para pagar com Pix.${dono}`, tag: 'cob-' + c.tipo + c.venc, pagar: ctx.gid, m: 'cob-atraso', v: { ...v, dias }, suf: dono }); }
   }
   return out;
 }

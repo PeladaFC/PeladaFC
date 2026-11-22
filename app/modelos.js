@@ -29,6 +29,7 @@
     cobranca: ['o que está sendo cobrado', 'Mensalidade de novembro'],
     vence: ['vencimento (com vírgula antes)', ', vence em 10/12'],
     dia: ['data do vencimento', '10/12'],
+    dias: ['dias de atraso', '3'],
   };
   // um modelo por notificação: k = chave do aviso na lista dos Automáticos
   const MOD = {
@@ -49,7 +50,7 @@
     'notas': { k: 'resultado', n: 'Resultado da pelada', t: '🏆 Saiu o resultado · [grupo]', x: 'A votação da pelada de [data] terminou. Veja o craque, as notas e os prêmios.' },
     'rodada': { k: 'votacao', n: 'Avaliação geral aberta', t: '⭐ Avaliação geral do elenco aberta · [grupo]', x: 'Avalie [jogadores] da galera nos 5 critérios até [ate]. O voto é secreto.' },
     'cob-hoje': { k: 'cobranca', n: 'No dia do vencimento', t: '⏰ Vence hoje · [grupo]', x: '[cobranca]: [valor] vence hoje. Pague pelo app com Pix e o Caixa confirma na hora.' },
-    'cob-atraso': { k: 'cobranca', n: '5 dias depois do vencimento', t: '🔴 Pagamento atrasado · [grupo]', x: '[cobranca]: [valor] venceu há 5 dias. Toque para pagar com Pix.' },
+    'cob-atraso': { k: 'cobranca', n: 'Atrasado: 3 e 5 dias depois do vencimento', t: '🔴 Pagamento atrasado · [grupo]', x: '[cobranca]: [valor] venceu há [dias] dias. Toque para pagar com Pix.' },
     'cob-extra': { k: 'cobranca', n: 'Cobrança extra nova', t: '💰 Nova cobrança · [grupo]', x: '[cobranca]: [valor][vence]. Pague pelo app com Pix.' },
     'cob-ev': { k: 'cobranca', n: 'Confirmou num evento com valor', t: '💰 [evento] de [dia] · [grupo]', x: '[valor], vence em [dia]. Pague pelo app com Pix.' },
     'pag30': { k: 'cobranca', n: 'Diarista convocado: 30 minutos para pagar', t: '💰 Pague em até 30 minutos · [grupo]', x: 'Diária da pelada de [data]: [valor]. Pague pelo app até [ate] para garantir sua vaga; depois disso ela é liberada para outro diarista.' },

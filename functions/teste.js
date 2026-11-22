@@ -30,9 +30,10 @@ t('15 minutos antes: só mensalista sem resposta', () => {
   assert.ok(R.prazoMensChegando(p, 990 * 60e3)); assert.ok(!R.prazoMensChegando(p, 900 * 60e3));
   const av = R.lembreteMens(p, 'p1', ctx); assert.deepStrictEqual(av[0].para, ['uB']);
 });
-t('cobranças: no vencimento da pelada, 5 dias de atraso e dono da conta (sem aviso no dia 1º)', () => {
+t('cobranças: no vencimento da pelada, 3 e 5 dias de atraso e dono da conta (sem aviso no dia 1º)', () => {
   const c2 = { ...ctx, cfg: { ...ctx.cfg, mensal: 80, vencMens: 10, mpConectadoEm: 1, mpDonoJid: 'jB' }, caixa: { '2026-10': { extras: { x1: { nome: 'Camisa', v: 35, quem: ['jC'], venc: '2026-10-15', pag: {} } } } }, pel: {} };
   assert.strictEqual(R.avisosCobranca(c2, '2026-10-01').length, 0);
+  assert.ok(R.avisosCobranca(c2, '2026-10-13').some(x => /venceu há 3 dias/.test(x.texto))); assert.ok(R.avisosCobranca(c2, '2026-10-15').some(x => /venceu há 5 dias/.test(x.texto))); assert.strictEqual(R.avisosCobranca(c2, '2026-10-14').filter(x => /^cob-m/.test(x.tag)).length, 0);
   const d10 = R.avisosCobranca(c2, '2026-10-10'); assert.ok(d10.some(x => x.para[0] === 'uB' && /Vence hoje/.test(x.titulo) && /Mensalidade de outubro/.test(x.texto) && /A conta que recebe é sua/.test(x.texto)));
   const d15 = R.avisosCobranca(c2, '2026-10-15'); assert.ok(d15.some(x => x.para[0] === 'uC' && /Camisa: R\$ 35,00 vence hoje/.test(x.texto)));
   const d20 = R.avisosCobranca(c2, '2026-10-20'); assert.ok(d20.some(x => /atrasado/.test(x.titulo) && /Camisa/.test(x.texto)));

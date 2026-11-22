@@ -405,7 +405,7 @@ function swDica(){if(swDica.feita||!SW_DICA_ON)return;const c=document.querySele
 // O app já avisou a galera sobre este aviso da Agenda? (confere de verdade antes de pintar o cartão de verde)
 // - Convocação: tem pelada marcada desde antes do horário → todos já receberam "Pelada marcada" no app (e o lembrete de confirmar).
 // - Cobrar respostas e Lista: pelada marcada desde antes do horário E alguém ainda sem resposta naquela hora → o app mandou o lembrete para quem faltava.
-// - Cobrança: o servidor manda às 10h no dia do vencimento (o que a pelada escolheu) e 5 dias depois, para quem deve; só vale se esse aviso estiver ligado.
+// - Cobrança: o servidor manda às 10h no dia do vencimento (o que a pelada escolheu) e 3 e 5 dias depois, para quem ainda deve; só vale se esse aviso estiver ligado.
 // - Outra mensagem: o app não manda sozinho → continua amarelo.
 // jogadores ligados a uma conta do app (são os que recebem os avisos do app)
 function comContaSet(){return new Set(Object.values(S.pres||{}).map(d=>d&&d.jogador).filter(Boolean))}
@@ -420,8 +420,8 @@ function jaNoApp(v){const a=v.a,t=v.when.getTime();if(v.key&&(a.app||{})[v.key])
     return ps.some(([pid,p])=>{const R=respDe(p,pid);return gente.some(j=>{const r=R[j];return!r||!r.s||r.t>t})})}
   if(a.tipo==='pagamento'){if(!CX()||(cfg().pushOff||{}).cobranca)return false;
     const dia=iso(v.when).slice(0,10),dez=new Date(dia+'T10:00:00');if(Date.now()<dez.getTime())return false;
-    const ant=iso(new Date(dez.getTime()-5*864e5)).slice(0,10);
-    return gente.some(j=>pendenciasDe(j).some(c=>c.venc===dia||c.venc===ant))}
+    const ant=iso(new Date(dez.getTime()-5*864e5)).slice(0,10),ant3=iso(new Date(dez.getTime()-3*864e5)).slice(0,10);
+    return gente.some(j=>pendenciasDe(j).some(c=>c.venc===dia||c.venc===ant3||c.venc===ant))}
   return false}
 function avisosVencidos(){
   const now=new Date(),out=[];
@@ -2049,7 +2049,7 @@ const AVISOS_AUTO=[
   {g:'notas',k:'avaliar',e:'⭐',n:'Dar notas da pelada de hoje',q:'quando a pelada termina',p:'quem jogou'},
   {g:'notas',k:'resultado',e:'🏆',n:'Resultado e prêmios da pelada',q:'quando a votação da pelada fecha',p:'quem jogou'},
   {g:'notas',k:'votacao',e:'🗳️',n:'Avaliação geral do elenco aberta',q:'quando você abre a avaliação geral (não é a de cada pelada)',p:'todos'},
-  {g:'dinheiro',k:'cobranca',e:'💰',n:'Cobranças',q:'às 10h, no dia do vencimento que a pelada escolheu e 5 dias depois; cobrança extra nova; diária do evento ao confirmar. Tocar abre o Pix',p:'quem deve'},
+  {g:'dinheiro',k:'cobranca',e:'💰',n:'Cobranças',q:'às 10h, no dia do vencimento que a pelada escolheu e, se ainda não pagou, 3 e 5 dias depois; cobrança extra nova; diária do evento ao confirmar. Tocar abre o Pix',p:'quem deve'},
   {g:'grupo',k:'entrar',e:'👋',n:'Pedido para entrar',q:'quando alguém entra pelo convite',p:'administradores'},
   {g:'grupo',k:'aniversario',e:'🎂',n:'Aniversariante do dia',q:'às 10h, no dia do aniversário de quem informou a data no perfil',p:'todos'},
   {g:'grupo',k:'mural',e:'📣',n:'Recado do mural',q:'quando você publica no mural ou em "Outra mensagem"',p:'todos'}];
