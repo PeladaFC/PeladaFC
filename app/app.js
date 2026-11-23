@@ -421,8 +421,7 @@ function render() {
     ${jog.length ? `<h3 class="home-sec">Você joga</h3>${jog.map(g => card(g, false)).join('')}` : ''}
     <div class="home-acoes"><button class="btn primary" data-sh="ir" data-v="nova">+ Criar pelada</button><button class="btn" data-sh="ir" data-v="codigo">📷 Entrar com código</button></div>
     <h3 class="home-sec">Chame a galera</h3>
-    <div class="home-conv"><button class="tile" data-sh="ir" data-v="compartilhar"><span class="ic">📲</span><b>Convidar para o app</b><span class="sub">QR Code ou link</span></button>${ids.length ? `<button class="tile" data-sh="ir" data-v="convidar-pelada"><span class="ic">⚽</span><b>Convidar para a pelada</b><span class="sub">Já entra no grupo</span></button>` : ''}</div>
-    <button class="ob-link" style="align-self:center;margin-top:4px" data-sh="demo">Ver demonstração do app</button>`; }
+    <div class="home-conv"><button class="tile" data-sh="ir" data-v="compartilhar"><span class="ic">📲</span><b>Convidar para o app</b><span class="sub">QR Code ou link</span></button>${ids.length ? `<button class="tile" data-sh="ir" data-v="convidar-pelada"><span class="ic">⚽</span><b>Convidar para a pelada</b><span class="sub">Já entra no grupo</span></button>` : ''}</div>`; }
   if (t === 'nova') h = topo('minhas') + `<h2>Criar sua pelada</h2><p class="lead">Depois você ajusta tudo nos Ajustes.</p>
     <form id="f-nova" class="stack" novalidate>
       <label class="field"><span>Nome da pelada</span><input type="text" id="n-nome" placeholder="Pelada do Sábado" required></label>
@@ -1562,6 +1561,7 @@ function telaDono() { const P = UIp.painel || {}, D = P.dados;
       <div class="sub" style="margin-top:3px">${pl(r.grupos, 'grupo')} · ${pl(r.ativos, 'ativo')} · ${pl(r.jogadores, 'jogador', 'jogadores')} · ${pl(r.contas, 'conta')} · ${pl(r.pagantes, 'pagante')}</div></div>`).join('')}</div>` : '<p class="sub" style="margin:0">Nada ainda.</p>'; };
   return `<h2>Painel do dono</h2><p class="lead">Como o app está sendo usado. Só você e a empresa veem esta tela.</p>
   <div class="panel" style="padding:10px 12px;margin-bottom:10px"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><span class="small">🌐 <b>Nota geral do app</b>: recalculada todo dia às 4h30, cruzando os grupos.</span><button class="btn sm" data-sh="nota-geral-agora">Recalcular agora</button></div></div>
+  <div class="panel" style="padding:10px 12px;margin-bottom:10px"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><span class="small">▶️ <b>Demonstração do app</b>: uma pelada de exemplo para mostrar a alguém.</span><button class="btn sm" data-sh="demo">Abrir</button></div></div>
   <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
     ${tile('Contas criadas', n(C.total), `+${n(C.novas30)} nos últimos 30 dias`)}
     ${tile('Contas ativas', n(C.ativas30), 'usaram nos últimos 30 dias')}

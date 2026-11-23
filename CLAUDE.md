@@ -57,6 +57,7 @@ No ar em https://pelotafc.com.br/app.
 - Barrinha Presença · Times · Jogo e pós-jogo (`.subtabs`, sticky): z-index 15, ABAIXO da barra de abas de baixo (`nav.tabs`, 20). O Felipe não quer que ela passe por cima das abas; nada que gruda na tela pode ficar acima de 20.
 - Notas fiscais da comissão (Painel do dono → Notas fiscais): "⚙️ Configuração" dentro do app, só para a empresa (ação `nf-config`/`nf-salvar` em `functions/nfse.js`): Quando emitir (só "Uma por mês": uma nota por organizador no dia 1º; o Felipe não quer "a cada pagamento" porque seriam notas de centavos), Ambiente Teste/Valendo, chave "Emitir notas automaticamente" com o texto Ligado/Desligado, dados da empresa e envio do certificado A1 (senha conferida no servidor). Salvar com 2 toques. Substitui o `configurar-nfse.sh`.
 - Suporte com autorização do dono (2 h) e chamados.
+- "Ver demonstração do app" saiu da tela inicial (pedido do Felipe, 23/11/2026): agora é uma linha "▶️ Demonstração do app" com botão "Abrir" no Painel do dono → Visão geral, logo abaixo da Nota geral.
 
 ## Pendente
 
