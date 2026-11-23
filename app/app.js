@@ -303,7 +303,7 @@ function render() {
     ${EU ? `<button class="btn block" data-sh="sair">Sair da conta</button>${EU.email ? `<p class="sub" style="text-align:center">Você entrou como: <b>${escH(EU.email)}</b></p>` : ''}
       <p class="sub" style="text-align:center;margin:0"><a href="/termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="/privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
       <button class="btn sm" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
-  if (t === 'dono') h = topo('perfil') + abasDono('dono') + telaDono();
+  if (t === 'dono') h = topo('perfil', '<button class="ob-link" style="font-size:13px;padding:4px 0" data-sh="demo">Ver demonstração do app</button>') + abasDono('dono') + telaDono();
   if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + (UIp.supInfo ? `<div class="sup-info"><span>🛟 <b>${UIp.supInfo.novo ? 'Pedido enviado' : 'Pedido já enviado'}</b> · ${escH(UIp.supInfo.nome)} · vale até ${(d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'))(new Date(UIp.supInfo.em + PEDIDO_VALE))}</span><button class="btn sm" data-sh="sup-cancelar" data-v="${escH(UIp.supInfo.gid)}">Retirar</button><button class="btn sm" data-sh="sup-info-ok" aria-label="Fechar">✕</button></div>` : '') + telaGruposDono();
   if (t === 'donoreps') h = topo('perfil') + abasDono('reps') + telaRepsDono();
   if (t === 'donoerros') h = topo('perfil') + abasDono('erros') + telaErrosDono();
@@ -1561,7 +1561,6 @@ function telaDono() { const P = UIp.painel || {}, D = P.dados;
       <div class="sub" style="margin-top:3px">${pl(r.grupos, 'grupo')} · ${pl(r.ativos, 'ativo')} · ${pl(r.jogadores, 'jogador', 'jogadores')} · ${pl(r.contas, 'conta')} · ${pl(r.pagantes, 'pagante')}</div></div>`).join('')}</div>` : '<p class="sub" style="margin:0">Nada ainda.</p>'; };
   return `<h2>Painel do dono</h2><p class="lead">Como o app está sendo usado. Só você e a empresa veem esta tela.</p>
   <div class="panel" style="padding:10px 12px;margin-bottom:10px"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><span class="small">🌐 <b>Nota geral do app</b>: recalculada todo dia às 4h30, cruzando os grupos.</span><button class="btn sm" data-sh="nota-geral-agora">Recalcular agora</button></div></div>
-  <div class="panel" style="padding:10px 12px;margin-bottom:10px"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><span class="small">▶️ <b>Demonstração do app</b>: uma pelada de exemplo para mostrar a alguém.</span><button class="btn sm" data-sh="demo">Abrir</button></div></div>
   <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
     ${tile('Contas criadas', n(C.total), `+${n(C.novas30)} nos últimos 30 dias`)}
     ${tile('Contas ativas', n(C.ativas30), 'usaram nos últimos 30 dias')}
