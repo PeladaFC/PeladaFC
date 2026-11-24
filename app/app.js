@@ -399,6 +399,7 @@ function render() {
     <button class="btn block" data-sh="ir" data-v="perfil">Voltar</button>`; }
   const avOk = rid => { try { return !!localStorage.getItem('pelada.avok.' + rid); } catch (e) { return false; } };
   const avAb = g => { const a = GRUPOS[g] && GRUPOS[g].avAberta; return a && a.v === 2 && a.fim > Date.now() && !avOk(a.rid) ? a : null; };
+  if (t === 'demohome') h = telaDemoHome();
   if (t === 'minhas') { const ids = Object.keys(GRUPOS); const adm = ids.filter(g => (GRUPOS[g].admins || []).includes(EU.uid)), jog = ids.filter(g => !adm.includes(g));
     const ini = n => { const ws = (n || '?').split(/\s+/).filter(Boolean), g = ws.filter(w => w.length > 2); return escH(((g.length ? g : ws).slice(0, 2).map(w => w[0]).join('')).toUpperCase()); };
     const CRESTS = ['#1B6A36', '#C0392B', '#2F6FD0', '#7E57C2', '#E8742A', '#0E7C7B', '#9A6B00'];
@@ -417,6 +418,7 @@ function render() {
     ${adm.filter(g => window.pedidoSuporte(GRUPOS[g])).map(g => `<div class="alerta-sup"><span class="ic">🛟</span><div class="grow"><b>O suporte do Pelota FC pediu acesso</b><span>${escH(GRUPOS[g].nome || 'Pelada')} · acesso por 24 horas</span>
       <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm sup-sim" data-sh="sup-aceitar" data-v="${g}">Liberar por 24 horas</button><button class="btn sm sup-nao" data-sh="sup-recusar" data-v="${g}">Agora não</button></div></div></div>`).join('')}
     ${ids.filter(avAb).map(g => `<button class="alerta-av" data-sh="avaliar" data-v="${g}"><span class="ic">⭐</span><span><b>Avaliação geral do elenco aberta!</b>${escH(GRUPOS[g].nome || 'Pelada')} · dê sua nota para o elenco</span><span class="ir">Avaliar</span></button>`).join('')}
+    ${ids.length ? '' : `<button class="ob-opt conheca" data-sh="demo"><span class="ic" style="background:var(--pitch-soft)">⚽</span><span class="grow"><b>Veja como o app funciona</b><span class="sub">Uma pelada de exemplo, com passo a passo. Leva 1 minuto.</span></span><span class="seta" aria-hidden="true">›</span></button>`}
     ${cartaoCidade()}${cartaoPush()}
     ${adm.length ? `<h3 class="home-sec">Você administra</h3>${adm.map(g => card(g, true)).join('')}` : ''}
     ${jog.length ? `<h3 class="home-sec">Você joga</h3>${jog.map(g => card(g, false)).join('')}` : ''}
@@ -708,6 +710,7 @@ window.suporteAdmin = async (op, gid) => {
    (com número de pendentes). O dono responde pelo app ou pelo WhatsApp e marca "Dúvida resolvida", que tira do painel. */
 /* ================= Carta do atleta (tela inicial) ================= */
 let ATLETA = null, UNSUB_ATL = null, NGERAL = null, UNSUB_NG = null;
+const NGERAL_get = () => NGERAL;
 function ouvirAtleta() {
   if (UNSUB_ATL) { UNSUB_ATL(); UNSUB_ATL = null; } ATLETA = null; if (!EU) return;
   if (UNSUB_NG) { UNSUB_NG(); UNSUB_NG = null; } NGERAL = null;
@@ -735,8 +738,8 @@ function verificarDonoInicio() {
   notasServidor('acesso').then(() => { ls.set('pelota.dono.' + EU.uid, '1'); UIp.notasOk = true; if (TELA === 'minhas') render(); },
     e => { if (e && e.status === 403) ls.set(k, String(Date.now())); });
 }
-function cartaAtleta(ola, eu) {
-  const L = (ATLETA || []).filter(x => GRUPOS[x._gid]), vis = L.filter(x => x.ovr != null), w = x => 1 + (x.j || 0), soma = f => L.reduce((t, x) => t + (Number(x[f]) || 0), 0);
+function cartaAtleta(ola, eu, F) { // F: dados de exemplo (demonstração)
+  const NGERAL = F ? F.NG : NGERAL_get(); const L = F ? F.L : (ATLETA || []).filter(x => GRUPOS[x._gid]), vis = L.filter(x => x.ovr != null), w = x => 1 + (x.j || 0), soma = f => L.reduce((t, x) => t + (Number(x[f]) || 0), 0);
   const peso = k => vis.filter(x => x.kind === k).reduce((t, x) => t + w(x), 0), kind = peso('GOL') > peso('linha') ? 'GOL' : 'linha', vk = vis.filter(x => x.kind === kind);
   let ovrG = vis.length ? Math.round(vis.reduce((t, x) => t + x.ovr * w(x), 0) / vis.reduce((t, x) => t + w(x), 0)) : null;
   const pos = (() => { const c = {}; L.forEach(x => { c[x.pos] = (c[x.pos] || 0) + w(x); }); return Object.entries(c).sort((a, b) => b[1] - a[1])[0]?.[0] || ''; })();
@@ -745,7 +748,7 @@ function cartaAtleta(ola, eu) {
   if (NGERAL && NGERAL.ovr != null && vis.length) { ovrG = NGERAL.ovr; const kg = NGERAL.kind === 'GOL' ? 'GOL' : 'linha'; atr = ATR[kg].map(([k, n]) => [n, Math.round(Number((NGERAL.crit || {})[k]) || 60)]); }
   const posG = NGERAL && NGERAL.pos && vis.length ? NGERAL.pos : null;
   const nome = (eu.apelido || eu.nome || 'Atleta').split(/\s+/)[0];
-  const fotos = fotosEu(eu);
+  const fotos = F ? [F.foto] : fotosEu(eu);
   const tier = ovrG == null ? 'neutro' : ovrG >= 80 ? 'ouro' : ovrG >= 60 ? 'prata' : 'bronze';
   const POSN = { GOL: 'Goleiro', ZAG: 'Zagueiro', LAT: 'Lateral', VOL: 'Volante', MEI: 'Meio-campo', ATA: 'Atacante' };
   // temporadas: soma dos números de cada ano em todas as peladas
@@ -759,7 +762,7 @@ function cartaAtleta(ola, eu) {
         : `<p class="atl-vazio">${L.length ? 'Seus números aparecem depois da primeira avaliação da galera.' : (Object.keys(GRUPOS).length ? 'Abra suas peladas para montar sua carta.' : 'Sua carta de atleta aparece aqui depois que você entrar no elenco de uma pelada.')}</p>`}</div></div>
     <div class="atl-meus"><div class="atl-meus-top"><span class="atl-tit">Meus números</span><label class="atl-temp"><span>${ano === 'todas' ? 'Todas as temporadas' : 'Temporada ' + ano.slice(2)}</span><i aria-hidden="true">▾</i><select data-temporada aria-label="Escolher temporada">${lista.map(y => `<option value="${y}" ${y === ano ? 'selected' : ''}>Temporada ${y.slice(2)}</option>`).join('')}<option value="todas" ${ano === 'todas' ? 'selected' : ''}>Todas as temporadas</option></select></label></div>
       <div class="atl-stats"><div><b>${T.j}</b><span>jogos</span></div><div><b>${T.g}</b><span>gols</span></div><div><b>${T.a}</b><span>assist.</span></div><div><b>${T.mvp}</b><span>craque</span></div></div>
-</div><p class="atl-priv">Só você vê sua carta. A nota é calculada com o cruzamento das avaliações de todos os jogadores do Pelota FC.</p></div>`;
+</div><p class="atl-priv">Só você vê sua carta. A nota é calculada com o cruzamento das avaliações de todos os jogadores do Pelota FC. <button type="button" class="atl-como" data-sh="nota-como">Como é calculada?</button></p></div>`;
 }
 let MINHAS_DUV = [], UNSUB_DUV = null, DUV_DONO = null, UNSUB_DUV_DONO = null;
 function ouvirMinhasDuvidas() {
@@ -822,6 +825,7 @@ function abrirGrupo(gid, resp) {
   unsubGrupo = B.listenDoc('grupos/' + gid, s => { if (sup && s.exists && !((s.data.suporte || {}).ate > Date.now())) { aviso('O administrador encerrou o suporte desta pelada.'); sairSuporte(); return; } if (!s.exists) { if (ABERTO === gid) { delete GRUPOS[gid]; aviso('Este grupo foi apagado.'); window.voltarGrupos(); } return; } GRUPOS[gid] = s.data; window.atualizarGrupo({ ...s.data }); }, e => console.warn(e));
 }
 window.voltarGrupos = () => {
+  if (DEMO) { window.pararPelada(); ir('demohome'); window.scrollTo(0, 0); return; } // na demonstração, "‹" volta para a tela inicial de exemplo
   if (SUPORTE) { sairSuporte(); return; }
   window.pararPelada(); if (unsubGrupo) { unsubGrupo(); unsubGrupo = null; }
   ABERTO = null; ls.set('pelada.ultimo', null);
@@ -1739,6 +1743,42 @@ async function renovarPush() {
   } catch (e) { console.warn(e); }
 }
 // contas antigas sem cidade: pede uma vez na tela inicial (some quando salvar; "Agora não" esconde por 7 dias)
+/* ---------- demonstração: tela inicial de exemplo + passeio guiado ---------- */
+let DEMO = null; // { de: 'dono' | 'minhas', casa, grupo } enquanto a demonstração está aberta
+function entrarDemo(de) { DEMO = { de }; ir('demohome'); window.scrollTo(0, 0); setTimeout(tourCasa, 600); }
+function tourCasa() { if (!window.tourGuia || TELA !== 'demohome') return;
+  window.tourGuia([
+    { el: '.atl-escudo', t: 'Sua carta de atleta', x: 'O <b>74</b> é a sua nota geral, de 0 a 99. Ela junta as notas que a galera te dá em todas as suas peladas e corrige a régua de cada grupo. Toque em <b>Como é calculada?</b> na carta para ver os detalhes.' },
+    { el: '.atl-dir', t: 'Valências', x: 'Técnica, físico, passe, finalização e defesa. Vêm das notas de 1 a 5 que a galera dá depois de cada pelada.' },
+    { el: '.atl-meus', t: 'Meus números', x: 'Jogos, gols, assistências e quantas vezes você foi o craque, separados por temporada.' },
+    { el: '.demo-clube', t: 'Suas peladas', x: 'Aqui ficam as peladas que você joga ou administra. Toque para ver uma por dentro.' }
+  ], { fimTxt: 'Abrir a pelada', aoFim: () => { const b = document.querySelector('.demo-clube'); if (b) b.click(); } }); }
+function sairDemo() { const de = DEMO && DEMO.de; DEMO = null; window.pararPelada(); if (de === 'dono') { ir('dono'); if (!UIp.painel || !UIp.painel.dados) carregarPainel(); } else ir('minhas'); window.scrollTo(0, 0); }
+function demoCarta() { const ano = String(new Date().getFullYear()), crit = { tec: 78, fis: 71, pas: 80, fin: 68, mar: 62 };
+  return { foto: window.avatarDesenho ? window.avatarDesenho(7) : '', NG: { ovr: 74, kind: 'linha', pos: 'MEI', crit },
+    L: [{ _gid: 'demo', ovr: 74, kind: 'linha', pos: 'MEI', j: 12, crit: { tec: 4, fis: 3.5, pas: 4, fin: 3.4, mar: 3.1 }, anos: { [ano]: { j: 12, g: 5, a: 7, mvp: 2 } } }] }; }
+function telaDemoHome() {
+  const hr = new Date().getHours(), ola = hr < 5 ? 'Boa noite' : hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite', F = demoCarta();
+  return `<div class="banner demo-casa"><span><b>Demonstração.</b> Tela inicial de exemplo. Nada aqui é salvo.</span><button class="btn sm" data-sh="demo-sair">Sair</button></div>
+    <div class="ob-top"><span class="ob-sim" style="background:var(--pitch);color:var(--pitch-ink)">PELOTA FC</span><span class="ob-dir"><span class="eu-av">L<img class="eu-av-img" src="${escH(F.foto)}" alt=""></span></span></div>
+    ${cartaAtleta(ola, { apelido: 'Lipe' }, F)}
+    <button class="prox-linha" data-sh="demo-abrir"><span class="pl-ic">📅</span><span class="grow"><b>Sábado, 08:00</b> · Pelada do Sábado</span><span class="seta" aria-hidden="true">›</span></button>
+    <h3 class="home-sec">Você administra</h3>
+    <button class="clube demo-clube" data-sh="demo-abrir" style="--cor:#1B6A36"><span class="escudo"><span>PS</span></span><span class="grow"><b>Pelada do Sábado</b><span class="sub">Sábado 08:00 · <em>esta semana</em></span></span><span class="papel">Admin</span><span class="seta" aria-hidden="true">›</span></button>
+    <div class="home-acoes"><button class="btn primary" data-sh="demo-so">+ Criar pelada</button><button class="btn" data-sh="demo-so">📷 Entrar com código</button></div>
+    <button class="ob-link" style="align-self:center;margin-top:6px;font-size:13px" data-sh="demo-tour-casa">Ver o passeio de novo</button>`;
+}
+// explicação da nota geral (a mesma na carta de verdade e na demonstração)
+const NOTA_COMO = `<div class="stack nota-como" style="gap:10px">
+  <p>O número grande da carta é a sua <b>nota geral</b>, de 0 a 99. Ela vale igual em qualquer pelada do app.</p>
+  <ol>
+    <li><b>Em cada pelada</b>, a galera te dá notas de 1 a 5 em cada valência (técnica, físico, passe, finalização e defesa; goleiro tem as dele). Isso vira a sua nota naquele grupo.</li>
+    <li><b>Cada grupo tem a sua régua:</b> tem pelada que dá nota alta para todo mundo e tem pelada mais exigente.</li>
+    <li><b>O app descobre a régua de cada grupo</b> comparando os jogadores que jogam em mais de uma pelada, e corrige: quem é avaliado numa pelada "generosa" não fica com nota inflada, e quem joga numa pelada exigente não sai prejudicado.</li>
+    <li><b>Quem joga mais pesa mais:</b> a pelada em que você tem mais jogos conta mais na sua nota.</li>
+  </ol>
+  <p><b>Cores da carta:</b> bronze até 59 · prata de 60 a 79 · ouro de 80 para cima.</p>
+  <p class="sub">A nota é recalculada todo dia de madrugada. Só você vê a sua carta; os outros jogadores não veem a sua nota geral.</p></div>`;
 function cartaoCidade() {
   if (!EU || !PERFIL || (PERFIL.uf && PERFIL.cidade)) return '';
   try { if (Date.now() - Number(localStorage.getItem('pelota.cid.' + EU.uid) || 0) < 7 * 864e5) return ''; } catch (e) {}
@@ -1907,7 +1947,12 @@ document.addEventListener('click', async e => {
   if (a === 'copiar-app') { try { await navigator.clipboard.writeText(LINK_APP); aviso('Link do app copiado.'); } catch (err) { aviso(LINK_APP); } }
   if (a === 'share-app') { try { await navigator.share({ title: 'Pelota FC', text: MSG_APP }); } catch (err) { } }
   if (a === 'aceitar') aceitarConvite();
-  if (a === 'demo') { mostrarCasca(false); window.abrirDemo(); }
+  if (a === 'demo') entrarDemo(TELA === 'dono' ? 'dono' : 'minhas');
+  if (a === 'demo-sair') sairDemo();
+  if (a === 'demo-so') aviso('Na demonstração não dá. Saia da demonstração para criar a sua pelada.');
+  if (a === 'demo-abrir') { mostrarCasca(false); window.abrirDemo(); if (!DEMO.grupo) { DEMO.grupo = true; setTimeout(() => window.tourDemoGrupo && window.tourDemoGrupo(), 500); } }
+  if (a === 'demo-tour-casa') tourCasa();
+  if (a === 'nota-como') window.openSheet && window.openSheet('Como a nota é calculada', NOTA_COMO);
 });
 document.addEventListener('change', e => {
   const t = e.target; if (t.id !== 'p-foto' || !t.files || !t.files[0]) return;
@@ -2015,7 +2060,7 @@ window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); }
     if (!EU || saiuEm == null || Date.now() - saiuEm < PARADO_MS) return;
     saiuEm = null;
     const sh = document.getElementById('sheet'); if (sh) sh.innerHTML = '';
-    if (ABERTO) window.voltarGrupos(); else if (TELA !== 'minhas' && TELA !== 'perfil') ir('minhas');
+    DEMO = null; if (ABERTO) window.voltarGrupos(); else if (TELA !== 'minhas' && TELA !== 'perfil') ir('minhas');
     window.scrollTo(0, 0);
   };
   document.addEventListener('visibilitychange', () => { if (document.hidden) saiuEm = Date.now(); else voltarAoInicio(); });

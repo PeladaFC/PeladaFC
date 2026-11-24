@@ -1386,9 +1386,9 @@ function tJogo(A){
   h+=cartaoAvCompleta();
   h+=painelPosJogo();
   if(A)h+=painelAprovar();
-  if(A)for(const v of avisosVencidos()){const app=jaNoApp(v);h+=cartaoSw(app?' wa':'',`data-sw="aviso" data-a="${v.id}" data-key="${v.key}"`,app?cartaoTexto(esc(avN(v.a)),subVerde(),''):cartaoTexto(esc(avN(v.a)),'Hora de mandar',`${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}`),`<button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button>`);}
-  if(A)for(const r of repasses())h+=cartaoSw(' wa',`data-sw="rep" data-p="${r.pid}" data-k="${r.k}"`,cartaoTexto(r.n,subVerde(),''),`<button class="btn sm" data-act="msg" data-v="${r.k}" data-p="${r.pid}" data-rk="${r.k}">Ver mensagem</button>`);
-  if(A&&(avisosVencidos().length||repasses().length))h+=swDicaTexto();
+  if(A&&!demo)for(const v of avisosVencidos()){const app=jaNoApp(v);h+=cartaoSw(app?' wa':'',`data-sw="aviso" data-a="${v.id}" data-key="${v.key}"`,app?cartaoTexto(esc(avN(v.a)),subVerde(),''):cartaoTexto(esc(avN(v.a)),'Hora de mandar',`${DIAS3[v.when.getDay()]} ${pad(v.when.getHours())}:${pad(v.when.getMinutes())}`),`<button class="btn sm" data-act="msg" data-v="${v.a.tipo}" data-aviso="${v.id}" data-key="${v.key}">Gerar mensagem</button>`);}
+  if(A&&!demo)for(const r of repasses())h+=cartaoSw(' wa',`data-sw="rep" data-p="${r.pid}" data-k="${r.k}"`,cartaoTexto(r.n,subVerde(),''),`<button class="btn sm" data-act="msg" data-v="${r.k}" data-p="${r.pid}" data-rk="${r.k}">Ver mensagem</button>`);
+  if(A&&!demo&&(avisosVencidos().length||repasses().length))h+=swDicaTexto();
   const cur=atual();
   if(!cur){
     h+=A?`<button type="button" class="board board-marcar" data-act="np-abrir" aria-expanded="${!!UI.npAberto}"><div class="when">Sem pelada<br>marcada</div><div class="where">${EV()?'Evento livre':esc(DIAS[c.dia])+' das '+esc(horarioTxt(null))}${c.local?' · '+esc(c.local):''}</div><span class="board-cta">${UI.npAberto?'Marcando a pelada ▾':'＋ Toque para marcar a pelada'}</span></button>`
@@ -3300,26 +3300,79 @@ function obRender(){
 }
 
 /* ---------- demonstração ---------- */
+// desenhos de pessoas (feitos aqui, sem foto de ninguém) para preencher os cartões da demonstração
+function avatarDesenho(i){
+  const pele=['#F1C9A5','#E0AC82','#C68B5E','#A86B43','#8A5233','#6B3E26'][i%6],cab=['#2B1B12','#4A2E1C','#111111','#7A4B26','#2B1B12','#C9A15B','#3A2A20'][(i*3)%7];
+  const fundo=['#D8EEDD','#FCE9B8','#DDE7F7','#F6DCD2','#E5DEF3','#D9F0EE'][(i*5)%6],cam=['#1B6A36','#C0392B','#2F6FD0','#E8742A','#0E7C7B','#7E57C2'][(i*7)%6];
+  const tipo=i%5,barba=i%4===1,oculos=i%7===3;
+  const cabelo=[`<path d="M30 44c0-14 9-22 20-22s20 8 20 22c-3-6-9-9-20-9s-17 3-20 9z" fill="${cab}"/>`,
+    `<g fill="${cab}">${[[33,36],[40,29],[48,26],[56,27],[63,32],[67,40],[36,30],[60,29],[44,25],[52,25],[31,42],[69,44]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="6"/>`).join('')}</g>`,
+    `<path d="M31 42c1-11 9-17 19-17s18 6 19 17c-5-4-11-5-19-5s-14 1-19 5z" fill="${cab}" opacity=".85"/>`,
+    `<path d="M29 48c-1-16 8-25 21-25s22 9 21 25l-3-1c0-8-4-12-18-12s-18 4-18 12z" fill="${cab}"/><path d="M29 48c0 6 1 10 3 13l-1-14zM71 48c0 6-1 10-3 13l1-14z" fill="${cab}"/>`,
+    `<path d="M33 38c3-9 10-13 17-13s14 4 17 13c-6-3-11-4-17-4s-11 1-17 4z" fill="${cab}"/>`][tipo];
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="${fundo}"/>
+<path d="M18 100c2-17 15-26 32-26s30 9 32 26z" fill="${cam}"/><path d="M42 74h16l-8 9z" fill="#fff" opacity=".85"/>
+<rect x="43" y="60" width="14" height="16" rx="6" fill="${pele}"/><ellipse cx="50" cy="47" rx="19" ry="22" fill="${pele}"/>
+<ellipse cx="31" cy="49" rx="3.5" ry="5" fill="${pele}"/><ellipse cx="69" cy="49" rx="3.5" ry="5" fill="${pele}"/>
+${cabelo}${barba?`<path d="M33 52c2 13 9 19 17 19s15-6 17-19c-3 5-8 7-17 7s-14-2-17-7z" fill="${cab}" opacity=".9"/>`:''}
+<circle cx="43" cy="48" r="2.3" fill="#1d1d1d"/><circle cx="57" cy="48" r="2.3" fill="#1d1d1d"/>
+<path d="M39 42q4-2 8 0M53 42q4-2 8 0" stroke="${cab}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+${oculos?'<g fill="none" stroke="#222" stroke-width="1.6"><circle cx="43" cy="48" r="5.5"/><circle cx="57" cy="48" r="5.5"/><path d="M48.5 48h3"/></g>':''}
+<path d="M44 58q6 5 12 0" stroke="#7a3b2a" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)}
+window.avatarDesenho=avatarDesenho;
+/* passeio guiado: escurece a tela, destaca um pedaço e mostra um balão com "Próximo"; "Pular" fecha a qualquer momento */
+function tourGuia(passos,op={}){let i=0;document.querySelectorAll('.tour').forEach(e=>e.remove());
+  const el=document.createElement('div');el.className='tour';el.innerHTML='<div class="tour-spot"></div><div class="tour-bal" role="dialog" aria-live="polite"></div>';document.body.appendChild(el);
+  const spot=el.querySelector('.tour-spot'),bal=el.querySelector('.tour-bal');
+  const fechar=()=>{el.remove();window.removeEventListener('resize',pos);window.removeEventListener('scroll',pos,true);if(op.aoSair)op.aoSair()};
+  let alvo=null;
+  function pos(){if(!alvo||!alvo.isConnected)return;const r=alvo.getBoundingClientRect(),m=6,vh=window.innerHeight;
+    Object.assign(spot.style,{left:r.left-m+'px',top:r.top-m+'px',width:r.width+2*m+'px',height:r.height+2*m+'px'});
+    const bh=bal.offsetHeight,baixo=r.bottom+m+14+bh<vh-8;bal.style.top=(baixo?r.bottom+m+12:Math.max(8,r.top-m-12-bh))+'px';bal.classList.toggle('cima',!baixo);
+    const cx=Math.min(Math.max(r.left+r.width/2,40),window.innerWidth-40);bal.style.setProperty('--seta',(cx-bal.getBoundingClientRect().left)+'px')}
+  function mostra(){const P=passos[i];if(!P){fechar();return}if(P.antes)P.antes();
+    setTimeout(()=>{alvo=typeof P.el==='function'?P.el():document.querySelector(P.el);if(!alvo){i++;mostra();return}
+      alvo.scrollIntoView({block:P.bloco||'center',behavior:'instant'});const ult=i===passos.length-1;
+      bal.innerHTML=`<b>${P.t}</b><p>${P.x}</p><div class="tour-pe"><span class="tour-n">${i+1} de ${passos.length}</span><button type="button" class="tour-pular">${ult?'Fechar':'Pular'}</button><button type="button" class="btn primary sm tour-prox">${ult?(op.fimTxt||'Começar'):'Próximo'}</button></div>`;
+      bal.querySelector('.tour-pular').onclick=fechar;bal.querySelector('.tour-prox').onclick=()=>{if(ult){fechar();if(op.aoFim)op.aoFim()}else{i++;mostra()}};
+      requestAnimationFrame(pos);setTimeout(pos,250);setTimeout(pos,600)},P.antes?350:60)}
+  window.addEventListener('resize',pos);window.addEventListener('scroll',pos,true);mostra()}
+window.tourGuia=tourGuia;
+// passeio de dentro da pelada de exemplo (visão do administrador)
+window.tourDemoGrupo=function(){if(!demo)return;UI.comoJogador=false;UI.tab='jogo';UI.sub='presenca';render();window.scrollTo(0,0);
+  const sub=k=>()=>{UI.tab='jogo';UI.sub=k;render()},aba=k=>()=>{UI.tab=k;render();window.scrollTo(0,0)},depoisSub=()=>{const s=document.querySelector('.subtabs');return s&&s.nextElementSibling};
+  tourGuia([
+    {el:'.board-pel',t:'A pelada da semana',x:'Dia, hora, local e quantos já confirmaram. O administrador marca a pelada e todo mundo recebe o aviso no celular.'},
+    {el:()=>{const d=depoisSub();return d&&d.querySelector('.item')},antes:sub('presenca'),t:'Presença',x:'Cada jogador confirma aqui: <b>Vou</b> ou <b>Não vou</b>. Encheu as vagas? O próximo entra sozinho na lista de espera.'},
+    {el:()=>{const b=document.querySelector('[data-act=sortear]');return b&&b.parentElement},antes:sub('times'),t:'Times equilibrados',x:'Com a lista fechada, o app sorteia os times usando as notas de cada um. Dá para mexer à mão, se quiser.'},
+    {el:'[data-act=gol-abrir]',antes:sub('pos'),t:'Jogo e pós-jogo',x:'Durante o jogo, lance os gols. No fim, a galera dá notas, vota no craque e saem as artes prontas para o Instagram.'},
+    {el:'#nav [data-v=ranking]',antes:sub('presenca'),t:'Ranking',x:'Artilharia, assistências e craques da temporada, atualizados sozinhos.'},
+    {el:'#nav [data-v=caixa]',t:'Caixa com Pix',x:'Mensalidades e diárias pagas com Pix. O dinheiro cai na hora na conta do organizador, e quem está devendo aparece primeiro.'},
+    {el:'#nav [data-v=avisos]',t:'Avisos automáticos',x:'O app avisa a galera sozinho: pelada marcada, times sorteados, cobrança, aniversário…'},
+    {el:'.banner.demo button',antes:()=>window.scrollTo(0,0),t:'Agora é com você',x:'Mexa à vontade: nada aqui é salvo. Toque em <b>Ver como jogador</b> para ver o app do jeito que o jogador vê.'}
+  ],{aoSair:()=>{UI.sub='presenca';render()}})};
 function startDemo(){
   REAL=S;demo=true;REAL_ID=myId;myId='demo-me';
-  const nomes=[['Tiago Moura','Goleiro','GOL',''],['Ronaldo Sá','Rato','GOL',''],['André Lima','Dedé','ZAG','MEI'],['Bruno Paiva','','ZAG',''],['Caio Rocha','Caio','ZAG',''],['Diego Alves','Alemão','ZAG','MEI'],['Edson Cruz','Didi','MEI',''],['Felipe Nunes','Lipe','MEI','ATA'],['Gustavo Reis','Gugu','MEI',''],['Heitor Melo','','MEI','ZAG'],['Igor Santos','Igão','MEI',''],['João Pedro','JP','ATA',''],['Kauã Ferraz','','ATA','MEI'],['Lucas Brito','Luquinha','ATA',''],['Marcos Vidal','Marquinhos','ATA',''],['Nando Costa','Nandinho','ZAG',''],['Otávio Leal','Tavinho','MEI',''],['Paulo Dias','Paulão','ZAG',''],['Rafael Gil','Rafa','ATA','MEI'],['Sérgio Lins','Serginho','MEI',''],['Vitor Hugo','VH','ATA',''],['Wesley Teles','Wes','MEI','ATA']];
+  // pelada simples para entender o passo a passo: 2 goleiros + 12 de linha (2 times de 5, 1 na espera, 1 sem resposta)
+  const nomes=[['Tiago Moura','Tiago','GOL',''],['Ronaldo Sá','Rato','GOL',''],['André Lima','Dedé','ZAG','MEI'],['Bruno Paiva','','ZAG',''],['Caio Rocha','Caio','ZAG',''],['Diego Alves','Alemão','ZAG','MEI'],['Edson Cruz','Didi','MEI',''],['Felipe Nunes','Lipe','MEI','ATA'],['Gustavo Reis','Gugu','MEI',''],['Igor Santos','Igão','MEI',''],['João Pedro','JP','ATA',''],['Lucas Brito','Luquinha','ATA',''],['Marcos Vidal','Marquinhos','ATA',''],['Rafael Gil','Rafa','ATA','MEI']];
   const jog={};const r=s=>{let x=Math.sin(s)*1e4;return x-Math.floor(x)};
   nomes.forEach(([n,a,pos,pos2],i)=>{const crit={};critKey(pos).forEach(([k],ki)=>crit[k]=1+Math.floor(r(i*7+ki)*5));
-    jog['d'+i]={nome:n,apelido:a,pos,pos2,tipo:i%5===4?'diarista':'mensalista',crit,ativo:true,tel:''}});
+    jog['d'+i]={nome:n,apelido:a,pos,pos2,tipo:i%5===4?'diarista':'mensalista',crit,ativo:true,tel:'',foto:avatarDesenho(i)}});
   const hoje=new Date(),prox=proximaData(),pass=new Date(parseD(prox));pass.setDate(pass.getDate()-7);
-  const resp={};Object.keys(jog).forEach((id,i)=>{if(i<17)resp[id]={s:'sim',t:1000+i};else if(i<19)resp[id]={s:'nao',t:2000}});
-  const ids=Object.keys(jog),stats={};ids.slice(0,14).forEach((id,i)=>stats[id]={n:5+Math.round(r(i+50)*8)/2,g:jog[id].pos==='ATA'?Math.floor(r(i+9)*3):0,a:jog[id].pos==='MEI'?Math.floor(r(i+3)*3):0});
+  const resp={};Object.keys(jog).forEach((id,i)=>{if(i<13)resp[id]={s:'sim',t:1000+i}});
+  const ids=Object.keys(jog),stats={};ids.slice(0,12).forEach((id,i)=>stats[id]={n:5+Math.round(r(i+50)*8)/2,g:jog[id].pos==='ATA'?Math.floor(r(i+9)*3):0,a:jog[id].pos==='MEI'?Math.floor(r(i+3)*3):0});
   const mes=iso(hoje).slice(0,7);
-  S={config:{...DEF_CFG,nome:'Pelada do Sábado',local:'Arena Boa Viagem',localId:'l1',pix:'(81) 99999-0000'},jog,
+  S={config:{...DEF_CFG,times:2,porTime:5,nome:'Pelada do Sábado',local:'Arena Boa Viagem',localId:'l1',pix:'(81) 99999-0000'},jog,
     locais:{l1:{nome:'Arena Boa Viagem',end:'Boa Viagem',uf:'PE',cidade:'Recife',tipo:'Society',valor:200,mapa:'',obs:'Exemplo',usadoEm:2,tel:'(81) 99999-1111'},l2:{nome:'Quadra do Bairro',end:'Casa Amarela',uf:'PE',cidade:'Recife',tipo:'Quadra',valor:120,mapa:'',obs:'Exemplo',usadoEm:1},l3:{nome:'Society da Praia',end:'Casa Caiada',uf:'PE',cidade:'Olinda',tipo:'Society',valor:150,mapa:'',obs:'Exemplo'}},
-    pel:{p_demo1:{data:iso(pass),hora:'08:00',localId:'l1',local:'Arena Boa Viagem',encerradaEm:Date.now()-5*864e5,avalCampo:{gram:4,atend:5,amb:4,banh:3,tam:4},status:'encerrada',jogaram:ids.slice(0,14),stats,premios:{mvp:'d11',art:'d11',gar:'d7',gol:'d0'},diarias:{d4:true}},
+    pel:{p_demo1:{data:iso(pass),hora:'08:00',localId:'l1',local:'Arena Boa Viagem',encerradaEm:Date.now()-5*864e5,avalCampo:{gram:4,atend:5,amb:4,banh:3,tam:4},status:'encerrada',jogaram:ids.slice(0,12),stats,premios:{mvp:'d11',art:'d11',gar:'d7',gol:'d0'},diarias:{d4:true}},
          p_demo2:{data:prox,hora:'08:00',local:'Arena Boa Viagem',localId:'l1',status:'aberta',resp,criadoEm:Date.now()-26*36e5}},
     caixa:{[mes]:{mens:{d0:true,d1:true,d2:true,d3:true,d5:true,d6:true,d7:true},desp:[{id:'x1',d:'Aluguel do campo',v:400},{id:'x2',d:'Bola nova',v:120}]}},
     avisos:{a1:{tipo:'convocacao',dia:2,hora:'09:00',ativo:true},a2:{tipo:'cobrar',dia:4,hora:'19:00',ativo:true},a3:{tipo:'lista',dia:5,hora:'20:00',ativo:true},a4:{tipo:'times',dia:6,hora:'07:00',ativo:true}},
     mural:{items:[{id:'m1',t:Date.now()-3*36e5,titulo:'Recado do administrador',txt:'Galera, sábado tem pelada na Arena Boa Viagem às 8h. Chegar 15 min antes para dividir os coletes. Quem ainda não confirmou, confirma no app!'}]},
-    feed:{visto:0,items:[{id:'e2',tipo:'confirmou',texto:`Lipe confirmou presença (16/10) · ${dShort(prox)}`,t:Date.now()-36e5},{id:'e1',tipo:'desistiu',texto:`Alemão desistiu · ${dShort(prox)}`,t:Date.now()-72e5}]}};
+    feed:{visto:0,items:[{id:'e2',tipo:'confirmou',texto:`Lipe confirmou presença (16/10) · ${dShort(prox)}`,t:Date.now()-36e5}]}};
   S.votos={};S.avals={};S.membros=S.membros||{};
-  S.pres={'demo-x':{jogador:'d8',pel:{p_demo2:{s:'sim',t:Date.now()-18e5,a:null}},avalCampo:{p_demo1:{gram:3,atend:4,amb:5,banh:2,tam:4}}},'demo-w':{jogador:'d5',pel:{},avalCampo:{p_demo1:{gram:4,atend:4,amb:4,banh:3,tam:5}}},'demo-y':{jogador:'d19',pel:{p_demo2:{s:'sim',t:Date.now()-6e5,a:null}}}};
+  S.pres={'demo-x':{jogador:'d8',pel:{p_demo2:{s:'sim',t:Date.now()-18e5,a:null}},avalCampo:{p_demo1:{gram:3,atend:4,amb:5,banh:2,tam:4}}},'demo-w':{jogador:'d5',pel:{},avalCampo:{p_demo1:{gram:4,atend:4,amb:4,banh:3,tam:5}}},'demo-y':{jogador:'d12',pel:{p_demo2:{s:'sim',t:Date.now()-6e5,a:null}}},'demo-me':{jogador:'d7',pel:{p_demo2:{s:'sim',t:Date.now()-36e5,a:null}},avalCampo:{p_demo1:{gram:4,atend:4,amb:5,banh:3,tam:4}}}};
   UI.tab='jogo';UI.sub='presenca';render();window.scrollTo(0,0);
 }
 function stopDemo(){if(!REAL||!db){if(window.voltarGrupos)window.voltarGrupos();return}demo=false;myId=REAL_ID;S=REAL||{config:null,jog:{},pel:{},caixa:{},avisos:{},feed:null,pres:{},locais:{},mural:null};UI.comoJogador=false;REAL=null;render()}
