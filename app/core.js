@@ -3301,24 +3301,50 @@ function obRender(){
 
 /* ---------- demonstração ---------- */
 // desenhos de pessoas (feitos aqui, sem foto de ninguém) para preencher os cartões da demonstração
+const AV_PELE=['#F6D2B6','#EDB98A','#D99B6C','#B87A4B','#8D5A3B','#5E3A26'],AV_CAB={pr:'#1E1A18',ce:'#3B2519',ca:'#6B3E22',cc:'#9A6A3C',lo:'#D9AE5F',ru:'#B5522C',gr:'#B9B4AE'};
+// [pele, cor do cabelo, cabelo, barba, óculos, fundo, camisa, gola]
+const AV_GENTE=[[1,'ce','lado','rala','','#7EC8C9','#F2C230','time'],[3,'pr','black','cav','','#F2727A','#2D9CDB','time'],[2,'ca','topete','','','#F7C948','#1B6A36','redonda'],[0,'ru','cachos','cheia','red','#A9C6F5','#E8742A','polo'],
+  [4,'pr','raspado','','','#C9A6E8','#F4F1EA','v'],[0,'lo','lado','bigode','','#9ED9B8','#C0392B','redonda'],[5,'pr','tranca','','ret','#F7A04B','#2F6FD0','polo'],[1,'ca','topete','rala','','#F7C948','#1B6A36','time'],
+  [2,'gr','careca','cheia','red','#A9C6F5','#7E57C2','polo'],[4,'ce','raspado','cheia','','#F2727A','#0E7C7B','redonda'],[3,'pr','cachos','','','#C9A6E8','#F2C230','v'],[1,'cc','longo','','','#9ED9B8','#C0392B','time'],
+  [2,'pr','coque','cav','','#F7A04B','#2D9CDB','redonda'],[0,'ce','espeto','cheia','ret','#7EC8C9','#34495E','polo']];
+function avEscurece(h,f){const n=parseInt(h.slice(1),16),c=k=>Math.round(((n>>k)&255)*(1-f));return'#'+[16,8,0].map(k=>c(k).toString(16).padStart(2,'0')).join('')}
 function avatarDesenho(i){
-  const pele=['#F1C9A5','#E0AC82','#C68B5E','#A86B43','#8A5233','#6B3E26'][i%6],cab=['#2B1B12','#4A2E1C','#111111','#7A4B26','#2B1B12','#C9A15B','#3A2A20'][(i*3)%7];
-  const fundo=['#D8EEDD','#FCE9B8','#DDE7F7','#F6DCD2','#E5DEF3','#D9F0EE'][(i*5)%6],cam=['#1B6A36','#C0392B','#2F6FD0','#E8742A','#0E7C7B','#7E57C2'][(i*7)%6];
-  const tipo=i%5,barba=i%4===1,oculos=i%7===3;
-  const cabelo=[`<path d="M30 44c0-14 9-22 20-22s20 8 20 22c-3-6-9-9-20-9s-17 3-20 9z" fill="${cab}"/>`,
-    `<g fill="${cab}">${[[33,36],[40,29],[48,26],[56,27],[63,32],[67,40],[36,30],[60,29],[44,25],[52,25],[31,42],[69,44]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="6"/>`).join('')}</g>`,
-    `<path d="M31 42c1-11 9-17 19-17s18 6 19 17c-5-4-11-5-19-5s-14 1-19 5z" fill="${cab}" opacity=".85"/>`,
-    `<path d="M29 48c-1-16 8-25 21-25s22 9 21 25l-3-1c0-8-4-12-18-12s-18 4-18 12z" fill="${cab}"/><path d="M29 48c0 6 1 10 3 13l-1-14zM71 48c0 6-1 10-3 13l1-14z" fill="${cab}"/>`,
-    `<path d="M33 38c3-9 10-13 17-13s14 4 17 13c-6-3-11-4-17-4s-11 1-17 4z" fill="${cab}"/>`][tipo];
-  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="${fundo}"/>
-<path d="M18 100c2-17 15-26 32-26s30 9 32 26z" fill="${cam}"/><path d="M42 74h16l-8 9z" fill="#fff" opacity=".85"/>
-<rect x="43" y="60" width="14" height="16" rx="6" fill="${pele}"/><ellipse cx="50" cy="47" rx="19" ry="22" fill="${pele}"/>
-<ellipse cx="31" cy="49" rx="3.5" ry="5" fill="${pele}"/><ellipse cx="69" cy="49" rx="3.5" ry="5" fill="${pele}"/>
-${cabelo}${barba?`<path d="M33 52c2 13 9 19 17 19s15-6 17-19c-3 5-8 7-17 7s-14-2-17-7z" fill="${cab}" opacity=".9"/>`:''}
-<circle cx="43" cy="48" r="2.3" fill="#1d1d1d"/><circle cx="57" cy="48" r="2.3" fill="#1d1d1d"/>
-<path d="M39 42q4-2 8 0M53 42q4-2 8 0" stroke="${cab}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-${oculos?'<g fill="none" stroke="#222" stroke-width="1.6"><circle cx="43" cy="48" r="5.5"/><circle cx="57" cy="48" r="5.5"/><path d="M48.5 48h3"/></g>':''}
-<path d="M44 58q6 5 12 0" stroke="#7a3b2a" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+  const [pi,ci,cab,bar,ocu,fundo,cam,gola]=AV_GENTE[i%AV_GENTE.length],pele=AV_PELE[pi],sombra=avEscurece(pele,.14),c=AV_CAB[ci],c2=avEscurece(c,.25),camS=avEscurece(cam,.18);
+  const atras={black:`<g fill="${c}"><circle cx="50" cy="36" r="24"/><circle cx="30" cy="44" r="11"/><circle cx="70" cy="44" r="11"/></g>`,
+    longo:`<path d="M27 48C26 30 36 20 50 20s24 10 23 28l1 22c-4 4-9 5-12 4l-1-22H39l-1 22c-3 1-8 0-12-4z" fill="${c}"/>`,
+    tranca:`<g fill="${c}">${[30,35,40,60,65,70].map(x=>`<rect x="${x-2.6}" y="40" width="5.2" height="${x<40||x>60?26:22}" rx="2.6"/>`).join('')}</g>`,
+    coque:`<circle cx="50" cy="18" r="8" fill="${c}"/>`}[cab]||'';
+  const frente={lado:`<path d="M30 49C27 31 37 21 51 21c13 0 21 8 19 27-2-7-4-10-7-12-8 3-19 2-27-4-3 4-5 10-6 17z" fill="${c}"/><path d="M37 32c6 4 15 5 24 3" stroke="${c2}" stroke-width="1.2" fill="none" opacity=".6"/>`,
+    topete:`<path d="M31 47c-1-14 6-24 16-27 9-4 19 0 21 7 3 6 2 13 1 20-2-7-5-11-9-13-8 2-18 1-24-2-3 4-4 9-5 15z" fill="${c}"/><path d="M45 21c5-1 11 0 14 4" stroke="${c2}" stroke-width="1.3" fill="none" opacity=".7"/>`,
+    black:`<g fill="${c}">${[[34,30],[42,25],[50,23],[58,25],[66,30],[31,38],[69,38]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="7.5"/>`).join('')}</g>`,
+    cachos:`<g fill="${c}">${[[33,37],[38,30],[45,26],[52,25],[59,27],[65,31],[68,38],[41,33],[56,32],[49,31]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="5.2"/>`).join('')}</g>`,
+    raspado:`<path d="M31 46c0-14 9-21 19-21s19 7 19 21c-3-7-9-11-19-11s-16 4-19 11z" fill="${c}" opacity=".88"/>`,
+    careca:`<path d="M30 52c0-4 1-7 2-9M70 52c0-4-1-7-2-9" stroke="${c}" stroke-width="4" stroke-linecap="round"/><ellipse cx="44" cy="31" rx="6" ry="3" fill="#fff" opacity=".22"/>`,
+    longo:`<path d="M30 49c-2-17 8-27 20-27 13 0 22 10 20 27-4-8-9-13-15-14-6 4-15 6-21 5-2 3-3 6-4 9z" fill="${c}"/>`,
+    tranca:`<path d="M30 47c0-14 9-22 20-22s20 8 20 22c-3-6-8-10-20-10s-17 4-20 10z" fill="${c}"/><path d="M36 33l3 4M44 29l2 5M52 28v5M60 30l-2 5M66 35l-3 3" stroke="${c2}" stroke-width="1.4" stroke-linecap="round"/>`,
+    coque:`<path d="M31 46c0-14 9-21 19-21s19 7 19 21c-4-8-10-12-19-12s-15 4-19 12z" fill="${c}"/>`,
+    espeto:`<path d="M31 47l-1-9 4 2-1-9 5 4 1-9 5 6 3-9 4 8 4-8 3 9 5-6 1 9 5-4-1 9 4-2-1 9c-4-7-10-11-19-11s-15 4-19 11z" fill="${c}"/>`}[cab];
+  const barba={cheia:`<path d="M30 52c0 15 9 25 20 25s20-10 20-25c-2 7-6 11-11 12-3-3-15-3-18 0-5-1-9-5-11-12z" fill="${c}"/>`,
+    rala:`<path d="M31 53c1 13 9 22 19 22s18-9 19-22c-3 6-7 9-11 10-3-2-13-2-16 0-4-1-8-4-11-10z" fill="${c}" opacity=".28"/>`,
+    cav:`<path d="M44 69c2 5 10 5 12 0l-1-3c-3 1-7 1-10 0z" fill="${c}"/><path d="M42 61c3-3 13-3 16 0-3 0-5 1-8 1s-5-1-8-1z" fill="${c}"/>`,
+    bigode:`<path d="M41 61.5c3-4 15-4 18 0-3-.5-6 .5-9 1.5-3-1-6-2-9-1.5z" fill="${c}"/>`}[bar]||'';
+  const ocl=ocu==='red'?'<g fill="#fff" fill-opacity=".15" stroke="#2B2B2B" stroke-width="1.6"><circle cx="42" cy="50" r="5.6"/><circle cx="58" cy="50" r="5.6"/><path d="M47.6 50h4.8" fill="none"/></g>'
+    :ocu==='ret'?'<g fill="#fff" fill-opacity=".15" stroke="#2B2B2B" stroke-width="1.8"><rect x="35.5" y="45.5" width="12.5" height="9" rx="3"/><rect x="52" y="45.5" width="12.5" height="9" rx="3"/><path d="M48 49h4" fill="none"/></g>':'';
+  const gl={redonda:`<path d="M40 80c3 4 17 4 20 0" stroke="${camS}" stroke-width="3" fill="none"/>`,v:`<path d="M41 79l9 11 9-11z" fill="${sombra}"/><path d="M41 79l9 11 9-11" stroke="${camS}" stroke-width="2.4" fill="none"/>`,
+    polo:`<path d="M41 79l9 7 9-7 6 6-7 6-8-8-8 8-7-6z" fill="#fff" opacity=".95"/>`,time:`<path d="M40 80c3 4 17 4 20 0" stroke="#fff" stroke-width="3.2" fill="none"/><path d="M17 100c1-8 4-13 9-16l4 16zM83 100c-1-8-4-13-9-16l-4 16z" fill="#fff" opacity=".35"/>`}[gola]||'';
+  const ruiva=ci==='ru'||pi===0;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="${fundo}"/>${atras}
+<path d="M14 100c1-14 13-22 36-22s35 8 36 22z" fill="${cam}"/>${gl}
+<path d="M43 63h14v17c-4 3-10 3-14 0z" fill="${pele}"/><path d="M43 68c4 3 10 3 14 0v-4H43z" fill="${sombra}"/>
+<ellipse cx="30.5" cy="52" rx="3.8" ry="5.4" fill="${pele}"/><ellipse cx="69.5" cy="52" rx="3.8" ry="5.4" fill="${pele}"/><ellipse cx="30.8" cy="52" rx="1.6" ry="2.8" fill="${sombra}"/><ellipse cx="69.2" cy="52" rx="1.6" ry="2.8" fill="${sombra}"/>
+<path d="M31 46c0-14 9-21 19-21s19 7 19 21v8c0 12-9 20-19 20s-19-8-19-20z" fill="${pele}"/>
+${frente}${barba}
+<circle cx="37" cy="58" r="3.6" fill="#F0766B" opacity="${ruiva?.28:.18}"/><circle cx="63" cy="58" r="3.6" fill="#F0766B" opacity="${ruiva?.28:.18}"/>
+<path d="M37.5 43.5q4.5-2.8 9 0M53.5 43.5q4.5-2.8 9 0" stroke="${ci==='gr'?'#8E8984':c}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+<ellipse cx="42" cy="50" rx="3.4" ry="3.1" fill="#fff"/><ellipse cx="58" cy="50" rx="3.4" ry="3.1" fill="#fff"/><circle cx="42.4" cy="50.3" r="2.2" fill="#2B1B14"/><circle cx="58.4" cy="50.3" r="2.2" fill="#2B1B14"/><circle cx="43.2" cy="49.4" r=".75" fill="#fff"/><circle cx="59.2" cy="49.4" r=".75" fill="#fff"/>
+<path d="M50 51c-1 3-2.4 5.2-2.4 6.2 0 1.2 1.4 1.6 3.4 1.3" stroke="${avEscurece(pele,.24)}" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+<path d="M42.5 62.5c2.2 5.5 12.8 5.5 15 0z" fill="#7B2D26"/><path d="M43.6 62.6c2.6 1.6 10.2 1.6 12.8 0l-.6 1.7c-3 1-8.6 1-11.6 0z" fill="#fff"/><path d="M46 66.4c2.4.9 5.6.9 8 0" stroke="#E8857A" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+${ocl}</svg>`;
   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)}
 window.avatarDesenho=avatarDesenho;
 /* passeio guiado: escurece a tela, destaca um pedaço e mostra um balão com "Próximo"; "Pular" fecha a qualquer momento */
