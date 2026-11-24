@@ -2669,8 +2669,8 @@ document.addEventListener('click',async e=>{
   if(b.tagName==='SELECT')return;
   const A=ADM();
   switch(act){
-    case'tab':UI.tab=d.v;UI.sel=null;try{localStorage.setItem('pelada.tab',d.v)}catch(_){};render();window.scrollTo(0,0);break;
-    case'sub':{UI.sub=d.v;UI.sel=null;UI.confirmEnd=false;const s0=document.querySelector('.subtabs'),y0=s0?s0.getBoundingClientRect().top+window.scrollY-12:0,colado=s0&&window.scrollY>y0;render();
+    case'tab':UI.tab=d.v;UI.sel=null;try{localStorage.setItem('pelada.tab',d.v)}catch(_){};render();window.scrollTo(0,0);if(demo&&!UI.comoJogador)dicaDemo(d.v);break;
+    case'sub':{if(demo&&!UI.comoJogador)dicaDemo(d.v);UI.sub=d.v;UI.sel=null;UI.confirmEnd=false;const s0=document.querySelector('.subtabs'),y0=s0?s0.getBoundingClientRect().top+window.scrollY-12:0,colado=s0&&window.scrollY>y0;render();
       if(colado){const s1=document.querySelector('.subtabs');if(s1)window.scrollTo(0,s1.getBoundingClientRect().top+window.scrollY-12)}break}
     case'filtro':UI.filtro=d.v;render();break;
     case'rk':UI.rk=d.v;render();break;
@@ -3348,10 +3348,13 @@ ${ocl}</svg>`;
   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)}
 window.avatarDesenho=avatarDesenho;
 /* passeio guiado: escurece a tela, destaca um pedaço e mostra um balão com "Próximo"; "Pular" fecha a qualquer momento */
+let TOUR_ON=false;
 function tourGuia(passos,op={}){let i=0;document.querySelectorAll('.tour').forEach(e=>e.remove());
   const el=document.createElement('div');el.className='tour';el.innerHTML='<div class="tour-spot"></div><div class="tour-bal" role="dialog" aria-live="polite"></div>';document.body.appendChild(el);
   const spot=el.querySelector('.tour-spot'),bal=el.querySelector('.tour-bal');
-  const fechar=()=>{el.remove();window.removeEventListener('resize',pos);window.removeEventListener('scroll',pos,true);if(op.aoSair)op.aoSair()};
+  const trava=e=>{if(!bal.contains(e.target))e.preventDefault()};el.addEventListener('touchmove',trava,{passive:false});el.addEventListener('wheel',trava,{passive:false});
+  const raiz=document.documentElement,ovA=raiz.style.overflow;raiz.style.overflow='hidden';TOUR_ON=true;const tick=setInterval(()=>pos(),300);
+  const fechar=()=>{el.remove();clearInterval(tick);raiz.style.overflow=ovA;TOUR_ON=false;window.removeEventListener('resize',pos);window.removeEventListener('scroll',pos,true);if(op.aoSair)op.aoSair()};
   let alvo=null;
   function pos(){if(!alvo||!alvo.isConnected)return;const r=alvo.getBoundingClientRect(),m=6,vh=window.innerHeight;
     Object.assign(spot.style,{left:r.left-m+'px',top:r.top-m+'px',width:r.width+2*m+'px',height:r.height+2*m+'px'});
@@ -3366,18 +3369,41 @@ function tourGuia(passos,op={}){let i=0;document.querySelectorAll('.tour').forEa
   window.addEventListener('resize',pos);window.addEventListener('scroll',pos,true);mostra()}
 window.tourGuia=tourGuia;
 // passeio de dentro da pelada de exemplo (visão do administrador)
-window.tourDemoGrupo=function(){if(!demo)return;UI.comoJogador=false;UI.tab='jogo';UI.sub='presenca';render();window.scrollTo(0,0);
-  const sub=k=>()=>{UI.tab='jogo';UI.sub=k;render()},aba=k=>()=>{UI.tab=k;render();window.scrollTo(0,0)},depoisSub=()=>{const s=document.querySelector('.subtabs');return s&&s.nextElementSibling};
+const painelDe=t=>[...document.querySelectorAll('#app .panel,#app details.panel')].find(e=>(e.innerText||'').trim().toUpperCase().startsWith(t.toUpperCase()));
+window.tourDemoGrupo=function(){if(!demo)return;UI.comoJogador=false;UI.tab='jogo';UI.sub='presenca';render();window.scrollTo(0,0);DICA_VISTA.clear();
+  const sub=k=>()=>{UI.tab='jogo';UI.sub=k;render()},depoisSub=()=>{const s=document.querySelector('.subtabs');return s&&s.nextElementSibling};
   tourGuia([
-    {el:'.board-pel',t:'A pelada da semana',x:'Dia, hora, local e quantos já confirmaram. O administrador marca a pelada e todo mundo recebe o aviso no celular.'},
+    {el:'.board-pel',t:'A pelada da semana',x:'Dia, hora, local e quantos já confirmaram. O administrador marca a pelada e todo mundo recebe o aviso no celular. O botão <b>🎨 Arte</b> gera a arte da convocação, pronta para o Instagram e o WhatsApp.'},
     {el:()=>{const d=depoisSub();return d&&d.querySelector('.item')},antes:sub('presenca'),t:'Presença',x:'Cada jogador confirma aqui: <b>Vou</b> ou <b>Não vou</b>. Encheu as vagas? O próximo entra sozinho na lista de espera.'},
-    {el:()=>{const b=document.querySelector('[data-act=sortear]');return b&&b.parentElement},antes:sub('times'),t:'Times equilibrados',x:'Com a lista fechada, o app sorteia os times usando as notas de cada um. Dá para mexer à mão, se quiser.'},
-    {el:'[data-act=gol-abrir]',antes:sub('pos'),t:'Jogo e pós-jogo',x:'Durante o jogo, lance os gols. No fim, a galera dá notas, vota no craque e saem as artes prontas para o Instagram.'},
-    {el:'#nav [data-v=ranking]',antes:sub('presenca'),t:'Ranking',x:'Artilharia, assistências e craques da temporada, atualizados sozinhos.'},
-    {el:'#nav [data-v=caixa]',t:'Caixa com Pix',x:'Mensalidades e diárias pagas com Pix. O dinheiro cai na hora na conta do organizador, e quem está devendo aparece primeiro.'},
+    {el:'.subtabs',t:'Times e Jogo e pós-jogo',x:'Toque em <b>Times</b> e em <b>Jogo e pós-jogo</b> quando quiser: lá dentro eu explico cada parte.'},
+    {el:'#nav [data-v=ranking]',t:'Ranking',x:'Artilharia, assistências e craques da temporada, atualizados sozinhos.'},
+    {el:'#nav [data-v=caixa]',t:'Caixa',x:'O financeiro da pelada, com Pix. Toque aqui depois para ver; explico cada parte lá dentro.'},
     {el:'#nav [data-v=avisos]',t:'Avisos automáticos',x:'O app avisa a galera sozinho: pelada marcada, times sorteados, cobrança, aniversário…'},
     {el:'.banner.demo button',antes:()=>window.scrollTo(0,0),t:'Agora é com você',x:'Mexa à vontade: nada aqui é salvo. Toque em <b>Ver como jogador</b> para ver o app do jeito que o jogador vê.'}
   ],{aoSair:()=>{UI.sub='presenca';render()}})};
+// explicações que aparecem só quando a pessoa toca na aba (uma vez por demonstração)
+const DICA_VISTA=new Set();
+const DICAS={
+  times:[
+    {el:()=>painelDe('Regras do sorteio'),t:'Regras do sorteio',x:'Combine quem joga junto (ex.: dois amigos) ou quem não pode cair no mesmo time (ex.: dois irmãos). O sorteio respeita.'},
+    {el:()=>painelDe('🏆 Formato'),t:'Formato do jogo',x:'Convencional (quem ganha fica), pontos corridos, mata-mata… O app monta a tabela e conta os pontos sozinho.'},
+    {el:()=>{const b=document.querySelector('[data-act=sortear]');return b&&b.parentElement},t:'Sortear os times',x:'Escolha quantos times e toque em <b>Sortear</b>. Os times saem equilibrados pelas notas e posições de cada um; os goleiros ficam de fora do sorteio.'},
+    {el:()=>[...document.querySelectorAll('#app button')].find(b=>/na mão/.test(b.innerText)),t:'Montar na mão',x:'Prefere escolher você mesmo? Monte os times na mão. Quando publicar, todo mundo recebe os times no celular.'}],
+  pos:[
+    {el:'[data-act=gol-abrir]',t:'Lançar gol',x:'Durante o jogo, toque aqui e escolha quem fez o gol e quem deu o passe. Vai tudo para o ranking e para a carta de cada um.'},
+    {el:()=>{const p=painelDe('Dar notas da pelada');return p&&(p.querySelector('.av-txt,p,.sub')?p.firstElementChild:p)},t:'Notas da pelada',x:'Quando a pelada termina, a galera dá notas de 1 a 5 para cada jogador. É daí que sai a nota da carta de atleta.'},
+    {el:()=>painelDe('Destaques'),t:'Destaques',x:'Fechada a votação, saem o craque, o xerife (melhor defensor) e o melhor goleiro da pelada.'},
+    {el:'.board.dcq',t:'Craque da pelada',x:'O craque da última pelada fica em destaque aqui, com a foto e a nota dele.'},
+    {el:()=>document.querySelector('.dq-bt')||document.querySelector('[data-act=destaques-pel]'),t:'Artes para o Instagram',x:'Em <b>⭐ Destaques</b> ficam as artes prontas, no formato Feed e Story, com o botão <b>Postar no Instagram</b>. Quem foi premiado também vê e posta a arte dele.'}],
+  caixa:[
+    {el:'.cx-conta',t:'Saldo do caixa',x:'Quanto tinha, quanto entrou e saiu no mês e quanto tem agora.'},
+    {el:'.cx-data',t:'Data e valores do mês',x:'O dia do vencimento e os valores da mensalidade e da diária. O app cobra sozinho no vencimento e de novo 3 e 5 dias depois, se ainda estiver devendo.'},
+    {el:()=>painelDe('Mensalidades'),t:'Mensalidades',x:'Quem deve aparece primeiro. O jogador paga com Pix pelo app, o dinheiro cai na hora na conta do organizador e o app dá baixa sozinho. Quem pagou em dinheiro, você marca à mão.'},
+    {el:()=>painelDe('Diárias e eventos'),t:'Diárias',x:'Quem é diarista paga por pelada. Aqui você vê quem já pagou cada jogo.'},
+    {el:()=>painelDe('Cobranças extras'),t:'Cobranças extras',x:'Churrasco, camisa nova, evento… Crie uma cobrança avulsa; dá até para pedir o tamanho da camisa de cada um.'},
+    {el:()=>painelDe('Outras entradas e saídas'),t:'Despesas e entradas',x:'Aluguel do campo, bola nova… Lance aqui e o saldo se ajusta.'},
+    {el:'[data-act=msg][data-v=prestacao]',t:'Prestação de contas',x:'Com um toque, a prestação de contas do mês sai em PDF ou vai direto para o WhatsApp da galera.'}]};
+function dicaDemo(k){if(!demo||TOUR_ON||DICA_VISTA.has(k)||!DICAS[k])return;DICA_VISTA.add(k);setTimeout(()=>tourGuia(DICAS[k],{fimTxt:'Entendi'}),350)}
 function startDemo(){
   REAL=S;demo=true;REAL_ID=myId;myId='demo-me';
   // pelada simples para entender o passo a passo: 2 goleiros + 12 de linha (2 times de 5, 1 na espera, 1 sem resposta)
