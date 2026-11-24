@@ -3375,9 +3375,9 @@ window.tourDemoGrupo=function(){if(!demo)return;UI.comoJogador=false;UI.tab='jog
   tourGuia([
     {el:'.board-pel',t:'A pelada da semana',x:'Dia, hora, local e quantos já confirmaram. O administrador marca a pelada e todo mundo recebe o aviso no celular. O botão <b>🎨 Arte</b> gera a arte da convocação, pronta para o Instagram e o WhatsApp.'},
     {el:()=>{const d=depoisSub();return d&&d.querySelector('.item')},antes:sub('presenca'),t:'Presença',x:'Cada jogador confirma aqui: <b>Vou</b> ou <b>Não vou</b>. Encheu as vagas? O próximo entra sozinho na lista de espera.'},
-    {el:'.subtabs',t:'Times e Jogo e pós-jogo',x:'Toque em <b>Times</b> e em <b>Jogo e pós-jogo</b> quando quiser: lá dentro eu explico cada parte.'},
+    {el:'.subtabs',t:'Aqui é a mágica da pelada ✨',x:'Em <b>Times</b>, o app sorteia times equilibrados pelas notas de cada um. Em <b>Jogo e pós-jogo</b>, saem os gols, as notas, o craque e as artes para o Instagram. Toque em cada um para eu explicar mais.'},
     {el:'#nav [data-v=ranking]',t:'Ranking',x:'Artilharia, assistências e craques da temporada, atualizados sozinhos.'},
-    {el:'#nav [data-v=caixa]',t:'Caixa',x:'O financeiro da pelada, com Pix. Toque aqui depois para ver; explico cada parte lá dentro.'},
+    {el:'#nav [data-v=caixa]',t:'O dinheiro da pelada 💰',x:'Mensalidades e diárias pagas com Pix, o dinheiro cai na hora na conta do organizador, e o app cobra quem está devendo sozinho. Toque aqui depois para eu explicar mais.'},
     {el:'#nav [data-v=avisos]',t:'Avisos automáticos',x:'O app avisa a galera sozinho: pelada marcada, times sorteados, cobrança, aniversário…'},
     {el:'.banner.demo button',antes:()=>window.scrollTo(0,0),t:'Agora é com você',x:'Mexa à vontade: nada aqui é salvo. Toque em <b>Ver como jogador</b> para ver o app do jeito que o jogador vê.'}
   ],{aoSair:()=>{UI.sub='presenca';render()}})};
