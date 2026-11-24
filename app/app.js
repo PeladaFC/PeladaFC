@@ -304,6 +304,7 @@ function render() {
       <p class="sub" style="text-align:center;margin:0"><a href="/termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="/privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>
       <button class="btn sm" style="align-self:center;margin-top:8px" data-sh="excluir-ver">Excluir minha conta</button>` : ''}`; }
   if (t === 'dono') h = topo('perfil', '<button class="ob-link" style="font-size:13px;padding:4px 0" data-sh="demo">Ver demonstração do app</button>') + abasDono('dono') + telaDono();
+  if (t === 'donolista') h = topo('dono') + telaListaDono();
   if (t === 'donogrupos') h = topo('perfil') + abasDono('grupos') + (UIp.supInfo ? `<div class="sup-info"><span>🛟 <b>${UIp.supInfo.novo ? 'Pedido enviado' : 'Pedido já enviado'}</b> · ${escH(UIp.supInfo.nome)} · vale até ${(d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'))(new Date(UIp.supInfo.em + PEDIDO_VALE))}</span><button class="btn sm" data-sh="sup-cancelar" data-v="${escH(UIp.supInfo.gid)}">Retirar</button><button class="btn sm" data-sh="sup-info-ok" aria-label="Fechar">✕</button></div>` : '') + telaGruposDono();
   if (t === 'donoreps') h = topo('perfil') + abasDono('reps') + telaRepsDono();
   if (t === 'donoerros') h = topo('perfil') + abasDono('erros') + telaErrosDono();
@@ -416,7 +417,7 @@ function render() {
     ${adm.filter(g => window.pedidoSuporte(GRUPOS[g])).map(g => `<div class="alerta-sup"><span class="ic">🛟</span><div class="grow"><b>O suporte do Pelota FC pediu acesso</b><span>${escH(GRUPOS[g].nome || 'Pelada')} · acesso por 24 horas</span>
       <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm sup-sim" data-sh="sup-aceitar" data-v="${g}">Liberar por 24 horas</button><button class="btn sm sup-nao" data-sh="sup-recusar" data-v="${g}">Agora não</button></div></div></div>`).join('')}
     ${ids.filter(avAb).map(g => `<button class="alerta-av" data-sh="avaliar" data-v="${g}"><span class="ic">⭐</span><span><b>Avaliação geral do elenco aberta!</b>${escH(GRUPOS[g].nome || 'Pelada')} · dê sua nota para o elenco</span><span class="ir">Avaliar</span></button>`).join('')}
-    ${cartaoPush()}
+    ${cartaoCidade()}${cartaoPush()}
     ${adm.length ? `<h3 class="home-sec">Você administra</h3>${adm.map(g => card(g, true)).join('')}` : ''}
     ${jog.length ? `<h3 class="home-sec">Você joga</h3>${jog.map(g => card(g, false)).join('')}` : ''}
     <div class="home-acoes"><button class="btn primary" data-sh="ir" data-v="nova">+ Criar pelada</button><button class="btn" data-sh="ir" data-v="codigo">📷 Entrar com código</button></div>
@@ -1164,7 +1165,7 @@ const semAcento = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]
 function gruposFiltrados(F0) { const G = ((UIp.painel || {}).dados || {}).grupos || [], F = F0 || UIp.gf || GF0, q = semAcento(F.q).trim();
   let L = G.filter(g => (!q || semAcento([g.nome, g.cidade, g.uf, g.codigo].join(' ')).includes(q))
     && (F.sit === 'todos' || (F.sit === 'ativos' ? g.ativo : !g.ativo)) && (!F.reg || regiaoDe(g.uf) === F.reg) && (!F.uf || g.uf === F.uf)
-    && (!F.cidade || (g.cidade + ' · ' + g.uf) === F.cidade) && (!F.pag || (F.pag === 'sim') === (g.comissaoMes > 0)));
+    && (!F.cidade || (g.cidade + ' · ' + g.uf) === F.cidade) && (!F.pag || (F.pag === 'sim') === (g.comissaoMes > 0)) && (!F.pix || g.pix));
   const ord = { recente: (a, b) => (b.criadoEm || 0) - (a.criadoEm || 0), antigo: (a, b) => (a.criadoEm || 0) - (b.criadoEm || 0), jogadores: (a, b) => b.jogadores - a.jogadores,
     comissao: (a, b) => b.comissaoMes - a.comissaoMes, ultima: (a, b) => String(b.ultima || '').localeCompare(String(a.ultima || '')), nome: (a, b) => a.nome.localeCompare(b.nome) }[F.ord] || (() => 0);
   return L.sort(ord); }
@@ -1194,11 +1195,31 @@ function filtrosGruposHTML(F, G, attr, pref, qr) {
   <div class="row" style="gap:8px;flex-wrap:nowrap;align-items:flex-end">${attr === 'gf' ? sel('ord', 'Ordenar por', [['recente', 'Mais novos'], ['antigo', 'Mais antigos'], ['ultima', 'Pelada mais recente'], ['jogadores', 'Mais jogadores'], ['comissao', 'Mais comissão'], ['nome', 'Nome (A–Z)']]) : '<span style="flex:1"></span>'}
     <button class="btn" data-sh="${pref}-limpar" style="flex:none;min-height:42px">Limpar filtros</button></div>`;
 }
+/* Painel do dono → tocar em Contas criadas, Contas ativas ou Jogadores no elenco abre a lista de nomes (só o dono vê) */
+const DL_TIT = { contas: 'Contas criadas', ativas: 'Contas ativas', elenco: 'Jogadores' };
+function listaDonoHTML() { const D = (UIp.painel || {}).dados || {}, k = UIp.dl, q = semAcento(UIp.dlq || '').trim(), d30 = Date.now() - 30 * 864e5;
+  const dt = ms => ms ? new Date(ms).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
+  const pill = (sim, a, b) => `<span class="small" style="flex:none;padding:3px 10px;border-radius:999px;font-weight:700;background:${sim ? '#d8eedd' : '#e6e8e4'};color:${sim ? '#0F4D27' : '#56665B'}">${sim ? a : b}</span>`;
+  const linha = (nome, sub, dir) => `<div class="dl-item"><div class="grow"><b>${escH(nome)}</b><div class="sub">${sub}</div></div>${dir}</div>`;
+  if (k === 'elenco') { const L = (D.elenco || []).filter(j => !q || semAcento(j.nome + ' ' + j.grupo).includes(q)), cc = L.filter(j => j.conta).length;
+    return `<p class="sub" style="margin:0">${L.length} ${L.length === 1 ? 'jogador' : 'jogadores'} · ${cc} com conta no app</p>` + (L.length ? `<div class="panel" style="padding:0 14px">${L.map(j => linha(j.nome, escH(j.grupo) + (j.ativo ? '' : ' · inativo'), pill(j.conta, 'Com conta', 'Sem conta'))).join('')}</div>` : '<p class="sub">Ninguém encontrado.</p>'); }
+  const L = (D.pessoas || []).filter(x => (k !== 'ativas' || x.uso > d30) && (!q || semAcento([x.nome, x.email, x.cidade, x.uf].concat(x.grupos).join(' ')).includes(q)));
+  if (k === 'ativas') L.sort((a, b) => b.uso - a.uso);
+  const semCid = L.filter(x => !x.uf).length;
+  return `<p class="sub" style="margin:0">${L.length} ${L.length === 1 ? 'conta' : 'contas'}${semCid ? ` · ${semCid} sem cidade no cadastro` : ''}</p>` + (L.length ? `<div class="panel" style="padding:0 14px">${L.map(x => linha(x.nome || x.email || 'Sem nome',
+    [x.uf ? escH(x.cidade + ' · ' + x.uf) : 'sem cidade', x.grupos.length ? escH(x.grupos.join(', ')) : 'sem pelada', k === 'ativas' ? 'usou em ' + dt(x.uso) : 'entrou em ' + dt(x.criado)].join(' · '),
+    k === 'ativas' ? '' : pill(x.uso > d30, 'Ativa', 'Parada'))).join('')}</div>` : '<p class="sub">Ninguém encontrado.</p>'); }
+function telaListaDono() { const P = UIp.painel || {}, D = P.dados;
+  if (!D) return `<h2>${DL_TIT[UIp.dl] || 'Lista'}</h2><p class="lead">Carregando…</p>`;
+  return `<h2>${DL_TIT[UIp.dl]}</h2>
+  <label class="field" style="margin:0"><input type="search" data-dlq value="${escH(UIp.dlq || '')}" placeholder="${UIp.dl === 'elenco' ? 'Nome ou grupo' : 'Nome, cidade ou grupo'}" aria-label="Procurar"></label>
+  <div id="dl-lista" class="stack" style="gap:8px">${listaDonoHTML()}</div>`; }
 function telaGruposDono() { const P = UIp.painel || {}, D = P.dados;
   if (!D) return '<h2>Grupos</h2>' + (P.erro ? `<div class="banner">${escH(P.erro)}</div>` : '<p class="lead">Carregando os grupos…</p>');
   const F = UIp.gf = UIp.gf && !Array.isArray(UIp.gf.reg) ? UIp.gf : gfNovo(), G = D.grupos || [];
   return `<h2>Grupos</h2><p class="lead">Todos os grupos do app. Procure pelo nome, cidade, código de convite ou QR Code.</p>
   ${filtrosGruposHTML(F, G, 'gf', 'gf', true)}
+  ${F.pix ? '<p class="small" style="margin:0">💳 Mostrando só os grupos com Pix conectado · <button class="ob-link" style="font-size:13px" data-sh="gf-limpar">ver todos</button></p>' : ''}
   <div id="gf-lista" class="stack" style="gap:10px">${listaGruposHTML()}</div>`; }
 /* representantes + simulador do líquido (fase 1: só cadastro; os grupos ligam na fase 2 pelo código da loja) */
 const SIM0 = { preco: '19,90', loja: '15', imp: '6', com: '10', regime: 'simples' };
@@ -1553,7 +1574,7 @@ function telaDono() { const P = UIp.painel || {}, D = P.dados;
   if (!D) return '<h2>Painel do dono</h2>';
   const n = v => Number(v || 0).toLocaleString('pt-BR'), pl = (v, um, varios) => n(v) + ' ' + (Number(v) === 1 ? um : (varios || um + 's')), rs = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const T = D.totais, C = D.contas, [a, m] = D.mes.split('-');
-  const tile = (rot, val, sub) => `<div class="panel" style="padding:12px 14px;display:grid;gap:2px"><span class="sub">${rot}</span><b class="num" style="font-size:26px;line-height:1.1">${val}</b>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`;
+  const tile = (rot, val, sub, ver) => `<${ver ? `button type="button" data-sh="dono-ver" data-v="${ver}"` : 'div'} class="panel${ver ? ' dono-tile' : ''}" style="padding:12px ${ver ? 26 : 14}px 12px 14px;display:grid;gap:2px;text-align:left;width:100%;font:inherit;color:inherit"><span class="sub">${rot}</span><b class="num" style="font-size:26px;line-height:1.1">${val}</b>${sub ? `<span class="sub">${sub}</span>` : ''}${ver ? '<i class="dono-seta">›</i>' : ''}</${ver ? 'button' : 'div'}>`;
   const MET = { grupos: 'Grupos', jogadores: 'Jogadores', contas: 'Contas', pagantes: 'Pagantes' }, met = P.met || 'grupos';
   const barras = (lista, ord) => { const L = ord ? lista.slice().sort((x, y) => ord.indexOf(x.nome) - ord.indexOf(y.nome)) : lista; const max = Math.max(1, ...L.map(r => r[met] || 0));
     return L.length ? `<div style="display:grid;gap:10px">${L.map(r => `<div><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px"><span class="small"><b>${escH(r.nome)}</b></span><b class="num">${n(r[met])}</b></div>
@@ -1562,14 +1583,14 @@ function telaDono() { const P = UIp.painel || {}, D = P.dados;
   return `<h2>Painel do dono</h2><p class="lead">Como o app está sendo usado. Só você e a empresa veem esta tela.</p>
   <div class="panel" style="padding:10px 12px;margin-bottom:10px"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><span class="small">🌐 <b>Nota geral do app</b>: recalculada todo dia às 4h30, cruzando os grupos.</span><button class="btn sm" data-sh="nota-geral-agora">Recalcular agora</button></div></div>
   <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-    ${tile('Contas criadas', n(C.total), `+${n(C.novas30)} nos últimos 30 dias`)}
-    ${tile('Contas ativas', n(C.ativas30), 'usaram nos últimos 30 dias')}
-    ${tile('Grupos', n(T.grupos), `${n(T.ativos)} com pelada nos últimos 30 dias`)}
-    ${tile('Jogadores no elenco', n(T.jogadores), `${n(T.membros)} entraram com conta`)}
-    ${tile('Grupos com Pix', n(T.comPix), 'Mercado Pago conectado')}
-    ${tile('Grupos pagantes', n(T.pagantes), `geraram comissão em ${MESES[Number(m) - 1].toLowerCase()}`)}
-    ${tile('Pix no mês', n(T.pixMes), rs(T.volumeMes) + ' movimentados')}
-    ${tile('Comissão no mês', rs(T.comissaoMes), '1% dos Pix aprovados')}
+    ${tile('Contas criadas', n(C.total), `+${n(C.novas30)} nos últimos 30 dias`, 'contas')}
+    ${tile('Contas ativas', n(C.ativas30), 'usaram nos últimos 30 dias', 'ativas')}
+    ${tile('Grupos', n(T.grupos), `${n(T.ativos)} com pelada nos últimos 30 dias`, 'grupos')}
+    ${tile('Jogadores no elenco', n(T.jogadores), `${n(T.membros)} entraram com conta`, 'elenco')}
+    ${tile('Grupos com Pix', n(T.comPix), 'Mercado Pago conectado', 'pix')}
+    ${tile('Grupos pagantes', n(T.pagantes), `geraram comissão em ${MESES[Number(m) - 1].toLowerCase()}`, 'pag')}
+    ${tile('Pix no mês', n(T.pixMes), rs(T.volumeMes) + ' movimentados', 'pag')}
+    ${tile('Comissão no mês', rs(T.comissaoMes), '1% dos Pix aprovados', 'pag')}
   </div>
   <p class="sub" style="margin:2px 0 0">${n(C.comCidade)} de ${n(C.total)} contas já têm cidade no cadastro. As outras entram pela cidade da pelada.</p>
   <p class="sub" style="margin:2px 0 0">"Pagantes" conta quem gerou comissão no Pix. Quando a assinatura Pro existir, ela entra aqui também.</p>
@@ -1583,9 +1604,9 @@ function telaDono() { const P = UIp.painel || {}, D = P.dados;
     <tbody>${D.cidades.length ? D.cidades.map(c => `<tr style="border-top:1px solid var(--line,#d2dbce)"><td style="padding:6px 4px">${escH(c.nome)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.grupos)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.jogadores)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.contas)}</td><td class="num" style="padding:6px 4px;text-align:right">${n(c.pagantes)}</td></tr>`).join('') : '<tr><td colspan="5" class="sub" style="padding:6px 4px">Nenhuma cidade informada ainda.</td></tr>'}</tbody></table></div></div>
   <p class="sub" style="text-align:center;margin:0">Atualizado às ${new Date(D.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${P.carregando ? ' · atualizando…' : ''}</p>
   <button class="btn block" data-sh="dono-atualizar">Atualizar números</button>`; }
-async function carregarPainel() { const P = UIp.painel = UIp.painel || {}; P.carregando = true; P.erro = null; if (TELA === 'dono' || TELA === 'donogrupos') render(); if (TELA === 'donovitform') vtRedesenha();
+async function carregarPainel() { const P = UIp.painel = UIp.painel || {}; P.carregando = true; P.erro = null; if (TELA === 'dono' || TELA === 'donogrupos' || TELA === 'donolista') render(); if (TELA === 'donovitform') vtRedesenha();
   try { P.dados = MOCK ? painelMock() : await notasServidor('painel'); } catch (e) { P.erro = e.message; }
-  P.carregando = false; if (TELA === 'dono' || TELA === 'donogrupos') render(); if (TELA === 'donovitform') vtRedesenha(); }
+  P.carregando = false; if (TELA === 'dono' || TELA === 'donogrupos' || TELA === 'donolista') render(); if (TELA === 'donovitform') vtRedesenha(); }
 function painelMock() { const r = (nome, grupos, ativos, jogadores, contas, pagantes) => ({ nome, grupos, ativos, jogadores, contas, pagantes, comissaoMes: pagantes * 9.4 });
   return { em: Date.now(), mes: new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 7), contas: { total: 412, novas30: 58, ativas30: 296, comCidade: 187 },
     totais: { grupos: 23, ativos: 19, jogadores: 486, membros: 351, comPix: 9, pagantes: 7, pixMes: 214, volumeMes: 5180.5, comissaoMes: 51.81, semCidade: 2 },
@@ -1595,6 +1616,9 @@ function painelMock() { const r = (nome, grupos, ativos, jogadores, contas, paga
       ['Society dos Amigos', 'João Pessoa', 'PB', 'SOC9KP', 2, 1, 20, 15, 1, 8.1], ['Pelada da Firma', 'São Paulo', 'SP', 'FIRM3X', 5, 0, 12, 4, 0, 0], ['Baba de Domingo', 'Natal', 'RN', 'BABA21', 0, 1, 21, 17, 0, 0],
       ['Torneio de Natal', 'Recife', 'PE', 'NATAL1', null, 0, 30, 12, 1, 0]].map(([nome, cidade, uf, codigo, dia, ativo, jogadores, contas, pix, comissaoMes], i) => ({ gid: 'g' + i, nome, cidade, uf, codigo, dia: dia == null ? null : dia, evento: dia == null,
       ativo: !!ativo, jogadores, contas, pix: !!pix, pixMes: comissaoMes ? Math.round(comissaoMes / .2) : 0, comissaoMes, ultima: ativo ? '2026-10-2' + (i % 7) : '2026-08-1' + i, criadoEm: Date.now() - i * 9 * 864e5, regiao: '' })),
+    pessoas: [['Jânio Santos', 'Recife', 'PE', 2, 1, ['Pelada do Sábado']], ['Felipe Costa', 'Recife', 'PE', 40, 0, ['Pelada do Sábado', 'Torneio de Natal']], ['Marcos Lima', '', '', 12, 3, ['Fut do Pina']], ['', '', '', 5, 20, []], ['Ana Paula', 'Olinda', 'PE', 60, 45, ['Racha da Quinta']]]
+      .map(([nome, cidade, uf, dc, du, grupos]) => ({ nome, email: nome ? '' : 'conta.sem.nome@exemplo.com', cidade, uf, criado: Date.now() - dc * 864e5, uso: Date.now() - du * 864e5, grupos })),
+    elenco: [['Bruno', 'Pelada do Sábado', 1, 1], ['Carlão', 'Pelada do Sábado', 0, 1], ['Jânio', 'Pelada do Sábado', 1, 1], ['Léo', 'Fut do Pina', 0, 0], ['Zé Galinha', 'Racha da Quinta', 1, 1]].map(([nome, grupo, conta, ativo]) => ({ nome, grupo, conta: !!conta, ativo: !!ativo })),
     cidades: [r('Recife · PE', 9, 8, 203, 146, 4), r('Olinda · PE', 3, 2, 62, 41, 1), r('Jaboatão dos Guararapes · PE', 2, 2, 45, 34, 0), r('João Pessoa · PB', 2, 2, 41, 30, 1), r('São Paulo · SP', 2, 1, 40, 29, 1), r('Natal · RN', 1, 1, 21, 17, 0), r('Rio de Janeiro · RJ', 1, 1, 21, 15, 0), r('Porto Alegre · RS', 1, 1, 18, 12, 0)] }; }
 function baixarPdf(r) { const b = atob(r.pdf), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
   const u = URL.createObjectURL(new Blob([u8], { type: 'application/pdf' })), el = document.createElement('a'); el.href = u; el.download = r.nome || 'nota.pdf'; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); }
@@ -1714,6 +1738,14 @@ async function renovarPush() {
     if (TELA === 'minhas' && est !== 'carregando') render();
   } catch (e) { console.warn(e); }
 }
+// contas antigas sem cidade: pede uma vez na tela inicial (some quando salvar; "Agora não" esconde por 7 dias)
+function cartaoCidade() {
+  if (!EU || !PERFIL || (PERFIL.uf && PERFIL.cidade)) return '';
+  try { if (Date.now() - Number(localStorage.getItem('pelota.cid.' + EU.uid) || 0) < 7 * 864e5) return ''; } catch (e) {}
+  return `<div class="ob-opt cid-card" style="padding:12px 14px;cursor:default;align-items:flex-start"><span class="ic" style="background:var(--pitch-soft)">📍</span><span class="grow" style="display:grid;gap:8px"><span><b>Complete seu cadastro</b><span class="sub">De qual cidade você é?</span></span>
+    ${campoUFCidade('k', '', '')}
+    <span class="row" style="gap:8px;flex-wrap:nowrap"><button class="btn primary sm" data-sh="cid-salvar" style="flex:1">Salvar</button><button class="btn sm" data-sh="cid-depois">Agora não</button></span></span></div>`;
+}
 function cartaoPush() {
   const e = PUSH.estado;
   if (e === 'carregando' && !PUSH.iniciado) setTimeout(renovarPush, 0);
@@ -1768,6 +1800,11 @@ document.addEventListener('click', async e => {
     $('n-dia-box').hidden = ev; $('n-fixa-box').hidden = ev;
     $('n-tipo-txt').textContent = ev ? 'Sem cobrança e sem dia fixo: o administrador marca cada pelada na data que quiser, e o grupo continua para os próximos eventos. Ninguém entra como mensalista nem diarista: quem confirma primeiro garante a vaga.' : 'Tem mensalistas e diaristas, e acontece toda semana no mesmo dia.'; }
   if (a === 'push-ativar') ativarPush();
+  if (a === 'cid-salvar') { const uf = $('k-uf').value, cidade = ($('k-cidade') || {}).value || ''; if (!uf || !cidade) { aviso('Escolha o estado e a cidade.'); return; }
+    B.set('users/' + EU.uid, { uf, cidade }, { merge: true }).then(() => { PERFIL = { ...(PERFIL || {}), uf, cidade }; aviso('Cidade salva. Valeu!'); render(); }).catch(e => aviso(e.message || 'Não deu certo. Tente de novo.')); return; }
+  if (a === 'cid-depois') { try { localStorage.setItem('pelota.cid.' + EU.uid, String(Date.now())); } catch (e) {} render(); return; }
+  if (a === 'dono-ver') { if (v === 'grupos' || v === 'pix' || v === 'pag') { UIp.gf = { ...gfNovo(), pix: v === 'pix' ? 'sim' : '', pag: v === 'pag' ? 'sim' : '' }; ir('donogrupos'); }
+    else { UIp.dl = v; UIp.dlq = ''; ir('donolista'); } return; }
   if (a === 'dono') { ir('dono'); if (!UIp.painel || !UIp.painel.dados) carregarPainel(); }
   if (a === 'dono-atualizar') carregarPainel();
   if (a === 'dono-grupos') { ir('donogrupos'); if (!UIp.painel || !UIp.painel.dados) carregarPainel(); }
@@ -1896,6 +1933,8 @@ function vtRedesenha() { const y = window.scrollY; render(); window.scrollTo(0, 
   UIp.gf = UIp.gf && !Array.isArray(UIp.gf.reg) ? UIp.gf : gfNovo(); UIp.gf[el.dataset.gf] = el.value; if (el.dataset.gf === 'reg') { UIp.gf.uf = ''; UIp.gf.cidade = ''; } if (el.dataset.gf === 'uf') UIp.gf.cidade = '';
   if (el.dataset.gf === 'q') { const box = $('gf-lista'); if (box) box.innerHTML = listaGruposHTML(); } else if (tipo === 'change') render();
 }));
+document.addEventListener('input', e => {
+  if (TELA !== 'donolista' || !e.target.hasAttribute || !e.target.hasAttribute('data-dlq')) return; UIp.dlq = e.target.value; const box = $('dl-lista'); if (box) box.innerHTML = listaDonoHTML(); });
 document.addEventListener('input', e => {
   const el = e.target.closest && e.target.closest('[data-sim]'); if (!el || TELA !== 'donoreps') return;
   UIp.sim = UIp.sim || { ...SIM0 }; UIp.sim[el.dataset.sim] = el.value; UIp.simMexido = true; const box = $('sim-res'); if (box) box.innerHTML = simResultadoHTML();

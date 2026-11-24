@@ -193,29 +193,30 @@ module.exports = (db, PAG) => {
   async function painel() {
     const agora = Date.now(), d30 = agora - 30 * 864e5, mes = mesRecife(agora), desde = diaRecife(d30);
     const contas = { total: 0, novas30: 0, ativas30: 0 };
-    let tok;
+    let tok; const auth = {}; // quem é cada conta, para as listas do Painel do dono (só o dono vê)
     do {
       const r = await admin.auth().listUsers(1000, tok);
-      r.users.forEach(u => { contas.total++; const c = Date.parse(u.metadata.creationTime) || 0, l = Date.parse(u.metadata.lastRefreshTime || u.metadata.lastSignInTime) || 0; if (c > d30) contas.novas30++; if (l > d30) contas.ativas30++; });
+      r.users.forEach(u => { contas.total++; const c = Date.parse(u.metadata.creationTime) || 0, l = Date.parse(u.metadata.lastRefreshTime || u.metadata.lastSignInTime) || 0; if (c > d30) contas.novas30++; if (l > d30) contas.ativas30++;
+        auth[u.uid] = { c, l, nome: u.displayName || '', email: u.email || '' }; });
       tok = r.pageToken;
     } while (tok);
     const tot = { grupos: 0, ativos: 0, jogadores: 0, membros: 0, comPix: 0, pagantes: 0, pixMes: 0, volumeMes: 0, comissaoMes: 0, semCidade: 0 };
-    const reg = {}, ufs = {}, cids = {}, todosMembros = new Set(), grupoOnde = {}, listaGrupos = [];
+    const reg = {}, ufs = {}, cids = {}, todosMembros = new Set(), grupoOnde = {}, listaGrupos = [], elenco = [], nomesGrupo = {};
     const soma = (map, k, g, membrosIds) => { const o = map[k] = map[k] || { nome: k, grupos: 0, ativos: 0, jogadores: 0, pagantes: 0, comissaoMes: 0, _m: new Set() };
       o.grupos++; if (g.ativo) o.ativos++; o.jogadores += g.jogadores; if (g.pagante) o.pagantes++; o.comissaoMes += g.comissao; membrosIds.forEach(id => o._m.add(id)); };
     const grupos = await db.collection('grupos').get();
     for (const gd of grupos.docs) {
       const ref = gd.ref;
-      const [cfgS, locS, jogC, memS, pelS, cobS, ultS] = await Promise.all([
-        ref.collection('config').doc('geral').get(), ref.collection('locais').get(), ref.collection('jogadores').count().get(),
+      const [cfgS, locS, jogC, memS, pelS, cobS, ultS, presS] = await Promise.all([
+        ref.collection('config').doc('geral').get(), ref.collection('locais').get(), ref.collection('jogadores').select('nome', 'apelido', 'ativo').get(),
         ref.collection('membros').select().get(), ref.collection('peladas').where('data', '>=', desde).select().get(),
         ref.collection('cobrancas').where('status', '==', 'approved').get(),
-        ref.collection('peladas').orderBy('data', 'desc').limit(1).select('data').get()]);
+        ref.collection('peladas').orderBy('data', 'desc').limit(1).select('data').get(), ref.collection('pres').select('jogador').get()]);
       const cfg = cfgS.exists ? cfgS.data() : {};
       const onde = ondeFica(cfg, locS.docs.map(d => d.data()), gd.data().criadoEm);
       let pix = 0, volume = 0, comissao = 0;
       cobS.forEach(c => { const x = c.data(); if (mesRecife(x.pagoEm || x.atualizadoEm || x.criadoEm || 0) !== mes) return; pix++; volume += Number(x.valor) || 0; comissao += Number(x.feeMP != null ? x.feeMP : x.fee) || 0; });
-      const g = { ativo: pelS.size > 0, jogadores: jogC.data().count || 0, pagante: comissao > 0, comissao };
+      const g = { ativo: pelS.size > 0, jogadores: jogC.size, pagante: comissao > 0, comissao };
       const ids = memS.docs.map(d => d.id); ids.forEach(id => todosMembros.add(id));
       tot.grupos++; if (g.ativo) tot.ativos++; tot.jogadores += g.jogadores; if (cfg.mpConectadoEm) tot.comPix++; if (g.pagante) tot.pagantes++;
       tot.pixMes += pix; tot.volumeMes += volume; tot.comissaoMes += comissao; if (!onde.uf) tot.semCidade++;
@@ -224,16 +225,22 @@ module.exports = (db, PAG) => {
       listaGrupos.push({ gid: gd.id, nome: G.nome || cfg.nome || 'Pelada', codigo: G.codigo || '', rep: G.rep || '', cidade: onde.cidade || '', uf: onde.uf || '', regiao: onde.regiao,
         criadoEm: G.criadoEm || null, ultima: ultS.empty ? null : String(ultS.docs[0].data().data || '') || null, ativo: g.ativo, jogadores: g.jogadores, contas: ids.length,
         pix: !!cfg.mpConectadoEm, pixMes: pix, comissaoMes: Math.round(comissao * 100) / 100, evento: !!(G.evento || cfg.evento), dia: G.dia != null ? Number(G.dia) : (cfg.dia != null ? Number(cfg.dia) : null) });
+      const nomeG = G.nome || cfg.nome || 'Pelada', comConta = new Set(presS.docs.map(d => d.data().jogador).filter(Boolean));
+      jogC.forEach(j => { const x = j.data(); elenco.push({ nome: String(x.apelido || x.nome || 'Sem nome').slice(0, 60), grupo: nomeG, conta: comConta.has(j.id), ativo: x.ativo !== false }); });
+      nomesGrupo[gd.id] = nomeG;
       soma(reg, onde.regiao, g, ids);
       if (onde.uf) { soma(ufs, onde.uf, g, ids); soma(cids, (onde.cidade || 'Cidade não informada') + ' · ' + onde.uf, g, ids); }
     }
     tot.membros = todosMembros.size;
     // contas por região: vale a cidade do cadastro da pessoa; sem ela, a cidade da primeira pelada dela
     Object.values(reg).concat(Object.values(ufs), Object.values(cids)).forEach(o => { o._m = new Set(); });
-    const usuarios = await db.collection('users').select('cidade', 'uf', 'grupos').get();
-    let cadastroComCidade = 0;
+    const usuarios = await db.collection('users').select('cidade', 'uf', 'grupos', 'nome', 'apelido').get();
+    let cadastroComCidade = 0; const pessoas = [], viu = new Set();
     for (const u of usuarios.docs) {
       const x = u.data(); let uf = String(x.uf || '').toUpperCase(), cidade = String(x.cidade || '').trim();
+      const a = auth[u.id]; viu.add(u.id);
+      if (a) pessoas.push({ nome: String(x.nome || x.apelido || a.nome || '').slice(0, 60), email: x.nome || x.apelido ? '' : a.email, cidade: UF_REGIAO[uf] ? cidade : '', uf: UF_REGIAO[uf] ? uf : '',
+        criado: a.c, uso: a.l, grupos: Object.keys(x.grupos || {}).map(id => nomesGrupo[id]).filter(Boolean) });
       if (UF_REGIAO[uf]) cadastroComCidade++;
       else { const g0 = Object.keys(x.grupos || {}).map(id => grupoOnde[id]).find(Boolean); if (g0) { uf = g0.uf; cidade = g0.cidade; } }
       const r = UF_REGIAO[uf] || 'Sem cidade informada';
@@ -242,9 +249,12 @@ module.exports = (db, PAG) => {
         const ck = (cidade || 'Cidade não informada') + ' · ' + uf; (cids[ck] = cids[ck] || { nome: ck, grupos: 0, ativos: 0, jogadores: 0, pagantes: 0, comissaoMes: 0, _m: new Set() })._m.add(u.id); }
     }
     contas.comCidade = cadastroComCidade;
+    for (const id in auth) if (!viu.has(id)) pessoas.push({ nome: auth[id].nome, email: auth[id].nome ? '' : auth[id].email, cidade: '', uf: '', criado: auth[id].c, uso: auth[id].l, grupos: [] });
+    pessoas.sort((a, b) => b.criado - a.criado);
+    elenco.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     const lista = m => Object.values(m).map(({ _m, ...o }) => ({ ...o, contas: _m.size, comissaoMes: Math.round(o.comissaoMes * 100) / 100 })).sort((a, b) => b.grupos - a.grupos || b.jogadores - a.jogadores);
     tot.volumeMes = Math.round(tot.volumeMes * 100) / 100; tot.comissaoMes = Math.round(tot.comissaoMes * 100) / 100;
-    return { em: agora, mes, contas, totais: tot, regioes: lista(reg), estados: lista(ufs), cidades: lista(cids).slice(0, 30), grupos: listaGrupos };
+    return { em: agora, mes, contas, totais: tot, regioes: lista(reg), estados: lista(ufs), cidades: lista(cids).slice(0, 30), grupos: listaGrupos, pessoas, elenco };
   }
   // ---- configuração pelo app ----
   const CAMPOS_NF = ['ligado', 'ambiente', 'cnpj', 'im', 'cTribNac', 'cNBS', 'pTotTribSN', 'serie', 'nInicial'];
